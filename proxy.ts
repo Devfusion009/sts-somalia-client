@@ -42,9 +42,11 @@ export async function proxy(request: NextRequest) {
   );
 
   if (isProtected && !user) {
+    const originalPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
-    redirectUrl.searchParams.set("redirect_to", request.nextUrl.pathname);
+    redirectUrl.search = "";
+    redirectUrl.searchParams.set("redirect_to", originalPath);
     return NextResponse.redirect(redirectUrl);
   }
 

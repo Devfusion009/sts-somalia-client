@@ -48,7 +48,18 @@ function StatusBanner({ status, portalHref, portalLabel }: { status: Status; por
   return null;
 }
 
-export default async function BecomePartnerPage() {
+const VALID_PROGRAMS = ["agent", "partner", "affiliate"] as const;
+
+export default async function BecomePartnerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ program?: string }>;
+}) {
+  const { program } = await searchParams;
+  const defaultTab = VALID_PROGRAMS.includes(program as (typeof VALID_PROGRAMS)[number])
+    ? (program as (typeof VALID_PROGRAMS)[number])
+    : "agent";
+
   const profile = await requireUser();
   const supabase = await createClient();
 
@@ -95,7 +106,7 @@ export default async function BecomePartnerPage() {
         <p className="text-sm text-muted-foreground">Apply to join STS Somalia as an agent, hotel partner, or affiliate.</p>
       </div>
 
-      <Tabs defaultValue="agent">
+      <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="agent">Travel Agent</TabsTrigger>
           <TabsTrigger value="partner">Hotel Partner</TabsTrigger>
