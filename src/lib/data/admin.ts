@@ -103,6 +103,105 @@ export async function getUmrahPackageById(id: string) {
   return data;
 }
 
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export async function getRevenueTrend(months = 6) {
+  const supabase = await createClient();
+
+  const cutoff = new Date();
+  cutoff.setDate(1);
+  cutoff.setMonth(cutoff.getMonth() - (months - 1));
+  cutoff.setHours(0, 0, 0, 0);
+
+  const { data } = await supabase
+    .from("orders")
+    .select("total, status, created_at")
+    .in("status", ["paid", "processing", "completed"])
+    .gte("created_at", cutoff.toISOString());
+
+  const buckets = new Map<string, { revenue: number; orders: number }>();
+  for (let i = 0; i < months; i++) {
+    const d = new Date(cutoff);
+    d.setMonth(d.getMonth() + i);
+    buckets.set(`${d.getFullYear()}-${d.getMonth()}`, { revenue: 0, orders: 0 });
+  }
+
+  for (const order of data ?? []) {
+    const d = new Date(order.created_at);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const bucket = buckets.get(key);
+    if (!bucket) continue;
+    bucket.revenue += Number(order.total);
+    bucket.orders += 1;
+  }
+
+  return Array.from(buckets.entries()).map(([key, value]) => {
+    const [, month] = key.split("-").map(Number);
+    return { month: MONTH_LABELS[month], revenue: Math.round(value.revenue), orders: value.orders };
+  });
+}
+
+const BOOKING_TYPE_LABELS: Record<string, string> = {
+  hotel: "Hotels",
+  flight: "Flights",
+  visa: "Visa",
+  umrah: "Umrah",
+};
+
+export async function getBookingsByType() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("order_items")
+    .select("item_type, orders!inner(status)")
+    .in("orders.status", ["paid", "processing", "completed"]);
+
+  const counts: Record<string, number> = { hotel: 0, flight: 0, visa: 0, umrah: 0 };
+  for (const item of data ?? []) {
+    counts[item.item_type] = (counts[item.item_type] ?? 0) + 1;
+  }
+
+  return Object.entries(counts).map(([type, count]) => ({
+    type,
+    label: BOOKING_TYPE_LABELS[type] ?? type,
+    count,
+  }));
+}
+
+export async function getRecentOrdersWithItems(limit = 6) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("orders")
+    .select(
+      "id, order_number, status, currency, total, created_at, customer:profiles!orders_customer_id_fkey(full_name, email), order_items(item_type)"
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  return data ?? [];
+}
+
+export async function getTopHotels(limit = 5) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("hotel_bookings")
+    .select("hotel_id, total_price, status, hotels(name, city)")
+    .in("status", ["confirmed", "completed"]);
+
+  const byHotel = new Map<string, { name: string; city: string; bookings: number; revenue: number }>();
+  for (const booking of data ?? []) {
+    const hotel = booking.hotels as unknown as { name: string; city: string } | null;
+    if (!hotel) continue;
+    const existing = byHotel.get(booking.hotel_id) ?? { name: hotel.name, city: hotel.city, bookings: 0, revenue: 0 };
+    existing.bookings += 1;
+    existing.revenue += Number(booking.total_price);
+    byHotel.set(booking.hotel_id, existing);
+  }
+
+  return Array.from(byHotel.values())
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, limit);
+}
+
 export async function getAllUsers() {
   const supabase = await createClient();
   const { data } = await supabase

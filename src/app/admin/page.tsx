@@ -1,8 +1,29 @@
 import Link from "next/link";
-import { Users, ShoppingCart, DollarSign, ClipboardCheck } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import {
+  Users,
+  ShoppingCart,
+  DollarSign,
+  ClipboardCheck,
+  Building2,
+  Plane,
+  FileText,
+  Landmark,
+  type LucideIcon,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getDashboardStats } from "@/lib/data/admin";
+import { Badge } from "@/components/ui/badge";
+import {
+  getDashboardStats,
+  getRevenueTrend,
+  getBookingsByType,
+  getRecentOrdersWithItems,
+  getTopHotels,
+} from "@/lib/data/admin";
+import { RevenueTrendChart } from "@/components/admin/revenue-trend-chart";
+import { BookingsByTypeChart } from "@/components/admin/bookings-by-type-chart";
+import { UsersByRoleChart } from "@/components/admin/users-by-role-chart";
 
 const ROLE_LABELS: Record<string, string> = {
   customer: "Customers",
@@ -12,8 +33,27 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "Admins",
 };
 
+const ITEM_TYPE_ICON: Record<string, LucideIcon> = {
+  hotel: Building2,
+  flight: Plane,
+  visa: FileText,
+  umrah: Landmark,
+};
+
 export default async function AdminDashboardPage() {
-  const stats = await getDashboardStats();
+  const [stats, revenueTrend, bookingsByType, recentOrders, topHotels] = await Promise.all([
+    getDashboardStats(),
+    getRevenueTrend(),
+    getBookingsByType(),
+    getRecentOrdersWithItems(6),
+    getTopHotels(5),
+  ]);
+
+  const usersByRoleData = Object.entries(ROLE_LABELS).map(([role, label]) => ({
+    role,
+    label,
+    count: stats.usersByRole[role] ?? 0,
+  }));
 
   return (
     <div className="space-y-6">
@@ -43,17 +83,113 @@ export default async function AdminDashboardPage() {
         </Card>
       ) : null}
 
+      <div className="grid gap-4 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle className="text-base">Revenue trend</CardTitle>
+            <p className="text-sm text-muted-foreground">Paid revenue and order volume, last 6 months.</p>
+          </CardHeader>
+          <CardContent>
+            <RevenueTrendChart data={revenueTrend} />
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">Bookings by type</CardTitle>
+            <p className="text-sm text-muted-foreground">Paid order items, by product line.</p>
+          </CardHeader>
+          <CardContent>
+            <BookingsByTypeChart data={bookingsByType} />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Recent orders</CardTitle>
+              <p className="text-sm text-muted-foreground">The latest orders placed across the platform.</p>
+            </div>
+            <Button size="sm" variant="outline" render={<Link href="/admin/orders" />}>
+              View all
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {recentOrders.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">No orders yet.</p>
+            ) : (
+              recentOrders.map((order) => {
+                const firstType = order.order_items[0]?.item_type;
+                const Icon = firstType ? ITEM_TYPE_ICON[firstType] : ShoppingCart;
+                return (
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 hover:bg-muted/50"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Icon className="size-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{order.customer?.full_name ?? "—"}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {order.order_number} · {formatDistanceToNow(new Date(order.created_at), { addSuffix: true })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-sm font-semibold">
+                        {order.currency} {Number(order.total).toFixed(0)}
+                      </span>
+                      <Badge variant="secondary" className="capitalize">
+                        {order.status.replace("_", " ")}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">Top hotels</CardTitle>
+            <p className="text-sm text-muted-foreground">By confirmed booking revenue.</p>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {topHotels.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">No confirmed bookings yet.</p>
+            ) : (
+              topHotels.map((hotel) => (
+                <div key={hotel.name} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 hover:bg-muted/50">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Building2 className="size-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{hotel.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {hotel.city} · {hotel.bookings} booking{hotel.bookings > 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold">${hotel.revenue.toFixed(0)}</span>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Users by role</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-          {Object.entries(ROLE_LABELS).map(([role, label]) => (
-            <div key={role}>
-              <p className="text-2xl font-semibold">{stats.usersByRole[role] ?? 0}</p>
-              <p className="text-xs text-muted-foreground">{label}</p>
-            </div>
-          ))}
+        <CardContent>
+          <UsersByRoleChart data={usersByRoleData} />
         </CardContent>
       </Card>
     </div>

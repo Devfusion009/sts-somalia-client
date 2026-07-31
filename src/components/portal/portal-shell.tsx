@@ -95,6 +95,16 @@ export function PortalShell({
 }) {
   const pathname = usePathname();
 
+  // A route like "/admin/catalog/umrah" also starts with "/admin", so
+  // naively prefix-matching every item would highlight "Dashboard" (href
+  // "/admin") at the same time as "Umrah Catalog". Only the single item
+  // with the longest matching href should be treated as active.
+  const activeHref = navGroups
+    .flatMap((group) => group.items)
+    .map((item) => item.href)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0];
+
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
@@ -124,7 +134,7 @@ export function PortalShell({
                     return (
                       <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton
-                          isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                          isActive={item.href === activeHref}
                           tooltip={item.label}
                           render={<Link href={item.href} />}
                         >
