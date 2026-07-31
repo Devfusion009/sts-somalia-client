@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Plane, Mail, MapPin } from "lucide-react";
+import Image from "next/image";
+import { Mail, MapPin } from "lucide-react";
 import { NAV_LINKS, PARTNER_LINKS } from "@/lib/nav-links";
 
 export function SiteFooter() {
@@ -7,11 +8,8 @@ export function SiteFooter() {
     <footer className="border-t border-border bg-secondary/40">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4 lg:px-8">
         <div className="md:col-span-1">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Plane className="size-5" />
-            </span>
-            <span className="font-heading text-lg font-semibold text-foreground">STS Somalia</span>
+          <Link href="/" className="flex items-center">
+            <Image src="/logo.png" alt="STS Somalia" width={714} height={312} className="h-9 w-auto" />
           </Link>
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">
             Scout Travel Solution — flights, hotels, visas, and Umrah journeys,
