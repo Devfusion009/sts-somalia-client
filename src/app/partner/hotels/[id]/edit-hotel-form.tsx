@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
-import { updateHotel } from "@/lib/actions/hotel-partner";
+import { updateHotel } from "@/modules/hotels/partner-actions";
 
 type Hotel = {
   id: string;

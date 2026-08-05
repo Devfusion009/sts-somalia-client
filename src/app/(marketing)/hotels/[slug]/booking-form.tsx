@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { AlertCircle, CalendarDays } from "lucide-react";
+import { useActionState, useMemo, useState } from "react";
+import { AlertCircle, ArrowRight, BedDouble } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,30 +15,53 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 import { SubmitButton } from "@/components/submit-button";
-import { createHotelBooking } from "@/lib/actions/hotel-bookings";
+import { createHotelBooking } from "@/modules/hotels/booking-actions";
 
 const today = new Date().toISOString().slice(0, 10);
+
+function nightsBetween(checkIn: string, checkOut: string) {
+  if (!checkIn || !checkOut) return 0;
+  const diff = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+  return diff > 0 ? Math.round(diff / (1000 * 60 * 60 * 24)) : 0;
+}
 
 export function BookingForm({
   hotelId,
   room,
+  defaults,
 }: {
   hotelId: string;
   room: { id: string; name: string; base_price: number; currency: string; max_occupancy: number };
+  defaults?: { checkIn?: string; checkOut?: string; guests?: string };
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(createHotelBooking, null);
+  const [checkIn, setCheckIn] = useState(defaults?.checkIn ?? "");
+  const [checkOut, setCheckOut] = useState(defaults?.checkOut ?? "");
+  const [numRooms, setNumRooms] = useState(1);
+
+  const nights = useMemo(() => nightsBetween(checkIn, checkOut), [checkIn, checkOut]);
+  const total = nights > 0 ? room.base_price * numRooms * nights : null;
+  const defaultAdults = Math.min(
+    Math.max(Number.parseInt(defaults?.guests ?? "2", 10) || 2, 1),
+    room.max_occupancy * 10
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button />}>Book this room</DialogTrigger>
+      <DialogTrigger render={<Button className="gap-1.5" />}>
+        Book <ArrowRight className="size-3.5" />
+      </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{room.name}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <BedDouble className="size-4 text-primary" /> {room.name}
+          </DialogTitle>
           <DialogDescription>
-            <CalendarDays className="mr-1 inline size-3.5" />
-            {room.currency} {room.base_price.toFixed(0)} / night
+            {room.currency} {room.base_price.toFixed(0)} / night · up to {room.max_occupancy} guests
+            per room
           </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
@@ -54,46 +77,103 @@ export function BookingForm({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="checkIn">Check-in</Label>
-              <Input id="checkIn" name="checkIn" type="date" min={today} required />
+              <Label htmlFor={`checkIn-${room.id}`}>
+                Check-in <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id={`checkIn-${room.id}`}
+                name="checkIn"
+                type="date"
+                min={today}
+                value={checkIn}
+                onChange={(e) => setCheckIn(e.target.value)}
+                required
+              />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="checkOut">Check-out</Label>
-              <Input id="checkOut" name="checkOut" type="date" min={today} required />
+              <Label htmlFor={`checkOut-${room.id}`}>
+                Check-out <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id={`checkOut-${room.id}`}
+                name="checkOut"
+                type="date"
+                min={checkIn || today}
+                value={checkOut}
+                onChange={(e) => setCheckOut(e.target.value)}
+                required
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="numRooms">Rooms</Label>
-              <Input id="numRooms" name="numRooms" type="number" min={1} max={20} defaultValue={1} required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="numAdults">Adults</Label>
+              <Label htmlFor={`numRooms-${room.id}`}>Rooms</Label>
               <Input
-                id="numAdults"
-                name="numAdults"
+                id={`numRooms-${room.id}`}
+                name="numRooms"
                 type="number"
                 min={1}
-                max={room.max_occupancy * 10}
-                defaultValue={2}
+                max={20}
+                value={numRooms}
+                onChange={(e) => setNumRooms(Math.max(1, Number(e.target.value) || 1))}
                 required
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="numChildren">Children</Label>
-              <Input id="numChildren" name="numChildren" type="number" min={0} max={30} defaultValue={0} required />
+              <Label htmlFor={`numAdults-${room.id}`}>Adults</Label>
+              <Input
+                id={`numAdults-${room.id}`}
+                name="numAdults"
+                type="number"
+                min={1}
+                max={room.max_occupancy * 10}
+                defaultValue={defaultAdults}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`numChildren-${room.id}`}>Children</Label>
+              <Input
+                id={`numChildren-${room.id}`}
+                name="numChildren"
+                type="number"
+                min={0}
+                max={30}
+                defaultValue={0}
+                required
+              />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="specialRequests">Special requests (optional)</Label>
-            <Textarea id="specialRequests" name="specialRequests" rows={3} placeholder="Early check-in, high floor, etc." />
+            <Label htmlFor={`specialRequests-${room.id}`}>Special requests (optional)</Label>
+            <Textarea
+              id={`specialRequests-${room.id}`}
+              name="specialRequests"
+              rows={2}
+              placeholder="Early check-in, high floor, airport pickup…"
+            />
           </div>
 
-          <SubmitButton className="w-full" pendingText="Booking…">
-            Confirm booking
+          <Separator />
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {nights > 0
+                ? `${nights} night${nights > 1 ? "s" : ""} × ${numRooms} room${numRooms > 1 ? "s" : ""}`
+                : "Select your dates"}
+            </p>
+            <p className="font-heading text-lg font-bold text-primary">
+              {total !== null ? `${room.currency} ${total.toFixed(0)}` : "—"}
+            </p>
+          </div>
+
+          <SubmitButton className="w-full gap-1.5" pendingText="Reserving…">
+            Continue to Payment <ArrowRight className="size-4" />
           </SubmitButton>
+          <p className="text-center text-xs text-muted-foreground">
+            You won&apos;t be charged yet — payment is completed on the next step.
+          </p>
         </form>
       </DialogContent>
     </Dialog>

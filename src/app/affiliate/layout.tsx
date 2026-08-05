@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
-import { getMyAffiliate } from "@/lib/data/affiliate-portal";
+import { getMyAffiliate } from "@/modules/affiliates/queries";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

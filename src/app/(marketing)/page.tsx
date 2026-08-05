@@ -3,10 +3,10 @@ import { ArrowRight } from "lucide-react";
 import { HomeHero } from "@/components/marketing/home-hero";
 import { ValueProps } from "@/components/marketing/value-props";
 import { PartnerCta } from "@/components/marketing/partner-cta";
-import { HotelCard } from "@/components/hotels/hotel-card";
-import { PackageCard } from "@/components/umrah/package-card";
-import { getFeaturedHotels } from "@/lib/data/hotels";
-import { getFeaturedPackages } from "@/lib/data/umrah";
+import { HotelCard } from "@/modules/hotels/components/hotel-card";
+import { PackageCard } from "@/modules/umrah/components/package-card";
+import { getFeaturedHotels } from "@/modules/hotels/queries";
+import { getFeaturedPackages } from "@/modules/umrah/queries";
 
 export default async function HomePage() {
   const [hotels, packages] = await Promise.all([getFeaturedHotels(), getFeaturedPackages()]);

@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getUmrahPackagesAdmin } from "@/lib/data/admin";
+import { getUmrahPackagesAdmin } from "@/modules/admin/queries";
 import { UmrahPackageForm } from "./umrah-package-form";
 
 const STATUS_VARIANT: Record<string, "default" | "secondary"> = {

@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/session";
-import { getMyAffiliate, getMyPayouts } from "@/lib/data/affiliate-portal";
+import { getMyAffiliate, getMyPayouts } from "@/modules/affiliates/queries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";

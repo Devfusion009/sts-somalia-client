@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/session";
-import { getMyPartnerId, getPartnerBookings } from "@/lib/data/hotel-partner";
+import { getMyPartnerId, getPartnerBookings } from "@/modules/hotels/partner-queries";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -30,8 +30,10 @@ export default async function PartnerBookingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-semibold">Bookings</h1>
-        <p className="text-sm text-muted-foreground">Bookings across all of your hotels.</p>
+        <h1 className="font-heading text-2xl font-bold">Bookings</h1>
+        <p className="text-sm text-muted-foreground">
+          Bookings across all of your hotels — confirm or update their status as they come in.
+        </p>
       </div>
 
       {bookings.length === 0 ? (

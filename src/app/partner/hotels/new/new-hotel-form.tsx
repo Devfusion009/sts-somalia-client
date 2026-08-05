@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
-import { createHotel } from "@/lib/actions/hotel-partner";
+import { createHotel } from "@/modules/hotels/partner-actions";
 
 export function NewHotelForm() {
   const [state, formAction] = useActionState(createHotel, null);

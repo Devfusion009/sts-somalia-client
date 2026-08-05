@@ -19,7 +19,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
-import { createVisaType, updateVisaType } from "@/lib/actions/admin";
+import { createVisaType, updateVisaType } from "@/modules/admin/actions";
+import { documentSlotsToLines } from "@/modules/admin/visa-type-utils";
 import type { Database } from "@/lib/types/database.types";
 
 type VisaType = Database["public"]["Tables"]["visa_types"]["Row"];
@@ -99,6 +100,63 @@ export function VisaTypeForm({ visaType }: { visaType?: VisaType }) {
               <Label htmlFor="description">Description</Label>
               <Textarea id="description" name="description" defaultValue={visaType?.description ?? ""} rows={2} />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="overview">Overview (shown on the detail page)</Label>
+              <Textarea id="overview" name="overview" defaultValue={visaType?.overview ?? ""} rows={3} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="visaCategory">Category</Label>
+                <Select name="visaCategory" defaultValue={visaType?.visa_category ?? "tourist"}>
+                  <SelectTrigger id="visaCategory" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tourist">Tourist</SelectItem>
+                    <SelectItem value="business">Business</SelectItem>
+                    <SelectItem value="transit">Transit</SelectItem>
+                    <SelectItem value="umrah">Umrah</SelectItem>
+                    <SelectItem value="work">Work</SelectItem>
+                    <SelectItem value="student">Student</SelectItem>
+                    <SelectItem value="family_visit">Family visit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="entryType">Entries</Label>
+                <Select name="entryType" defaultValue={visaType?.entry_type ?? "single"}>
+                  <SelectTrigger id="entryType" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single">Single entry</SelectItem>
+                    <SelectItem value="multiple">Multiple entry</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="validityDays">Validity (days)</Label>
+                <Input
+                  id="validityDays"
+                  name="validityDays"
+                  type="number"
+                  min={0}
+                  defaultValue={visaType?.validity_days ?? undefined}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="stayDays">Max stay (days)</Label>
+                <Input
+                  id="stayDays"
+                  name="stayDays"
+                  type="number"
+                  min={0}
+                  defaultValue={visaType?.stay_days ?? undefined}
+                />
+              </div>
+            </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="processingDaysMin">Min days</Label>
@@ -126,15 +184,29 @@ export function VisaTypeForm({ visaType }: { visaType?: VisaType }) {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="requiredDocuments">Required documents (one per line)</Label>
+              <Label htmlFor="requiredDocuments">Document upload slots (one per line)</Label>
               <Textarea
                 id="requiredDocuments"
                 name="requiredDocuments"
-                rows={3}
-                defaultValue={((visaType?.required_documents as string[] | null) ?? []).join("\n")}
-                placeholder={"passport_scan\nphoto"}
+                rows={5}
+                defaultValue={documentSlotsToLines(visaType?.required_documents)}
+                placeholder={"passport_bio|Passport Bio Page|required|5|Color copy of passport bio page\nphoto|Passport Size Photo|required|2"}
+                className="font-mono text-xs"
               />
+              <p className="text-xs text-muted-foreground">
+                Format: <code>key|Label|required or optional|max MB|description</code> — the last
+                two parts are optional. These become the upload boxes in the customer wizard.
+              </p>
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="isFeatured"
+                defaultChecked={visaType?.is_featured ?? false}
+                className="size-4 accent-primary"
+              />
+              Featured (shown under &ldquo;Popular destinations&rdquo;)
+            </label>
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select name="status" defaultValue={visaType?.status ?? "draft"}>

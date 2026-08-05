@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { Building2, Plane, FileText, Landmark, Search, Users } from "lucide-react";
+import { Building2, Plane, FileText, Landmark, PartyPopper, Search, Users } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,14 +50,14 @@ export function HomeHero() {
             <span className="text-primary">Scout Travel Solution</span>
           </h1>
           <p className="mt-4 text-lg text-muted-foreground">
-            Flights, hotels, visas, and Umrah packages — booked with confidence,
-            backed by real people in Mogadishu.
+            Flights, hotels, visas, Umrah packages, and event halls — booked with
+            confidence, backed by real people in Mogadishu.
           </p>
         </div>
 
         <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-border bg-card p-2 shadow-lg sm:p-4">
           <Tabs defaultValue="hotels">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="hotels">
                 <Building2 /> Hotels
               </TabsTrigger>
@@ -69,6 +69,9 @@ export function HomeHero() {
               </TabsTrigger>
               <TabsTrigger value="umrah">
                 <Landmark /> Umrah
+              </TabsTrigger>
+              <TabsTrigger value="events">
+                <PartyPopper /> Events
               </TabsTrigger>
             </TabsList>
 
@@ -172,6 +175,16 @@ export function HomeHero() {
                   Browse curated Umrah packages with flights, hotels, and visa included.
                 </p>
                 <Button render={<Link href="/umrah" />}>Browse packages</Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="events" className="p-2 sm:p-4">
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  <PartyPopper className="mr-1 inline size-4" />
+                  Weddings, conferences, and celebrations — book premium halls and venues.
+                </p>
+                <Button render={<Link href="/events" />}>Explore venues</Button>
               </div>
             </TabsContent>
           </Tabs>

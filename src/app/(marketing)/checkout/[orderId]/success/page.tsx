@@ -1,0 +1,110 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { CheckCircle2, Clock, ArrowRight } from "lucide-react";
+import { requireUser } from "@/lib/auth/session";
+import { getOrderForCheckout, describeOrderItem } from "@/modules/payments/queries";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+
+export const metadata: Metadata = { title: "Payment Confirmation" };
+
+function money(amount: number | string, currency: string) {
+  return `${currency} ${Number(amount).toFixed(2)}`;
+}
+
+export default async function CheckoutSuccessPage({
+  params,
+}: {
+  params: Promise<{ orderId: string }>;
+}) {
+  const { orderId } = await params;
+  await requireUser();
+
+  const order = await getOrderForCheckout(orderId);
+  if (!order) notFound();
+  if (order.status === "pending_payment") redirect(`/checkout/${orderId}`);
+
+  const paid = order.status !== "cancelled";
+  const successfulPayment = order.payments.find((p) => p.status === "succeeded");
+  const primaryItem = order.order_items[0];
+  const primaryHref = primaryItem ? describeOrderItem(primaryItem).href : "/account/bookings";
+
+  return (
+    <div className="mx-auto w-full max-w-2xl px-4 py-12">
+      <div className="text-center">
+        {paid ? (
+          <>
+            <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-primary/10">
+              <CheckCircle2 className="size-9 text-primary" />
+            </span>
+            <h1 className="mt-4 text-2xl font-bold tracking-tight lg:text-3xl">
+              Payment received — thank you!
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Your order <span className="font-medium text-foreground">{order.order_number}</span>{" "}
+              is confirmed. A receipt has been added to your account.
+            </p>
+          </>
+        ) : (
+          <>
+            <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-muted">
+              <Clock className="size-9 text-muted-foreground" />
+            </span>
+            <h1 className="mt-4 text-2xl font-bold tracking-tight">Order {order.status}</h1>
+          </>
+        )}
+      </div>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="text-base">Order Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {order.order_items.map((item) => {
+            const info = describeOrderItem(item);
+            return (
+              <div key={item.id} className="flex items-start justify-between gap-4">
+                <div>
+                  <Link href={info.href} className="font-medium hover:underline">
+                    {info.title}
+                  </Link>
+                  {info.subtitle ? (
+                    <p className="text-xs text-muted-foreground">{info.subtitle}</p>
+                  ) : null}
+                </div>
+                <p className="shrink-0 font-medium">{money(item.total_price, order.currency)}</p>
+              </div>
+            );
+          })}
+          <Separator />
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Payment Method</span>
+            <span className="font-medium">{successfulPayment?.method_label ?? "—"}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Status</span>
+            <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
+              {order.status.replace("_", " ")}
+            </Badge>
+          </div>
+          <div className="flex justify-between text-base font-semibold">
+            <span>Total Paid</span>
+            <span className="text-primary">{money(order.total, order.currency)}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+        <Button size="lg" className="gap-2" render={<Link href={primaryHref} />}>
+          Track your booking <ArrowRight className="size-4" />
+        </Button>
+        <Button size="lg" variant="outline" render={<Link href="/account/bookings" />}>
+          My Bookings
+        </Button>
+      </div>
+    </div>
+  );
+}

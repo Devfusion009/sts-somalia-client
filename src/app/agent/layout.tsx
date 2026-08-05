@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
-import { getMyAgency } from "@/lib/data/agent-portal";
+import { getMyAgency } from "@/modules/agencies/queries";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

@@ -21,6 +21,10 @@ import {
   BookOpenCheck,
   Landmark,
   ShieldCheck,
+  Stamp,
+  Plane,
+  PartyPopper,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -62,6 +66,10 @@ export const PORTAL_ICONS = {
   catalog: BookOpenCheck,
   umrah: Landmark,
   admin: ShieldCheck,
+  visa: Stamp,
+  flights: Plane,
+  events: PartyPopper,
+  payments: CreditCard,
 } satisfies Record<string, LucideIcon>;
 
 export type PortalIconName = keyof typeof PORTAL_ICONS;

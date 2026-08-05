@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
-import { createUmrahPackage, updateUmrahPackage } from "@/lib/actions/admin";
+import { createUmrahPackage, updateUmrahPackage } from "@/modules/admin/actions";
 import type { Database } from "@/lib/types/database.types";
 
 type UmrahPackage = Database["public"]["Tables"]["umrah_packages"]["Row"];

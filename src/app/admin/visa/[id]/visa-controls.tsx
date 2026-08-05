@@ -1,0 +1,190 @@
+"use client";
+
+import { useActionState, useRef, useState } from "react";
+import { FilePlus2, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { SubmitButton } from "@/components/submit-button";
+import {
+  adminSetVisaStatus,
+  adminRequestDocument,
+  adminUploadResultDocument,
+  type ActionState,
+} from "@/modules/visa/admin-actions";
+import { VISA_STATUS_LABELS } from "@/modules/visa/schemas";
+
+const TRANSITIONS = [
+  "submitted",
+  "in_review",
+  "additional_info_required",
+  "processing",
+  "approved",
+  "rejected",
+  "issued",
+  "cancelled",
+] as const;
+
+/** Status transition control: pick a status, add an optional customer-visible note. */
+export function StatusControl({
+  applicationId,
+  currentStatus,
+}: {
+  applicationId: string;
+  currentStatus: string;
+}) {
+  const [state, formAction] = useActionState(adminSetVisaStatus, null);
+  const [status, setStatus] = useState(currentStatus);
+
+  return (
+    <form action={formAction} className="space-y-3">
+      <input type="hidden" name="applicationId" value={applicationId} />
+      <input type="hidden" name="status" value={status} />
+      <div className="space-y-1.5">
+        <Label>Move to status</Label>
+        <Select value={status} onValueChange={(v) => setStatus(v as string)}>
+          <SelectTrigger className="w-full capitalize">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TRANSITIONS.map((s) => (
+              <SelectItem key={s} value={s}>
+                {VISA_STATUS_LABELS[s] ?? s}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="status-note">Note (shown on the customer&apos;s timeline)</Label>
+        <Textarea
+          id="status-note"
+          name="note"
+          rows={2}
+          placeholder="e.g. Application forwarded to the immigration authority."
+        />
+      </div>
+      {state?.error ? (
+        <Alert variant="destructive">
+          <AlertDescription>{state.error}</AlertDescription>
+        </Alert>
+      ) : null}
+      <SubmitButton pendingText="Updating…" disabled={status === currentStatus} className="w-full">
+        Update Status
+      </SubmitButton>
+    </form>
+  );
+}
+
+export function RequestDocumentDialog({ applicationId }: { applicationId: string }) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction] = useActionState(adminRequestDocument, null);
+  const lastState = useRef<ActionState>(null);
+  if (state !== lastState.current) {
+    lastState.current = state;
+    if (state && !state.error && open) setOpen(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+        <FilePlus2 /> Request document
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <form action={formAction}>
+          <input type="hidden" name="applicationId" value={applicationId} />
+          <DialogHeader>
+            <DialogTitle>Request an additional document</DialogTitle>
+            <DialogDescription>
+              The applicant is notified and the application moves to &ldquo;Additional
+              Documents&rdquo;.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="req-title">Document name</Label>
+              <Input id="req-title" name="title" placeholder="e.g. Bank Statement (Last 3 Months)" required />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="req-desc">Instructions (optional)</Label>
+              <Textarea id="req-desc" name="description" rows={2} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Requirement</Label>
+              <Select name="requirement" defaultValue="required">
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="required">Required</SelectItem>
+                  <SelectItem value="optional">Optional</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {state?.error ? (
+              <Alert variant="destructive">
+                <AlertDescription>{state.error}</AlertDescription>
+              </Alert>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <SubmitButton pendingText="Sending…">Send request</SubmitButton>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Upload the final visa document that the customer downloads. */
+export function ResultUpload({ applicationId }: { applicationId: string }) {
+  const [state, formAction, pending] = useActionState(adminUploadResultDocument, null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <form ref={formRef} action={formAction} className="space-y-1.5">
+      <input type="hidden" name="applicationId" value={applicationId} />
+      <input
+        ref={inputRef}
+        type="file"
+        name="file"
+        accept=".pdf,.jpg,.jpeg,.png"
+        className="sr-only"
+        onChange={() => formRef.current?.requestSubmit()}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        disabled={pending}
+        onClick={() => inputRef.current?.click()}
+        className="w-full gap-2"
+      >
+        <Upload className="size-4" />
+        {pending ? "Uploading…" : "Upload visa document"}
+      </Button>
+      {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
+    </form>
+  );
+}

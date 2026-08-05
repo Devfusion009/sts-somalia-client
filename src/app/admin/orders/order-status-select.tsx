@@ -3,7 +3,7 @@
 import { useActionState, useEffect } from "react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { updateOrderStatus } from "@/lib/actions/admin";
+import { updateOrderStatus } from "@/modules/admin/actions";
 import type { Database } from "@/lib/types/database.types";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];

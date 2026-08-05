@@ -1,8 +1,9 @@
 export const NAV_LINKS = [
-  { href: "/hotels", label: "Hotels" },
   { href: "/flights", label: "Flights" },
+  { href: "/hotels", label: "Hotels" },
   { href: "/visa", label: "Visa" },
   { href: "/umrah", label: "Umrah" },
+  { href: "/events", label: "Events & Halls" },
 ];
 
 export const PARTNER_LINKS = [

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getUmrahPackageById } from "@/lib/data/admin";
+import { getUmrahPackageById } from "@/modules/admin/queries";
 import { DeparturesForm } from "./departures-form";
 
 export default async function UmrahPackageDeparturesPage({ params }: { params: Promise<{ id: string }> }) {

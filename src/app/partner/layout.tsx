@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
-import { getMyPartnerId } from "@/lib/data/hotel-partner";
+import { getMyPartnerId } from "@/modules/hotels/partner-queries";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

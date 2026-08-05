@@ -20,10 +20,13 @@ import {
   getBookingsByType,
   getRecentOrdersWithItems,
   getTopHotels,
-} from "@/lib/data/admin";
-import { RevenueTrendChart } from "@/components/admin/revenue-trend-chart";
-import { BookingsByTypeChart } from "@/components/admin/bookings-by-type-chart";
-import { UsersByRoleChart } from "@/components/admin/users-by-role-chart";
+  getVisaStatsAdmin,
+  getUpcomingHallBookings,
+} from "@/modules/admin/queries";
+import { VISA_STATUS_LABELS } from "@/modules/visa/schemas";
+import { RevenueTrendChart } from "@/modules/admin/components/revenue-trend-chart";
+import { BookingsByTypeChart } from "@/modules/admin/components/bookings-by-type-chart";
+import { UsersByRoleChart } from "@/modules/admin/components/users-by-role-chart";
 
 const ROLE_LABELS: Record<string, string> = {
   customer: "Customers",
@@ -41,13 +44,21 @@ const ITEM_TYPE_ICON: Record<string, LucideIcon> = {
 };
 
 export default async function AdminDashboardPage() {
-  const [stats, revenueTrend, bookingsByType, recentOrders, topHotels] = await Promise.all([
-    getDashboardStats(),
-    getRevenueTrend(),
-    getBookingsByType(),
-    getRecentOrdersWithItems(6),
-    getTopHotels(5),
-  ]);
+  const [stats, revenueTrend, bookingsByType, recentOrders, topHotels, visaStats, upcomingHalls] =
+    await Promise.all([
+      getDashboardStats(),
+      getRevenueTrend(),
+      getBookingsByType(),
+      getRecentOrdersWithItems(6),
+      getTopHotels(5),
+      getVisaStatsAdmin(),
+      getUpcomingHallBookings(5),
+    ]);
+  const visaActive =
+    (visaStats.byStatus["submitted"] ?? 0) +
+    (visaStats.byStatus["in_review"] ?? 0) +
+    (visaStats.byStatus["additional_info_required"] ?? 0) +
+    (visaStats.byStatus["processing"] ?? 0);
 
   const usersByRoleData = Object.entries(ROLE_LABELS).map(([role, label]) => ({
     role,
@@ -177,6 +188,79 @@ export default async function AdminDashboardPage() {
                     </div>
                   </div>
                   <span className="shrink-0 text-sm font-semibold">${hotel.revenue.toFixed(0)}</span>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Visa pipeline</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {visaActive} application{visaActive === 1 ? "" : "s"} in progress ·{" "}
+                {visaStats.total} total
+              </p>
+            </div>
+            <Button size="sm" variant="outline" render={<Link href="/admin/visa" />}>
+              Review
+            </Button>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {Object.keys(VISA_STATUS_LABELS)
+              .filter((s) => s !== "draft" && (visaStats.byStatus[s] ?? 0) > 0)
+              .map((status) => (
+                <Link
+                  key={status}
+                  href={`/admin/visa?status=${status}`}
+                  className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:border-primary/50"
+                >
+                  <span className="font-semibold">{visaStats.byStatus[status]}</span>
+                  <span className="text-muted-foreground">{VISA_STATUS_LABELS[status]}</span>
+                </Link>
+              ))}
+            {visaStats.total === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground">No visa applications yet.</p>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Upcoming events</CardTitle>
+              <p className="text-sm text-muted-foreground">Next hall bookings on the calendar.</p>
+            </div>
+            <Button size="sm" variant="outline" render={<Link href="/admin/events" />}>
+              Manage
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {upcomingHalls.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No upcoming hall bookings.
+              </p>
+            ) : (
+              upcomingHalls.map((booking) => (
+                <div
+                  key={booking.id}
+                  className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 hover:bg-muted/50"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium capitalize">
+                      {booking.event_type.replace("_", " ")} · {booking.venue?.name ?? "—"}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {new Date(booking.event_date).toLocaleDateString()}
+                      {booking.expected_guests ? ` · ${booking.expected_guests} guests` : ""}
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="capitalize">
+                    {booking.status}
+                  </Badge>
                 </div>
               ))
             )}

@@ -560,6 +560,78 @@ export type Database = {
           },
         ]
       }
+      event_venues: {
+        Row: {
+          address: string | null
+          amenities: Json
+          base_price: number
+          capacity_seated: number | null
+          capacity_standing: number | null
+          city: string
+          country_code: string
+          created_at: string
+          currency: string
+          description: string | null
+          event_types: Json
+          id: string
+          images: Json
+          is_featured: boolean
+          name: string
+          price_unit: string
+          size_sqm: number | null
+          slug: string
+          status: Database["public"]["Enums"]["listing_status"]
+          tagline: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          amenities?: Json
+          base_price: number
+          capacity_seated?: number | null
+          capacity_standing?: number | null
+          city: string
+          country_code?: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          event_types?: Json
+          id?: string
+          images?: Json
+          is_featured?: boolean
+          name: string
+          price_unit?: string
+          size_sqm?: number | null
+          slug: string
+          status?: Database["public"]["Enums"]["listing_status"]
+          tagline?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          amenities?: Json
+          base_price?: number
+          capacity_seated?: number | null
+          capacity_standing?: number | null
+          city?: string
+          country_code?: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          event_types?: Json
+          id?: string
+          images?: Json
+          is_featured?: boolean
+          name?: string
+          price_unit?: string
+          size_sqm?: number | null
+          slug?: string
+          status?: Database["public"]["Enums"]["listing_status"]
+          tagline?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       flight_bookings: {
         Row: {
           agency_id: string | null
@@ -778,6 +850,104 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "flight_bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hall_bookings: {
+        Row: {
+          admin_notes: string | null
+          agency_id: string | null
+          booked_by: string
+          booking_ref: string
+          created_at: string
+          currency: string
+          customer_id: string
+          customer_notes: string | null
+          end_time: string | null
+          event_date: string
+          event_name: string | null
+          event_type: string
+          expected_guests: number | null
+          id: string
+          price: number
+          setup_requirements: string | null
+          start_time: string | null
+          status: Database["public"]["Enums"]["booking_status"]
+          updated_at: string
+          venue_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          agency_id?: string | null
+          booked_by: string
+          booking_ref?: string
+          created_at?: string
+          currency?: string
+          customer_id: string
+          customer_notes?: string | null
+          end_time?: string | null
+          event_date: string
+          event_name?: string | null
+          event_type: string
+          expected_guests?: number | null
+          id?: string
+          price?: number
+          setup_requirements?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["booking_status"]
+          updated_at?: string
+          venue_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          agency_id?: string | null
+          booked_by?: string
+          booking_ref?: string
+          created_at?: string
+          currency?: string
+          customer_id?: string
+          customer_notes?: string | null
+          end_time?: string | null
+          event_date?: string
+          event_name?: string | null
+          event_type?: string
+          expected_guests?: number | null
+          id?: string
+          price?: number
+          setup_requirements?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["booking_status"]
+          updated_at?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hall_bookings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hall_bookings_booked_by_fkey"
+            columns: ["booked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hall_bookings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hall_bookings_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "event_venues"
             referencedColumns: ["id"]
           },
         ]
@@ -1278,6 +1448,7 @@ export type Database = {
         Row: {
           created_at: string
           flight_booking_id: string | null
+          hall_booking_id: string | null
           hotel_booking_id: string | null
           id: string
           item_type: Database["public"]["Enums"]["order_item_type"]
@@ -1291,6 +1462,7 @@ export type Database = {
         Insert: {
           created_at?: string
           flight_booking_id?: string | null
+          hall_booking_id?: string | null
           hotel_booking_id?: string | null
           id?: string
           item_type: Database["public"]["Enums"]["order_item_type"]
@@ -1304,6 +1476,7 @@ export type Database = {
         Update: {
           created_at?: string
           flight_booking_id?: string | null
+          hall_booking_id?: string | null
           hotel_booking_id?: string | null
           id?: string
           item_type?: Database["public"]["Enums"]["order_item_type"]
@@ -1320,6 +1493,13 @@ export type Database = {
             columns: ["flight_booking_id"]
             isOneToOne: false
             referencedRelation: "flight_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_hall_booking_id_fkey"
+            columns: ["hall_booking_id"]
+            isOneToOne: false
+            referencedRelation: "hall_bookings"
             referencedColumns: ["id"]
           },
           {
@@ -1364,6 +1544,7 @@ export type Database = {
           id: string
           notes: string | null
           order_number: string
+          paid_at: string | null
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
           tax_total: number
@@ -1381,6 +1562,7 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number?: string
+          paid_at?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           tax_total?: number
@@ -1398,6 +1580,7 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number?: string
+          paid_at?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           tax_total?: number
@@ -1491,10 +1674,15 @@ export type Database = {
           created_at: string
           currency: string
           id: string
+          instructions: string | null
           method_id: string | null
+          method_label: string | null
           order_id: string
+          paid_at: string | null
+          payer_phone: string | null
           provider: string
           provider_payment_intent_id: string | null
+          provider_ref: string | null
           raw_payload: Json
           status: Database["public"]["Enums"]["payment_status"]
           updated_at: string
@@ -1504,10 +1692,15 @@ export type Database = {
           created_at?: string
           currency?: string
           id?: string
+          instructions?: string | null
           method_id?: string | null
+          method_label?: string | null
           order_id: string
+          paid_at?: string | null
+          payer_phone?: string | null
           provider: string
           provider_payment_intent_id?: string | null
+          provider_ref?: string | null
           raw_payload?: Json
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
@@ -1517,10 +1710,15 @@ export type Database = {
           created_at?: string
           currency?: string
           id?: string
+          instructions?: string | null
           method_id?: string | null
+          method_label?: string | null
           order_id?: string
+          paid_at?: string | null
+          payer_phone?: string | null
           provider?: string
           provider_payment_intent_id?: string | null
+          provider_ref?: string | null
           raw_payload?: Json
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
@@ -1870,14 +2068,19 @@ export type Database = {
           agency_id: string | null
           applicant_notes: string | null
           applicant_profile_id: string | null
+          applicant_type: string
+          application_ref: string
+          contact_details: Json
           created_at: string
           currency: string
+          current_step: number
           decided_at: string | null
           decided_by: string | null
           id: string
           price: number
           status: Database["public"]["Enums"]["visa_status"]
           submitted_by: string
+          travel_details: Json
           traveler_details: Json
           updated_at: string
           visa_type_id: string
@@ -1887,14 +2090,19 @@ export type Database = {
           agency_id?: string | null
           applicant_notes?: string | null
           applicant_profile_id?: string | null
+          applicant_type?: string
+          application_ref?: string
+          contact_details?: Json
           created_at?: string
           currency?: string
+          current_step?: number
           decided_at?: string | null
           decided_by?: string | null
           id?: string
           price: number
           status?: Database["public"]["Enums"]["visa_status"]
           submitted_by: string
+          travel_details?: Json
           traveler_details?: Json
           updated_at?: string
           visa_type_id: string
@@ -1904,14 +2112,19 @@ export type Database = {
           agency_id?: string | null
           applicant_notes?: string | null
           applicant_profile_id?: string | null
+          applicant_type?: string
+          application_ref?: string
+          contact_details?: Json
           created_at?: string
           currency?: string
+          current_step?: number
           decided_at?: string | null
           decided_by?: string | null
           id?: string
           price?: number
           status?: Database["public"]["Enums"]["visa_status"]
           submitted_by?: string
+          travel_details?: Json
           traveler_details?: Json
           updated_at?: string
           visa_type_id?: string
@@ -1954,11 +2167,75 @@ export type Database = {
           },
         ]
       }
-      visa_documents: {
+      visa_document_requests: {
         Row: {
           application_id: string
           created_at: string
+          description: string | null
+          document_id: string | null
+          id: string
+          requested_by: string | null
+          requirement: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          description?: string | null
+          document_id?: string | null
+          id?: string
+          requested_by?: string | null
+          requirement?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          description?: string | null
+          document_id?: string | null
+          id?: string
+          requested_by?: string | null
+          requirement?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_document_requests_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_document_requests_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "visa_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_document_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visa_documents: {
+        Row: {
+          application_id: string
+          content_type: string | null
+          created_at: string
           document_type: string
+          file_name: string | null
+          file_size: number | null
           id: string
           storage_path: string
           uploaded_by: string
@@ -1966,8 +2243,11 @@ export type Database = {
         }
         Insert: {
           application_id: string
+          content_type?: string | null
           created_at?: string
           document_type: string
+          file_name?: string | null
+          file_size?: number | null
           id?: string
           storage_path: string
           uploaded_by: string
@@ -1975,8 +2255,11 @@ export type Database = {
         }
         Update: {
           application_id?: string
+          content_type?: string | null
           created_at?: string
           document_type?: string
+          file_name?: string | null
+          file_size?: number | null
           id?: string
           storage_path?: string
           uploaded_by?: string
@@ -1999,48 +2282,119 @@ export type Database = {
           },
         ]
       }
+      visa_members: {
+        Row: {
+          application_id: string
+          created_at: string
+          date_of_birth: string | null
+          details: Json
+          full_name: string
+          id: string
+          is_primary: boolean
+          nationality: string | null
+          passport_expiry: string | null
+          passport_number: string | null
+          relationship: string
+          sort_order: number
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          date_of_birth?: string | null
+          details?: Json
+          full_name: string
+          id?: string
+          is_primary?: boolean
+          nationality?: string | null
+          passport_expiry?: string | null
+          passport_number?: string | null
+          relationship?: string
+          sort_order?: number
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          date_of_birth?: string | null
+          details?: Json
+          full_name?: string
+          id?: string
+          is_primary?: boolean
+          nationality?: string | null
+          passport_expiry?: string | null
+          passport_number?: string | null
+          relationship?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_members_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       visa_types: {
         Row: {
           created_at: string
           currency: string
           description: string | null
           destination_country_code: string
+          entry_type: string
           id: string
+          is_featured: boolean
           name: string
+          overview: string | null
           price: number
           processing_days_max: number | null
           processing_days_min: number | null
           required_documents: Json
           status: Database["public"]["Enums"]["listing_status"]
+          stay_days: number | null
           updated_at: string
+          validity_days: number | null
+          visa_category: string
         }
         Insert: {
           created_at?: string
           currency?: string
           description?: string | null
           destination_country_code: string
+          entry_type?: string
           id?: string
+          is_featured?: boolean
           name: string
+          overview?: string | null
           price: number
           processing_days_max?: number | null
           processing_days_min?: number | null
           required_documents?: Json
           status?: Database["public"]["Enums"]["listing_status"]
+          stay_days?: number | null
           updated_at?: string
+          validity_days?: number | null
+          visa_category?: string
         }
         Update: {
           created_at?: string
           currency?: string
           description?: string | null
           destination_country_code?: string
+          entry_type?: string
           id?: string
+          is_featured?: boolean
           name?: string
+          overview?: string | null
           price?: number
           processing_days_max?: number | null
           processing_days_min?: number | null
           required_documents?: Json
           status?: Database["public"]["Enums"]["listing_status"]
+          stay_days?: number | null
           updated_at?: string
+          validity_days?: number | null
+          visa_category?: string
         }
         Relationships: []
       }
@@ -2066,7 +2420,9 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      generate_hall_booking_ref: { Args: never; Returns: string }
       generate_order_number: { Args: never; Returns: string }
+      generate_visa_application_ref: { Args: never; Returns: string }
       has_role: {
         Args: { check_role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
@@ -2131,7 +2487,7 @@ export type Database = {
       invoice_status: "draft" | "issued" | "paid" | "void"
       listing_status: "draft" | "pending_review" | "published" | "suspended"
       member_status: "active" | "invited" | "removed"
-      order_item_type: "hotel" | "flight" | "visa" | "umrah"
+      order_item_type: "hotel" | "flight" | "visa" | "umrah" | "hall"
       order_status:
         | "pending_payment"
         | "paid"
@@ -2155,6 +2511,7 @@ export type Database = {
         | "submitted"
         | "in_review"
         | "additional_info_required"
+        | "processing"
         | "approved"
         | "rejected"
         | "issued"
@@ -2307,7 +2664,7 @@ export const Constants = {
       invoice_status: ["draft", "issued", "paid", "void"],
       listing_status: ["draft", "pending_review", "published", "suspended"],
       member_status: ["active", "invited", "removed"],
-      order_item_type: ["hotel", "flight", "visa", "umrah"],
+      order_item_type: ["hotel", "flight", "visa", "umrah", "hall"],
       order_status: [
         "pending_payment",
         "paid",
@@ -2333,6 +2690,7 @@ export const Constants = {
         "submitted",
         "in_review",
         "additional_info_required",
+        "processing",
         "approved",
         "rejected",
         "issued",

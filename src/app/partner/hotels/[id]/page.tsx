@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
-import { getMyPartnerId, getHotelForEdit } from "@/lib/data/hotel-partner";
+import { getMyPartnerId, getHotelForEdit } from "@/modules/hotels/partner-queries";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EditHotelForm } from "./edit-hotel-form";

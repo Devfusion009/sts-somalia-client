@@ -10,7 +10,7 @@ import {
   submitAgencyApplication,
   submitHotelPartnerApplication,
   submitAffiliateApplication,
-} from "@/lib/actions/applications";
+} from "@/modules/partnerships/actions";
 
 export function AgencyApplicationForm() {
   const [state, formAction] = useActionState(submitAgencyApplication, null);

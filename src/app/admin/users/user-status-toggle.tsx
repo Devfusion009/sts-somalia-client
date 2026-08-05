@@ -3,7 +3,7 @@
 import { useActionState, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { toggleUserStatus } from "@/lib/actions/admin";
+import { toggleUserStatus } from "@/modules/admin/actions";
 import type { Database } from "@/lib/types/database.types";
 
 type AccountStatus = Database["public"]["Enums"]["account_status"];

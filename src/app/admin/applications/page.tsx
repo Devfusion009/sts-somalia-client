@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getPendingApplications } from "@/lib/data/admin";
+import { getPendingApplications } from "@/modules/admin/queries";
 import {
   approveAgencyApplication,
   rejectAgencyApplication,
@@ -9,7 +9,7 @@ import {
   rejectHotelPartnerApplication,
   approveAffiliateApplication,
   rejectAffiliateApplication,
-} from "@/lib/actions/admin";
+} from "@/modules/admin/actions";
 import { ApplicationActions } from "./application-actions";
 
 function EmptyRow({ colSpan }: { colSpan: number }) {

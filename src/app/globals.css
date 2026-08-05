@@ -56,81 +56,85 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* STS brand: the logo's teal-green carries the interface (primary actions,
+   steppers, links); its orange is reserved for high-emphasis marketing CTAs
+   and price highlights so it stays special. Neutrals are teal-tinted rather
+   than gray so even empty screens feel on-brand. */
 :root {
-  --background: #fafcff;
-  --foreground: #0c4a6e;
+  --background: #f8fbfa;
+  --foreground: #10312c;
   --card: #ffffff;
-  --card-foreground: #0c4a6e;
+  --card-foreground: #10312c;
   --popover: #ffffff;
-  --popover-foreground: #0c4a6e;
-  --primary: #0284c7;
+  --popover-foreground: #10312c;
+  --primary: #00947c;
   --primary-foreground: #ffffff;
-  --secondary: #f0f9ff;
-  --secondary-foreground: #0c4a6e;
-  --muted: #eff6fb;
-  --muted-foreground: #64748b;
-  --accent: #e0f2fe;
-  --accent-foreground: #0c4a6e;
+  --secondary: #eaf6f2;
+  --secondary-foreground: #0c4a40;
+  --muted: #eff5f3;
+  --muted-foreground: #5f7873;
+  --accent: #dcf2ea;
+  --accent-foreground: #0c4a40;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: #dceefb;
-  --input: #dceefb;
-  --ring: #0284c7;
-  --brand-accent: #ea580c;
+  --border: #dfeae6;
+  --input: #d5e4df;
+  --ring: #00947c;
+  --brand-accent: #f4711c;
   --brand-accent-foreground: #ffffff;
   --brand-gold: #f59e0b;
-  --chart-1: #0284c7;
-  --chart-2: #ea580c;
-  --chart-3: #059669;
+  --chart-1: #00947c;
+  --chart-2: #f4711c;
+  --chart-3: #0284c7;
   --chart-4: #7c3aed;
   --chart-5: #f59e0b;
   --radius: 0.75rem;
-  --sidebar: #0c4a6e;
-  --sidebar-foreground: #f0f9ff;
-  --sidebar-primary: #0ea5e9;
-  --sidebar-primary-foreground: #0f172a;
-  --sidebar-accent: #0e3852;
-  --sidebar-accent-foreground: #f0f9ff;
+  --sidebar: #06231e;
+  --sidebar-foreground: #e6f5f0;
+  --sidebar-primary: #14ba9c;
+  --sidebar-primary-foreground: #04211c;
+  --sidebar-accent: #0c3a32;
+  --sidebar-accent-foreground: #e6f5f0;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #38bdf8;
+  --sidebar-ring: #2dd4b4;
 }
 
 .dark {
-  --background: #071726;
-  --foreground: #e5f2fb;
-  --card: #0c2233;
-  --card-foreground: #e5f2fb;
-  --popover: #0c2233;
-  --popover-foreground: #e5f2fb;
-  --primary: #38bdf8;
-  --primary-foreground: #072033;
-  --secondary: #12314a;
-  --secondary-foreground: #e5f2fb;
-  --muted: #12314a;
-  --muted-foreground: #93b4cc;
-  --accent: #12314a;
-  --accent-foreground: #e5f2fb;
+  --background: #061412;
+  --foreground: #e2f3ee;
+  --card: #0a211d;
+  --card-foreground: #e2f3ee;
+  --popover: #0a211d;
+  --popover-foreground: #e2f3ee;
+  --primary: #2dd4b4;
+  --primary-foreground: #04211c;
+  --secondary: #103630;
+  --secondary-foreground: #e2f3ee;
+  --muted: #103630;
+  --muted-foreground: #8fb3ab;
+  --accent: #103630;
+  --accent-foreground: #e2f3ee;
   --destructive: #f87171;
   --destructive-foreground: #450a0a;
   --border: rgba(255, 255, 255, 0.1);
   --input: rgba(255, 255, 255, 0.12);
-  --ring: #38bdf8;
-  --brand-accent: #fb923c;
+  --ring: #2dd4b4;
+  --brand-accent: #fb8b3c;
   --brand-accent-foreground: #1a0800;
   --brand-gold: #fbbf24;
-  --chart-1: #38bdf8;
-  --chart-2: #fb923c;
-  --chart-3: #34d399;
+  --chart-1: #2dd4b4;
+  --chart-2: #fb8b3c;
+  --chart-3: #38bdf8;
   --chart-4: #a78bfa;
   --chart-5: #fbbf24;
-  --sidebar: #051018;
-  --sidebar-foreground: #e5f2fb;
-  --sidebar-primary: #38bdf8;
-  --sidebar-primary-foreground: #072033;
-  --sidebar-accent: #0c2233;
-  --sidebar-accent-foreground: #e5f2fb;
+  --sidebar: #04100e;
+  --sidebar-foreground: #e2f3ee;
+  --sidebar-primary: #2dd4b4;
+  --sidebar-primary-foreground: #04211c;
+  --sidebar-accent: #0a211d;
+  --sidebar-accent-foreground: #e2f3ee;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #38bdf8;
+  --sidebar-ring: #2dd4b4;
 }
 
 @layer base {

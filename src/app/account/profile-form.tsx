@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
-import { updateProfileAction } from "@/lib/actions/profile";
+import { updateProfileAction } from "@/modules/identity/actions";
 import type { Database } from "@/lib/types/database.types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];

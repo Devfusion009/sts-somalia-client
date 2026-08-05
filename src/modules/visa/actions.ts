@@ -1,0 +1,601 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile, requireUser } from "@/lib/auth/session";
+import { createOrderForBooking, getActiveAgencyId } from "@/modules/orders/helpers";
+import {
+  APPLICANT_TYPES,
+  memberSchema,
+  parseDocumentSlots,
+  personalInfoSchema,
+  travelInfoSchema,
+} from "./schemas";
+
+export type ActionState = {
+  error: string | null;
+  /** Submitted field values echoed back so forms can re-fill after a
+   *  validation error (React 19 resets uncontrolled fields post-action). */
+  values?: Record<string, string>;
+} | null;
+
+function formValues(formData: FormData): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (typeof value === "string" && key !== "applicationId") out[key] = value;
+  }
+  return out;
+}
+
+const MAX_UPLOAD_BYTES_DEFAULT = 5 * 1024 * 1024;
+const ALLOWED_UPLOAD_TYPES = ["image/jpeg", "image/png", "application/pdf"];
+
+function sanitizeFilename(name: string) {
+  return name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+}
+
+/** RLS-scoped fetch that also proves "mine + still editable". */
+async function getEditableApplication(applicationId: string, userId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("visa_applications")
+    .select("*, visa_type:visa_type_id (*), members:visa_members (*), documents:visa_documents (*)")
+    .eq("id", applicationId)
+    .eq("submitted_by", userId)
+    .eq("status", "draft")
+    .maybeSingle();
+  return { supabase, application: data };
+}
+
+function wizardPath(applicationId: string, step: number) {
+  return `/visa/apply/${applicationId}?step=${step}`;
+}
+
+// ---------------------------------------------------------------------------
+// Start / resume
+// ---------------------------------------------------------------------------
+export async function startVisaApplication(formData: FormData): Promise<void> {
+  const visaTypeId = z.string().uuid().parse(formData.get("visaTypeId"));
+  const user = await getCurrentProfile();
+  // Send signed-out visitors through login and straight back to this visa.
+  if (!user) redirect(`/login?redirect_to=${encodeURIComponent(`/visa/${visaTypeId}`)}`);
+  const supabase = await createClient();
+
+  const { data: existingDraft } = await supabase
+    .from("visa_applications")
+    .select("id")
+    .eq("visa_type_id", visaTypeId)
+    .eq("submitted_by", user.id)
+    .eq("status", "draft")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingDraft) redirect(wizardPath(existingDraft.id, 1));
+
+  const { data: visaType } = await supabase
+    .from("visa_types")
+    .select("*")
+    .eq("id", visaTypeId)
+    .eq("status", "published")
+    .maybeSingle();
+  if (!visaType) redirect("/visa");
+
+  const { data: application, error } = await supabase
+    .from("visa_applications")
+    .insert({
+      visa_type_id: visaType.id,
+      applicant_profile_id: user.id,
+      submitted_by: user.id,
+      agency_id: await getActiveAgencyId(supabase, user.id),
+      status: "draft",
+      price: visaType.price,
+      currency: visaType.currency,
+      contact_details: { email: user.email ?? "", mobile: user.phone ?? "" },
+    })
+    .select("id")
+    .single();
+
+  if (error || !application) redirect("/visa");
+  redirect(wizardPath(application.id, 1));
+}
+
+// ---------------------------------------------------------------------------
+// Step 1 — applicant type (+ family/group members)
+// ---------------------------------------------------------------------------
+export async function saveApplicantType(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      applicantType: z.enum(APPLICANT_TYPES),
+    })
+    .safeParse({
+      applicationId: formData.get("applicationId"),
+      applicantType: formData.get("applicantType"),
+    });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(
+    parsed.data.applicationId,
+    user.id
+  );
+  if (!application) return { error: "This application can no longer be edited." };
+
+  if (parsed.data.applicantType !== "single") {
+    const others = application.members.filter((m) => !m.is_primary);
+    if (others.length === 0) {
+      return {
+        error:
+          parsed.data.applicantType === "family"
+            ? "Add at least one family member (or choose Single Applicant)."
+            : "Add at least one group member (or choose Single Applicant).",
+      };
+    }
+  }
+
+  await supabase
+    .from("visa_applications")
+    .update({
+      applicant_type: parsed.data.applicantType,
+      current_step: Math.max(application.current_step, 2),
+    })
+    .eq("id", application.id);
+
+  // Members added while experimenting don't belong on a single application.
+  if (parsed.data.applicantType === "single") {
+    await supabase
+      .from("visa_members")
+      .delete()
+      .eq("application_id", application.id)
+      .eq("is_primary", false);
+  }
+
+  redirect(wizardPath(application.id, 2));
+}
+
+export async function saveVisaMember(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const applicationId = z.string().uuid().safeParse(formData.get("applicationId"));
+  if (!applicationId.success) return { error: "Invalid application." };
+  const parsed = memberSchema.safeParse({
+    fullName: formData.get("fullName"),
+    relationship: formData.get("relationship"),
+    dateOfBirth: formData.get("dateOfBirth"),
+    nationality: formData.get("nationality"),
+    passportNumber: formData.get("passportNumber"),
+    passportExpiry: formData.get("passportExpiry")?.toString() || undefined,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(applicationId.data, user.id);
+  if (!application) return { error: "This application can no longer be edited." };
+
+  const memberId = formData.get("memberId")?.toString();
+  const row = {
+    application_id: application.id,
+    full_name: parsed.data.fullName,
+    relationship: parsed.data.relationship,
+    date_of_birth: parsed.data.dateOfBirth,
+    nationality: parsed.data.nationality,
+    passport_number: parsed.data.passportNumber,
+    passport_expiry: parsed.data.passportExpiry || null,
+  };
+
+  const result = memberId
+    ? await supabase
+        .from("visa_members")
+        .update(row)
+        .eq("id", memberId)
+        .eq("application_id", application.id)
+    : await supabase
+        .from("visa_members")
+        .insert({ ...row, sort_order: application.members.length });
+  if (result.error) return { error: result.error.message };
+
+  revalidatePath(`/visa/apply/${application.id}`);
+  return { error: null };
+}
+
+export async function removeVisaMember(formData: FormData): Promise<void> {
+  const memberId = z.string().uuid().parse(formData.get("memberId"));
+  const applicationId = z.string().uuid().parse(formData.get("applicationId"));
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(applicationId, user.id);
+  if (!application) return;
+
+  await supabase
+    .from("visa_members")
+    .delete()
+    .eq("id", memberId)
+    .eq("application_id", application.id)
+    .eq("is_primary", false);
+  revalidatePath(`/visa/apply/${application.id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Step 2 — personal information (primary applicant)
+// ---------------------------------------------------------------------------
+export async function savePersonalInfo(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const applicationId = z.string().uuid().safeParse(formData.get("applicationId"));
+  if (!applicationId.success) return { error: "Invalid application." };
+  const parsed = personalInfoSchema.safeParse({
+    fullName: formData.get("fullName"),
+    dateOfBirth: formData.get("dateOfBirth"),
+    gender: formData.get("gender"),
+    nationality: formData.get("nationality"),
+    passportNumber: formData.get("passportNumber"),
+    passportExpiry: formData.get("passportExpiry"),
+    placeOfBirth: formData.get("placeOfBirth"),
+    countryOfBirth: formData.get("countryOfBirth"),
+    maritalStatus: formData.get("maritalStatus"),
+    email: formData.get("email"),
+    mobile: formData.get("mobile"),
+    occupation: formData.get("occupation"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message, values: formValues(formData) };
+  }
+
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(applicationId.data, user.id);
+  if (!application) return { error: "This application can no longer be edited." };
+
+  const d = parsed.data;
+  await supabase
+    .from("visa_applications")
+    .update({
+      traveler_details: {
+        full_name: d.fullName,
+        date_of_birth: d.dateOfBirth,
+        gender: d.gender,
+        nationality: d.nationality,
+        passport_number: d.passportNumber,
+        passport_expiry: d.passportExpiry,
+        place_of_birth: d.placeOfBirth,
+        country_of_birth: d.countryOfBirth,
+        marital_status: d.maritalStatus,
+        occupation: d.occupation,
+      },
+      contact_details: { email: d.email, mobile: d.mobile },
+      current_step: Math.max(application.current_step, 3),
+    })
+    .eq("id", application.id);
+
+  // The primary applicant is also a member row so the member list is the
+  // complete travelling party.
+  const primary = application.members.find((m) => m.is_primary);
+  const primaryRow = {
+    application_id: application.id,
+    is_primary: true,
+    full_name: d.fullName,
+    relationship: "self",
+    date_of_birth: d.dateOfBirth,
+    nationality: d.nationality,
+    passport_number: d.passportNumber,
+    passport_expiry: d.passportExpiry,
+    sort_order: -1,
+  };
+  if (primary) {
+    await supabase.from("visa_members").update(primaryRow).eq("id", primary.id);
+  } else {
+    await supabase.from("visa_members").insert(primaryRow);
+  }
+
+  redirect(wizardPath(application.id, 3));
+}
+
+// ---------------------------------------------------------------------------
+// Step 3 — travel information
+// ---------------------------------------------------------------------------
+export async function saveTravelInfo(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const applicationId = z.string().uuid().safeParse(formData.get("applicationId"));
+  if (!applicationId.success) return { error: "Invalid application." };
+  const parsed = travelInfoSchema.safeParse({
+    arrivalDate: formData.get("arrivalDate"),
+    departureDate: formData.get("departureDate"),
+    portOfEntry: formData.get("portOfEntry"),
+    portOfExit: formData.get("portOfExit")?.toString() || undefined,
+    flightNumber: formData.get("flightNumber")?.toString() || undefined,
+    returnFlightNumber: formData.get("returnFlightNumber")?.toString() || undefined,
+    purposeOfVisit: formData.get("purposeOfVisit"),
+    payer: formData.get("payer"),
+    sponsorName: formData.get("sponsorName")?.toString() || undefined,
+    addressAtDestination: formData.get("addressAtDestination"),
+    hasRelatives: formData.get("hasRelatives") ?? "no",
+    visitedBefore: formData.get("visitedBefore") ?? "no",
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message, values: formValues(formData) };
+  }
+
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(applicationId.data, user.id);
+  if (!application) return { error: "This application can no longer be edited." };
+
+  const d = parsed.data;
+  await supabase
+    .from("visa_applications")
+    .update({
+      travel_details: {
+        arrival_date: d.arrivalDate,
+        departure_date: d.departureDate,
+        port_of_entry: d.portOfEntry,
+        port_of_exit: d.portOfExit ?? null,
+        flight_number: d.flightNumber ?? null,
+        return_flight_number: d.returnFlightNumber ?? null,
+        purpose: d.purposeOfVisit,
+        payer: d.payer,
+        sponsor_name: d.sponsorName ?? null,
+        address: d.addressAtDestination,
+        has_relatives: d.hasRelatives === "yes",
+        visited_before: d.visitedBefore === "yes",
+      },
+      current_step: Math.max(application.current_step, 4),
+    })
+    .eq("id", application.id);
+
+  redirect(wizardPath(application.id, 4));
+}
+
+// ---------------------------------------------------------------------------
+// Step 4 — document upload
+// ---------------------------------------------------------------------------
+export async function uploadVisaDocument(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = z
+    .object({ applicationId: z.string().uuid(), slotKey: z.string().min(1) })
+    .safeParse({
+      applicationId: formData.get("applicationId"),
+      slotKey: formData.get("slotKey"),
+    });
+  if (!parsed.success) return { error: "Invalid upload request." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to upload." };
+  if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) {
+    return { error: "Only JPG, PNG, or PDF files are accepted." };
+  }
+
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(
+    parsed.data.applicationId,
+    user.id
+  );
+  if (!application) return { error: "This application can no longer be edited." };
+
+  const slots = parseDocumentSlots(application.visa_type?.required_documents);
+  const slot = slots.find((s) => s.key === parsed.data.slotKey);
+  if (!slot) return { error: "Unknown document type." };
+  const maxBytes = (slot.max_mb ?? 5) * 1024 * 1024 || MAX_UPLOAD_BYTES_DEFAULT;
+  if (file.size > maxBytes) {
+    return { error: `"${slot.label}" must be ${slot.max_mb ?? 5}MB or smaller.` };
+  }
+
+  const storagePath = `${application.id}/${slot.key}-${Date.now()}-${sanitizeFilename(file.name)}`;
+  const { error: uploadError } = await supabase.storage
+    .from("visa-documents")
+    .upload(storagePath, file, { contentType: file.type });
+  if (uploadError) return { error: uploadError.message };
+
+  // Replace any previous upload in the same slot.
+  const previous = application.documents.filter((doc) => doc.document_type === slot.key);
+  if (previous.length > 0) {
+    await supabase.storage.from("visa-documents").remove(previous.map((p) => p.storage_path));
+    await supabase
+      .from("visa_documents")
+      .delete()
+      .in(
+        "id",
+        previous.map((p) => p.id)
+      );
+  }
+
+  const { error: insertError } = await supabase.from("visa_documents").insert({
+    application_id: application.id,
+    document_type: slot.key,
+    storage_path: storagePath,
+    uploaded_by: user.id,
+    file_name: file.name,
+    file_size: file.size,
+    content_type: file.type,
+  });
+  if (insertError) return { error: insertError.message };
+
+  revalidatePath(`/visa/apply/${application.id}`);
+  return { error: null };
+}
+
+export async function removeVisaDocument(formData: FormData): Promise<void> {
+  const documentId = z.string().uuid().parse(formData.get("documentId"));
+  const applicationId = z.string().uuid().parse(formData.get("applicationId"));
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(applicationId, user.id);
+  if (!application) return;
+
+  const doc = application.documents.find((d) => d.id === documentId);
+  if (!doc) return;
+  await supabase.storage.from("visa-documents").remove([doc.storage_path]);
+  await supabase.from("visa_documents").delete().eq("id", doc.id);
+  revalidatePath(`/visa/apply/${application.id}`);
+}
+
+export async function continueFromDocuments(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const applicationId = z.string().uuid().safeParse(formData.get("applicationId"));
+  if (!applicationId.success) return { error: "Invalid application." };
+
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(applicationId.data, user.id);
+  if (!application) return { error: "This application can no longer be edited." };
+
+  const slots = parseDocumentSlots(application.visa_type?.required_documents);
+  const uploadedKeys = new Set(application.documents.map((d) => d.document_type));
+  const missing = slots.filter((s) => s.required && !uploadedKeys.has(s.key));
+  if (missing.length > 0) {
+    return { error: `Please upload: ${missing.map((m) => m.label).join(", ")}.` };
+  }
+
+  await supabase
+    .from("visa_applications")
+    .update({ current_step: Math.max(application.current_step, 5) })
+    .eq("id", application.id);
+  redirect(wizardPath(application.id, 5));
+}
+
+// ---------------------------------------------------------------------------
+// Step 5 → submit (then payment)
+// ---------------------------------------------------------------------------
+export async function submitVisaApplication(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const applicationId = z.string().uuid().safeParse(formData.get("applicationId"));
+  if (!applicationId.success) return { error: "Invalid application." };
+  if (formData.get("confirmAccuracy") !== "on") {
+    return { error: "Please confirm that all information is correct." };
+  }
+
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(applicationId.data, user.id);
+  if (!application) return { error: "This application can no longer be edited." };
+  const visaType = application.visa_type;
+  if (!visaType) return { error: "This visa service is no longer available." };
+
+  // Completeness re-checks — the wizard enforces these step by step, but the
+  // submit action is the gate that matters.
+  const traveler = (application.traveler_details ?? {}) as Record<string, string>;
+  const contact = (application.contact_details ?? {}) as Record<string, string>;
+  const personal = personalInfoSchema.safeParse({
+    fullName: traveler.full_name,
+    dateOfBirth: traveler.date_of_birth,
+    gender: traveler.gender,
+    nationality: traveler.nationality,
+    passportNumber: traveler.passport_number,
+    passportExpiry: traveler.passport_expiry,
+    placeOfBirth: traveler.place_of_birth,
+    countryOfBirth: traveler.country_of_birth,
+    maritalStatus: traveler.marital_status,
+    email: contact.email,
+    mobile: contact.mobile,
+    occupation: traveler.occupation,
+  });
+  if (!personal.success) {
+    return { error: "Personal information is incomplete — please review step 2." };
+  }
+  const travel = (application.travel_details ?? {}) as Record<string, unknown>;
+  if (Object.keys(travel).length === 0) {
+    return { error: "Travel information is incomplete — please review step 3." };
+  }
+
+  const slots = parseDocumentSlots(visaType.required_documents);
+  const uploadedKeys = new Set(application.documents.map((d) => d.document_type));
+  const missing = slots.filter((s) => s.required && !uploadedKeys.has(s.key));
+  if (missing.length > 0) {
+    return { error: `Missing documents: ${missing.map((m) => m.label).join(", ")}.` };
+  }
+
+  const applicantCount =
+    application.applicant_type === "single" ? 1 : Math.max(application.members.length, 1);
+  const total = Number(visaType.price) * applicantCount;
+
+  const { error: updateError } = await supabase
+    .from("visa_applications")
+    .update({ status: "submitted", price: total, current_step: 6 })
+    .eq("id", application.id);
+  if (updateError) return { error: updateError.message };
+
+  const order = await createOrderForBooking(supabase, {
+    customerId: application.applicant_profile_id ?? user.id,
+    bookedBy: user.id,
+    agencyId: application.agency_id,
+    currency: visaType.currency,
+    itemType: "visa",
+    price: total,
+    visaApplicationId: application.id,
+  });
+
+  redirect(`/checkout/${order.id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Post-decision: upload an admin-requested document
+// ---------------------------------------------------------------------------
+export async function uploadRequestedDocument(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = z
+    .object({ requestId: z.string().uuid(), applicationId: z.string().uuid() })
+    .safeParse({
+      requestId: formData.get("requestId"),
+      applicationId: formData.get("applicationId"),
+    });
+  if (!parsed.success) return { error: "Invalid request." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to upload." };
+  if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) {
+    return { error: "Only JPG, PNG, or PDF files are accepted." };
+  }
+  if (file.size > MAX_UPLOAD_BYTES_DEFAULT) return { error: "Files must be 5MB or smaller." };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: request } = await supabase
+    .from("visa_document_requests")
+    .select("*, application:application_id (id, submitted_by)")
+    .eq("id", parsed.data.requestId)
+    .eq("application_id", parsed.data.applicationId)
+    .maybeSingle();
+  if (!request || request.application?.submitted_by !== user.id) {
+    return { error: "This document request is not available." };
+  }
+  if (request.status !== "requested") return { error: "This document was already provided." };
+
+  const storagePath = `${parsed.data.applicationId}/request-${request.id}-${Date.now()}-${sanitizeFilename(file.name)}`;
+  const { error: uploadError } = await supabase.storage
+    .from("visa-documents")
+    .upload(storagePath, file, { contentType: file.type });
+  if (uploadError) return { error: uploadError.message };
+
+  const { data: doc, error: docError } = await supabase
+    .from("visa_documents")
+    .insert({
+      application_id: parsed.data.applicationId,
+      document_type: `request:${request.title}`,
+      storage_path: storagePath,
+      uploaded_by: user.id,
+      file_name: file.name,
+      file_size: file.size,
+      content_type: file.type,
+    })
+    .select("id")
+    .single();
+  if (docError || !doc) return { error: docError?.message ?? "Upload failed." };
+
+  const { error: linkError } = await supabase
+    .from("visa_document_requests")
+    .update({ status: "uploaded", document_id: doc.id })
+    .eq("id", request.id);
+  if (linkError) return { error: linkError.message };
+
+  revalidatePath(`/account/visa/${parsed.data.applicationId}`);
+  return { error: null };
+}

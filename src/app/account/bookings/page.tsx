@@ -1,4 +1,4 @@
-import { CheckCircle2, Building2, Plane, FileText, Landmark } from "lucide-react";
+import { CheckCircle2, Building2, Plane, FileText, Landmark, PartyPopper } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -15,7 +15,7 @@ import {
 
 type UnifiedBooking = {
   id: string;
-  type: "hotel" | "flight" | "visa" | "umrah";
+  type: "hotel" | "flight" | "visa" | "umrah" | "hall";
   title: string;
   subtitle: string;
   status: string;
@@ -24,7 +24,13 @@ type UnifiedBooking = {
   createdAt: string;
 };
 
-const TYPE_ICON = { hotel: Building2, flight: Plane, visa: FileText, umrah: Landmark };
+const TYPE_ICON = {
+  hotel: Building2,
+  flight: Plane,
+  visa: FileText,
+  umrah: Landmark,
+  hall: PartyPopper,
+};
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = {
   confirmed: "default",
@@ -48,6 +54,7 @@ const SUCCESS_MESSAGES: Record<string, string> = {
   flight: "Your flight request was submitted.",
   visa: "Your visa application was submitted.",
   umrah: "Your Umrah booking was created.",
+  hall: "Your hall booking request was created.",
 };
 
 export default async function AccountBookingsPage({
@@ -60,7 +67,7 @@ export default async function AccountBookingsPage({
   const supabase = await createClient();
   const orFilter = `customer_id.eq.${profile.id},booked_by.eq.${profile.id}`;
 
-  const [hotelRes, flightRes, visaRes, umrahRes] = await Promise.all([
+  const [hotelRes, flightRes, visaRes, umrahRes, hallRes] = await Promise.all([
     supabase
       .from("hotel_bookings")
       .select("id, check_in, check_out, status, total_price, currency, created_at, hotels(name)")
@@ -76,6 +83,10 @@ export default async function AccountBookingsPage({
     supabase
       .from("umrah_bookings")
       .select("id, status, total_price, currency, created_at, num_pilgrims, umrah_packages(name)")
+      .or(orFilter),
+    supabase
+      .from("hall_bookings")
+      .select("id, event_type, event_date, status, price, currency, created_at, event_venues(name)")
       .or(orFilter),
   ]);
 
@@ -120,13 +131,23 @@ export default async function AccountBookingsPage({
       currency: u.currency,
       createdAt: u.created_at,
     })),
+    ...(hallRes.data ?? []).map((h) => ({
+      id: h.id,
+      type: "hall" as const,
+      title: h.event_venues?.name ?? "Hall booking",
+      subtitle: `${h.event_type.replace(/_/g, " ")} · ${h.event_date}`,
+      status: h.status,
+      price: h.price,
+      currency: h.currency,
+      createdAt: h.created_at,
+    })),
   ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-semibold">My Bookings</h1>
-        <p className="text-sm text-muted-foreground">Every hotel, flight, visa, and Umrah booking you&apos;ve made.</p>
+        <p className="text-sm text-muted-foreground">Every hotel, flight, visa, Umrah, and event hall booking you&apos;ve made.</p>
       </div>
 
       {success && SUCCESS_MESSAGES[success] ? (

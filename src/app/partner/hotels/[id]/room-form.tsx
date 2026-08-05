@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
-import { createRoom, updateRoom } from "@/lib/actions/hotel-partner";
+import { createRoom, updateRoom } from "@/modules/hotels/partner-actions";
 
 type Room = {
   id: string;

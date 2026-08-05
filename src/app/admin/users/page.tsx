@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getAllUsers } from "@/lib/data/admin";
+import { getAllUsers } from "@/modules/admin/queries";
 import { UserStatusToggle } from "./user-status-toggle";
 
 const ROLE_LABELS: Record<string, string> = {

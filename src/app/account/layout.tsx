@@ -7,6 +7,7 @@ const NAV_GROUPS: PortalNavGroup[] = [
     items: [
       { href: "/account", label: "Overview", icon: "profile" },
       { href: "/account/bookings", label: "My Bookings", icon: "bookings" },
+      { href: "/account/visa", label: "Visa Applications", icon: "visa" },
       { href: "/account/become", label: "Become a Partner", icon: "become-partner" },
     ],
   },

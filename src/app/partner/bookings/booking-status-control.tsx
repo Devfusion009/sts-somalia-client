@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updateBookingStatus } from "@/lib/actions/hotel-partner";
+import { updateBookingStatus } from "@/modules/hotels/partner-actions";
 
 const OPTIONS = ["pending", "confirmed", "cancelled", "completed", "no_show"] as const;
 

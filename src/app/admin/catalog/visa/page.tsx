@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getVisaTypesAdmin } from "@/lib/data/admin";
+import { getVisaTypesAdmin } from "@/modules/admin/queries";
 import { countryName } from "@/lib/countries";
 import { VisaTypeForm } from "./visa-type-form";
 

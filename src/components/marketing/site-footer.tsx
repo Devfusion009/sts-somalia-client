@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Mail, MapPin } from "lucide-react";
+import { Mail, MapPin, Phone } from "lucide-react";
 import { NAV_LINKS, PARTNER_LINKS } from "@/lib/nav-links";
 
 export function SiteFooter() {
@@ -12,15 +12,18 @@ export function SiteFooter() {
             <Image src="/logo.png" alt="STS Somalia" width={714} height={312} className="h-9 w-auto" />
           </Link>
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-            Scout Travel Solution — flights, hotels, visas, and Umrah journeys,
-            booked with confidence.
+            Scout Travel Solution — flights, hotels, visas, Umrah journeys, and
+            event halls, booked with confidence.
           </p>
           <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground">
+            <a href="tel:+252611444420" className="flex items-center gap-2 hover:text-primary">
+              <Phone className="size-4" /> +252 611 444 420
+            </a>
             <a href="mailto:support@sts-somalia.example" className="flex items-center gap-2 hover:text-primary">
               <Mail className="size-4" /> support@sts-somalia.example
             </a>
             <span className="flex items-center gap-2">
-              <MapPin className="size-4" /> Mogadishu, Somalia
+              <MapPin className="size-4" /> Sultan Business Park, Waaberi District, Muqdisho
             </span>
           </div>
         </div>
@@ -67,6 +70,16 @@ export function SiteFooter() {
             <li>
               <Link href="/signup" className="hover:text-primary">
                 Sign up
+              </Link>
+            </li>
+            <li>
+              <Link href="/terms" className="hover:text-primary">
+                Terms &amp; Conditions
+              </Link>
+            </li>
+            <li>
+              <Link href="/privacy" className="hover:text-primary">
+                Privacy Policy
               </Link>
             </li>
           </ul>

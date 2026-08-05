@@ -7,7 +7,14 @@ const NAV_GROUPS: PortalNavGroup[] = [
     items: [
       { href: "/admin", label: "Dashboard", icon: "overview" },
       { href: "/admin/applications", label: "Applications", icon: "applications" },
-      { href: "/admin/orders", label: "Orders", icon: "orders" },
+      { href: "/admin/orders", label: "Orders & Payments", icon: "orders" },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { href: "/admin/visa", label: "Visa Applications", icon: "visa" },
+      { href: "/admin/events", label: "Events & Halls", icon: "events" },
     ],
   },
   {
