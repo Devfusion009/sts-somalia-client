@@ -118,6 +118,7 @@ export function FlightSearchForm({
             id="depart_date"
             name="depart_date"
             type="date"
+            autoComplete="off"
             className="h-11"
             defaultValue={defaults.departDate}
             required
@@ -130,6 +131,7 @@ export function FlightSearchForm({
               id="return_date"
               name="return_date"
               type="date"
+              autoComplete="off"
               className="h-11"
               defaultValue={defaults.returnDate}
             />
@@ -141,6 +143,7 @@ export function FlightSearchForm({
             id="adults"
             name="adults"
             type="number"
+            autoComplete="off"
             min={1}
             max={9}
             className="h-11"

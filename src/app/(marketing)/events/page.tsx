@@ -41,6 +41,7 @@ export default async function EventsPage({
             <form className="mt-7 flex max-w-lg gap-2 rounded-2xl bg-background/95 p-2 shadow-lg">
               <Input
                 name="city"
+                autoComplete="off"
                 placeholder="Search by city (e.g. Mogadishu, Hargeisa)"
                 defaultValue={city}
                 className="border-0 bg-transparent text-foreground shadow-none focus-visible:ring-0"

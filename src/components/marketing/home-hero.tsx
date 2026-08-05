@@ -81,6 +81,8 @@ export function HomeHero() {
                   <Label htmlFor="hotel-city">Destination</Label>
                   <Input
                     id="hotel-city"
+                    name="hotel-city"
+                    autoComplete="off"
                     placeholder="Mogadishu, Nairobi, Dubai…"
                     value={hotelForm.city}
                     onChange={(e) => setHotelForm((f) => ({ ...f, city: e.target.value }))}
@@ -91,6 +93,7 @@ export function HomeHero() {
                   <Input
                     id="hotel-checkin"
                     type="date"
+                    autoComplete="off"
                     value={hotelForm.checkIn}
                     onChange={(e) => setHotelForm((f) => ({ ...f, checkIn: e.target.value }))}
                   />
@@ -100,6 +103,7 @@ export function HomeHero() {
                   <Input
                     id="hotel-checkout"
                     type="date"
+                    autoComplete="off"
                     value={hotelForm.checkOut}
                     onChange={(e) => setHotelForm((f) => ({ ...f, checkOut: e.target.value }))}
                   />
@@ -118,6 +122,8 @@ export function HomeHero() {
                   <Label htmlFor="flight-origin">From</Label>
                   <Input
                     id="flight-origin"
+                    name="flight-origin"
+                    autoComplete="off"
                     placeholder="MGQ"
                     value={flightForm.origin}
                     onChange={(e) => setFlightForm((f) => ({ ...f, origin: e.target.value }))}
@@ -127,6 +133,8 @@ export function HomeHero() {
                   <Label htmlFor="flight-destination">To</Label>
                   <Input
                     id="flight-destination"
+                    name="flight-destination"
+                    autoComplete="off"
                     placeholder="DXB"
                     value={flightForm.destination}
                     onChange={(e) => setFlightForm((f) => ({ ...f, destination: e.target.value }))}
@@ -137,6 +145,7 @@ export function HomeHero() {
                   <Input
                     id="flight-depart"
                     type="date"
+                    autoComplete="off"
                     value={flightForm.departDate}
                     onChange={(e) => setFlightForm((f) => ({ ...f, departDate: e.target.value }))}
                   />
@@ -155,6 +164,8 @@ export function HomeHero() {
                   <Label htmlFor="visa-country">Destination country</Label>
                   <Input
                     id="visa-country"
+                    name="visa-country"
+                    autoComplete="off"
                     placeholder="UAE, Turkey, Saudi Arabia…"
                     value={visaCountry}
                     onChange={(e) => setVisaCountry(e.target.value)}

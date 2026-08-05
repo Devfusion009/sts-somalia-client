@@ -38,7 +38,10 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
   return (
     <form
       onSubmit={handleSubmit}
-      className="grid grid-cols-1 gap-3 rounded-2xl bg-background/95 p-4 shadow-lg sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_0.8fr_auto] lg:items-end"
+      // The hero renders this card inside a dark section (text-sidebar-foreground);
+      // reset back to the normal foreground so labels/input text stay legible on
+      // this light card instead of inheriting the hero's light-on-dark color.
+      className="grid grid-cols-1 gap-3 rounded-2xl bg-background/95 p-4 text-foreground shadow-lg sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_0.8fr_auto] lg:items-end"
     >
       <div className="space-y-1.5">
         <Label htmlFor="city" className="flex items-center gap-1 text-xs">
@@ -46,6 +49,8 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
         </Label>
         <Input
           id="city"
+          name="hotel-destination"
+          autoComplete="off"
           placeholder="Mogadishu, Nairobi, Dubai…"
           value={values.city}
           onChange={(e) => set("city", e.target.value)}
@@ -58,6 +63,7 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
         <Input
           id="checkIn"
           type="date"
+          autoComplete="off"
           min={today}
           value={values.checkIn}
           onChange={(e) => set("checkIn", e.target.value)}
@@ -70,6 +76,7 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
         <Input
           id="checkOut"
           type="date"
+          autoComplete="off"
           min={values.checkIn || today}
           value={values.checkOut}
           onChange={(e) => set("checkOut", e.target.value)}
@@ -82,6 +89,8 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
         <Input
           id="guests"
           type="number"
+          autoComplete="off"
+          placeholder="2"
           min={1}
           max={30}
           value={values.guests}

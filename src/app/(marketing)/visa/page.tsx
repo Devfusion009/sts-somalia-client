@@ -45,6 +45,7 @@ export default async function VisaListPage({
             <form className="mt-7 flex max-w-lg gap-2 rounded-2xl bg-background/95 p-2 shadow-lg">
               <Input
                 name="country"
+                autoComplete="off"
                 placeholder="Where do you want to go? (e.g. UAE, Turkey)"
                 defaultValue={country}
                 className="border-0 bg-transparent text-foreground shadow-none focus-visible:ring-0"
