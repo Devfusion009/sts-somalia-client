@@ -24,8 +24,27 @@ type TypedClient = SupabaseClient<Database>;
  *      reminders fire immediately in local dev / before Vercel Cron is
  *      configured, and are not solely dependent on the plan tier's cron
  *      frequency limits.
+ *
+ * WHY horizonMs EXISTS
+ * Firing only what is due RIGHT NOW silently drops reminders whenever the
+ * caller runs less often than the reminder lead time. Concretely, on a daily
+ * cron: an event at 20:00 with a 30-minute lead has a reminder time of 19:30.
+ * The 05:00 run sees 19:30 as still in the future and skips it; by the next
+ * run the event has already started, so `start_at >= now` filters it out and
+ * the reminder is never sent at all.
+ *
+ * horizonMs closes that gap by also firing anything that would come due before
+ * the next run. Callers pass their own interval:
+ *   - the cron passes its schedule period, so nothing is ever missed; the cost
+ *     is that a long-lead reminder can arrive early rather than not at all.
+ *   - the admin layout passes 0, so while an admin is actually browsing,
+ *     reminders still land at their exact time.
+ * Whichever fires first wins, because reminder_sent_at makes it idempotent.
  */
-export async function fireDueEventReminders(supabase: TypedClient): Promise<number> {
+export async function fireDueEventReminders(
+  supabase: TypedClient,
+  { horizonMs = 0 }: { horizonMs?: number } = {}
+): Promise<number> {
   const now = new Date();
   const lookahead = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
@@ -39,7 +58,7 @@ export async function fireDueEventReminders(supabase: TypedClient): Promise<numb
 
   const due = (candidates ?? []).filter((e) => {
     const reminderAt = new Date(e.start_at).getTime() - (e.reminder_minutes_before ?? 0) * 60_000;
-    return reminderAt <= now.getTime();
+    return reminderAt <= now.getTime() + horizonMs;
   });
 
   if (due.length === 0) return 0;

@@ -16,6 +16,15 @@ import { fireDueEventReminders } from "@/modules/admin/calendar-reminders";
  * deployed/configured, or on a Vercel plan tier with a coarser cron
  * schedule than the reminder window needs.
  */
+/**
+ * How often the cron in vercel.json actually runs. Vercel Hobby allows at most
+ * one run per day ("Hobby accounts are limited to daily cron jobs" — a
+ * sub-daily schedule fails the whole deploy, not just the cron), so this is 24h.
+ * Keep it in step with vercel.json: too small and reminders in the gap are
+ * never sent; too large and they all arrive early.
+ */
+const CRON_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
@@ -26,6 +35,9 @@ export async function GET(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const remindersSent = await fireDueEventReminders(supabase);
-  return NextResponse.json({ remindersSent });
+  // Must match the schedule in vercel.json. Anything coming due before the next
+  // run is fired now — otherwise a reminder whose lead time falls between two
+  // runs is never sent at all (see fireDueEventReminders).
+  const remindersSent = await fireDueEventReminders(supabase, { horizonMs: CRON_INTERVAL_MS });
+  return NextResponse.json({ remindersSent, horizonHours: CRON_INTERVAL_MS / 3_600_000 });
 }
