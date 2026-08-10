@@ -29,8 +29,8 @@ export function getIntegrations() {
 
   return {
     payments: { stripe, waafi, edahab, testMode },
-    flights: { duffel: !!process.env.DUFFEL_API_KEY },
     email: { resend: !!process.env.RESEND_API_KEY },
+    whatsappApi: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM),
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
     bankTransfer: {
       bankName: process.env.BANK_TRANSFER_BANK_NAME ?? "Premier Bank",

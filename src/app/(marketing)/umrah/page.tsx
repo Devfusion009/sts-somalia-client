@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { Landmark, HeartHandshake, ShieldCheck, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PackageCard } from "@/modules/umrah/components/package-card";
@@ -17,9 +18,35 @@ export default async function UmrahPage() {
 
   return (
     <div>
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-sidebar via-sidebar to-primary/40 text-sidebar-foreground">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+      {/* Hero — same construction as VisaHeroBanner and FlightsHero: a filled
+          background image under a directional scrim, with the content lifted
+          above it on z-10. */}
+      <section className="relative isolate overflow-hidden bg-sidebar text-sidebar-foreground">
+        <Image
+          src="/marketing/umrah-hero.webp"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          // Narrow screens crop hard: object-right would frame the blown-out
+          // open end of the arcade and put the brightest pixels in the image
+          // directly behind the copy. Centre keeps the mid-tone columns there
+          // instead, and only wide viewports have room to favour the right.
+          className="object-cover object-center lg:object-right"
+        />
+        {/* The artwork's arcade sits on the right and its left half is already
+            deep shadow, so the scrim only has to deepen what is there — heavy
+            on the left where the headline sits, clearing towards the arches so
+            the photograph is still legible as a photograph.
+            The gradient has almost no horizontal room to travel on a phone, so
+            it stays strong to the right edge until lg, where the copy column
+            ends well before the arches begin. */}
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-sidebar via-sidebar/90 to-sidebar/70 lg:via-sidebar/85 lg:to-sidebar/35"
+          aria-hidden
+        />
+
+        <div className="relative z-10 mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
           <div className="max-w-2xl">
             <Badge className="border-transparent bg-primary/20 text-primary-foreground">
               Umrah Packages
@@ -51,7 +78,8 @@ export default async function UmrahPage() {
           <div>
             <h2 className="font-heading text-xl font-bold">Choose your package</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Three tiers of comfort — every package includes visa processing and dedicated support.
+              Departures from Mogadishu and Hargeisa, from a one-week express trip to the last ten nights of
+              Ramadan. Every package includes visa processing and a guide who travels with the group.
             </p>
           </div>
         </div>

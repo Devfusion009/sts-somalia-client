@@ -4,6 +4,8 @@ import { notFound, redirect } from "next/navigation";
 import { ChevronRight, Home } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getApplicationForWizard } from "@/modules/visa/queries";
+import { getMyDocuments } from "@/modules/travelers/queries";
+import { TRAVELER_DOCUMENT_TYPES } from "@/modules/travelers/schemas";
 import { countryName } from "@/lib/countries";
 import { VisaTypeBanner } from "@/modules/visa/components/visa-shared";
 import { WizardStepper } from "@/modules/visa/components/wizard-stepper";
@@ -17,6 +19,8 @@ import {
 } from "@/modules/visa/components/steps";
 
 export const metadata: Metadata = { title: "Visa Application" };
+
+const VAULT_TYPE_LABELS = new Map(TRAVELER_DOCUMENT_TYPES.map((t) => [t.value, t.label]));
 
 export default async function VisaWizardPage({
   params,
@@ -38,6 +42,22 @@ export default async function VisaWizardPage({
 
   const visaType = application.visa_type;
   const destination = countryName(visaType.destination_country_code);
+
+  // Only the document step offers vault reuse, so only that step pays for the
+  // query. Every other step would be loading a list nothing renders.
+  const vaultOptions =
+    step === 4
+      ? (await getMyDocuments()).map((doc) => ({
+          id: doc.id,
+          label:
+            doc.label ??
+            `${VAULT_TYPE_LABELS.get(doc.document_type) ?? "Document"}${
+              doc.traveler ? ` — ${doc.traveler.full_name}` : ""
+            }`,
+          fileName: doc.file_name,
+          documentType: doc.document_type,
+        }))
+      : [];
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -70,7 +90,7 @@ export default async function VisaWizardPage({
           ) : step === 3 ? (
             <StepTravelInfo application={application} destination={destination} />
           ) : step === 4 ? (
-            <StepDocuments application={application} />
+            <StepDocuments application={application} vaultOptions={vaultOptions} />
           ) : (
             <StepReview application={application} />
           )}

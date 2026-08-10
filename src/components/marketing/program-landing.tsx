@@ -18,6 +18,7 @@ export function ProgramLanding({
   benefits,
   steps,
   faqNote,
+  loginHref,
 }: {
   eyebrow: string;
   icon: LucideIcon;
@@ -28,6 +29,8 @@ export function ProgramLanding({
   benefits: ProgramBenefit[];
   steps: ProgramStep[];
   faqNote?: string;
+  /** For programs with a dedicated portal login (e.g. /agent/login) — shows an "already registered" link instead of the generic apply-then-login copy. */
+  loginHref?: string;
 }) {
   return (
     <div>
@@ -45,13 +48,24 @@ export function ProgramLanding({
             <Button size="lg" className="bg-brand-accent text-brand-accent-foreground hover:bg-brand-accent/90" render={<Link href={ctaHref} />}>
               {ctaLabel} <ArrowRight />
             </Button>
-            <Button size="lg" variant="outline" render={<Link href="/signup" />}>
-              Create a free account
-            </Button>
+            {!loginHref && (
+              <Button size="lg" variant="outline" render={<Link href="/signup" />}>
+                Create a free account
+              </Button>
+            )}
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            Already have an account? You&apos;ll be asked to log in, then land right back here to apply.
-          </p>
+          {loginHref ? (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Already an approved agent?{" "}
+              <Link href={loginHref} className="font-medium text-primary hover:underline">
+                Log in to the Agent Portal
+              </Link>
+            </p>
+          ) : (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Already have an account? You&apos;ll be asked to log in, then land right back here to apply.
+            </p>
+          )}
         </div>
       </section>
 

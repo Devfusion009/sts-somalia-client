@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireRole } from "@/lib/auth/session";
+import { requirePlatformAdmin } from "@/lib/auth/session";
 
 export type ActionState = { error: string | null } | null;
 
@@ -43,7 +43,7 @@ export async function adminSetVisaStatus(
     });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const admin = await requireRole("admin");
+  const admin = await requirePlatformAdmin();
   const supabase = await createClient();
 
   const isDecision = ["approved", "rejected", "issued"].includes(parsed.data.status);
@@ -99,7 +99,7 @@ export async function adminRequestDocument(
     });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const admin = await requireRole("admin");
+  const admin = await requirePlatformAdmin();
   const supabase = await createClient();
 
   const { error } = await supabase.from("visa_document_requests").insert({
@@ -123,7 +123,7 @@ export async function adminRequestDocument(
 
 /** Accept or waive a requested document; auto-advance once none are outstanding. */
 export async function adminResolveDocumentRequest(formData: FormData): Promise<void> {
-  await requireRole("admin");
+  await requirePlatformAdmin();
   const parsed = z
     .object({
       requestId: z.string().uuid(),
@@ -170,7 +170,7 @@ export async function adminUploadResultDocument(
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to upload." };
   if (file.size > 10 * 1024 * 1024) return { error: "Files must be 10MB or smaller." };
 
-  const admin = await requireRole("admin");
+  const admin = await requirePlatformAdmin();
   const supabase = await createClient();
 
   const storagePath = `${applicationId.data}/visa-result-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;

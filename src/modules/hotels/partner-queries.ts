@@ -45,6 +45,34 @@ export async function getHotelForEdit(hotelId: string, partnerId: string) {
   return data;
 }
 
+/** Room + parent hotel, scoped by partner_id like getHotelForEdit. */
+export async function getRoomForInventory(roomId: string, hotelId: string, partnerId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("hotel_rooms")
+    .select("*, hotels!inner(id, name, partner_id)")
+    .eq("id", roomId)
+    .eq("hotel_id", hotelId)
+    .eq("hotels.partner_id", partnerId)
+    .maybeSingle();
+  return data;
+}
+
+/** Upcoming capped nights for a room (today onwards, capped window). */
+export async function getRoomInventory(roomId: string, days = 60) {
+  const supabase = await createClient();
+  const from = new Date().toISOString().slice(0, 10);
+  const to = new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+  const { data } = await supabase
+    .from("hotel_room_inventory")
+    .select("id, date, total_units, booked_units, price_override")
+    .eq("room_id", roomId)
+    .gte("date", from)
+    .lte("date", to)
+    .order("date");
+  return data ?? [];
+}
+
 export async function getPartnerBookings(partnerId: string) {
   const supabase = await createClient();
   const { data: hotels } = await supabase.from("hotels").select("id").eq("partner_id", partnerId);

@@ -12,11 +12,11 @@ export async function getOrderForCheckout(orderId: string) {
       `*,
        order_items (
          *,
-         hotel_booking:hotel_booking_id (id, check_in, check_out, num_rooms, hotel:hotel_id (name)),
+         hotel_booking:hotel_booking_id (id, check_in, check_out, num_rooms, guest_details, hotel:hotel_id (name)),
          flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at),
          visa_application:visa_application_id (id, application_ref, applicant_type, visa_type:visa_type_id (name, destination_country_code)),
          umrah_booking:umrah_booking_id (id, num_pilgrims, package:package_id (name)),
-         hall_booking:hall_booking_id (id, event_date, event_type, venue:venue_id (name))
+         hall_booking:hall_booking_id (id, start_date, end_date, event_type, venue:venue_id (name))
        ),
        payments (*)`
     )
@@ -28,6 +28,14 @@ export async function getOrderForCheckout(orderId: string) {
 
 export type CheckoutOrder = NonNullable<Awaited<ReturnType<typeof getOrderForCheckout>>>;
 export type CheckoutOrderItem = CheckoutOrder["order_items"][number];
+
+/** Reads hotel_bookings.guest_details ({full_name}[] jsonb) into plain names. */
+export function hotelGuestNames(guestDetails: unknown): string[] {
+  if (!Array.isArray(guestDetails)) return [];
+  return guestDetails
+    .map((g) => (g && typeof g === "object" && "full_name" in g ? String((g as { full_name: unknown }).full_name) : null))
+    .filter((name): name is string => Boolean(name && name.trim()));
+}
 
 /** Human title/subtitle + post-payment destination for one order item. */
 export function describeOrderItem(item: CheckoutOrderItem): {
@@ -78,11 +86,14 @@ export function describeOrderItem(item: CheckoutOrderItem): {
     }
     case "hall": {
       const booking = item.hall_booking;
+      const range = booking
+        ? booking.end_date !== booking.start_date
+          ? `${format(new Date(booking.start_date), "d MMM")} → ${format(new Date(booking.end_date), "d MMM yyyy")}`
+          : format(new Date(booking.start_date), "d MMM yyyy")
+        : "";
       return {
         title: booking?.venue?.name ?? "Hall booking",
-        subtitle: booking
-          ? `${booking.event_type} · ${format(new Date(booking.event_date), "d MMM yyyy")}`
-          : "",
+        subtitle: booking ? `${booking.event_type} · ${range}` : "",
         href: "/account/bookings",
       };
     }

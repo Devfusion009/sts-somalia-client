@@ -2,6 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/lib/types/database.types";
+import { cookieDomain } from "@/lib/subdomain";
 
 /**
  * Server Component / Server Action / Route Handler client. Runs as the
@@ -15,6 +16,10 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      // Host-only: the session written on admin.<host> is not readable on
+      // <host>, which is what keeps the portals from sharing a credential.
+      // See lib/subdomain.ts for why, and for the one knob that changes it.
+      cookieOptions: { domain: cookieDomain() || undefined },
       cookies: {
         getAll() {
           return cookieStore.getAll();

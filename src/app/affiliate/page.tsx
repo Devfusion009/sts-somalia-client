@@ -65,7 +65,7 @@ export default async function AffiliateDashboardPage() {
         <StatCard label="Links created" value={links.length} />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Pending conversions" value={pendingConversions} />
         <StatCard label="Approved conversions" value={approvedConversions} />
         <StatCard label="Paid conversions" value={paidConversions} />

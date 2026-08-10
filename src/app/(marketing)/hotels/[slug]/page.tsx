@@ -11,12 +11,14 @@ import {
   Star,
   Users,
 } from "lucide-react";
-import { getHotelBySlug } from "@/modules/hotels/queries";
+import { getHotelBySlug, getRoomAvailability } from "@/modules/hotels/queries";
 import { hotelImageUrls, amenityLabel } from "@/modules/hotels/images";
 import { MediaPlaceholder } from "@/components/media-placeholder";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookingForm } from "./booking-form";
+import { AgencyBookingSlot } from "@/modules/agencies/components/agency-booking-slot";
 
 export async function generateMetadata({
   params,
@@ -45,6 +47,14 @@ export default async function HotelDetailPage({
   const rooms = hotel.hotel_rooms.filter((room) => room.status === "published");
   const amenities = Array.isArray(hotel.amenities) ? (hotel.amenities as string[]) : [];
   const images = hotelImageUrls(hotel.images);
+
+  // With dates selected, surface remaining capacity for capped nights. Rooms
+  // absent from the map have no caps for the stay — no note shown.
+  const availability = await getRoomAvailability(
+    rooms.map((r) => r.id),
+    checkIn,
+    checkOut
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
@@ -129,6 +139,8 @@ export default async function HotelDetailPage({
             const roomAmenities = Array.isArray(room.amenities)
               ? (room.amenities as string[])
               : [];
+            const unitsLeft = availability.get(room.id);
+            const soldOut = unitsLeft !== undefined && unitsLeft <= 0;
             return (
               <Card key={room.id} className="overflow-hidden py-0">
                 <CardContent className="flex flex-col gap-0 p-0 sm:flex-row">
@@ -185,12 +197,26 @@ export default async function HotelDetailPage({
                         {room.currency} {room.base_price.toFixed(0)}
                       </span>
                       <span className="block text-xs text-muted-foreground">per night</span>
+                      {soldOut ? (
+                        <span className="mt-1 block text-xs font-semibold text-destructive">
+                          Sold out for your dates
+                        </span>
+                      ) : unitsLeft !== undefined && unitsLeft <= 5 ? (
+                        <span className="mt-1 block text-xs font-semibold text-brand-gold">
+                          Only {unitsLeft} left for your dates
+                        </span>
+                      ) : null}
                     </p>
-                    <BookingForm
-                      hotelId={hotel.id}
-                      room={room}
-                      defaults={{ checkIn, checkOut, guests }}
-                    />
+                    {soldOut ? (
+                      <Button disabled>Sold out</Button>
+                    ) : (
+                      <BookingForm
+                        hotelId={hotel.id}
+                        room={room}
+                        defaults={{ checkIn, checkOut, guests }}
+                        bookedForSlot={<AgencyBookingSlot />}
+                      />
+                    )}
                   </div>
                 </CardContent>
               </Card>

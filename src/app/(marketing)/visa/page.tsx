@@ -8,6 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { getVisaTypes } from "@/modules/visa/queries";
 import { countryFlag, countryName } from "@/lib/countries";
 import { fmtMoney, processingText } from "@/modules/visa/components/visa-shared";
+import { VisaRequirementBadge } from "@/modules/visa/components/visa-requirement-badge";
+import { VisaHeroBanner, VisaProcess } from "@/components/marketing/visa-hero";
+import { HomeFaq } from "@/components/marketing/home-faq";
 
 export const metadata: Metadata = { title: "Visa Services" };
 
@@ -28,42 +31,44 @@ export default async function VisaListPage({
 
   return (
     <div>
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-sidebar via-sidebar to-primary/40 text-sidebar-foreground">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
-          <div className="max-w-2xl">
-            <Badge className="border-transparent bg-primary/20 text-primary-foreground">
-              Visa Services
-            </Badge>
-            <h1 className="mt-4 font-heading text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-              Visas made simple, <span className="text-brand-accent">wherever you&apos;re going</span>
-            </h1>
-            <p className="mt-4 text-base leading-relaxed text-sidebar-foreground/80">
-              Apply online in minutes — STS handles the paperwork, follows up with the immigration
-              authorities, and keeps you updated at every step.
-            </p>
-            <form className="mt-7 flex max-w-lg gap-2 rounded-2xl bg-background/95 p-2 shadow-lg">
-              <Input
-                name="country"
-                autoComplete="off"
-                placeholder="Where do you want to go? (e.g. UAE, Turkey)"
-                defaultValue={country}
-                className="border-0 bg-transparent text-foreground shadow-none focus-visible:ring-0"
-              />
-              <Button type="submit" size="lg" className="shrink-0 gap-1.5">
-                <Search className="size-4" /> Search
-              </Button>
-            </form>
-            <ul className="mt-7 flex flex-wrap gap-x-6 gap-y-2">
-              {TRUST_POINTS.map((point) => (
-                <li key={point.text} className="flex items-center gap-2 text-sm text-sidebar-foreground/80">
-                  <point.icon className="size-4 text-primary" /> {point.text}
-                </li>
-              ))}
-            </ul>
-          </div>
+      <VisaHeroBanner>
+        <div className="max-w-2xl">
+          <Badge className="border-white/25 bg-white/15 text-white backdrop-blur-sm">Visa services</Badge>
+          <h1 className="mt-4 font-heading text-3xl font-bold tracking-tight text-white drop-shadow-lg sm:text-4xl lg:text-5xl">
+            Visas without the guesswork,{" "}
+            <span className="text-brand-accent">wherever you&apos;re going</span>
+          </h1>
+          <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 drop-shadow">
+            Our visa desk handles hundreds of applications a month. We know what each consulate
+            actually wants — and we check it twice before it goes anywhere near them.
+          </p>
+
+          <form className="mt-8 flex max-w-lg items-center rounded-xl bg-white p-1.5 shadow-2xl">
+            <Input
+              name="country"
+              autoComplete="off"
+              placeholder="Where are you going? UAE, Türkiye, Kenya…"
+              defaultValue={country}
+              aria-label="Destination country"
+              className="h-11 border-0 bg-transparent text-neutral-900 shadow-none placeholder:text-neutral-400 focus-visible:ring-0 dark:bg-transparent"
+            />
+            <button
+              type="submit"
+              className="flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-brand-accent px-6 font-heading text-sm font-bold text-brand-accent-foreground transition-colors hover:bg-brand-accent/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <Search className="size-4" /> Search
+            </button>
+          </form>
+
+          <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
+            {TRUST_POINTS.map((point) => (
+              <li key={point.text} className="flex items-center gap-2 text-sm font-medium text-white/85 drop-shadow">
+                <point.icon className="size-4 text-teal-300" /> {point.text}
+              </li>
+            ))}
+          </ul>
         </div>
-      </section>
+      </VisaHeroBanner>
 
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         {featured.length > 0 ? (
@@ -129,6 +134,9 @@ export default async function VisaListPage({
                             {visa.entry_type === "multiple" ? "Multiple entry" : "Single entry"}
                           </span>
                         </div>
+                        <div className="mt-2">
+                          <VisaRequirementBadge destinationCountryName={countryName(visa.destination_country_code)} />
+                        </div>
                       </div>
                       <div className="shrink-0 text-right">
                         <p className="text-[10px] text-muted-foreground uppercase">From</p>
@@ -157,6 +165,9 @@ export default async function VisaListPage({
           )}
         </section>
       </div>
+
+      <VisaProcess />
+      <HomeFaq />
     </div>
   );
 }

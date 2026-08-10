@@ -2,14 +2,18 @@ import Link from "next/link";
 import { LayoutDashboard } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { portalForRole } from "@/lib/auth/roles";
+import { portalForProfile } from "@/lib/auth/roles";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getSelfTraveler } from "@/modules/travelers/queries";
+import { TravelerProfileCard } from "@/modules/travelers/components/traveler-profile-card";
+import { PassportExpiryAlert } from "@/modules/travelers/components/passport-alert";
 import { ProfileForm } from "./profile-form";
 
 export default async function AccountOverviewPage() {
   const profile = await requireUser();
   const supabase = await createClient();
+  const selfTraveler = await getSelfTraveler();
 
   const [{ count: hotelCount }, { count: flightCount }, { count: visaCount }, { count: umrahCount }] =
     await Promise.all([
@@ -32,7 +36,7 @@ export default async function AccountOverviewPage() {
     ]);
 
   const totalBookings = (hotelCount ?? 0) + (flightCount ?? 0) + (visaCount ?? 0) + (umrahCount ?? 0);
-  const portal = portalForRole(profile.role);
+  const portal = portalForProfile(profile);
 
   return (
     <div className="space-y-6">
@@ -40,6 +44,11 @@ export default async function AccountOverviewPage() {
         <h1 className="font-heading text-2xl font-semibold">Welcome back{profile.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}</h1>
         <p className="text-sm text-muted-foreground">Manage your profile and see all your STS bookings in one place.</p>
       </div>
+
+      {/* Above the fold, before the stat cards. An expiring passport is the
+          one thing on this page that has a deadline attached to it — burying
+          it under the booking counts would be filing it, not warning about it. */}
+      <PassportExpiryAlert expiry={selfTraveler?.passport_expiry} subject="Your passport" />
 
       {portal ? (
         <Card className="border-primary/30 bg-primary/5">
@@ -76,6 +85,7 @@ export default async function AccountOverviewPage() {
       ) : null}
 
       <ProfileForm profile={profile} />
+      <TravelerProfileCard traveler={selfTraveler} />
     </div>
   );
 }

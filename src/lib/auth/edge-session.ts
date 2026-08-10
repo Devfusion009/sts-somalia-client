@@ -1,0 +1,126 @@
+import { jwtVerify, createRemoteJWKSet } from "jose";
+import type { NextRequest } from "next/server";
+
+/**
+ * Reads and verifies the Supabase session from the raw request cookies, for use
+ * in the proxy — before any React renders.
+ *
+ * WHY NOT createServerClient().getUser()
+ * That is an HTTP call to the auth server on every request, and it still would
+ * not answer "is this a platform admin" without a second call to the database.
+ * Verifying the JWT locally against the cached JWKS is one network fetch for
+ * the whole process lifetime, then pure CPU.
+ *
+ * WHAT THIS IS FOR
+ * Failing fast at the origin boundary: an unauthenticated or non-admin request
+ * to admin.<host> is turned away before the console boots. It is NOT the
+ * authorization boundary — see the note in the migration that adds the claim.
+ * Postgres RLS and requirePlatformAdmin() still gate every byte of data, and
+ * both re-read the live column rather than trusting a token that may predate a
+ * demotion.
+ */
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+// Module scope so the key set is fetched once and cached for the process, not
+// per request. jose handles re-fetching on unknown `kid` (key rotation).
+const jwks = SUPABASE_URL
+  ? createRemoteJWKSet(new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`))
+  : null;
+
+/**
+ * Verification can fail for two very different reasons, and conflating them is
+ * a bug: a bad signature means "reject", but the JWKS being momentarily
+ * unreachable (cold process, network blip, key rotation in flight) means "we
+ * don't know". Treating the second as "no session" bounces a legitimate admin
+ * to the login page on the first request after every cold start.
+ */
+export type EdgeSessionResult =
+  | { kind: "none" }
+  | { kind: "session"; session: EdgeSession }
+  | { kind: "unverifiable" };
+
+export type EdgeSession = {
+  userId: string;
+  email?: string;
+  isPlatformAdmin: boolean;
+  /** True when the token predates the claim hook, so the flag can't be trusted. */
+  claimMissing: boolean;
+};
+
+/**
+ * Supabase stores the session as `sb-<ref>-auth-token`, base64-encoded JSON.
+ * Large sessions are split across `.0`, `.1`, … chunks, so the parts are
+ * reassembled in index order before decoding.
+ */
+function readSessionCookie(request: NextRequest): string | null {
+  const all = request.cookies.getAll();
+  const base = all.filter((c) => /^sb-.*-auth-token$/.test(c.name));
+  if (base.length > 0) return base[0].value;
+
+  const chunks = all
+    .filter((c) => /^sb-.*-auth-token\.\d+$/.test(c.name))
+    .sort((a, b) => Number(a.name.split(".").pop()) - Number(b.name.split(".").pop()));
+  return chunks.length > 0 ? chunks.map((c) => c.value).join("") : null;
+}
+
+function accessTokenFrom(cookieValue: string): string | null {
+  try {
+    const raw = cookieValue.startsWith("base64-")
+      ? Buffer.from(cookieValue.slice("base64-".length), "base64").toString("utf8")
+      : decodeURIComponent(cookieValue);
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.access_token === "string" ? parsed.access_token : null;
+  } catch {
+    // A malformed or truncated cookie is treated as no session at all rather
+    // than throwing — a bad cookie must not 500 every page on the origin.
+    return null;
+  }
+}
+
+/** Never throws. See EdgeSessionResult for why this isn't just nullable. */
+export async function readEdgeSession(request: NextRequest): Promise<EdgeSessionResult> {
+  if (!jwks) return { kind: "unverifiable" };
+
+  const cookie = readSessionCookie(request);
+  if (!cookie) return { kind: "none" };
+
+  const token = accessTokenFrom(cookie);
+  if (!token) return { kind: "none" };
+
+  try {
+    // Signature, expiry and issuer are all checked. An expired token is
+    // rejected here, so the portal boundary can't be held open by a stale
+    // cookie the browser happens to still be sending.
+    const { payload } = await jwtVerify(token, jwks, {
+      issuer: `${SUPABASE_URL}/auth/v1`,
+    });
+
+    const claim = payload.is_platform_admin;
+    return {
+      kind: "session",
+      session: {
+        userId: String(payload.sub ?? ""),
+        email: typeof payload.email === "string" ? payload.email : undefined,
+        isPlatformAdmin: claim === true,
+        claimMissing: typeof claim !== "boolean",
+      },
+    };
+  } catch (error) {
+    // Only these are verdicts ABOUT THE TOKEN. Everything else — a failed
+    // fetch to the JWKS, or ERR_JWKS_NO_MATCHING_KEY, which happens legitimately
+    // while a signing key is rotating — says nothing about the caller and must
+    // not be turned into a rejection, or key rotation would sign every admin out.
+    const TOKEN_VERDICTS = new Set([
+      "ERR_JWT_EXPIRED",
+      "ERR_JWT_CLAIM_VALIDATION_FAILED",
+      "ERR_JWT_INVALID",
+      "ERR_JWS_INVALID",
+      "ERR_JWS_SIGNATURE_VERIFICATION_FAILED",
+    ]);
+    const code = (error as { code?: unknown } | null)?.code;
+    return typeof code === "string" && TOKEN_VERDICTS.has(code)
+      ? { kind: "none" }
+      : { kind: "unverifiable" };
+  }
+}

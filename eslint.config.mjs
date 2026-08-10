@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Supabase-generated runtime artifacts (minified vendor code) — not ours
+    // to lint; they drown real findings in hundreds of prefer-const errors.
+    "supabase/.temp/**",
   ]),
 ]);
 

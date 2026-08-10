@@ -13,16 +13,17 @@ export type PaymentMethodId =
   | "zaad"
   | "sahal"
   | "edahab"
+  | "agency_wallet"
   | "bank_transfer"
   | "cash_office";
 
-export type PaymentProvider = "stripe" | "waafi" | "edahab" | "manual" | "test";
+export type PaymentProvider = "stripe" | "waafi" | "edahab" | "wallet" | "manual" | "test";
 
 export type PaymentMethodDef = {
   id: PaymentMethodId;
   label: string;
   description: string;
-  kind: "card" | "mobile_money" | "bank" | "cash";
+  kind: "card" | "mobile_money" | "wallet" | "bank" | "cash";
   provider: PaymentProvider;
   /** Short brand chips rendered on the right of the method row. */
   badges: string[];
@@ -31,9 +32,25 @@ export type PaymentMethodDef = {
   simulated: boolean;
 };
 
-export function getAvailablePaymentMethods(): PaymentMethodDef[] {
+export function getAvailablePaymentMethods(opts?: {
+  /** Present when the order belongs to the viewer's agency — enables pay-from-balance. */
+  agencyWallet?: { available: number; currency: string };
+}): PaymentMethodDef[] {
   const { payments } = getIntegrations();
   const methods: PaymentMethodDef[] = [];
+
+  if (opts?.agencyWallet) {
+    methods.push({
+      id: "agency_wallet",
+      label: "Agency Balance",
+      description: `Pay from your agency wallet — ${opts.agencyWallet.currency} ${opts.agencyWallet.available.toFixed(2)} available`,
+      kind: "wallet",
+      provider: "wallet",
+      badges: ["B2B"],
+      requiresPhone: false,
+      simulated: false,
+    });
+  }
 
   if (payments.stripe || payments.testMode) {
     methods.push({

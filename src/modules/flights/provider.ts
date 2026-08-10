@@ -1,11 +1,13 @@
 import "server-only";
-import { getIntegrations } from "@/lib/integrations";
+import { resolveDuffelApiKey } from "@/lib/provider-runtime/duffel";
 
 /**
- * Env-driven flight search. When DUFFEL_API_KEY is present the search goes
- * live against Duffel's offer-request API; without it the module degrades to
- * the manual quote-request flow. No SDK — plain fetch, mapped to a small
- * offer shape the UI owns.
+ * Flight search against Duffel's offer-request API. The API key comes from
+ * the admin-managed platform_api_integrations table when Duffel is active
+ * there, falling back to the legacy DUFFEL_API_KEY env var — so existing
+ * env-only deployments keep working unchanged. With neither configured, the
+ * module degrades to the manual quote-request flow. No SDK — plain fetch,
+ * mapped to a small offer shape the UI owns.
  */
 
 export type FlightSearchParams = {
@@ -16,6 +18,8 @@ export type FlightSearchParams = {
   adults: number;
   cabinClass: "economy" | "premium_economy" | "business" | "first";
 };
+
+export type FarePenalty = { amount: number; currency: string } | null;
 
 export type FlightOffer = {
   id: string;
@@ -29,6 +33,13 @@ export type FlightOffer = {
   cabinClass: string;
   totalAmount: number;
   currency: string;
+  /** null = Duffel didn't return conditions for this fare (unknown, not "no"). */
+  refundable: boolean | null;
+  refundPenalty: FarePenalty;
+  changeable: boolean | null;
+  changePenalty: FarePenalty;
+  /** Checked bags for the first passenger's first segment — a summary, not a per-passenger/per-segment breakdown. */
+  checkedBagsIncluded: number | null;
 };
 
 export type FlightSearchResult = {
@@ -38,11 +49,22 @@ export type FlightSearchResult = {
   providerError?: string;
 };
 
+type DuffelBaggage = { type?: string; quantity?: number };
+
+type DuffelPassenger = { baggages?: DuffelBaggage[] };
+
 type DuffelSegment = {
   origin?: { iata_code?: string };
   destination?: { iata_code?: string };
   departing_at?: string;
   arriving_at?: string;
+  passengers?: DuffelPassenger[];
+};
+
+type DuffelConditionEntry = {
+  allowed?: boolean;
+  penalty_amount?: string;
+  penalty_currency?: string;
 };
 
 type DuffelOffer = {
@@ -51,7 +73,18 @@ type DuffelOffer = {
   total_currency?: string;
   owner?: { name?: string };
   slices?: Array<{ duration?: string; segments?: DuffelSegment[] }>;
+  conditions?: {
+    refund_before_departure?: DuffelConditionEntry | null;
+    change_before_departure?: DuffelConditionEntry | null;
+  };
 };
+
+function mapPenalty(entry: DuffelConditionEntry | null | undefined): FarePenalty {
+  if (!entry?.penalty_amount) return null;
+  const amount = Number(entry.penalty_amount);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return { amount, currency: entry.penalty_currency ?? "USD" };
+}
 
 /** ISO 8601 duration (PT4H30M) → minutes. */
 function parseDuration(duration: string | undefined): number | null {
@@ -63,8 +96,8 @@ function parseDuration(duration: string | undefined): number | null {
 }
 
 export async function searchLiveFlights(params: FlightSearchParams): Promise<FlightSearchResult> {
-  const { flights } = getIntegrations();
-  if (!flights.duffel) return { live: false, offers: [] };
+  const apiKey = await resolveDuffelApiKey();
+  if (!apiKey) return { live: false, offers: [] };
 
   const slices: Array<{ origin: string; destination: string; departure_date: string }> = [
     { origin: params.origin, destination: params.destination, departure_date: params.departDate },
@@ -81,7 +114,7 @@ export async function searchLiveFlights(params: FlightSearchParams): Promise<Fli
     const res = await fetch("https://api.duffel.com/air/offer_requests?return_offers=true", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.DUFFEL_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Duffel-Version": "v2",
         "Content-Type": "application/json",
       },
@@ -107,6 +140,13 @@ export async function searchLiveFlights(params: FlightSearchParams): Promise<Fli
       const first = segments[0];
       const last = segments[segments.length - 1];
       if (!first?.departing_at || !last?.arriving_at) return [];
+
+      const refund = offer.conditions?.refund_before_departure;
+      const change = offer.conditions?.change_before_departure;
+      const checkedBags = first.passengers?.[0]?.baggages
+        ?.filter((b) => b.type === "checked")
+        .reduce((sum, b) => sum + (b.quantity ?? 0), 0);
+
       return [
         {
           id: offer.id,
@@ -120,6 +160,11 @@ export async function searchLiveFlights(params: FlightSearchParams): Promise<Fli
           cabinClass: params.cabinClass,
           totalAmount: Number(offer.total_amount ?? 0),
           currency: offer.total_currency ?? "USD",
+          refundable: refund ? Boolean(refund.allowed) : null,
+          refundPenalty: mapPenalty(refund),
+          changeable: change ? Boolean(change.allowed) : null,
+          changePenalty: mapPenalty(change),
+          checkedBagsIncluded: checkedBags ?? null,
         },
       ];
     });

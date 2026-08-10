@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { Menu, ChevronDown, LayoutDashboard, User, LogOut, Handshake } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+
+import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -23,12 +25,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { NAV_LINKS, PARTNER_LINKS } from "@/lib/nav-links";
 import { signOutAction } from "@/lib/auth/actions";
-import { portalForRole } from "@/lib/auth/roles";
+import { portalForProfile } from "@/lib/auth/roles";
+import { MEGA_SECTIONS, SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL, type MegaSection } from "@/lib/marketing-nav";
+import { cn } from "@/lib/utils";
+import { createScrollFlagStore } from "@/lib/scroll-flag-store";
 import type { Database } from "@/lib/types/database.types";
 
+import { ArrowForwardIcon, ArticleIcon, CelebrationIcon, DashboardIcon, ExpandMoreIcon, FlightTakeoffIcon, HotelIcon, LogoutIcon, MenuIcon, MosqueIcon, NearMeIcon, PersonIcon, PlaceIcon, SearchIcon } from "@/components/ui/mui-icons";
+import type { SvgIconComponent } from "@/components/ui/mui-icons";
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+
+const ICONS: Record<MegaSection["icon"], SvgIconComponent> = {
+  flight: FlightTakeoffIcon,
+  hotel: HotelIcon,
+  visa: ArticleIcon,
+  umrah: MosqueIcon,
+  events: CelebrationIcon,
+};
 
 function initials(name: string | null, email: string | null) {
   const source = name?.trim() || email || "?";
@@ -40,54 +54,137 @@ function initials(name: string | null, email: string | null) {
     .toUpperCase();
 }
 
+/**
+ * Pill-shaped primary nav with hover mega-menus, matching the reference
+ * layout. Partner/acquisition links stay out of this consumer nav (they live
+ * in the footer) — the one exception is the portal switch, which only appears
+ * for an account that already holds that identity.
+ */
 export function SiteHeaderClient({ profile }: { profile: Profile | null }) {
   const pathname = usePathname();
-  const [partnersOpen, setPartnersOpen] = useState(false);
-  const portal = profile ? portalForRole(profile.role) : null;
+  const portal = profile ? portalForProfile(profile) : null;
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Hover intent: a small close delay stops the panel flickering while the
+  // pointer crosses the gap between the pill and the panel below it.
+  const open = (key: string) => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpenKey(key);
+  };
+  const scheduleClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setOpenKey(null), 140);
+  };
+
+  // Closing on navigation is done in the links' onClick rather than an effect
+  // on `pathname` — an effect would setState synchronously on every route
+  // change, and the click is the actual event we care about.
+  const closeNow = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpenKey(null);
+  };
+
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
 
   return (
     <>
-      <nav className="hidden items-center gap-1 md:flex">
-        {NAV_LINKS.map((link) => (
-          <Button
-            key={link.href}
-            variant="ghost"
-            render={<Link href={link.href} />}
-            className={pathname.startsWith(link.href) ? "bg-accent text-accent-foreground" : ""}
-          >
-            {link.label}
-          </Button>
-        ))}
-        <DropdownMenu open={partnersOpen} onOpenChange={setPartnersOpen}>
-          <DropdownMenuTrigger render={<Button variant="ghost" />}>
-            Partner with us
-            <ChevronDown className="size-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
-            {PARTNER_LINKS.map((item) => (
-              <DropdownMenuItem
-                key={item.href}
-                render={<Link href={item.href} />}
-                className="flex-col items-start gap-0.5 py-2"
+      {/* ---------------- Desktop pill nav ---------------- */}
+      <nav aria-label="Primary" className="hidden items-center gap-2 lg:flex" onMouseLeave={scheduleClose}>
+        {MEGA_SECTIONS.map((section) => {
+          const Icon = ICONS[section.icon];
+          const active = pathname.startsWith(section.href);
+          const isOpen = openKey === section.key;
+
+          return (
+            <div key={section.key} className="relative" onMouseEnter={() => open(section.key)}>
+              <Link
+                href={section.href}
+                aria-expanded={isOpen}
+                onFocus={() => open(section.key)}
+                onClick={closeNow}
+                className={cn(
+                  "flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-all duration-300 ease-out group-data-[condensed]/header:h-9 group-data-[condensed]/header:px-3.5 group-data-[condensed]/header:text-[13px]",
+                  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none",
+                  active || isOpen
+                    ? "border-primary/30 bg-primary/10 text-primary"
+                    : "border-border bg-card text-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+                )}
               >
-                <span className="font-medium">{item.label}</span>
-                <span className="text-xs text-muted-foreground">{item.description}</span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+                <Icon sx={{ fontSize: 19 }} />
+                {section.label}
+                <ExpandMoreIcon
+                  sx={{ fontSize: 16 }}
+                  className={cn("transition-transform duration-200", isOpen && "rotate-180")}
+                />
+              </Link>
+
+              <AnimatePresence>
+                {isOpen ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                    className="absolute top-full left-1/2 z-50 w-max -translate-x-1/2 pt-3"
+                  >
+                    <div className="overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl">
+                      <div className="flex items-start gap-3 border-b border-border bg-secondary/50 p-4">
+                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+                          <Icon sx={{ fontSize: 20 }} />
+                        </span>
+                        <div className="max-w-xs">
+                          <Link
+                            href={section.href}
+                            onClick={closeNow}
+                            className="flex items-center gap-1.5 font-heading text-sm font-bold hover:text-primary"
+                          >
+                            All {section.label}
+                            <ArrowForwardIcon sx={{ fontSize: 14 }} className="text-primary" />
+                          </Link>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{section.blurb}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-8 p-4">
+                        {section.columns.map((column) => (
+                          <div key={column.heading} className="min-w-44">
+                            <p className="mb-2 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+                              {column.heading}
+                            </p>
+                            <ul className="space-y-0.5">
+                              {column.links.map((link) => (
+                                <li key={link.href + link.label}>
+                                  <Link
+                                    href={link.href}
+                                    onClick={closeNow}
+                                    className="block rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-primary"
+                                  >
+                                    {link.label}
+                                  </Link>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          );
+        })}
       </nav>
 
-      <div className="hidden items-center gap-2 md:flex">
+      {/* ---------------- Desktop right cluster ---------------- */}
+      <div className="hidden items-center gap-2 lg:flex">
         {profile ? (
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" className="gap-2 pl-2" />}>
+            <DropdownMenuTrigger render={<Button variant="ghost" className="h-11 gap-2 rounded-full pl-2 transition-[height] duration-300 ease-out group-data-[condensed]/header:h-9" />}>
               <Avatar className="size-7">
-                <AvatarFallback className="text-xs">
-                  {initials(profile.full_name, profile.email)}
-                </AvatarFallback>
+                <AvatarFallback className="text-xs">{initials(profile.full_name, profile.email)}</AvatarFallback>
               </Avatar>
-              {profile.full_name || "My Account"}
+              <span className="max-w-28 truncate">{profile.full_name || "My Account"}</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuGroup>
@@ -95,96 +192,117 @@ export function SiteHeaderClient({ profile }: { profile: Profile | null }) {
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem render={<Link href="/account" />}>
-                <User /> My Account
+                <PersonIcon sx={{ fontSize: 18 }} /> My Account
               </DropdownMenuItem>
               {portal ? (
                 <DropdownMenuItem render={<Link href={portal.href} />}>
-                  <LayoutDashboard /> {portal.label}
+                  <DashboardIcon sx={{ fontSize: 18 }} /> Switch to {portal.label}
                 </DropdownMenuItem>
               ) : null}
               <DropdownMenuSeparator />
               <form action={signOutAction}>
                 <DropdownMenuItem variant="destructive" render={<button type="submit" className="w-full" />}>
-                  <LogOut /> Sign out
+                  <LogoutIcon sx={{ fontSize: 18 }} /> Sign out
                 </DropdownMenuItem>
               </form>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <>
-            <Button variant="ghost" render={<Link href="/login" />}>
-              Log in
-            </Button>
-            <Button
-              className="bg-brand-accent text-brand-accent-foreground hover:bg-brand-accent/90"
-              render={<Link href="/signup" />}
-            >
-              Sign up
-            </Button>
-          </>
+          <Button
+            variant="outline"
+            render={<Link href="/login" />}
+            className="h-11 rounded-full border-brand-accent px-5 font-semibold text-brand-accent transition-all duration-300 ease-out group-data-[condensed]/header:h-9 group-data-[condensed]/header:px-4 hover:bg-brand-accent hover:text-brand-accent-foreground dark:border-brand-accent dark:bg-transparent"
+          >
+            Log in
+          </Button>
         )}
+
+        <Button
+          render={<Link href="/#plan" />}
+          className="h-11 gap-2 rounded-full bg-brand-accent px-5 font-semibold text-brand-accent-foreground transition-all duration-300 ease-out group-data-[condensed]/header:h-9 group-data-[condensed]/header:px-4 hover:bg-brand-accent/90"
+        >
+          <NearMeIcon sx={{ fontSize: 18 }} />
+          Plan My Trip
+        </Button>
       </div>
 
+      {/* ---------------- Mobile ---------------- */}
       <Sheet>
-        <SheetTrigger render={<Button variant="ghost" size="icon" className="md:hidden" />}>
-          <Menu />
+        <SheetTrigger
+          render={
+            <Button variant="ghost" size="icon" aria-label="Open menu" className="size-11 rounded-full transition-[width,height] duration-300 ease-out group-data-[condensed]/header:size-9 lg:hidden" />
+          }
+        >
+          <MenuIcon />
         </SheetTrigger>
-        <SheetContent side="right" className="w-72">
+        <SheetContent side="right" className="flex w-80 flex-col">
           <SheetHeader>
             <SheetTitle>Menu</SheetTitle>
           </SheetHeader>
-          <div className="flex flex-col gap-1 px-4">
-            {NAV_LINKS.map((link) => (
-              <SheetClose
-                key={link.href}
-                render={<Link href={link.href} className="rounded-md px-3 py-2 text-sm font-medium hover:bg-accent" />}
-              >
-                {link.label}
-              </SheetClose>
-            ))}
-            <div className="mt-2 border-t border-border pt-2">
-              <p className="px-3 pb-1 text-xs font-medium text-muted-foreground">Partner with us</p>
-              {PARTNER_LINKS.map((item) => (
-                <SheetClose
-                  key={item.href}
-                  render={
-                    <Link
-                      href={item.href}
-                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent"
-                    />
-                  }
-                >
-                  <Handshake className="size-4" /> {item.label}
-                </SheetClose>
-              ))}
-            </div>
-            <div className="mt-2 border-t border-border pt-3">
+
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <nav className="flex flex-col gap-5">
+              {MEGA_SECTIONS.map((section) => {
+                const Icon = ICONS[section.icon];
+                return (
+                  <div key={section.key}>
+                    <SheetClose
+                      render={
+                        <Link
+                          href={section.href}
+                          className="flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-2 font-heading text-base font-semibold hover:bg-accent"
+                        />
+                      }
+                    >
+                      <span className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
+                        <Icon sx={{ fontSize: 18 }} />
+                      </span>
+                      {section.label}
+                    </SheetClose>
+                    <div className="mt-1 ml-6 flex flex-col border-l border-border pl-5">
+                      {section.columns[0]?.links.slice(0, 4).map((link) => (
+                        <SheetClose
+                          key={link.href + link.label}
+                          render={
+                            <Link
+                              href={link.href}
+                              className="rounded-md px-2 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                            />
+                          }
+                        >
+                          {link.label}
+                        </SheetClose>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </nav>
+
+            <div className="mt-6 border-t border-border pt-4">
               {profile ? (
                 <div className="flex flex-col gap-1">
-                  <SheetClose render={<Link href="/account" className="rounded-md px-3 py-2 text-sm font-medium hover:bg-accent" />}>
+                  <SheetClose render={<Link href="/account" className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent" />}>
                     My Account
                   </SheetClose>
                   {portal ? (
-                    <SheetClose render={<Link href={portal.href} className="rounded-md px-3 py-2 text-sm font-medium hover:bg-accent" />}>
-                      {portal.label}
+                    <SheetClose render={<Link href={portal.href} className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent" />}>
+                      Switch to {portal.label}
                     </SheetClose>
                   ) : null}
                   <form action={signOutAction}>
-                    <button
-                      type="submit"
-                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-destructive hover:bg-accent"
-                    >
+                    <button type="submit" className="w-full rounded-md px-3 py-2.5 text-left text-sm font-medium text-destructive hover:bg-accent">
                       Sign out
                     </button>
                   </form>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2 px-3">
-                  <Button variant="outline" render={<Link href="/login" />}>
+                <div className="flex flex-col gap-2">
+                  <Button variant="outline" render={<Link href="/login" />} className="h-11 rounded-full">
                     Log in
                   </Button>
                   <Button
-                    className="bg-brand-accent text-brand-accent-foreground hover:bg-brand-accent/90"
+                    className="h-11 rounded-full bg-brand-accent font-semibold text-brand-accent-foreground hover:bg-brand-accent/90"
                     render={<Link href="/signup" />}
                   >
                     Sign up
@@ -193,8 +311,84 @@ export function SiteHeaderClient({ profile }: { profile: Profile | null }) {
               )}
             </div>
           </div>
+
+          <SheetFooter className="border-t border-border">
+            <a
+              href={SUPPORT_PHONE_TEL}
+              className="flex min-h-11 items-center justify-center gap-2 rounded-full bg-secondary px-4 text-sm font-semibold text-secondary-foreground"
+            >
+              {SUPPORT_PHONE_DISPLAY}
+            </a>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
     </>
+  );
+}
+
+/**
+ * Slim destination search that lives directly under the nav — on the home page
+ * it only appears once the hero's own search has scrolled away, mirroring the
+ * reference site's sticky search behaviour.
+ */
+const useSearchRevealed = createScrollFlagStore(560, 460);
+
+export function HeaderSearch() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [value, setValue] = useState("");
+  // Only the home page hides it initially — it already has a big hero search,
+  // so this one reveals once that scrolls away. Everywhere else it's always up.
+  const isHome = pathname === "/";
+  // Cached + hysteresis store, same reasoning as the header shell: revealing
+  // this bar adds ~47px of layout, which feeds back into scroll position. A
+  // live `window.scrollY` snapshot would make React's commit-time re-read
+  // disagree with render and loop.
+  const scrolledPast = useSearchRevealed();
+  const visible = !isHome || scrolledPast;
+
+  return (
+    <AnimatePresence initial={false}>
+      {visible ? (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          className="relative z-10 overflow-hidden border-t border-border/70 bg-background"
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              router.push(value.trim() ? `/hotels?city=${encodeURIComponent(value.trim())}` : "/hotels");
+            }}
+            className="mx-auto flex max-w-2xl items-center gap-0 px-4 py-3 transition-[padding] duration-300 ease-out group-data-[condensed]/header:py-1.5"
+          >
+            <div className="relative flex-1">
+              <PlaceIcon
+                sx={{ fontSize: 22 }}
+                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                type="search"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                aria-label="Search destinations"
+                placeholder="Where do you want to go?"
+                autoComplete="off"
+                className="h-12 w-full rounded-l-xl rounded-r-none border border-r-0 border-input bg-card pr-3 pl-11 text-sm text-foreground outline-none transition-[height] duration-300 ease-out group-data-[condensed]/header:h-9 placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+              />
+            </div>
+            <button
+              type="submit"
+              className="h-12 shrink-0 rounded-r-xl bg-brand-accent px-7 text-sm font-bold text-brand-accent-foreground transition-all duration-300 ease-out group-data-[condensed]/header:h-9 hover:bg-brand-accent/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <SearchIcon sx={{ fontSize: 18 }} className="mr-1 -ml-1 align-text-bottom sm:hidden" />
+              <span className="hidden sm:inline">Search</span>
+            </button>
+          </form>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }

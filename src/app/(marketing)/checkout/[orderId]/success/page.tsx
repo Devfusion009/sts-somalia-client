@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CheckCircle2, Clock, ArrowRight } from "lucide-react";
+import { CheckCircle2, Clock, ArrowRight, Download } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import { getOrderForCheckout, describeOrderItem } from "@/modules/payments/queries";
+import { getOrderForCheckout, describeOrderItem, hotelGuestNames } from "@/modules/payments/queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { WhatsAppInlineLink } from "@/components/marketing/whatsapp-button";
 
 export const metadata: Metadata = { title: "Payment Confirmation" };
 
@@ -28,6 +29,8 @@ export default async function CheckoutSuccessPage({
   if (order.status === "pending_payment") redirect(`/checkout/${orderId}`);
 
   const paid = order.status !== "cancelled";
+  const invoiceAvailable =
+    order.status === "paid" || order.status === "processing" || order.status === "completed";
   const successfulPayment = order.payments.find((p) => p.status === "succeeded");
   const primaryItem = order.order_items[0];
   const primaryHref = primaryItem ? describeOrderItem(primaryItem).href : "/account/bookings";
@@ -65,6 +68,8 @@ export default async function CheckoutSuccessPage({
         <CardContent className="space-y-3 text-sm">
           {order.order_items.map((item) => {
             const info = describeOrderItem(item);
+            const guestNames =
+              item.item_type === "hotel" ? hotelGuestNames(item.hotel_booking?.guest_details) : [];
             return (
               <div key={item.id} className="flex items-start justify-between gap-4">
                 <div>
@@ -73,6 +78,9 @@ export default async function CheckoutSuccessPage({
                   </Link>
                   {info.subtitle ? (
                     <p className="text-xs text-muted-foreground">{info.subtitle}</p>
+                  ) : null}
+                  {guestNames.length > 0 ? (
+                    <p className="text-xs text-muted-foreground">Guests: {guestNames.join(", ")}</p>
                   ) : null}
                 </div>
                 <p className="shrink-0 font-medium">{money(item.total_price, order.currency)}</p>
@@ -104,7 +112,25 @@ export default async function CheckoutSuccessPage({
         <Button size="lg" variant="outline" render={<Link href="/account/bookings" />}>
           My Bookings
         </Button>
+        {invoiceAvailable ? (
+          <Button
+            size="lg"
+            variant="outline"
+            className="gap-2"
+            render={<a href={`/api/invoices/${order.id}`} target="_blank" rel="noopener noreferrer" />}
+          >
+            <Download className="size-4" /> Download Invoice
+          </Button>
+        ) : null}
       </div>
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        Questions about this booking?{" "}
+        <WhatsAppInlineLink message={`Hello STS! I have a question about my order ${order.order_number}.`}>
+          Message us on WhatsApp
+        </WhatsAppInlineLink>{" "}
+        — include your order number and we&apos;ll take it from there.
+      </p>
     </div>
   );
 }

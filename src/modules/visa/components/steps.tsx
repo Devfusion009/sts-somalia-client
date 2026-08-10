@@ -56,6 +56,7 @@ import {
   savePersonalInfo,
   saveTravelInfo,
   uploadVisaDocument,
+  attachVaultDocument,
   removeVisaDocument,
   continueFromDocuments,
   submitVisaApplication,
@@ -782,18 +783,38 @@ function formatBytes(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** One saved vault document, reduced to what the picker needs. */
+export type VaultOption = {
+  id: string;
+  label: string;
+  fileName: string;
+  documentType: string;
+};
+
 function UploadSlot({
   applicationId,
   slot,
   existing,
+  vaultOptions,
 }: {
   applicationId: string;
   slot: DocumentSlot;
   existing?: WizardApplication["documents"][number];
+  vaultOptions: VaultOption[];
 }) {
   const [state, formAction, pending] = useActionState(uploadVisaDocument, null);
+  const [attachState, attachAction, attaching] = useActionState(attachVaultDocument, null);
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Documents whose saved type matches this slot float to the top; the rest
+  // stay selectable because slot keys are per-visa-type free text and won't
+  // always line up with the vault's fixed vocabulary.
+  const ranked = [...vaultOptions].sort((a, b) => {
+    const aMatch = a.documentType === slot.key ? 0 : 1;
+    const bMatch = b.documentType === slot.key ? 0 : 1;
+    return aMatch - bMatch || a.label.localeCompare(b.label);
+  });
 
   return (
     <div className="space-y-1.5">
@@ -859,11 +880,53 @@ function UploadSlot({
           {state?.error ? <p className="mt-1.5 text-xs text-destructive">{state.error}</p> : null}
         </form>
       )}
+
+      {/* Reuse from the vault. Only offered when the slot is empty and the
+          customer actually has something saved — an empty picker would just be
+          a dead control on every application. */}
+      {!existing && ranked.length > 0 ? (
+        <form action={attachAction} className="flex flex-wrap items-center gap-2 pt-1">
+          <input type="hidden" name="applicationId" value={applicationId} />
+          <input type="hidden" name="slotKey" value={slot.key} />
+          <label className="sr-only" htmlFor={`vault-${slot.key}`}>
+            Use a saved document for {slot.label}
+          </label>
+          <select
+            id={`vault-${slot.key}`}
+            name="documentId"
+            defaultValue=""
+            required
+            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-transparent px-2 text-xs shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <option value="" disabled>
+              Use a document from your vault…
+            </option>
+            {ranked.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <Button type="submit" size="sm" variant="outline" disabled={attaching}>
+            {attaching ? "Attaching…" : "Attach"}
+          </Button>
+          {attachState?.error ? (
+            <p className="w-full text-xs text-destructive">{attachState.error}</p>
+          ) : null}
+        </form>
+      ) : null}
     </div>
   );
 }
 
-export function StepDocuments({ application }: { application: WizardApplication }) {
+export function StepDocuments({
+  application,
+  vaultOptions = [],
+}: {
+  application: WizardApplication;
+  /** The customer's document vault, offered as an alternative to uploading. */
+  vaultOptions?: VaultOption[];
+}) {
   const [state, formAction] = useActionState(continueFromDocuments, null);
   const slots = parseDocumentSlots(application.visa_type?.required_documents);
   const byKey = new Map(application.documents.map((d) => [d.document_type, d]));
@@ -882,6 +945,7 @@ export function StepDocuments({ application }: { application: WizardApplication 
             applicationId={application.id}
             slot={slot}
             existing={byKey.get(slot.key)}
+            vaultOptions={vaultOptions}
           />
         ))}
       </div>

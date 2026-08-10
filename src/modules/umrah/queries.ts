@@ -1,20 +1,29 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { PackageCardData } from "@/modules/umrah/components/package-card";
+import { umrahImageUrls } from "@/modules/umrah/images";
 
 type PackageRow = {
   id: string;
   slug: string;
   name: string;
+  tagline: string | null;
+  tier: string | null;
+  is_featured: boolean;
+  origin_iata: string | null;
+  destination_iata: string | null;
   duration_days: number;
   base_price: number;
+  original_price: number | null;
   currency: string;
   includes: unknown;
+  images: unknown;
   umrah_package_departures: { departure_date: string; total_seats: number; booked_seats: number }[];
+  umrah_package_hotels: { city: string; name: string; star_rating: number | null; distance_to_haram_m: number | null }[];
 };
 
 const CARD_SELECT =
-  "id, slug, name, duration_days, base_price, currency, includes, umrah_package_departures(departure_date, total_seats, booked_seats)";
+  "id, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
 
 function toCardData(pkg: PackageRow): PackageCardData {
   const upcoming = pkg.umrah_package_departures
@@ -25,23 +34,45 @@ function toCardData(pkg: PackageRow): PackageCardData {
     id: pkg.id,
     slug: pkg.slug,
     name: pkg.name,
+    tagline: pkg.tagline,
+    tier: pkg.tier,
+    isFeatured: pkg.is_featured,
+    originIata: pkg.origin_iata,
+    destinationIata: pkg.destination_iata,
     duration_days: pkg.duration_days,
     base_price: pkg.base_price,
+    originalPrice: pkg.original_price === null ? null : Number(pkg.original_price),
     currency: pkg.currency,
     includes: Array.isArray(pkg.includes)
       ? (pkg.includes as unknown[]).filter((i): i is string => typeof i === "string")
       : [],
+    images: umrahImageUrls(pkg.images),
+    hotels: pkg.umrah_package_hotels ?? [],
     nextDeparture: upcoming[0] ?? null,
   };
 }
 
+/**
+ * The packages shown in the landing page's "Upcoming Umrah packages" band.
+ *
+ * Ordered by is_featured first, then price. This function previously ordered by
+ * created_at alone and never looked at is_featured at all — which meant the
+ * landing row silently became "the four most recently added packages", so
+ * publishing a new one pushed a curated package off the homepage. With a
+ * catalog of four that was invisible; it stops being invisible the moment the
+ * catalog grows.
+ *
+ * Price ascending as the tiebreak so the row reads as a ladder from the entry
+ * package upwards, rather than in whatever order rows happened to be inserted.
+ */
 export async function getFeaturedPackages(limit = 4): Promise<PackageCardData[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("umrah_packages")
     .select(CARD_SELECT)
     .eq("status", "published")
-    .order("created_at", { ascending: false })
+    .order("is_featured", { ascending: false })
+    .order("base_price", { ascending: true })
     .limit(limit);
 
   return (data ?? []).map(toCardData);
@@ -63,7 +94,13 @@ export async function getPackageBySlug(slug: string) {
   const { data } = await supabase
     .from("umrah_packages")
     .select(
-      "id, slug, name, description, duration_days, includes, base_price, currency, status, umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, price_override)"
+      `id, slug, name, description, tagline, tier, is_featured, origin_iata, destination_iata,
+       duration_days, includes, images, base_price, original_price, currency, status,
+       meal_plan, meals_note, contact_person_name, contact_person_phone, contact_person_email, contact_whatsapp,
+       umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, price_override),
+       umrah_package_hotels(id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order),
+       umrah_itinerary_days(id, day_number, title, description),
+       umrah_package_pricing(id, sharing, price)`
     )
     .eq("slug", slug)
     .eq("status", "published")

@@ -10,10 +10,11 @@ import {
   FileCheck2,
   Home,
   Send,
+  AlertTriangle,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { getVisaTypeById } from "@/modules/visa/queries";
 import { startVisaApplication } from "@/modules/visa/actions";
 import { parseDocumentSlots } from "@/modules/visa/schemas";
@@ -54,8 +55,15 @@ const HOW_IT_WORKS = [
   },
 ];
 
-export default async function VisaDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function VisaDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ blocked?: string }>;
+}) {
   const { id } = await params;
+  const { blocked } = await searchParams;
   const visa = await getVisaTypeById(id);
   if (!visa) notFound();
 
@@ -176,6 +184,14 @@ export default async function VisaDetailPage({ params }: { params: Promise<{ id:
                   {fmtMoney(visa.price, visa.currency)}
                 </span>
               </div>
+              {blocked ? (
+                <Alert variant="destructive">
+                  <AlertTriangle />
+                  <AlertDescription>
+                    Your agency isn&apos;t approved to book visa products. Contact support to update your account.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
               <form action={startVisaApplication} className="pt-2">
                 <input type="hidden" name="visaTypeId" value={visa.id} />
                 <SubmitButton size="lg" className="w-full gap-2" pendingText="Starting application…">

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Landmark, MapPin, Ruler, Search, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { MediaPlaceholder } from "@/components/media-placeholder";
 import { getVenues, getVenueEventTypes } from "@/modules/events/queries";
+import { venueImageUrls } from "@/modules/events/images";
 import { amenityInfo, eventTypeLabel, priceUnitLabel } from "@/modules/events/components/amenities";
 
 export const metadata: Metadata = { title: "Event & Hall Booking" };
@@ -24,9 +26,27 @@ export default async function EventsPage({
 
   return (
     <div>
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-sidebar via-sidebar to-primary/40 text-sidebar-foreground">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+      {/* Hero — same construction as VisaHeroBanner, FlightsHero and the Umrah
+          page: a filled background image under a directional scrim, content on
+          z-10. */}
+      <section className="relative isolate overflow-hidden bg-sidebar text-sidebar-foreground">
+        <Image
+          src="/marketing/events-hero.webp"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          // The artwork's floral stage sits right and its left is an empty
+          // dance floor; narrow screens crop too hard to rely on that, so they
+          // centre instead and only lg favours the right.
+          className="object-cover object-center lg:object-right"
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-sidebar via-sidebar/90 to-sidebar/70 lg:via-sidebar/85 lg:to-sidebar/35"
+          aria-hidden
+        />
+
+        <div className="relative z-10 mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
           <div className="max-w-2xl">
             <Badge className="border-transparent bg-primary/20 text-primary-foreground">
               Events &amp; Halls
@@ -93,11 +113,22 @@ export default async function EventsPage({
               const types = Array.isArray(venue.event_types)
                 ? (venue.event_types as string[]).slice(0, 3)
                 : [];
+              // Index 0 is the cover shot, matching the umrah/hotels convention.
+              const cover = venueImageUrls(venue.images)[0] ?? null;
               return (
                 <Link key={venue.id} href={`/events/${venue.slug}`} className="group">
                   <Card className="h-full overflow-hidden py-0 transition-all hover:-translate-y-0.5 hover:shadow-lg">
                     <div className="relative">
-                      <MediaPlaceholder seed={venue.slug} icon={Landmark} className="h-44 w-full" />
+                      {cover ? (
+                        // Venue photography can be either a repo asset or a
+                        // Storage URL, so this stays a plain <img>: next/image
+                        // would need the Supabase host allow-listed in
+                        // next.config.ts for admin-uploaded covers.
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={cover} alt="" className="h-44 w-full object-cover" />
+                      ) : (
+                        <MediaPlaceholder seed={venue.slug} icon={Landmark} className="h-44 w-full" />
+                      )}
                       {venue.is_featured ? (
                         <Badge className="absolute top-3 left-3 border-transparent bg-brand-accent text-brand-accent-foreground">
                           Featured

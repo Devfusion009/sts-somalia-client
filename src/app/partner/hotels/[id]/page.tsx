@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CalendarDays } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyPartnerId, getHotelForEdit } from "@/modules/hotels/partner-queries";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EditHotelForm } from "./edit-hotel-form";
 import { RoomDialog } from "./room-form";
 
@@ -76,7 +79,17 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
                     Up to {room.max_occupancy} guests · {room.currency} {room.base_price.toFixed(0)} / night
                   </p>
                 </div>
-                <RoomDialog hotelId={hotel.id} room={room} />
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    render={<Link href={`/partner/hotels/${hotel.id}/rooms/${room.id}`} />}
+                  >
+                    <CalendarDays className="size-3.5" /> Availability
+                  </Button>
+                  <RoomDialog hotelId={hotel.id} room={room} />
+                </div>
               </div>
             ))
           )}

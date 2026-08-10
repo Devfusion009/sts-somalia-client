@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/password-input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
@@ -28,7 +28,7 @@ export function ResetPasswordForm() {
           ) : null}
           <div className="space-y-2">
             <Label htmlFor="password">New password</Label>
-            <Input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required />
+            <PasswordInput id="password" name="password" autoComplete="new-password" minLength={8} required />
           </div>
           <SubmitButton className="w-full" pendingText="Saving…">
             Save new password

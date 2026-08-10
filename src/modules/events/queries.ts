@@ -48,3 +48,21 @@ export async function getVenueEventTypes() {
 }
 
 export type Venue = NonNullable<Awaited<ReturnType<typeof getVenueBySlug>>>;
+
+/**
+ * Anonymized occupancy for one venue — start_date/end_date/status only, via
+ * the get_venue_occupied_ranges RPC (see 20260809000003_hall_booking_date_
+ * ranges.sql). Deliberately excludes customer/agency/event details: this is
+ * meant for "is this date free" checks by ANY agent, including ones whose
+ * own agency didn't make the booking, which normal RLS would never let them
+ * read directly.
+ */
+export async function getVenueOccupiedRanges(venueId: string, from: string, to: string) {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("get_venue_occupied_ranges", {
+    target_venue_id: venueId,
+    from_date: from,
+    to_date: to,
+  });
+  return data ?? [];
+}

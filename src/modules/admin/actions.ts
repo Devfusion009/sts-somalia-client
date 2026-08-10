@@ -3,57 +3,25 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { requireRole } from "@/lib/auth/session";
+import { requirePlatformAdmin } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
 import type { Database } from "@/lib/types/database.types";
+import { UMRAH_INCLUDE_KEYS } from "@/modules/umrah/includes";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type ListingStatus = Database["public"]["Enums"]["listing_status"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
 
-async function callRpc(fn: "approve_agency_application" | "approve_hotel_partner_application" | "approve_affiliate_application", applicationId: string): Promise<ActionState> {
-  await requireRole("admin");
-  const supabase = await createClient();
-  const { error } = await supabase.rpc(fn, { application_id: applicationId });
-  if (error) return { error: error.message };
-  revalidatePath("/admin/applications");
-  revalidatePath("/admin");
-  return { error: null };
-}
-
-async function callRejectRpc(fn: "reject_agency_application" | "reject_hotel_partner_application" | "reject_affiliate_application", applicationId: string, notes: string | null): Promise<ActionState> {
-  await requireRole("admin");
-  const supabase = await createClient();
-  const { error } = await supabase.rpc(fn, { application_id: applicationId, notes: notes ?? undefined });
-  if (error) return { error: error.message };
-  revalidatePath("/admin/applications");
-  revalidatePath("/admin");
-  return { error: null };
-}
-
-export async function approveAgencyApplication(_prev: ActionState, formData: FormData) {
-  return callRpc("approve_agency_application", String(formData.get("applicationId")));
-}
-export async function rejectAgencyApplication(_prev: ActionState, formData: FormData) {
-  return callRejectRpc("reject_agency_application", String(formData.get("applicationId")), (formData.get("notes") as string) || null);
-}
-export async function approveHotelPartnerApplication(_prev: ActionState, formData: FormData) {
-  return callRpc("approve_hotel_partner_application", String(formData.get("applicationId")));
-}
-export async function rejectHotelPartnerApplication(_prev: ActionState, formData: FormData) {
-  return callRejectRpc("reject_hotel_partner_application", String(formData.get("applicationId")), (formData.get("notes") as string) || null);
-}
-export async function approveAffiliateApplication(_prev: ActionState, formData: FormData) {
-  return callRpc("approve_affiliate_application", String(formData.get("applicationId")));
-}
-export async function rejectAffiliateApplication(_prev: ActionState, formData: FormData) {
-  return callRejectRpc("reject_affiliate_application", String(formData.get("applicationId")), (formData.get("notes") as string) || null);
-}
+// NOTE: the simple approve/reject actions that used to live here were
+// superseded by src/modules/admin/application-actions.ts (approveApplication/
+// rejectApplication/requestMoreInfo/etc.), which additionally call
+// notifyApplicant() and — for agencies — redirect the admin into the
+// tier/commission-rate/credit-limit setup on /admin/agencies/[id].
 
 const orderStatuses: OrderStatus[] = ["pending_payment", "paid", "processing", "completed", "cancelled", "refunded"];
 
 export async function updateOrderStatus(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireRole("admin");
+  await requirePlatformAdmin();
   const orderId = String(formData.get("orderId"));
   const status = String(formData.get("status")) as OrderStatus;
   if (!orderStatuses.includes(status)) return { error: "Invalid status." };
@@ -146,16 +114,8 @@ function visaTypeRow(data: z.infer<typeof visaTypeSchema>) {
   };
 }
 
-function parseDocLines(input: string | undefined) {
-  if (!input) return [];
-  return input
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
 export async function createVisaType(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireRole("admin");
+  await requirePlatformAdmin();
   const parsed = visaTypeSchema.safeParse(visaTypeInput(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -167,7 +127,7 @@ export async function createVisaType(_prev: ActionState, formData: FormData): Pr
 }
 
 export async function updateVisaType(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireRole("admin");
+  await requirePlatformAdmin();
   const id = String(formData.get("id"));
   const parsed = visaTypeSchema.safeParse(visaTypeInput(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -191,23 +151,31 @@ function slugify(input: string) {
   );
 }
 
+// Checkboxes in the admin form only ever post values from UMRAH_INCLUDE_OPTIONS,
+// but this filters defensively rather than erroring — a stray/unknown value
+// (e.g. a stale form after the option list changes) is just dropped instead
+// of blocking the whole save.
+const includesSchema = z
+  .array(z.string())
+  .transform((values) => values.filter((v) => (UMRAH_INCLUDE_KEYS as string[]).includes(v)));
+
 const umrahPackageSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
   durationDays: z.coerce.number().int().min(1),
-  includes: z.string().optional(),
+  includes: includesSchema,
   basePrice: z.coerce.number().min(0),
   currency: z.string().min(3).max(3),
   status: z.enum(["draft", "pending_review", "published", "suspended"]),
 });
 
 export async function createUmrahPackage(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireRole("admin");
+  await requirePlatformAdmin();
   const parsed = umrahPackageSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description") || undefined,
     durationDays: formData.get("durationDays"),
-    includes: formData.get("includes") || undefined,
+    includes: formData.getAll("includes"),
     basePrice: formData.get("basePrice"),
     currency: formData.get("currency"),
     status: formData.get("status"),
@@ -220,7 +188,7 @@ export async function createUmrahPackage(_prev: ActionState, formData: FormData)
     slug: slugify(parsed.data.name),
     description: parsed.data.description ?? null,
     duration_days: parsed.data.durationDays,
-    includes: parseDocLines(parsed.data.includes),
+    includes: parsed.data.includes,
     base_price: parsed.data.basePrice,
     currency: parsed.data.currency.toUpperCase(),
     status: parsed.data.status as ListingStatus,
@@ -231,13 +199,13 @@ export async function createUmrahPackage(_prev: ActionState, formData: FormData)
 }
 
 export async function updateUmrahPackage(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireRole("admin");
+  await requirePlatformAdmin();
   const id = String(formData.get("id"));
   const parsed = umrahPackageSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description") || undefined,
     durationDays: formData.get("durationDays"),
-    includes: formData.get("includes") || undefined,
+    includes: formData.getAll("includes"),
     basePrice: formData.get("basePrice"),
     currency: formData.get("currency"),
     status: formData.get("status"),
@@ -251,7 +219,7 @@ export async function updateUmrahPackage(_prev: ActionState, formData: FormData)
       name: parsed.data.name,
       description: parsed.data.description ?? null,
       duration_days: parsed.data.durationDays,
-      includes: parseDocLines(parsed.data.includes),
+      includes: parsed.data.includes,
       base_price: parsed.data.basePrice,
       currency: parsed.data.currency.toUpperCase(),
       status: parsed.data.status as ListingStatus,
@@ -270,7 +238,7 @@ const departureSchema = z.object({
 });
 
 export async function createUmrahDeparture(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireRole("admin");
+  await requirePlatformAdmin();
   const parsed = departureSchema.safeParse({
     packageId: formData.get("packageId"),
     departureDate: formData.get("departureDate"),
@@ -295,7 +263,7 @@ export async function createUmrahDeparture(_prev: ActionState, formData: FormDat
 }
 
 export async function toggleUserStatus(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireRole("admin");
+  await requirePlatformAdmin();
   const userId = String(formData.get("userId"));
   const newStatus = String(formData.get("newStatus")) as AccountStatus;
 
@@ -376,7 +344,7 @@ function venueRow(data: z.infer<typeof venueSchema>) {
 }
 
 export async function createVenue(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireRole("admin");
+  await requirePlatformAdmin();
   const parsed = venueSchema.safeParse(venueInput(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -391,7 +359,7 @@ export async function createVenue(_prev: ActionState, formData: FormData): Promi
 }
 
 export async function updateVenue(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireRole("admin");
+  await requirePlatformAdmin();
   const id = String(formData.get("id"));
   const parsed = venueSchema.safeParse(venueInput(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -418,7 +386,7 @@ export async function updateHallBookingStatus(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireRole("admin");
+  await requirePlatformAdmin();
   const bookingId = String(formData.get("bookingId"));
   const status = String(formData.get("status"));
   if (!hallBookingStatuses.includes(status as (typeof hallBookingStatuses)[number])) {
@@ -440,7 +408,7 @@ export async function updateHallBookingPrice(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireRole("admin");
+  await requirePlatformAdmin();
   const bookingId = String(formData.get("bookingId"));
   const price = Number(formData.get("price"));
   if (!Number.isFinite(price) || price < 0) return { error: "Enter a valid price." };

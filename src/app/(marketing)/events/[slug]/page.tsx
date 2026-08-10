@@ -5,6 +5,7 @@ import { ChevronRight, Home, Landmark, MapPin, Ruler, Users } from "lucide-react
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MediaPlaceholder } from "@/components/media-placeholder";
+import { venueImageUrls } from "@/modules/events/images";
 import { getVenueBySlug } from "@/modules/events/queries";
 import {
   amenityInfo,
@@ -12,6 +13,7 @@ import {
   priceUnitLabel,
 } from "@/modules/events/components/amenities";
 import { HallBookingForm } from "@/modules/events/components/booking-form";
+import { AgencyBookingSlot } from "@/modules/agencies/components/agency-booking-slot";
 
 export async function generateMetadata({
   params,
@@ -33,6 +35,7 @@ export default async function VenueDetailPage({
   if (!venue) notFound();
 
   const amenities = Array.isArray(venue.amenities) ? (venue.amenities as string[]) : [];
+  const gallery = venueImageUrls(venue.images);
   const eventTypes = Array.isArray(venue.event_types) ? (venue.event_types as string[]) : [];
 
   return (
@@ -51,7 +54,14 @@ export default async function VenueDetailPage({
 
       {/* Hero */}
       <div className="relative overflow-hidden rounded-2xl">
-        <MediaPlaceholder seed={venue.slug} icon={Landmark} className="h-56 w-full sm:h-72" />
+        {gallery[0] ? (
+          // Either a repo asset or a Storage URL — see the note on the venue
+          // card; next/image would need the Supabase host allow-listed.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={gallery[0]} alt={venue.name} className="h-56 w-full object-cover sm:h-72" />
+        ) : (
+          <MediaPlaceholder seed={venue.slug} icon={Landmark} className="h-56 w-full sm:h-72" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
         <div className="absolute right-0 bottom-0 left-0 p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -83,6 +93,16 @@ export default async function VenueDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Thumbnail strip, same treatment as the Umrah package detail page. */}
+      {gallery.length > 1 ? (
+        <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
+          {gallery.slice(1, 7).map((src) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={src} src={src} alt="" className="h-16 w-full rounded-lg object-cover sm:h-20" />
+          ))}
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_380px]">
         <div className="space-y-8">
@@ -180,6 +200,7 @@ export default async function VenueDetailPage({
                 priceUnit={venue.price_unit}
                 eventTypes={eventTypes}
                 maxGuests={venue.capacity_standing ?? venue.capacity_seated}
+                bookedForSlot={<AgencyBookingSlot />}
               />
             </CardContent>
           </Card>

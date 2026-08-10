@@ -74,11 +74,13 @@ export function BookingForm({
   currency,
   basePrice,
   departures,
+  bookedForSlot,
 }: {
   packageSlug: string;
   currency: string;
   basePrice: number;
   departures: Departure[];
+  bookedForSlot?: React.ReactNode;
 }) {
   const [state, formAction] = useActionState(createUmrahBooking, null);
   const [selectedId, setSelectedId] = useState<string | null>(departures[0]?.id ?? null);
@@ -103,6 +105,7 @@ export function BookingForm({
 
   return (
     <form action={formAction} className="space-y-8">
+      {bookedForSlot}
       <section className="space-y-4">
         <SectionHeading
           index={1}

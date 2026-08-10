@@ -31,10 +31,12 @@ export function BookingForm({
   hotelId,
   room,
   defaults,
+  bookedForSlot,
 }: {
   hotelId: string;
   room: { id: string; name: string; base_price: number; currency: string; max_occupancy: number };
   defaults?: { checkIn?: string; checkOut?: string; guests?: string };
+  bookedForSlot?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(createHotelBooking, null);
@@ -75,7 +77,9 @@ export function BookingForm({
             </Alert>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-3">
+          {bookedForSlot}
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor={`checkIn-${room.id}`}>
                 Check-in <span className="text-destructive">*</span>
@@ -106,7 +110,7 @@ export function BookingForm({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor={`numRooms-${room.id}`}>Rooms</Label>
               <Input
@@ -156,6 +160,19 @@ export function BookingForm({
             />
           </div>
 
+          <div className="space-y-1.5">
+            <Label htmlFor={`guestNames-${room.id}`}>Guest names (optional)</Label>
+            <Textarea
+              id={`guestNames-${room.id}`}
+              name="guestNames"
+              rows={2}
+              placeholder={"One name per line — e.g.\nAhmed Hassan\nFatima Ali"}
+            />
+            <p className="text-xs text-muted-foreground">
+              Helps the hotel prepare — you can also add this later.
+            </p>
+          </div>
+
           <Separator />
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
@@ -171,6 +188,17 @@ export function BookingForm({
           <SubmitButton className="w-full gap-1.5" pendingText="Reserving…">
             Continue to Payment <ArrowRight className="size-4" />
           </SubmitButton>
+          {bookedForSlot ? (
+            <SubmitButton
+              name="intent"
+              value="hold"
+              variant="outline"
+              className="w-full gap-1.5"
+              pendingText="Holding…"
+            >
+              Hold for 24h without paying
+            </SubmitButton>
+          ) : null}
           <p className="text-center text-xs text-muted-foreground">
             You won&apos;t be charged yet — payment is completed on the next step.
           </p>

@@ -1,9 +1,19 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAffiliate } from "@/modules/affiliates/queries";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
+import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+
+/** Portal-scoped title — see the admin portal layout for why this lives on the layout. */
+export const metadata: Metadata = {
+  title: {
+    default: "Affiliate Dashboard",
+    template: "%s | Affiliate Dashboard",
+  },
+};
 
 const NAV_GROUPS: PortalNavGroup[] = [
   {
@@ -39,6 +49,13 @@ export default async function AffiliateLayout({ children }: { children: React.Re
         </Card>
       </div>
     );
+  }
+
+  // Suspension has to actually revoke access, not just flag the admin UI —
+  // the Partner Management Console's suspend/offboard transitions flip
+  // affiliates.status, and this is where that bites.
+  if (affiliate.status === "suspended") {
+    return <PortalSuspendedNotice portalLabel="Affiliate Dashboard" />;
   }
 
   return (

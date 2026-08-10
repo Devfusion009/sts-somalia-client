@@ -30,7 +30,7 @@ export default async function AffiliateLinksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-semibold">My Links</h1>
           <p className="text-sm text-muted-foreground">Create and share tracked links to earn commission.</p>
@@ -58,7 +58,9 @@ export default async function AffiliateLinksPage() {
             </TableHeader>
             <TableBody>
               {links.map((link) => {
-                const url = `${siteUrl}${link.target_path}?ref=${link.code}`;
+                // /r/<code> logs the click + drops the attribution cookie,
+                // then forwards to the link's target path.
+                const url = `${siteUrl}/r/${link.code}`;
                 return (
                   <TableRow key={link.id}>
                     <TableCell className="font-medium">{link.campaign_name ?? "—"}</TableCell>

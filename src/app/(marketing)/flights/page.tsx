@@ -3,14 +3,27 @@ import {
   BadgePercent,
   Clock3,
   Headset,
+  Luggage,
   MoveRight,
   Plane,
-  PlaneLanding,
-  PlaneTakeoff,
+  RefreshCcw,
   ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FlightsHero } from "@/components/marketing/flights-hero";
+import { FlightDealsRail } from "@/components/marketing/flight-deals-rail";
+import { TravelProsCards } from "@/components/marketing/travel-pros-cards";
+import { TrendingGrid } from "@/components/marketing/trending-grid";
+import { DealsByDestination, FlightsFaq } from "@/components/marketing/flight-accordions";
+import { jsonLdScript } from "@/lib/json-ld";
+import {
+  FLIGHT_DEALS,
+  TRENDING_CITIES,
+  TRENDING_COUNTRIES,
+  DEAL_GROUPS,
+  FLIGHT_FAQS,
+} from "@/components/marketing/flights-data";
 import { getAirports } from "@/modules/flights/queries";
 import { searchLiveFlights, type FlightSearchResult } from "@/modules/flights/provider";
 import { getCurrentProfile } from "@/lib/auth/session";
@@ -21,6 +34,16 @@ import {
 import { QuoteRequestForm } from "@/modules/flights/components/quote-request-form";
 
 export const metadata: Metadata = { title: "Flights" };
+
+const faqJsonLd = (faqs: Array<{ question: string; answer: string }>) => ({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((faq) => ({
+    "@type": "Question",
+    name: faq.question,
+    acceptedAnswer: { "@type": "Answer", text: faq.answer },
+  })),
+});
 
 const TRUST_POINTS = [
   { icon: BadgePercent, text: "Fair, transparent fares" },
@@ -39,6 +62,11 @@ function formatDate(iso: string) {
 function formatDuration(minutes: number | null) {
   if (!minutes) return "";
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
+function formatPenalty(penalty: { amount: number; currency: string } | null) {
+  if (!penalty) return null;
+  return `${penalty.currency} ${penalty.amount.toFixed(0)} fee`;
 }
 
 export default async function FlightsPage({
@@ -87,66 +115,47 @@ export default async function FlightsPage({
 
   return (
     <div>
-      {/* Hero + search */}
-      <section className="bg-gradient-to-br from-sidebar via-sidebar to-primary/40 text-sidebar-foreground">
-        <div className="mx-auto max-w-7xl px-4 pt-14 pb-24 sm:px-6 lg:px-8">
-          <Badge className="border-transparent bg-primary/20 text-primary-foreground">Flights</Badge>
-          <h1 className="mt-4 max-w-2xl font-heading text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-            Fly anywhere, <span className="text-brand-accent">from anywhere in Somalia</span>
-          </h1>
-          <p className="mt-4 max-w-xl text-base text-sidebar-foreground/80">
-            International and regional routes with honest fares — booked and supported by a local
-            team that knows the journey.
-          </p>
-          <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
-            {TRUST_POINTS.map((point) => (
-              <li key={point.text} className="flex items-center gap-2 text-sm text-sidebar-foreground/80">
-                <point.icon className="size-4 text-primary" /> {point.text}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+      {!hasSearch ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: jsonLdScript(faqJsonLd(FLIGHT_FAQS)) }}
+        />
+      ) : null}
+
+      <FlightsHero>
+        <FlightSearchForm airports={airports} defaults={defaults} />
+        <ul className="mt-5 flex flex-wrap gap-x-7 gap-y-2">
+          {TRUST_POINTS.map((point) => (
+            <li key={point.text} className="flex items-center gap-2 text-sm font-medium text-sidebar-foreground/75">
+              <point.icon className="size-4 text-sidebar-primary" /> {point.text}
+            </li>
+          ))}
+        </ul>
+      </FlightsHero>
+
+      {/* Discovery content only when the visitor hasn't searched yet. */}
+      {!hasSearch ? (
+        <>
+          <FlightDealsRail title="Travel deals under $500" href="/hotels" deals={FLIGHT_DEALS} />
+          <TravelProsCards />
+          <TrendingGrid
+            title="Trending cities"
+            subtitle="The routes most searched by travellers from Somalia"
+            entries={TRENDING_CITIES}
+          />
+          <TrendingGrid
+            title="Trending countries"
+            subtitle="Where Somali travellers fly most"
+            entries={TRENDING_COUNTRIES}
+          />
+          <DealsByDestination groups={DEAL_GROUPS} />
+          <FlightsFaq faqs={FLIGHT_FAQS} />
+        </>
+      ) : null}
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="-mt-14">
-          <FlightSearchForm airports={airports} defaults={defaults} />
-        </div>
-
         <div className="py-10">
-          {!hasSearch ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {[
-                {
-                  icon: PlaneTakeoff,
-                  title: "Popular: Mogadishu → Dubai",
-                  text: "Daily connections via regional hubs.",
-                },
-                {
-                  icon: Plane,
-                  title: "Umrah season fares",
-                  text: "Ask about Jeddah & Medina group rates.",
-                },
-                {
-                  icon: PlaneLanding,
-                  title: "Regional routes",
-                  text: "Hargeisa, Nairobi, Addis Ababa and more.",
-                },
-              ].map((item) => (
-                <Card key={item.title}>
-                  <CardContent className="flex items-start gap-3 p-5">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-primary">
-                      <item.icon className="size-4.5" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-bold">{item.title}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{item.text}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : result && result.live && result.offers.length > 0 ? (
+          {!hasSearch ? null : result && result.live && result.offers.length > 0 ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-heading text-xl font-bold">
@@ -157,49 +166,96 @@ export default async function FlightsPage({
                   </span>
                 </h2>
               </div>
-              {result.offers.map((offer) => (
-                <Card key={offer.id} className="transition-shadow hover:shadow-md">
-                  <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-4 p-5">
-                    <div className="min-w-32">
-                      <p className="text-sm font-bold">{offer.airline}</p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {offer.cabinClass.replace("_", " ")}
-                      </p>
-                    </div>
-                    <div className="flex flex-1 items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-heading text-lg font-bold">{formatTime(offer.departAt)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {offer.origin} · {formatDate(offer.departAt)}
+              {result.offers.map((offer) => {
+                const hasFareDetail =
+                  offer.refundPenalty || offer.changePenalty || offer.refundable === false || offer.changeable === false;
+                return (
+                  <Card key={offer.id} className="transition-shadow hover:shadow-md">
+                    <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-4 p-5">
+                      <div className="min-w-32">
+                        <p className="text-sm font-bold">{offer.airline}</p>
+                        <p className="text-xs text-muted-foreground capitalize">
+                          {offer.cabinClass.replace("_", " ")}
                         </p>
                       </div>
-                      <div className="flex flex-1 flex-col items-center px-2">
-                        <p className="text-[10px] text-muted-foreground">
-                          {formatDuration(offer.durationMinutes)}
-                        </p>
-                        <div className="relative h-px w-full min-w-16 bg-border">
-                          <Plane className="absolute -top-1.5 left-1/2 size-3 -translate-x-1/2 text-primary" />
+                      <div className="flex flex-1 items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-heading text-lg font-bold">{formatTime(offer.departAt)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {offer.origin} · {formatDate(offer.departAt)}
+                          </p>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">
-                          {offer.stops === 0 ? "Non-stop" : `${offer.stops} stop${offer.stops > 1 ? "s" : ""}`}
-                        </p>
+                        <div className="flex flex-1 flex-col items-center px-2">
+                          <p className="text-[10px] text-muted-foreground">
+                            {formatDuration(offer.durationMinutes)}
+                          </p>
+                          <div className="relative h-px w-full min-w-16 bg-border">
+                            <Plane className="absolute -top-1.5 left-1/2 size-3 -translate-x-1/2 text-primary" />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            {offer.stops === 0 ? "Non-stop" : `${offer.stops} stop${offer.stops > 1 ? "s" : ""}`}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-heading text-lg font-bold">{formatTime(offer.arriveAt)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {offer.destination} · {formatDate(offer.arriveAt)}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-heading text-lg font-bold">{formatTime(offer.arriveAt)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {offer.destination} · {formatDate(offer.arriveAt)}
+                      <div className="text-right">
+                        <p className="font-heading text-xl font-bold text-primary">
+                          {offer.currency} {offer.totalAmount.toFixed(0)}
                         </p>
+                        <p className="text-[10px] text-muted-foreground">total, all passengers</p>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-heading text-xl font-bold text-primary">
-                        {offer.currency} {offer.totalAmount.toFixed(0)}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">total, all passengers</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+
+                      <div className="flex w-full flex-wrap items-center gap-1.5 border-t border-border pt-3">
+                        {offer.checkedBagsIncluded !== null ? (
+                          <Badge variant="outline" className="gap-1 text-[10px] font-normal">
+                            <Luggage className="size-3" />
+                            {offer.checkedBagsIncluded === 0
+                              ? "Carry-on only"
+                              : `${offer.checkedBagsIncluded} checked bag${offer.checkedBagsIncluded > 1 ? "s" : ""}`}
+                          </Badge>
+                        ) : null}
+                        {offer.refundable !== null ? (
+                          <Badge variant="outline" className="gap-1 text-[10px] font-normal">
+                            <ShieldCheck className="size-3" />
+                            {offer.refundable ? "Refundable" : "Non-refundable"}
+                          </Badge>
+                        ) : null}
+                        {offer.changeable !== null ? (
+                          <Badge variant="outline" className="gap-1 text-[10px] font-normal">
+                            <RefreshCcw className="size-3" />
+                            {offer.changeable ? "Changeable" : "No changes"}
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      {hasFareDetail ? (
+                        <details className="w-full text-xs">
+                          <summary className="cursor-pointer font-medium text-primary">
+                            Fare rules
+                          </summary>
+                          <ul className="mt-1.5 space-y-0.5 text-muted-foreground">
+                            <li>
+                              {offer.refundable
+                                ? `Refundable${formatPenalty(offer.refundPenalty) ? ` — ${formatPenalty(offer.refundPenalty)}` : ""}`
+                                : "No refunds before departure"}
+                            </li>
+                            <li>
+                              {offer.changeable
+                                ? `Changes allowed${formatPenalty(offer.changePenalty) ? ` — ${formatPenalty(offer.changePenalty)}` : ""}`
+                                : "No changes before departure"}
+                            </li>
+                          </ul>
+                        </details>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                );
+              })}
               <Card className="border-dashed">
                 <CardContent className="p-5">
                   <p className="text-sm font-semibold">Want us to book one of these fares?</p>

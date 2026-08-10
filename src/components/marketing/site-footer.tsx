@@ -1,92 +1,158 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Mail, MapPin, Phone } from "lucide-react";
+
+import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
 import { NAV_LINKS, PARTNER_LINKS } from "@/lib/nav-links";
+import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from "@/lib/marketing-nav";
+
+import { EmailIcon, FacebookIcon, InstagramIcon, LinkedInIcon, PhoneInTalkIcon, PlaceIcon, XIcon, YouTubeIcon } from "@/components/ui/mui-icons";
+import type { SvgIconComponent } from "@/components/ui/mui-icons";
+const COMPANY_LINKS = [
+  { href: "/about", label: "About us" },
+  { href: "/account", label: "My Account" },
+  { href: "/account/bookings", label: "My bookings" },
+  { href: "/login", label: "Log in" },
+  { href: "/signup", label: "Sign up" },
+  { href: "/terms", label: "Terms & Conditions" },
+  { href: "/privacy", label: "Privacy Policy" },
+  { href: "/partner-terms", label: "Partner Terms" },
+];
+
+/* Placeholder handles — point these at the real STS profiles before launch. */
+const SOCIALS: Array<{ icon: SvgIconComponent; label: string; href: string }> = [
+  { icon: LinkedInIcon, label: "LinkedIn", href: "https://www.linkedin.com" },
+  { icon: InstagramIcon, label: "Instagram", href: "https://www.instagram.com" },
+  { icon: FacebookIcon, label: "Facebook", href: "https://www.facebook.com" },
+  { icon: YouTubeIcon, label: "YouTube", href: "https://www.youtube.com" },
+  { icon: XIcon, label: "X", href: "https://x.com" },
+];
+
+const LINK = "text-sm text-sidebar-foreground/70 transition-colors hover:text-sidebar-primary focus-visible:rounded focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none";
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-border bg-secondary/40">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4 lg:px-8">
-        <div className="md:col-span-1">
-          <Link href="/" className="flex items-center">
-            <Image src="/logo.png" alt="STS Somalia" width={714} height={312} className="h-9 w-auto" />
+    <footer className="bg-sidebar text-sidebar-foreground">
+      {/* Contact + newsletter */}
+      <div className="border-b border-sidebar-border">
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-3 lg:items-center lg:px-8">
+          <Link href="/" className="inline-flex items-center rounded-lg focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none">
+            <Image src="/logo.png" alt="STS Somalia" width={714} height={312} className="h-10 w-auto brightness-0 invert" />
           </Link>
-          <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-            Scout Travel Solution — flights, hotels, visas, Umrah journeys, and
-            event halls, booked with confidence.
+
+          <div>
+            <p className="text-sm text-sidebar-foreground/70">Contact our booking desk</p>
+            <a href={SUPPORT_PHONE_TEL} className="mt-1 flex items-center gap-2 font-heading text-xl font-bold hover:text-sidebar-primary">
+              <PhoneInTalkIcon sx={{ fontSize: 20 }} />
+              {SUPPORT_PHONE_DISPLAY}
+            </a>
+            <p className="mt-0.5 text-xs text-sidebar-foreground/60">Sat–Thu 8:00–18:00 EAT · emergencies 24/7</p>
+          </div>
+
+          <div className="lg:justify-self-end">
+            <p className="mb-2 text-sm font-semibold">Fare deals, before they sell out</p>
+            <NewsletterSignup />
+          </div>
+        </div>
+      </div>
+
+      {/* Columns */}
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
+        <div>
+          <p className="max-w-xs text-sm leading-relaxed text-sidebar-foreground/70">
+            Scout Travel Solution — flights, hotels, visas, Umrah journeys and event halls, booked with
+            confidence and backed by a real team in Mogadishu.
           </p>
-          <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground">
-            <a href="tel:+252611444420" className="flex items-center gap-2 hover:text-primary">
-              <Phone className="size-4" /> +252 611 444 420
+          <div className="mt-5 flex flex-col gap-2.5 text-sm text-sidebar-foreground/70">
+            <a href="mailto:info@scoutsts.com" className="flex items-center gap-2 transition-colors hover:text-sidebar-primary">
+              <EmailIcon sx={{ fontSize: 17 }} /> info@scoutsts.com
             </a>
-            <a href="mailto:support@sts-somalia.example" className="flex items-center gap-2 hover:text-primary">
-              <Mail className="size-4" /> support@sts-somalia.example
-            </a>
-            <span className="flex items-center gap-2">
-              <MapPin className="size-4" /> Sultan Business Park, Waaberi District, Muqdisho
+            {/* Both offices, so the footer matches the About page rather than
+                implying Mogadishu is the only place we can be reached. */}
+            <span className="flex items-start gap-2">
+              <PlaceIcon sx={{ fontSize: 17 }} className="mt-0.5 shrink-0" />
+              <span>
+                <span className="block font-medium text-sidebar-foreground/90">Mogadishu · head office</span>
+                First Floor 111, Sultan Business Park, Waaberi District
+              </span>
+            </span>
+            <span className="flex items-start gap-2">
+              <PlaceIcon sx={{ fontSize: 17 }} className="mt-0.5 shrink-0" />
+              <span>
+                <span className="block font-medium text-sidebar-foreground/90">Nairobi · Kenya office</span>
+                Yare Plaza, 3rd Floor, Office 308, Eastleigh
+              </span>
             </span>
           </div>
         </div>
 
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Explore</h3>
-          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+        <nav aria-label="Services">
+          <h2 className="text-sm font-semibold tracking-wider uppercase">Services</h2>
+          <ul className="mt-4 space-y-2.5">
             {NAV_LINKS.map((link) => (
               <li key={link.href}>
-                <Link href={link.href} className="hover:text-primary">
-                  {link.label}
-                </Link>
+                <Link href={link.href} className={LINK}>{link.label}</Link>
               </li>
             ))}
           </ul>
-        </div>
+        </nav>
 
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Partner with us</h3>
-          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+        <nav aria-label="Partner with us">
+          <h2 className="text-sm font-semibold tracking-wider uppercase">Partner with us</h2>
+          <ul className="mt-4 space-y-2.5">
             {PARTNER_LINKS.map((item) => (
               <li key={item.href}>
-                <Link href={item.href} className="hover:text-primary">
-                  {item.label}
-                </Link>
+                <Link href={item.href} className={LINK}>{item.label}</Link>
               </li>
             ))}
           </ul>
-        </div>
+        </nav>
 
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Company</h3>
-          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <li>
-              <Link href="/account" className="hover:text-primary">
-                My Account
-              </Link>
-            </li>
-            <li>
-              <Link href="/login" className="hover:text-primary">
-                Log in
-              </Link>
-            </li>
-            <li>
-              <Link href="/signup" className="hover:text-primary">
-                Sign up
-              </Link>
-            </li>
-            <li>
-              <Link href="/terms" className="hover:text-primary">
-                Terms &amp; Conditions
-              </Link>
-            </li>
-            <li>
-              <Link href="/privacy" className="hover:text-primary">
-                Privacy Policy
-              </Link>
-            </li>
+        <nav aria-label="Company">
+          <h2 className="text-sm font-semibold tracking-wider uppercase">Company</h2>
+          <ul className="mt-4 space-y-2.5">
+            {COMPANY_LINKS.map((link) => (
+              <li key={link.href}>
+                <Link href={link.href} className={LINK}>{link.label}</Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+
+      {/* Social */}
+      <div className="border-t border-sidebar-border">
+        <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-4 py-7 sm:flex-row sm:justify-center sm:px-6 lg:px-8">
+          <span className="font-heading text-lg font-bold">Follow us</span>
+          <ul className="flex items-center gap-3">
+            {SOCIALS.map((social) => (
+              <li key={social.label}>
+                <a
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={social.label}
+                  className="grid size-11 place-items-center rounded-full bg-white/10 text-sidebar-foreground transition-all duration-200 hover:scale-110 hover:bg-sidebar-primary hover:text-sidebar-primary-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
+                >
+                  <social.icon sx={{ fontSize: 20 }} />
+                </a>
+              </li>
+            ))}
           </ul>
         </div>
       </div>
-      <div className="border-t border-border py-6 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Scout Travel Solution. All rights reserved.
+
+      {/* Bottom bar */}
+      <div className="border-t border-sidebar-border bg-black/20">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-5 text-xs text-sidebar-foreground/60 sm:flex-row sm:px-6 lg:px-8">
+          <p>© {new Date().getFullYear()} Scout Travel Solution. All rights reserved.</p>
+          <div className="flex flex-wrap items-center justify-center gap-2" aria-label="Accepted payment methods">
+            {["EVC Plus", "Bank transfer", "Visa", "Mastercard"].map((method) => (
+              <span key={method} className="rounded-md border border-sidebar-border bg-white/5 px-2.5 py-1 font-medium">
+                {method}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
     </footer>
   );

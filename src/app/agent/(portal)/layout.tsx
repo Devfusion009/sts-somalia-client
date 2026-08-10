@@ -1,0 +1,111 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { requireUser } from "@/lib/auth/session";
+import { getMyAgency } from "@/modules/agencies/queries";
+import { agencyLogoUrl } from "@/modules/agencies/logo";
+import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
+import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+/** Portal-scoped title — see the admin portal layout for why this lives on the layout. */
+export const metadata: Metadata = {
+  title: {
+    default: "Agent Portal",
+    template: "%s | Agent Portal",
+  },
+};
+
+const NAV_GROUPS: PortalNavGroup[] = [
+  {
+    label: "Agent",
+    items: [
+      { href: "/agent", label: "Dashboard", icon: "overview" },
+      { href: "/agent/bookings", label: "Bookings", icon: "bookings" },
+      { href: "/agent/calendar", label: "Event Calendar", icon: "calendar" },
+      { href: "/agent/customers", label: "Customers", icon: "profile" },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { href: "/agent/wallet", label: "Wallet", icon: "payouts" },
+      { href: "/agent/reports", label: "Earnings", icon: "payments" },
+      { href: "/agent/markups", label: "Markups", icon: "catalog" },
+    ],
+  },
+  {
+    label: "My Account",
+    items: [
+      { href: "/agent/invoices", label: "My Invoices", icon: "invoice" },
+      { href: "/agent/bank-details", label: "Bank Details", icon: "bank" },
+      { href: "/agent/credit-notes", label: "Credit Notes", icon: "credit-note" },
+      { href: "/agent/debit-notes", label: "Debit Notes", icon: "debit-note" },
+      { href: "/agent/statement", label: "Statement", icon: "statement" },
+      { href: "/agent/refunds", label: "Refunds", icon: "refund" },
+    ],
+  },
+  {
+    label: "Agency",
+    items: [
+      { href: "/agent/settings", label: "Agency Profile", icon: "agency" },
+      { href: "/agent/team", label: "Team", icon: "team" },
+      { href: "/agent/security", label: "Security", icon: "security" },
+    ],
+  },
+];
+
+export default async function AgentLayout({ children }: { children: React.ReactNode }) {
+  // Checked via direct membership lookup, not profile.role: a user approved
+  // for more than one program (e.g. hotel partner AND agent) only has one
+  // role value on their profile (whichever was approved last), but keeps
+  // every membership row they were actually granted — gating on role alone
+  // would incorrectly lock them out of programs they still belong to.
+  const profile = await requireUser();
+  const membership = await getMyAgency(profile.id);
+
+  if (!membership) {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
+        <Card>
+          <CardContent className="space-y-3 p-6 text-center">
+            <p className="font-medium">No active agency membership found</p>
+            <p className="text-sm text-muted-foreground">
+              You don&apos;t currently have an active agency membership on this account.
+            </p>
+            <Button render={<Link href="/account/become" />}>Apply to become an agent</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Suspension has to actually revoke access, not just flag the admin UI —
+  // the Partner Management Console's suspend/offboard transitions flip
+  // agencies.status, and this is where that bites.
+  if (membership.agency.status === "suspended") {
+    return <PortalSuspendedNotice portalLabel="Agent Portal" />;
+  }
+
+  return (
+    <PortalShell
+      portalName="Agent Portal"
+      roleLabel={
+        {
+          owner: "Agency Owner",
+          admin: "Agency Admin",
+          booking_staff: "Booking Staff",
+          accountant: "Accountant",
+          viewer: "Viewer",
+        }[membership.roleInAgency] ?? "Agency Staff"
+      }
+      navGroups={NAV_GROUPS}
+      profileName={profile.full_name}
+      profileEmail={profile.email}
+      accent="agent"
+      brandLogoUrl={agencyLogoUrl(membership.agency.logo_path)}
+    >
+      {children}
+    </PortalShell>
+  );
+}

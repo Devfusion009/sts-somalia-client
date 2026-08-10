@@ -1,14 +1,19 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { ShieldCheck, Headset, Hourglass } from "lucide-react";
+import { ShieldCheck, Headset, Hourglass, CalendarClock, X } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
+import { getActiveAgencyId, HOLD_DURATION_HOURS } from "@/modules/orders/helpers";
+import { convertHoldToCheckout, cancelOrder } from "@/modules/orders/actions";
 import { getOrderForCheckout, describeOrderItem } from "@/modules/payments/queries";
 import { getAvailablePaymentMethods } from "@/modules/payments/registry";
 import { cancelPendingPayment } from "@/modules/payments/actions";
 import { CheckoutForm, type CheckoutMethod } from "@/modules/payments/components/checkout-form";
+import { WhatsAppInlineLink } from "@/components/marketing/whatsapp-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { CancelOrderButton } from "@/modules/orders/components/cancel-order-button";
 
 export const metadata: Metadata = { title: "Checkout" };
 
@@ -22,14 +27,47 @@ export default async function CheckoutPage({
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId } = await params;
-  await requireUser();
+  const profile = await requireUser();
 
   const order = await getOrderForCheckout(orderId);
   if (!order) notFound();
-  if (order.status !== "pending_payment") redirect(`/checkout/${orderId}/success`);
+  if (order.status !== "pending_payment" && order.status !== "held") {
+    redirect(`/checkout/${orderId}/success`);
+  }
+
+  const isHeld = order.status === "held";
+  const holdExpired = isHeld && order.hold_expires_at != null && new Date(order.hold_expires_at) < new Date();
+
+  // Lazy expiry: the viewer already has access to this specific order, so
+  // cancel it under their own permissions the moment anyone loads a stale
+  // hold — no privileged sweep needed on this path.
+  if (holdExpired) {
+    const supabase = await createClient();
+    await supabase.rpc("cancel_order", { target_order_id: orderId, reason: "Hold expired" });
+  }
+
+  // B2B: members of the booking agency can settle from the agency wallet.
+  let agencyWallet: { available: number; currency: string } | undefined;
+  if (order.agency_id) {
+    const supabase = await createClient();
+    const memberAgencyId = await getActiveAgencyId(supabase, profile.id);
+    if (memberAgencyId === order.agency_id) {
+      const { data: agency } = await supabase
+        .from("agencies")
+        .select("credit_balance, credit_limit")
+        .eq("id", order.agency_id)
+        .maybeSingle();
+      if (agency) {
+        agencyWallet = {
+          available: Number(agency.credit_balance) + Number(agency.credit_limit),
+          currency: order.currency,
+        };
+      }
+    }
+  }
 
   const pendingPayment = order.payments.find((p) => p.status === "requires_action");
-  const methods: CheckoutMethod[] = getAvailablePaymentMethods().map(
+  const methods: CheckoutMethod[] = getAvailablePaymentMethods({ agencyWallet }).map(
     ({ id, label, description, kind, badges, requiresPhone, simulated }) => ({
       id,
       label,
@@ -79,6 +117,12 @@ export default async function CheckoutPage({
                   </div>
                 );
               })}
+              {Number(order.markup_amount) > 0 ? (
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Service fee</span>
+                  <span>{money(order.markup_amount, order.currency)}</span>
+                </div>
+              ) : null}
               <Separator />
               <div className="flex items-center justify-between text-base font-semibold">
                 <span>Total Fee</span>
@@ -87,7 +131,51 @@ export default async function CheckoutPage({
             </CardContent>
           </Card>
 
-          {pendingPayment ? (
+          {holdExpired ? (
+            <Card className="border-destructive/40 bg-destructive/5">
+              <CardHeader className="flex-row items-center gap-2 space-y-0">
+                <X className="size-4 text-destructive" />
+                <CardTitle className="text-base">This hold has expired</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <p className="leading-relaxed">
+                  The {HOLD_DURATION_HOURS}-hour hold window closed before payment was completed —
+                  the reservation and any held inventory have been released. Search again to book a
+                  new one.
+                </p>
+              </CardContent>
+            </Card>
+          ) : isHeld ? (
+            <Card className="border-brand-gold/50 bg-brand-gold/5">
+              <CardHeader className="flex-row items-center gap-2 space-y-0">
+                <CalendarClock className="size-4 text-brand-gold" />
+                <CardTitle className="text-base">Held — not yet paid</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <p className="leading-relaxed">
+                  This booking is reserved until{" "}
+                  <span className="font-medium text-foreground">
+                    {order.hold_expires_at
+                      ? new Date(order.hold_expires_at).toLocaleString(undefined, {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })
+                      : "—"}
+                  </span>
+                  . Pay now to confirm it, or cancel to release the hold.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <form action={convertHoldToCheckout}>
+                    <input type="hidden" name="orderId" value={order.id} />
+                    <Button type="submit" size="sm" className="gap-1.5">
+                      Pay Now
+                    </Button>
+                  </form>
+                  <CancelOrderButton orderId={order.id} label="Release Hold" redirectTo="/account/bookings" />
+                </div>
+              </CardContent>
+            </Card>
+          ) : pendingPayment ? (
             <Card className="border-brand-gold/50 bg-brand-gold/5">
               <CardHeader className="flex-row items-center gap-2 space-y-0">
                 <Hourglass className="size-4 text-brand-gold" />
@@ -110,11 +198,16 @@ export default async function CheckoutPage({
               </CardContent>
             </Card>
           ) : (
-            <CheckoutForm
-              orderId={order.id}
-              methods={methods}
-              amountLabel={money(order.total, order.currency)}
-            />
+            <div className="space-y-3">
+              <CheckoutForm
+                orderId={order.id}
+                methods={methods}
+                amountLabel={money(order.total, order.currency)}
+              />
+              <div className="flex justify-end">
+                <CancelOrderButton orderId={order.id} redirectTo="/account/bookings" />
+              </div>
+            </div>
           )}
         </div>
 
@@ -148,7 +241,13 @@ export default async function CheckoutPage({
                 <p className="font-semibold">Need Help?</p>
                 <p className="mt-1 text-muted-foreground">
                   If you have any questions about the payment process, our support team is here to
-                  help — call +252 611 444 420.
+                  help — call +252 611 444 420 or{" "}
+                  <WhatsAppInlineLink
+                    message={`Hello STS! I need help paying for order ${order.order_number}.`}
+                  >
+                    chat with us on WhatsApp
+                  </WhatsAppInlineLink>
+                  .
                 </p>
               </div>
             </CardContent>

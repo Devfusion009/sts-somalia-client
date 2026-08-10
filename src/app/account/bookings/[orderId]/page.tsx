@@ -1,0 +1,389 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { format } from "date-fns";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CreditCard,
+  Download,
+  FileText,
+  Landmark,
+  Plane,
+  ReceiptText,
+  Send,
+  Ticket,
+  Users,
+} from "lucide-react";
+import { requireUser } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
+import { getOrderForCheckout, describeOrderItem, hotelGuestNames } from "@/modules/payments/queries";
+import { getBookingRequests } from "@/modules/bookings/queries";
+import { withdrawBookingRequestAction } from "@/modules/bookings/actions";
+import { StatusTimeline, type TimelineStage } from "@/modules/bookings/components/status-timeline";
+import { BookingRequestDialog } from "@/modules/bookings/components/booking-request-dialog";
+import {
+  TYPE_ICON,
+  TYPE_LABEL,
+  StatusBadge,
+  formatMoney,
+} from "@/modules/bookings/components/booking-shared";
+import { CancelOrderButton } from "@/modules/orders/components/cancel-order-button";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+import type { BookingType } from "@/modules/bookings/types";
+
+export const metadata: Metadata = { title: "Booking Details" };
+
+/**
+ * Umrah progresses through operational stages that mirror what actually happens
+ * to a pilgrim's file: the booking is taken, the seat is confirmed against a
+ * departure, the visa is issued, and the group travels.
+ */
+const UMRAH_STAGES: TimelineStage[] = [
+  { key: "booked", label: "Booking received", icon: Send },
+  { key: "confirmed", label: "Seats confirmed", icon: Users },
+  { key: "visa", label: "Visa & documents", icon: FileText },
+  { key: "travel", label: "Departure", icon: Plane },
+  { key: "completed", label: "Completed", icon: Landmark },
+];
+
+function umrahStageIndex(status: string): { index: number; outcome: "pending" | "success" | "failed" } {
+  switch (status) {
+    case "pending":
+      return { index: 0, outcome: "pending" };
+    case "confirmed":
+      return { index: 1, outcome: "pending" };
+    case "completed":
+      return { index: 4, outcome: "success" };
+    case "cancelled":
+    case "refunded":
+    case "no_show":
+    case "failed":
+      // Parked at the final marker with a failed outcome rather than reset to
+      // zero — the booking did progress, it just ended badly, and showing it at
+      // stage one would misrepresent the history.
+      return { index: 4, outcome: "failed" };
+    default:
+      return { index: 0, outcome: "pending" };
+  }
+}
+
+const REQUEST_KIND_LABEL: Record<string, string> = {
+  cancellation: "Cancellation request",
+  refund: "Refund request",
+  modification: "Change request",
+};
+
+export default async function BookingDetailPage({
+  params,
+}: {
+  params: Promise<{ orderId: string }>;
+}) {
+  const { orderId } = await params;
+  const profile = await requireUser();
+
+  const order = await getOrderForCheckout(orderId);
+  // getOrderForCheckout is RLS-scoped, so a missing row means "not yours or not
+  // there" — both are a 404 to the customer.
+  if (!order) notFound();
+
+  const [requests, supabase] = await Promise.all([getBookingRequests(orderId), createClient()]);
+
+  const { data: invoice } = await supabase
+    .from("invoices")
+    .select("invoice_number, status")
+    .eq("order_id", orderId)
+    .maybeSingle();
+
+  const isPaid = ["paid", "processing", "completed"].includes(order.status);
+  const isCancellableDirectly = order.status === "held" || order.status === "pending_payment";
+  const voucherAvailable = isPaid;
+
+  const umrahItem = order.order_items.find((i) => i.item_type === "umrah");
+  const umrahBookingStatus = umrahItem?.umrah_booking
+    ? // umrah_booking on the checkout query doesn't carry status, so fall back
+      // to the order's — accurate enough for the timeline, and it avoids a
+      // second round trip for a card that may not even render.
+      order.status === "completed"
+      ? "completed"
+      : order.status === "cancelled"
+        ? "cancelled"
+        : isPaid
+          ? "confirmed"
+          : "pending"
+    : null;
+
+  const openRequests = requests.filter((r) => r.status === "requested" || r.status === "in_review");
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2 mb-2 gap-1.5 text-muted-foreground"
+          render={<Link href="/account/bookings" />}
+        >
+          <ArrowLeft className="size-4" /> All bookings
+        </Button>
+
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-heading text-2xl font-bold">{order.order_number}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Booked {format(new Date(order.created_at), "d MMMM yyyy")}
+              {order.order_items.length > 1
+                ? ` · ${order.order_items.length} bookings in this itinerary`
+                : ""}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <StatusBadge status={order.status} />
+            <span className="font-heading text-xl font-bold">
+              {formatMoney(order.total, order.currency)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Documents */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Ticket className="size-4 text-muted-foreground" /> Documents
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            disabled={!voucherAvailable}
+            render={
+              voucherAvailable ? (
+                <a href={`/api/vouchers/${orderId}`} target="_blank" rel="noopener noreferrer" />
+              ) : undefined
+            }
+          >
+            <Download className="size-3.5" /> Travel voucher
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            disabled={!invoice}
+            render={
+              invoice ? (
+                <a href={`/api/invoices/${orderId}`} target="_blank" rel="noopener noreferrer" />
+              ) : undefined
+            }
+          >
+            <ReceiptText className="size-3.5" /> Invoice
+            {invoice ? ` ${invoice.invoice_number}` : ""}
+          </Button>
+          {!voucherAvailable ? (
+            <p className="w-full text-xs text-muted-foreground">
+              Your voucher becomes available once this booking is paid and confirmed.
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Combined itinerary */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Itinerary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 p-0">
+          <ul className="divide-y divide-border border-t border-border">
+            {order.order_items.map((item) => {
+              const described = describeOrderItem(item);
+              const type = item.item_type as BookingType;
+              const Icon = TYPE_ICON[type] ?? FileText;
+              const guests =
+                item.item_type === "hotel" ? hotelGuestNames(item.hotel_booking?.guest_details) : [];
+
+              return (
+                <li key={item.id} className="flex flex-wrap items-start gap-4 px-5 py-4">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
+                    <Icon className="size-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <Badge variant="secondary" className="mb-1">
+                      {TYPE_LABEL[type] ?? item.item_type}
+                    </Badge>
+                    <p className="font-medium">{described.title}</p>
+                    {described.subtitle ? (
+                      <p className="mt-0.5 text-sm text-muted-foreground">{described.subtitle}</p>
+                    ) : null}
+                    {guests.length > 0 ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Guests: {guests.join(", ")}
+                      </p>
+                    ) : null}
+                    {described.href !== "/account/bookings" ? (
+                      <Link
+                        href={described.href}
+                        className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        Track this application <ArrowRight className="size-3" />
+                      </Link>
+                    ) : null}
+                  </div>
+                  <span className="font-medium tabular-nums">
+                    {formatMoney(item.total_price, order.currency)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* Umrah progress */}
+      {umrahBookingStatus ? (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base">Umrah progress</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StatusTimeline
+              stages={UMRAH_STAGES}
+              currentIndex={umrahStageIndex(umrahBookingStatus).index}
+              outcome={umrahStageIndex(umrahBookingStatus).outcome}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Payments */}
+      {order.payments.length > 0 ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CreditCard className="size-4 text-muted-foreground" /> Payments
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 p-0">
+            <ul className="divide-y divide-border border-t border-border">
+              {order.payments.map((payment) => (
+                <li key={payment.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium capitalize">{payment.provider}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(payment.created_at), "d MMM yyyy, HH:mm")}
+                    </p>
+                  </div>
+                  <StatusBadge status={payment.status} />
+                  <span className="text-sm font-medium tabular-nums">
+                    {formatMoney(payment.amount, payment.currency)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Requests */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Manage this booking</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {requests.length > 0 ? (
+            <ul className="space-y-2">
+              {requests.map((request) => (
+                <li
+                  key={request.id}
+                  className="flex flex-wrap items-center gap-3 rounded-lg border border-border px-4 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">
+                      {REQUEST_KIND_LABEL[request.kind] ?? request.kind}
+                    </p>
+                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                      {request.reason}
+                    </p>
+                    {request.staff_note ? (
+                      <p className="mt-1 text-xs">
+                        <span className="font-medium">STS: </span>
+                        {request.staff_note}
+                      </p>
+                    ) : null}
+                  </div>
+                  <StatusBadge status={request.status} />
+                  {request.status === "requested" || request.status === "in_review" ? (
+                    <form action={withdrawBookingRequestAction}>
+                      <input type="hidden" name="requestId" value={request.id} />
+                      <input type="hidden" name="orderId" value={orderId} />
+                      <Button type="submit" variant="ghost" size="sm">
+                        Withdraw
+                      </Button>
+                    </form>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {requests.length > 0 ? <Separator /> : null}
+
+          {isCancellableDirectly ? (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                This booking hasn&apos;t been paid yet, so you can cancel it yourself at no cost.
+              </p>
+              <CancelOrderButton orderId={orderId} redirectTo="/account/bookings" />
+            </div>
+          ) : order.status === "cancelled" ? (
+            <Alert>
+              <AlertDescription>This booking has been cancelled.</AlertDescription>
+            </Alert>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                This booking is paid, so changes go through our team — supplier fare rules decide
+                what&apos;s possible and what it costs. We&apos;ll confirm before anything changes.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <BookingRequestDialog
+                  orderId={orderId}
+                  kind="modification"
+                  currency={order.currency}
+                  disabled={openRequests.some((r) => r.kind === "modification")}
+                />
+                <BookingRequestDialog
+                  orderId={orderId}
+                  kind="cancellation"
+                  currency={order.currency}
+                  disabled={openRequests.some((r) => r.kind === "cancellation")}
+                />
+                <BookingRequestDialog
+                  orderId={orderId}
+                  kind="refund"
+                  currency={order.currency}
+                  disabled={openRequests.some((r) => r.kind === "refund")}
+                />
+              </div>
+              {openRequests.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Options you already have an open request for are disabled until that request is
+                  resolved or withdrawn.
+                </p>
+              ) : null}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <p className="text-xs text-muted-foreground">
+        Booked by {profile.full_name ?? profile.email} · Reference {order.order_number}
+      </p>
+    </div>
+  );
+}

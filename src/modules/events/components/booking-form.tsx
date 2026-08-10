@@ -25,6 +25,7 @@ export function HallBookingForm({
   priceUnit,
   eventTypes,
   maxGuests,
+  bookedForSlot,
 }: {
   venueId: string;
   currency: string;
@@ -32,15 +33,18 @@ export function HallBookingForm({
   priceUnit: string;
   eventTypes: string[];
   maxGuests: number | null;
+  bookedForSlot?: React.ReactNode;
 }) {
   const [state, formAction] = useActionState(createHallBooking, null);
   const [guests, setGuests] = useState(100);
+  const [startDate, setStartDate] = useState("");
 
   const options = eventTypes.length > 0 ? eventTypes : ["wedding", "conference", "other"];
 
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="venueId" value={venueId} />
+      {bookedForSlot}
 
       <div className="space-y-1.5">
         <Label>Event Type <span className="text-destructive">*</span></Label>
@@ -64,12 +68,28 @@ export function HallBookingForm({
         <Input id="eventName" name="eventName" placeholder="e.g. Ahmed & Amina's Wedding" />
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="eventDate">Event Date <span className="text-destructive">*</span></Label>
-        <Input id="eventDate" name="eventDate" type="date" required />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="startDate">Start Date <span className="text-destructive">*</span></Label>
+          <Input
+            id="startDate"
+            name="startDate"
+            type="date"
+            required
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="endDate">End Date <span className="text-destructive">*</span></Label>
+          <Input id="endDate" name="endDate" type="date" min={startDate || undefined} required />
+        </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Multi-day events (e.g. setup through teardown) are supported — set the same date for both if it&apos;s a one-day event.
+      </p>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="startTime">Start Time</Label>
           <Input id="startTime" name="startTime" type="time" />

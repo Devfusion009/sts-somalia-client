@@ -1,9 +1,19 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
-import { getMyPartnerId } from "@/modules/hotels/partner-queries";
+import { getMyPartnerId, getMyPartner } from "@/modules/hotels/partner-queries";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
+import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+
+/** Portal-scoped title — see the admin portal layout for why this lives on the layout. */
+export const metadata: Metadata = {
+  title: {
+    default: "Hotel Partner Portal",
+    template: "%s | Hotel Partner Portal",
+  },
+};
 
 const NAV_GROUPS: PortalNavGroup[] = [
   {
@@ -39,6 +49,14 @@ export default async function PartnerLayout({ children }: { children: React.Reac
         </Card>
       </div>
     );
+  }
+
+  // Suspension has to actually revoke access, not just flag the admin UI —
+  // the Partner Management Console's suspend/offboard transitions flip
+  // hotel_partners.status, and this is where that bites.
+  const partner = await getMyPartner(partnerId);
+  if (partner?.status === "suspended") {
+    return <PortalSuspendedNotice portalLabel="Hotel Partner Portal" />;
   }
 
   return (

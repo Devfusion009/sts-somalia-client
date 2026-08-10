@@ -5,7 +5,8 @@ import { z } from "zod";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createOrderForBooking, getActiveAgencyId } from "@/modules/orders/helpers";
+import { assertAgencyCanBookProduct, createOrderForBooking, getActiveAgencyId } from "@/modules/orders/helpers";
+import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
 import type { ActionState } from "@/lib/auth/actions";
 
 const pilgrimSchema = z.object({
@@ -85,6 +86,9 @@ export async function createUmrahBooking(_prevState: ActionState, formData: Form
   const totalPrice = unitPrice * num_pilgrims;
   const currency = departure.umrah_packages.currency;
   const agencyId = await getActiveAgencyId(supabase, profile.id);
+  const access = await assertAgencyCanBookProduct(supabase, agencyId, "umrah");
+  if (!access.ok) return { error: access.message };
+  const agencyCustomerId = await resolveBookedForCustomer(supabase, agencyId, formData);
 
   const { data: booking, error: bookingError } = await supabase
     .from("umrah_bookings")
@@ -139,6 +143,7 @@ export async function createUmrahBooking(_prevState: ActionState, formData: Form
       customerId: profile.id,
       bookedBy: profile.id,
       agencyId,
+      agencyCustomerId,
       currency,
       itemType: "umrah",
       price: totalPrice,

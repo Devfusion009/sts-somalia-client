@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { CreditCard, Smartphone, Landmark, Building2, Lock, ArrowRight } from "lucide-react";
+import { CreditCard, Smartphone, Wallet, Landmark, Building2, Lock, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ export type CheckoutMethod = {
   id: string;
   label: string;
   description: string;
-  kind: "card" | "mobile_money" | "bank" | "cash";
+  kind: "card" | "mobile_money" | "wallet" | "bank" | "cash";
   badges: string[];
   requiresPhone: boolean;
   simulated: boolean;
@@ -24,6 +24,7 @@ export type CheckoutMethod = {
 const KIND_ICONS = {
   card: CreditCard,
   mobile_money: Smartphone,
+  wallet: Wallet,
   bank: Landmark,
   cash: Building2,
 } as const;

@@ -37,6 +37,10 @@ export async function initiateWithProvider(input: InitiationInput): Promise<Init
       return initiateWaafi(input);
     case "edahab":
       return initiateEdahab(input);
+    case "wallet":
+      // Agency-balance payments never reach the adapter layer — they settle
+      // synchronously in payFromAgencyWallet via the wallet SQL function.
+      return { type: "error", message: "Agency balance payments settle directly, not via a gateway." };
   }
 }
 

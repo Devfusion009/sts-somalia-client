@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile, requireUser } from "@/lib/auth/session";
-import { createOrderForBooking, getActiveAgencyId } from "@/modules/orders/helpers";
+import { assertAgencyCanBookProduct, createOrderForBooking, getActiveAgencyId } from "@/modules/orders/helpers";
 import {
   APPLICANT_TYPES,
   memberSchema,
@@ -83,13 +83,17 @@ export async function startVisaApplication(formData: FormData): Promise<void> {
     .maybeSingle();
   if (!visaType) redirect("/visa");
 
+  const agencyId = await getActiveAgencyId(supabase, user.id);
+  const access = await assertAgencyCanBookProduct(supabase, agencyId, "visa");
+  if (!access.ok) redirect(`/visa/${visaTypeId}?blocked=1`);
+
   const { data: application, error } = await supabase
     .from("visa_applications")
     .insert({
       visa_type_id: visaType.id,
       applicant_profile_id: user.id,
       submitted_by: user.id,
-      agency_id: await getActiveAgencyId(supabase, user.id),
+      agency_id: agencyId,
       status: "draft",
       price: visaType.price,
       currency: visaType.currency,
@@ -414,6 +418,106 @@ export async function uploadVisaDocument(
     content_type: file.type,
   });
   if (insertError) return { error: insertError.message };
+
+  revalidatePath(`/visa/apply/${application.id}`);
+  return { error: null };
+}
+
+/**
+ * Fills a document slot from the customer's vault instead of a fresh upload.
+ *
+ * The file is COPIED into visa-documents rather than referenced. Two reasons:
+ * the vault is private to the customer and staff reviewing an application must
+ * be able to read the attachment, and a submitted application has to keep the
+ * exact document it was assessed on even if the customer later deletes or
+ * replaces the vault original.
+ *
+ * Cross-bucket server-side copy isn't available (storage `copy` is same-bucket
+ * only), so this downloads and re-uploads.
+ */
+export async function attachVaultDocument(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      slotKey: z.string().min(1),
+      documentId: z.string().uuid(),
+    })
+    .safeParse({
+      applicationId: formData.get("applicationId"),
+      slotKey: formData.get("slotKey"),
+      documentId: formData.get("documentId"),
+    });
+  if (!parsed.success) return { error: "Invalid request." };
+
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(
+    parsed.data.applicationId,
+    user.id
+  );
+  if (!application) return { error: "This application can no longer be edited." };
+
+  const slots = parseDocumentSlots(application.visa_type?.required_documents);
+  const slot = slots.find((s) => s.key === parsed.data.slotKey);
+  if (!slot) return { error: "Unknown document type." };
+
+  // owner_id in the predicate, not just RLS — this reads a different user's
+  // table than the application, so the ownership check is explicit.
+  const { data: vaultDoc } = await supabase
+    .from("traveler_documents")
+    .select("storage_path, file_name, file_size, content_type")
+    .eq("id", parsed.data.documentId)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!vaultDoc) return { error: "That document is no longer in your vault." };
+
+  if (vaultDoc.content_type && !ALLOWED_UPLOAD_TYPES.includes(vaultDoc.content_type)) {
+    return { error: "Only JPG, PNG, or PDF files are accepted for visa applications." };
+  }
+  const maxBytes = (slot.max_mb ?? 5) * 1024 * 1024 || MAX_UPLOAD_BYTES_DEFAULT;
+  if (vaultDoc.file_size && vaultDoc.file_size > maxBytes) {
+    return { error: `"${slot.label}" must be ${slot.max_mb ?? 5}MB or smaller.` };
+  }
+
+  const { data: blob, error: downloadError } = await supabase.storage
+    .from("traveler-documents")
+    .download(vaultDoc.storage_path);
+  if (downloadError || !blob) return { error: "Could not read that document from your vault." };
+
+  const fileName = vaultDoc.file_name ?? `${slot.key}.bin`;
+  const storagePath = `${application.id}/${slot.key}-${Date.now()}-${sanitizeFilename(fileName)}`;
+  const { error: uploadError } = await supabase.storage
+    .from("visa-documents")
+    .upload(storagePath, blob, { contentType: vaultDoc.content_type ?? blob.type });
+  if (uploadError) return { error: uploadError.message };
+
+  const previous = application.documents.filter((doc) => doc.document_type === slot.key);
+  if (previous.length > 0) {
+    await supabase.storage.from("visa-documents").remove(previous.map((p) => p.storage_path));
+    await supabase
+      .from("visa_documents")
+      .delete()
+      .in(
+        "id",
+        previous.map((p) => p.id)
+      );
+  }
+
+  const { error: insertError } = await supabase.from("visa_documents").insert({
+    application_id: application.id,
+    document_type: slot.key,
+    storage_path: storagePath,
+    uploaded_by: user.id,
+    file_name: fileName,
+    file_size: vaultDoc.file_size,
+    content_type: vaultDoc.content_type,
+  });
+  if (insertError) {
+    await supabase.storage.from("visa-documents").remove([storagePath]);
+    return { error: insertError.message };
+  }
 
   revalidatePath(`/visa/apply/${application.id}`);
   return { error: null };

@@ -1,54 +1,60 @@
 import Link from "next/link";
 import { ArrowRight, Briefcase, Building2, HandCoins } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { SectionHeading } from "@/components/marketing/section-heading";
+import { Reveal } from "@/components/marketing/reveal";
 
 const CARDS = [
   {
     href: "/agents",
     icon: Briefcase,
-    title: "Travel Agents",
-    description: "Get B2B rates, book on behalf of your customers, and manage everything from one dashboard.",
+    title: "Become a travel agent",
+    description:
+      "Get B2B rates, book on behalf of your customers, and manage everything from one dashboard.",
   },
   {
     href: "/partners",
     icon: Building2,
-    title: "Hotel Partners",
-    description: "List your property, manage rooms and availability, and reach travelers across the region.",
+    title: "List your hotel",
+    description:
+      "List your property, manage rooms and availability, and reach travellers across the region.",
   },
   {
     href: "/affiliates",
     icon: HandCoins,
-    title: "Affiliates",
+    title: "Join the affiliate programme",
     description: "Share your link and earn commission on every booking you refer.",
   },
 ];
 
 export function PartnerCta() {
   return (
-    <section className="bg-secondary/40 py-16">
+    <section className="bg-muted/40 py-16 sm:py-20 lg:py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="font-heading text-3xl font-semibold">Grow your business with us</h2>
-          <p className="mt-2 text-muted-foreground">
-            Join STS Somalia as a partner and reach thousands of travelers.
-          </p>
-        </div>
-        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
-          {CARDS.map((card) => (
-            <Link key={card.href} href={card.href} className="group">
-              <Card className="h-full transition-shadow hover:shadow-lg">
-                <CardContent className="flex h-full flex-col gap-3 p-6">
-                  <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <card.icon className="size-5" />
-                  </span>
-                  <h3 className="font-heading text-lg font-semibold">{card.title}</h3>
-                  <p className="flex-1 text-sm text-muted-foreground">{card.description}</p>
-                  <span className="flex items-center gap-1 text-sm font-medium text-primary">
-                    Get started <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-                  </span>
-                </CardContent>
-              </Card>
-            </Link>
+        <Reveal>
+          <SectionHeading
+            eyebrow="Work with STS"
+            title="Grow your business with us"
+            lead="Agencies, hotels and promoters across the Horn of Africa earn with STS. Applications are reviewed by a human within two working days."
+          />
+        </Reveal>
+        <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-3">
+          {CARDS.map((card, i) => (
+            <Reveal key={card.href} delay={i * 80} className="grid">
+              <Link
+                href={card.href}
+                className="group flex h-full flex-col gap-3 rounded-2xl border border-border bg-card p-6 transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+              >
+                <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-colors duration-300 group-hover:bg-primary group-hover:text-primary-foreground">
+                  <card.icon className="size-5" aria-hidden />
+                </span>
+                <h3 className="font-heading text-lg font-semibold">{card.title}</h3>
+                <p className="flex-1 text-sm leading-relaxed text-muted-foreground">{card.description}</p>
+                <span className="flex items-center gap-1 text-sm font-semibold text-primary">
+                  Apply
+                  <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
+                </span>
+              </Link>
+            </Reveal>
           ))}
         </div>
       </div>
