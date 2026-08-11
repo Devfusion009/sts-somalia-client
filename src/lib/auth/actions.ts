@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { portalForProfile } from "@/lib/auth/roles";
-import { portalHref, rootOrigin } from "@/lib/subdomain";
+import { portalHref, portalLoginHref, rootOrigin } from "@/lib/subdomain";
 import { recordLoginEvent } from "@/modules/auth/security-actions";
 
 export type ActionState = { error: string | null } | null;
@@ -53,21 +53,42 @@ export async function signInAction(
       .select("role, is_platform_admin")
       .eq("id", user.id)
       .single();
+    // Recorded before the rejection below, so an admin credential used on the
+    // CUSTOMER form still appears in login history — that is precisely the
+    // event worth being able to see afterwards. Awaited but internally
+    // swallowed: it can slow login slightly, never break it.
+    await recordLoginEvent(user.id, profile?.role ?? undefined);
+
+    // The customer sign-in box is NOT an entry point to the platform console.
+    //
+    // Without a custom domain both portals sit on one origin and therefore
+    // share one cookie, so the host-only cookie scoping that isolates them
+    // (see cookieDomain) has nothing to separate — and portalForProfile()
+    // hands an admin a same-origin "/admin", dropping them straight into the
+    // console from the public form. Refusing here is the strongest boundary
+    // available in path-based mode, and it mirrors signInToPortalAction, which
+    // already turns non-admins away from /admin/login.
+    //
+    // Sign back out first: leaving a valid admin session attached to a
+    // "rejected" sign-in would defeat the entire point.
+    if (profile?.is_platform_admin) {
+      await supabase.auth.signOut();
+      return {
+        error: `This is a staff account — it can't be used on the customer sign-in. Use the Admin Console sign-in at ${portalLoginHref("admin")}.`,
+      };
+    }
+
     if (profile) {
       const portal = portalForProfile(profile);
-      // Only follow SAME-ORIGIN portal destinations. Sessions are host-only
-      // (see cookieDomain), so redirecting an admin from the customer login
-      // straight to admin.<host> would land them on the admin sign-in page
-      // immediately after signing in — they have to authenticate on that
-      // origin. /partner and /affiliate are paths on this same host and still
-      // work, so those are followed as before.
+      // Only follow SAME-ORIGIN portal destinations. When subdomains are
+      // configured, sessions are host-only, so sending an agent from the
+      // customer login straight to agent.<host> would land them on that
+      // portal's sign-in page immediately after signing in — they have to
+      // authenticate on that origin. /partner and /affiliate are paths on this
+      // same host and still work, so those are followed as before.
       const crossOrigin = portal?.href.startsWith("http") ?? false;
       roleDestination = portal && !crossOrigin ? portal.href : "/";
     }
-    // Recorded here, after the password check but before any MFA redirect, so
-    // the history shows the attempt that actually authenticated. Awaited but
-    // internally swallowed — it can slow login slightly, never break it.
-    await recordLoginEvent(user.id, profile?.role ?? undefined);
   }
 
   const redirectTo = formData.get("redirect_to");
