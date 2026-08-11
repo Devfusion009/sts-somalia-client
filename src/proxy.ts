@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { portalSubdomainFor, pathPrefixFor, rootOrigin } from "@/lib/subdomain";
+import { portalSubdomainFor, pathPrefixFor, rootOrigin, portalsAreIsolated } from "@/lib/subdomain";
 import { readEdgeSession } from "@/lib/auth/edge-session";
 
 /**
@@ -94,7 +94,7 @@ export async function proxy(request: NextRequest) {
   // configured, so this block is unreachable (and Phase 1 access to
   // /admin, /agent on the single host stays intact) until then.
   if (
-    rootOrigin() &&
+    portalsAreIsolated() &&
     (pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/agent" || pathname.startsWith("/agent/"))
   ) {
     return new NextResponse("Not Found", { status: 404, headers: { "content-type": "text/plain" } });

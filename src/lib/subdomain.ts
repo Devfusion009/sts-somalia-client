@@ -17,7 +17,48 @@
 
 export const APP_HOST = process.env.NEXT_PUBLIC_APP_HOST || null;
 
+/**
+ * Explicit per-portal hostnames, for when the portals live on origins that are
+ * NOT `admin.<APP_HOST>` / `agent.<APP_HOST>`.
+ *
+ * WHY THIS EXISTS
+ * `vercel.app` is on the Public Suffix List, so Vercel only ever issues
+ * single-label names — `admin.myproject.vercel.app` cannot be allocated. The
+ * only way to get separate ORIGINS without buying a domain is a separate Vercel
+ * project per portal, which yields unrelated names like
+ * `sts-somalia-admin.vercel.app`. The `admin.<host>` pattern can't describe
+ * that, so each portal host is named outright instead.
+ *
+ * Separate origins are the point: host-only session cookies (see cookieDomain)
+ * only isolate the portals when they actually sit on different origins. Under
+ * path-based mode everything shares one origin and one cookie, and the
+ * isolation is nominal.
+ *
+ * Set the SAME values on every deployment — each one needs to recognise all
+ * three hosts to route and to link across them correctly.
+ */
+const ADMIN_HOST = process.env.NEXT_PUBLIC_ADMIN_HOST || null;
+const AGENT_HOST = process.env.NEXT_PUBLIC_AGENT_HOST || null;
+/** The public/B2C origin, when portals are split across explicit hosts. */
+const PUBLIC_HOST = process.env.NEXT_PUBLIC_PUBLIC_HOST || null;
+
 export type PortalSubdomain = "admin" | "agent";
+
+const EXPLICIT_HOST: Record<PortalSubdomain, string | null> = {
+  admin: ADMIN_HOST,
+  agent: AGENT_HOST,
+};
+
+const bareHost = (h: string) => h.split(":")[0].toLowerCase();
+
+/**
+ * True once the portals are on separate origins by ANY mechanism — subdomains
+ * of APP_HOST, or explicitly named hosts. Everything that depends on "are these
+ * really different origins" keys off this rather than testing APP_HOST alone.
+ */
+export function portalsAreIsolated(): boolean {
+  return Boolean(APP_HOST || ADMIN_HOST || AGENT_HOST);
+}
 
 const PORTAL_PATH: Record<PortalSubdomain, string> = {
   admin: "/admin",
@@ -38,8 +79,10 @@ function protocolFor(host: string): "http" | "https" {
   return "https";
 }
 
-/** e.g. "https://admin.stssomalia.com" or "http://admin.localhost:3000". "" when subdomains aren't configured. */
+/** e.g. "https://admin.stssomalia.com" or "http://admin.localhost:3000". "" when portals aren't split out. */
 export function portalOrigin(portal: PortalSubdomain): string {
+  const explicit = EXPLICIT_HOST[portal];
+  if (explicit) return `${protocolFor(explicit)}://${explicit}`;
   if (!APP_HOST) return "";
   return `${protocolFor(APP_HOST)}://${portal}.${APP_HOST}`;
 }
@@ -85,6 +128,7 @@ export function portalLoginHref(portal: PortalSubdomain): string {
 
 /** e.g. "https://stssomalia.com" or "http://localhost:3000". "" when subdomains aren't configured. */
 export function rootOrigin(): string {
+  if (PUBLIC_HOST) return `${protocolFor(PUBLIC_HOST)}://${PUBLIC_HOST}`;
   if (!APP_HOST) return "";
   return `${protocolFor(APP_HOST)}://${APP_HOST}`;
 }
@@ -130,9 +174,19 @@ export function cookieDomain(): string {
  * subdomains aren't configured at all). Used by proxy.ts.
  */
 export function portalSubdomainFor(host: string): PortalSubdomain | null {
+  const incoming = bareHost(host);
+
+  // Explicitly named portal hosts win: they are unrelated names (separate
+  // Vercel projects), so no prefix arithmetic can recognise them.
+  for (const portal of ["admin", "agent"] as const) {
+    const explicit = EXPLICIT_HOST[portal];
+    if (explicit && incoming === bareHost(explicit)) return portal;
+  }
+
   if (!APP_HOST) return null;
-  if (!host.endsWith(APP_HOST)) return null;
-  const prefix = host.slice(0, host.length - APP_HOST.length);
+  const appHost = bareHost(APP_HOST);
+  if (!incoming.endsWith(appHost)) return null;
+  const prefix = incoming.slice(0, incoming.length - appHost.length);
   if (!prefix.endsWith(".")) return null;
   const label = prefix.slice(0, -1);
   return label === "admin" || label === "agent" ? label : null;
