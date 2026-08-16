@@ -18,8 +18,30 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { SubmitButton } from "@/components/submit-button";
 import { createHotelBooking } from "@/modules/hotels/booking-actions";
+import { cn } from "@/lib/utils";
 
 const today = new Date().toISOString().slice(0, 10);
+
+// Common hotel-booking special requests, researched from what Booking.com/
+// similar platforms offer (room preferences, timing) plus what a premium
+// hotel typically provides (pool, gym, view) — one-tap instead of typing
+// the same handful of things out every time. Forwarded as plain text in
+// special_requests; the schema has no structured column for this, and a
+// manual-booking hotel just needs it readable, not machine-parseable.
+const REQUEST_OPTIONS = [
+  "Early check-in",
+  "Late check-out",
+  "High floor",
+  "Ground floor",
+  "Away from elevator",
+  "Non-smoking room",
+  "Extra bed",
+  "Airport pickup",
+  "Swimming pool access",
+  "Gym / fitness access",
+  "Sea or city view",
+  "Breakfast included",
+];
 
 function nightsBetween(checkIn: string, checkOut: string) {
   if (!checkIn || !checkOut) return 0;
@@ -30,11 +52,14 @@ function nightsBetween(checkIn: string, checkOut: string) {
 export function BookingForm({
   hotelId,
   room,
+  bookingMode = "manual",
   defaults,
   bookedForSlot,
 }: {
   hotelId: string;
   room: { id: string; name: string; base_price: number; currency: string; max_occupancy: number };
+  /** 'manual': submit a request STS confirms by hand — no payment until confirmed. 'instant': pay at checkout. */
+  bookingMode?: "manual" | "instant";
   defaults?: { checkIn?: string; checkOut?: string; guests?: string };
   bookedForSlot?: React.ReactNode;
 }) {
@@ -43,9 +68,19 @@ export function BookingForm({
   const [checkIn, setCheckIn] = useState(defaults?.checkIn ?? "");
   const [checkOut, setCheckOut] = useState(defaults?.checkOut ?? "");
   const [numRooms, setNumRooms] = useState(1);
+  const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
+  const [extraNotes, setExtraNotes] = useState("");
+
+  function toggleRequest(option: string) {
+    setSelectedRequests((prev) => (prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option]));
+  }
+
+  const combinedRequests = [selectedRequests.join(", "), extraNotes.trim()].filter(Boolean).join(". ");
 
   const nights = useMemo(() => nightsBetween(checkIn, checkOut), [checkIn, checkOut]);
-  const total = nights > 0 ? room.base_price * numRooms * nights : null;
+  const isManual = bookingMode === "manual";
+  const priceOnRequest = room.base_price === 0;
+  const total = nights > 0 && !priceOnRequest ? room.base_price * numRooms * nights : null;
   const defaultAdults = Math.min(
     Math.max(Number.parseInt(defaults?.guests ?? "2", 10) || 2, 1),
     room.max_occupancy * 10
@@ -54,7 +89,7 @@ export function BookingForm({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button className="gap-1.5" />}>
-        Book <ArrowRight className="size-3.5" />
+        {isManual ? "Request Booking" : "Book"} <ArrowRight className="size-3.5" />
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -62,8 +97,9 @@ export function BookingForm({
             <BedDouble className="size-4 text-primary" /> {room.name}
           </DialogTitle>
           <DialogDescription>
-            {room.currency} {room.base_price.toFixed(0)} / night · up to {room.max_occupancy} guests
-            per room
+            {priceOnRequest
+              ? `Price on request · up to ${room.max_occupancy} guests per room`
+              : `${room.currency} ${room.base_price.toFixed(0)} / night · up to ${room.max_occupancy} guests per room`}
           </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
@@ -151,13 +187,40 @@ export function BookingForm({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor={`specialRequests-${room.id}`}>Special requests (optional)</Label>
+            <Label>Special requests (optional)</Label>
+            <div className="flex flex-wrap gap-2">
+              {REQUEST_OPTIONS.map((option) => {
+                const checked = selectedRequests.includes(option);
+                return (
+                  <label
+                    key={option}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                      checked
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={checked}
+                      onChange={() => toggleRequest(option)}
+                    />
+                    {option}
+                  </label>
+                );
+              })}
+            </div>
             <Textarea
               id={`specialRequests-${room.id}`}
-              name="specialRequests"
+              value={extraNotes}
+              onChange={(e) => setExtraNotes(e.target.value)}
               rows={2}
-              placeholder="Early check-in, high floor, airport pickup…"
+              placeholder="Anything else?"
+              className="mt-1.5"
             />
+            <input type="hidden" name="specialRequests" value={combinedRequests} />
           </div>
 
           <div className="space-y-1.5">
@@ -181,27 +244,41 @@ export function BookingForm({
                 : "Select your dates"}
             </p>
             <p className="font-heading text-lg font-bold text-primary">
-              {total !== null ? `${room.currency} ${total.toFixed(0)}` : "—"}
+              {priceOnRequest ? "Price on request" : total !== null ? `${room.currency} ${total.toFixed(0)}` : "—"}
             </p>
           </div>
 
-          <SubmitButton className="w-full gap-1.5" pendingText="Reserving…">
-            Continue to Payment <ArrowRight className="size-4" />
-          </SubmitButton>
-          {bookedForSlot ? (
-            <SubmitButton
-              name="intent"
-              value="hold"
-              variant="outline"
-              className="w-full gap-1.5"
-              pendingText="Holding…"
-            >
-              Hold for 24h without paying
-            </SubmitButton>
-          ) : null}
-          <p className="text-center text-xs text-muted-foreground">
-            You won&apos;t be charged yet — payment is completed on the next step.
-          </p>
+          {isManual ? (
+            <>
+              <SubmitButton className="w-full gap-1.5" pendingText="Sending request…">
+                Submit Booking Request <ArrowRight className="size-4" />
+              </SubmitButton>
+              <p className="text-center text-xs text-muted-foreground">
+                This hotel is confirmed manually by STS — we&apos;ll check with the hotel and confirm
+                your booking. You won&apos;t pay anything until it&apos;s confirmed.
+              </p>
+            </>
+          ) : (
+            <>
+              <SubmitButton className="w-full gap-1.5" pendingText="Reserving…">
+                Continue to Payment <ArrowRight className="size-4" />
+              </SubmitButton>
+              {bookedForSlot ? (
+                <SubmitButton
+                  name="intent"
+                  value="hold"
+                  variant="outline"
+                  className="w-full gap-1.5"
+                  pendingText="Holding…"
+                >
+                  Hold for 24h without paying
+                </SubmitButton>
+              ) : null}
+              <p className="text-center text-xs text-muted-foreground">
+                You won&apos;t be charged yet — payment is completed on the next step.
+              </p>
+            </>
+          )}
         </form>
       </DialogContent>
     </Dialog>

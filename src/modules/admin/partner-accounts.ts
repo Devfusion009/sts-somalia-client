@@ -24,6 +24,7 @@ const APPLICATION_TABLE = {
   agency: "agency_applications",
   hotel_partner: "hotel_partner_applications",
   affiliate: "affiliate_applications",
+  venue_partner: "venue_partner_applications",
 } as const;
 
 export type PartnerAccountRow = {
@@ -93,13 +94,20 @@ export type PartnerAccountDetail = {
     star_rating: number | null;
     rooms: Array<{ id: string; name: string; base_price: number; currency: string; status: string }>;
   }>;
+  venues: Array<{ id: string; name: string; city: string; status: string; basePrice: number; currency: string }>;
   agencySnapshot: {
     creditBalance: number;
     creditLimit: number;
     tierName: string | null;
     commissionRateSetAt: string | null;
   } | null;
-  affiliateSnapshot: { referralCode: string; totalEarned: number; totalPaid: number; linkCount: number } | null;
+  affiliateSnapshot: {
+    id: string;
+    referralCode: string;
+    totalEarned: number;
+    totalPaid: number;
+    linkCount: number;
+  } | null;
   payouts: Array<{
     id: string;
     amount: number;
@@ -137,7 +145,7 @@ export async function getPartnerAccountsIndex() {
 
   // Resolve display names from the per-type entity tables in one query each.
   const byType = (t: PartnerAccountType) => accounts.filter((a) => a.type === t).map((a) => a.entity_id);
-  const [agencies, hotelPartners, affiliates] = await Promise.all([
+  const [agencies, hotelPartners, affiliates, venuePartners] = await Promise.all([
     byType("agency").length
       ? supabase.from("agencies").select("id, name").in("id", byType("agency"))
       : Promise.resolve({ data: [] }),
@@ -147,11 +155,15 @@ export async function getPartnerAccountsIndex() {
     byType("affiliate").length
       ? supabase.from("affiliates").select("id, profile:profiles(full_name, email)").in("id", byType("affiliate"))
       : Promise.resolve({ data: [] }),
+    byType("venue_partner").length
+      ? supabase.from("venue_partners").select("id, name").in("id", byType("venue_partner"))
+      : Promise.resolve({ data: [] }),
   ]);
 
   const names = new Map<string, string>();
   for (const a of agencies.data ?? []) names.set(a.id, a.name);
   for (const h of hotelPartners.data ?? []) names.set(h.id, h.name);
+  for (const v of venuePartners.data ?? []) names.set(v.id, v.name);
   for (const f of affiliates.data ?? []) {
     const p = (f as { id: string; profile: { full_name: string | null; email: string } | null }).profile;
     names.set((f as { id: string }).id, p?.full_name || p?.email || "Affiliate");
@@ -231,6 +243,7 @@ export async function getPartnerAccount(accountId: string): Promise<PartnerAccou
   let entity: PartnerAccountDetail["entity"];
   let members: AccountMember[] = [];
   let hotels: PartnerAccountDetail["hotels"] = [];
+  let venues: PartnerAccountDetail["venues"] = [];
   let agencySnapshot: PartnerAccountDetail["agencySnapshot"] = null;
   let affiliateSnapshot: PartnerAccountDetail["affiliateSnapshot"] = null;
   let payouts: PartnerAccountDetail["payouts"] = [];
@@ -329,20 +342,70 @@ export async function getPartnerAccount(accountId: string): Promise<PartnerAccou
         status: r.status,
       })),
     }));
-  } else {
-    const [{ data: affiliate }, { count: linkCount }, { data: payoutRows }] = await Promise.all([
+  } else if (acc.type === "venue_partner") {
+    const [{ data: partner }, { data: memberRows }, { data: venueRows }] = await Promise.all([
       supabase
-        .from("affiliates")
-        .select("referral_code, status, commission_rate, total_earned, total_paid, profile:profiles(id, full_name, email, phone)")
+        .from("venue_partners")
+        .select("name, contact_email, contact_phone, status, commission_rate")
         .eq("id", acc.entity_id)
         .maybeSingle(),
-      supabase.from("affiliate_links").select("*", { count: "exact", head: true }).eq("affiliate_id", acc.entity_id),
       supabase
-        .from("commission_payouts")
-        .select("id, amount, currency, payout_reference, created_at")
-        .eq("affiliate_id", acc.entity_id)
+        .from("venue_partner_members")
+        .select("id, role_in_partner, status, profile:profiles(id, full_name, email)")
+        .eq("partner_id", acc.entity_id)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("event_venues")
+        .select("id, name, city, status, base_price, currency")
+        .eq("partner_id", acc.entity_id)
         .order("created_at", { ascending: false }),
     ]);
+    if (!partner) return null;
+    entity = {
+      name: partner.name,
+      contactEmail: partner.contact_email,
+      contactPhone: partner.contact_phone,
+      entityStatus: partner.status,
+      commissionRate: Number(partner.commission_rate),
+    };
+    members = (memberRows ?? []).map((m) => ({
+      id: m.id,
+      role: m.role_in_partner,
+      status: m.status,
+      profile: m.profile as unknown as AccountMember["profile"],
+    }));
+    venues = (venueRows ?? []).map((v) => ({
+      id: v.id,
+      name: v.name,
+      city: v.city,
+      status: v.status,
+      basePrice: Number(v.base_price),
+      currency: v.currency,
+    }));
+  } else {
+    // total_earned/total_paid no longer exist on affiliates (dropped in
+    // 20260814000001 — they never had a writer, always read $0.00).
+    // Computed live below from affiliate_conversions/commission_payouts
+    // instead, same as the affiliate's own dashboard (src/app/affiliate/page.tsx).
+    const [{ data: affiliate }, { count: linkCount }, { data: conversionRows }, { data: payoutRows }] =
+      await Promise.all([
+        supabase
+          .from("affiliates")
+          .select("referral_code, status, commission_rate, profile:profiles(id, full_name, email, phone)")
+          .eq("id", acc.entity_id)
+          .maybeSingle(),
+        supabase.from("affiliate_links").select("*", { count: "exact", head: true }).eq("affiliate_id", acc.entity_id),
+        supabase
+          .from("affiliate_conversions")
+          .select("commission_amount, status")
+          .eq("affiliate_id", acc.entity_id)
+          .neq("status", "reversed"),
+        supabase
+          .from("commission_payouts")
+          .select("id, amount, currency, method, payout_reference, created_at")
+          .eq("affiliate_id", acc.entity_id)
+          .order("created_at", { ascending: false }),
+      ]);
     if (!affiliate) return null;
     const profile = affiliate.profile as unknown as { id: string; full_name: string | null; email: string } | null;
     entity = {
@@ -352,20 +415,21 @@ export async function getPartnerAccount(accountId: string): Promise<PartnerAccou
       entityStatus: affiliate.status,
       commissionRate: Number(affiliate.commission_rate),
     };
-    affiliateSnapshot = {
-      referralCode: affiliate.referral_code,
-      totalEarned: Number(affiliate.total_earned),
-      totalPaid: Number(affiliate.total_paid),
-      linkCount: linkCount ?? 0,
-    };
     payouts = (payoutRows ?? []).map((p) => ({
       id: p.id,
       amount: Number(p.amount),
       currency: p.currency,
-      method: null,
+      method: p.method,
       reference: p.payout_reference,
       created_at: p.created_at,
     }));
+    affiliateSnapshot = {
+      id: acc.entity_id,
+      referralCode: affiliate.referral_code,
+      totalEarned: (conversionRows ?? []).reduce((sum, c) => sum + Number(c.commission_amount), 0),
+      totalPaid: payouts.reduce((sum, p) => sum + p.amount, 0),
+      linkCount: linkCount ?? 0,
+    };
   }
 
   const checklist = computeChecklist(acc.type, {
@@ -373,6 +437,7 @@ export async function getPartnerAccount(accountId: string): Promise<PartnerAccou
     documentRefs: application.document_refs,
     docReviews,
     hotels,
+    venues,
     agencySnapshot,
     affiliateSnapshot,
     memberCount: members.filter((m) => m.status === "active").length,
@@ -387,6 +452,7 @@ export async function getPartnerAccount(accountId: string): Promise<PartnerAccou
     docReviews,
     checklist,
     hotels,
+    venues,
     agencySnapshot,
     affiliateSnapshot,
     payouts,
@@ -406,6 +472,7 @@ function computeChecklist(
     documentRefs: DocumentRef[];
     docReviews: Map<string, { status: string }>;
     hotels: PartnerAccountDetail["hotels"];
+    venues: PartnerAccountDetail["venues"];
     agencySnapshot: PartnerAccountDetail["agencySnapshot"];
     affiliateSnapshot: PartnerAccountDetail["affiliateSnapshot"];
     memberCount: number;
@@ -423,6 +490,24 @@ function computeChecklist(
     description: `Every required document reviewed and marked verified (${requiredDocs.length} required).`,
     done: allDocsVerified,
   };
+
+  if (type === "venue_partner") {
+    return [
+      {
+        key: "payout_details",
+        label: "Payout details on file",
+        description: "Bank account for event payouts captured on the application's Settlement step.",
+        done: Boolean(d.bankName && d.bankAccountNumber),
+      },
+      docsItem,
+      {
+        key: "first_venue",
+        label: "First venue listed in the portal",
+        description: "The partner has created at least one event venue in their Venue Portal.",
+        done: input.venues.length > 0,
+      },
+    ];
+  }
 
   if (type === "hotel_partner") {
     const roomTypes = Array.isArray(d.roomTypes) ? (d.roomTypes as unknown[]) : [];

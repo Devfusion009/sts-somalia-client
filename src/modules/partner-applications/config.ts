@@ -1,14 +1,19 @@
-export type ApplicationKind = "agency" | "hotel_partner" | "affiliate";
+export type ApplicationKind = "agency" | "hotel_partner" | "affiliate" | "venue_partner";
 
 export const APP_CONFIG: Record<
   ApplicationKind,
   {
-    table: "agency_applications" | "hotel_partner_applications" | "affiliate_applications";
+    table:
+      | "agency_applications"
+      | "hotel_partner_applications"
+      | "affiliate_applications"
+      | "venue_partner_applications";
     nameField: "agency_name" | "business_name" | null;
     refRpc:
       | "generate_agency_application_ref"
       | "generate_hotel_partner_application_ref"
-      | "generate_affiliate_application_ref";
+      | "generate_affiliate_application_ref"
+      | "generate_venue_partner_application_ref";
     hasSettlementStep: boolean;
     portalHref: string;
     portalLabel: string;
@@ -46,6 +51,19 @@ export const APP_CONFIG: Record<
     label: "Affiliate",
     totalSteps: 5,
   },
+  // Event-hall owners — a supplier like hotel_partner (paid out for completed
+  // events, same settlement step), but a separate program: halls were
+  // previously an admin-only catalog with no owner at all.
+  venue_partner: {
+    table: "venue_partner_applications",
+    nameField: "business_name",
+    refRpc: "generate_venue_partner_application_ref",
+    hasSettlementStep: true,
+    portalHref: "/venue",
+    portalLabel: "Venue Portal",
+    label: "Event Venue Partner",
+    totalSteps: 6,
+  },
 };
 
 /** Step numbers are always in this order; affiliate skips step 4 (settlement). */
@@ -56,9 +74,16 @@ export function stepsFor(kind: ApplicationKind): number[] {
 
 export function stepLabel(kind: ApplicationKind, step: number): string {
   const labels: Record<number, string> = {
-    1: "Business Details",
-    2: "Authorized Contact",
-    3: kind === "hotel_partner" ? "Property Details" : kind === "affiliate" ? "Audience & Reach" : "Operations",
+    1: kind === "affiliate" ? "About You" : "Business Details",
+    2: kind === "affiliate" ? "Verification" : "Authorized Contact",
+    3:
+      kind === "hotel_partner"
+        ? "Property Details"
+        : kind === "venue_partner"
+          ? "Venue Details"
+          : kind === "affiliate"
+            ? "Audience & Reach"
+            : "Operations",
     4: "Settlement",
     5: "Documents",
     6: "Review & Submit",
@@ -71,6 +96,27 @@ export const VOLUME_RANGES = ["<20", "20-50", "50-100", "100-500", "500+"] as co
 export const PRODUCTS = ["flights", "hotels", "visa", "umrah", "halls"] as const;
 export const TRAFFIC_SOURCES = ["social_media", "blog", "email_list", "paid_ads", "other"] as const;
 export const PAYMENT_MODELS = ["prepaid_wallet", "credit_line"] as const;
+// Where an affiliate's audience actually is — the platform matters less than
+// the geography, since it decides whether they can plausibly drive Somalia
+// travel bookings at all.
+export const AUDIENCE_LOCATIONS = [
+  "somalia",
+  "diaspora_gulf",
+  "diaspora_europe",
+  "diaspora_north_america",
+  "mixed_international",
+  "other",
+] as const;
+// Shared between the applicant-facing wizard and the admin review page, so
+// the two never drift apart on what "diaspora_gulf" is supposed to mean.
+export const AUDIENCE_LOCATION_LABELS: Record<(typeof AUDIENCE_LOCATIONS)[number], string> = {
+  somalia: "Mainly in Somalia",
+  diaspora_gulf: "Somali diaspora — Gulf",
+  diaspora_europe: "Somali diaspora — Europe",
+  diaspora_north_america: "Somali diaspora — North America",
+  mixed_international: "Mixed / international",
+  other: "Other",
+};
 
 // Hotel partner is a supplier onboarding onto the platform (mirrors Expedia
 // Partner Central / Booking.com Partner Hub property setup), not a buyer
@@ -93,17 +139,81 @@ export const AMENITIES = [
   "non_smoking_rooms",
 ] as const;
 export const CANCELLATION_POLICIES = ["flexible", "moderate", "strict"] as const;
+
+// Human labels for the hotel vocabulary above — shared between the
+// applicant-facing wizard (components/steps.tsx) and the admin application
+// detail page, so a hotel's raw "sole_proprietorship" / "wifi" / "5" never
+// leaks into either UI unformatted. Kept here (not steps.tsx) specifically
+// so the admin page — a server component with no reason to import a "use
+// client" file — can use them too.
+export const PROPERTY_TYPE_LABELS: Record<string, string> = {
+  hotel: "Hotel",
+  aparthotel: "Aparthotel / Serviced apartments",
+  guesthouse: "Guesthouse",
+  resort: "Resort",
+  hostel: "Hostel",
+  villa: "Villa",
+  boutique_bnb: "Boutique / B&B",
+};
+
+export const STAR_RATING_LABELS: Record<string, string> = {
+  unrated: "Not officially rated",
+  "1": "1 star",
+  "2": "2 stars",
+  "3": "3 stars",
+  "4": "4 stars",
+  "5": "5 stars",
+};
+
+export const AMENITY_LABELS: Record<string, string> = {
+  wifi: "Free WiFi",
+  parking: "Parking",
+  pool: "Swimming pool",
+  breakfast_included: "Breakfast included",
+  airport_shuttle: "Airport shuttle",
+  air_conditioning: "Air conditioning",
+  restaurant: "On-site restaurant",
+  gym: "Gym / fitness center",
+  spa: "Spa",
+  elevator: "Elevator",
+  front_desk_24h: "24-hour front desk",
+  non_smoking_rooms: "Non-smoking rooms available",
+};
+
+export const CANCELLATION_POLICY_LABELS: Record<string, { label: string; hint: string }> = {
+  flexible: { label: "Flexible", hint: "Free cancellation up to 24h before check-in" },
+  moderate: { label: "Moderate", hint: "Free cancellation up to 5 days before check-in" },
+  strict: { label: "Strict", hint: "Non-refundable" },
+};
+// Venue partner's step-3 vocabulary — mirrors event_venues.event_types usage
+// on the public Events & Halls pages.
+export const VENUE_EVENT_TYPES = ["wedding", "engagement", "conference", "graduation", "corporate", "community"] as const;
 // A hotel is paid OUT by STS for completed stays (less commission), unlike
 // an agency which pays IN via wallet/credit line — payout cadence replaces
 // the agency's "payment model" choice on the hotel settlement step.
 export const PAYOUT_FREQUENCIES = ["weekly", "biweekly", "monthly"] as const;
+export const PAYOUT_FREQUENCY_LABELS: Record<string, string> = {
+  weekly: "Weekly",
+  biweekly: "Every 2 weeks",
+  monthly: "Monthly",
+};
 
 export const REJECT_COOLDOWN_DAYS = 30;
 
 export type DocSlot = { key: string; label: string; optional?: boolean; expiryField?: boolean };
 
-/** Shared with the server action that validates required documents before advancing to review. */
+/**
+ * Shared with the server action that validates required documents before
+ * advancing to review. Affiliate is an individual referring an existing B2C
+ * platform, not a registered business being onboarded as a supplier/buyer —
+ * a single identity check covers the actual risk (fraudulent payout claims),
+ * so it skips the business-registration/trade-license/tax-registration/
+ * proof-of-address paperwork the other two kinds need.
+ */
 export function docSlotsFor(kind: ApplicationKind): DocSlot[] {
+  if (kind === "affiliate") {
+    return [{ key: "contact_id", label: "Your ID or passport" }];
+  }
   const base: DocSlot[] = [
     { key: "business_registration", label: "Business registration certificate" },
     { key: "trade_license", label: "Trade license", expiryField: true },
@@ -113,5 +223,6 @@ export function docSlotsFor(kind: ApplicationKind): DocSlot[] {
   ];
   if (kind === "agency") base.push({ key: "iata_license", label: "IATA number or travel association license", optional: true });
   if (kind === "hotel_partner") base.push({ key: "property_ownership", label: "Proof of property ownership or lease agreement" });
+  if (kind === "venue_partner") base.push({ key: "property_ownership", label: "Proof of venue ownership or lease agreement" });
   return base;
 }

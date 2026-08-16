@@ -19,7 +19,7 @@ function wizardPath(kind: ApplicationKind, id: string, step: number) {
 
 function kindOf(formData: FormData): ApplicationKind {
   const v = formData.get("kind");
-  if (v === "agency" || v === "hotel_partner" || v === "affiliate") return v;
+  if (v === "agency" || v === "hotel_partner" || v === "affiliate" || v === "venue_partner") return v;
   throw new Error("Invalid application kind.");
 }
 
@@ -66,9 +66,9 @@ export async function startApplication(formData: FormData): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Step 1 — business details
+// Step 1 — business details (agency / hotel_partner) or "about you" (affiliate)
 // ---------------------------------------------------------------------------
-const step1Schema = z.object({
+const step1BusinessSchema = z.object({
   legalBusinessName: z.string().min(2, "Enter your legal business name."),
   tradingName: z.string().optional(),
   businessType: z.string().min(1, "Select a business type."),
@@ -84,43 +84,67 @@ const step1Schema = z.object({
   branchesJson: z.string().optional(),
 });
 
+// An affiliate is an individual referring an existing B2C platform, not a
+// registered business — no legal name/tax ID/office address, just who they
+// are, how to reach them, and where their audience actually is.
+const step1AffiliateSchema = z.object({
+  fullName: z.string().min(2, "Enter your full name."),
+  city: z.string().min(1, "Enter your city."),
+  audienceLocation: z.string().min(1, "Select where your audience is mainly based."),
+  mobile: phoneSchema,
+  email: z.string().email("Enter a valid email."),
+});
+
 export async function saveStep1(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const kind = kindOf(formData);
   const id = String(formData.get("applicationId"));
-  const parsed = step1Schema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const user = await requireUser();
   const { supabase, application } = await getEditableApplication(kind, id, user.id);
   if (!application) return { error: "This application can no longer be edited." };
 
-  let branches: Array<{ name: string; location: string }> = [];
-  try {
-    branches = parsed.data.branchesJson ? JSON.parse(parsed.data.branchesJson) : [];
-  } catch {
-    branches = [];
-  }
-
-  const details = mergeDetails(application.business_details, {
-    legalBusinessName: parsed.data.legalBusinessName,
-    tradingName: parsed.data.tradingName || null,
-    businessType: parsed.data.businessType,
-    yearEstablished: parsed.data.yearEstablished || null,
-    registrationNumber: parsed.data.registrationNumber || null,
-    taxId: parsed.data.taxId || null,
-    officeStreet: parsed.data.officeStreet || null,
-    officeCity: parsed.data.officeCity,
-    officeRegion: parsed.data.officeRegion || null,
-    businessPhone: parsed.data.businessPhone,
-    businessEmail: parsed.data.businessEmail,
-    website: parsed.data.website || null,
-    branches,
-    _wizard_step: Math.max(2, Number((application.business_details as Record<string, unknown> | null)?._wizard_step) || 1),
-  });
-
   const cfg = APP_CONFIG[kind];
-  const update: Record<string, unknown> = { business_details: details };
-  if (cfg.nameField) update[cfg.nameField] = parsed.data.legalBusinessName;
+  const currentStep = Number((application.business_details as Record<string, unknown> | null)?._wizard_step) || 1;
+  const update: Record<string, unknown> = {};
+
+  if (kind === "affiliate") {
+    const parsed = step1AffiliateSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    update.business_details = mergeDetails(application.business_details, {
+      fullName: parsed.data.fullName,
+      city: parsed.data.city,
+      audienceLocation: parsed.data.audienceLocation,
+      mobile: parsed.data.mobile,
+      email: parsed.data.email,
+      _wizard_step: Math.max(2, currentStep),
+    });
+  } else {
+    const parsed = step1BusinessSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    let branches: Array<{ name: string; location: string }> = [];
+    try {
+      branches = parsed.data.branchesJson ? JSON.parse(parsed.data.branchesJson) : [];
+    } catch {
+      branches = [];
+    }
+    update.business_details = mergeDetails(application.business_details, {
+      legalBusinessName: parsed.data.legalBusinessName,
+      tradingName: parsed.data.tradingName || null,
+      businessType: parsed.data.businessType,
+      yearEstablished: parsed.data.yearEstablished || null,
+      registrationNumber: parsed.data.registrationNumber || null,
+      taxId: parsed.data.taxId || null,
+      officeStreet: parsed.data.officeStreet || null,
+      officeCity: parsed.data.officeCity,
+      officeRegion: parsed.data.officeRegion || null,
+      businessPhone: parsed.data.businessPhone,
+      businessEmail: parsed.data.businessEmail,
+      website: parsed.data.website || null,
+      branches,
+      _wizard_step: Math.max(2, currentStep),
+    });
+    if (cfg.nameField) update[cfg.nameField] = parsed.data.legalBusinessName;
+  }
 
   const { error } = await supabase.from(cfg.table).update(update as never).eq("id", id);
   if (error) return { error: error.message };
@@ -130,9 +154,9 @@ export async function saveStep1(_prev: ActionState, formData: FormData): Promise
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 — authorized contact
+// Step 2 — authorized contact (agency / hotel_partner) or identity verification (affiliate)
 // ---------------------------------------------------------------------------
-const step2Schema = z.object({
+const step2ContactSchema = z.object({
   contactFullName: z.string().min(2, "Enter the contact's full name."),
   contactRole: z.string().min(1, "Enter their role or title."),
   contactIdNumber: z.string().min(3, "Enter a national ID or passport number."),
@@ -140,25 +164,40 @@ const step2Schema = z.object({
   contactEmail: z.string().email("Enter a valid email."),
 });
 
+// The affiliate already gave their name/phone/email in step 1 — step 2 here
+// exists purely to record the ID number backing the document they'll upload
+// in the Documents step, for payout fraud prevention.
+const step2AffiliateSchema = z.object({
+  idNumber: z.string().min(3, "Enter a national ID or passport number."),
+});
+
 export async function saveStep2(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const kind = kindOf(formData);
   const id = String(formData.get("applicationId"));
-  const parsed = step2Schema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const user = await requireUser();
   const { supabase, application } = await getEditableApplication(kind, id, user.id);
   if (!application) return { error: "This application can no longer be edited." };
 
   const step = Math.max(3, Number((application.business_details as Record<string, unknown> | null)?._wizard_step) || 1);
-  const details = mergeDetails(application.business_details, {
-    contactFullName: parsed.data.contactFullName,
-    contactRole: parsed.data.contactRole,
-    contactIdNumber: parsed.data.contactIdNumber,
-    contactMobile: parsed.data.contactMobile,
-    contactEmail: parsed.data.contactEmail,
-    _wizard_step: step,
-  });
+  let details: Record<string, unknown>;
+
+  if (kind === "affiliate") {
+    const parsed = step2AffiliateSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    details = mergeDetails(application.business_details, { idNumber: parsed.data.idNumber, _wizard_step: step });
+  } else {
+    const parsed = step2ContactSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    details = mergeDetails(application.business_details, {
+      contactFullName: parsed.data.contactFullName,
+      contactRole: parsed.data.contactRole,
+      contactIdNumber: parsed.data.contactIdNumber,
+      contactMobile: parsed.data.contactMobile,
+      contactEmail: parsed.data.contactEmail,
+      _wizard_step: step,
+    });
+  }
 
   const { error } = await supabase.from(APP_CONFIG[kind].table).update({ business_details: details } as never).eq("id", id);
   if (error) return { error: error.message };
@@ -196,6 +235,19 @@ const step3AffiliateSchema = z.object({
   handlesJson: z.string().optional(),
   audienceSize: z.string().optional(),
   trafficSource: z.string().min(1, "Select your primary traffic source."),
+  promotionPlan: z.string().min(10, "Tell us a bit about how you'll promote STS Somalia."),
+});
+
+// Venue application captures the flagship hall's shape — actual venue
+// listings (with photos, live pricing) are created in the Venue Portal after
+// approval, same split as hotel_partner's property step vs the portal.
+const step3VenueSchema = z.object({
+  venueName: z.string().min(2, "Enter the venue name."),
+  location: z.string().min(2, "Enter the venue's location/city."),
+  seatedCapacity: z.string().optional(),
+  standingCapacity: z.string().min(1, "Enter the standing capacity."),
+  eventTypes: z.string().optional(), // comma-separated
+  indicativePrice: z.string().optional(),
 });
 
 export async function saveStep3(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -243,6 +295,17 @@ export async function saveStep3(_prev: ActionState, formData: FormData): Promise
       amenities: parsed.data.amenities ? parsed.data.amenities.split(",").filter(Boolean) : [],
       cancellationPolicy: parsed.data.cancellationPolicy,
     };
+  } else if (kind === "venue_partner") {
+    const parsed = step3VenueSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    patch = {
+      venueName: parsed.data.venueName,
+      location: parsed.data.location,
+      seatedCapacity: parsed.data.seatedCapacity || null,
+      standingCapacity: parsed.data.standingCapacity,
+      eventTypes: parsed.data.eventTypes ? parsed.data.eventTypes.split(",").filter(Boolean) : [],
+      indicativePrice: parsed.data.indicativePrice || null,
+    };
   } else {
     const parsed = step3AffiliateSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -256,6 +319,7 @@ export async function saveStep3(_prev: ActionState, formData: FormData): Promise
       handles,
       audienceSize: parsed.data.audienceSize || null,
       trafficSource: parsed.data.trafficSource,
+      promotionPlan: parsed.data.promotionPlan,
     };
   }
 
@@ -302,7 +366,9 @@ export async function saveStep4(_prev: ActionState, formData: FormData): Promise
   if (!application) return { error: "This application can no longer be edited." };
 
   let patch: Record<string, unknown>;
-  if (kind === "hotel_partner") {
+  // Venue partners are suppliers exactly like hotels — paid out for completed
+  // events — so they share the payout-cadence + mandatory-bank settlement.
+  if (kind === "hotel_partner" || kind === "venue_partner") {
     const parsed = step4HotelSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return { error: parsed.error.issues[0].message };
     patch = {
@@ -437,7 +503,9 @@ export async function submitApplication(_prev: ActionState, formData: FormData):
   if (!application) return { error: "This application can no longer be edited." };
 
   const details = (application.business_details ?? {}) as Record<string, unknown>;
-  if (!details.legalBusinessName || !details.contactFullName || !details.contactEmail) {
+  const requiredDetailKeys =
+    kind === "affiliate" ? ["fullName", "email", "idNumber"] : ["legalBusinessName", "contactFullName", "contactEmail"];
+  if (requiredDetailKeys.some((key) => !details[key])) {
     return { error: "Please complete the earlier steps before submitting." };
   }
 
@@ -473,5 +541,9 @@ export async function submitApplication(_prev: ActionState, formData: FormData):
   if (error) return { error: error.message };
 
   revalidatePath("/account/become");
-  redirect(`/account/become?submitted=${encodeURIComponent(refData)}&program=${kind === "agency" ? "agent" : kind === "hotel_partner" ? "partner" : "affiliate"}`);
+  redirect(
+    `/account/become?submitted=${encodeURIComponent(refData)}&program=${
+      kind === "agency" ? "agent" : kind === "hotel_partner" ? "partner" : kind === "venue_partner" ? "venue" : "affiliate"
+    }`
+  );
 }

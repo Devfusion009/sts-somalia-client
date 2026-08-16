@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Home,
   MapPin,
+  Phone,
   Ruler,
   Star,
   Users,
@@ -14,6 +15,8 @@ import {
 import { getHotelBySlug, getRoomAvailability } from "@/modules/hotels/queries";
 import { hotelImageUrls, amenityLabel } from "@/modules/hotels/images";
 import { MediaPlaceholder } from "@/components/media-placeholder";
+import { PropertyLinks } from "@/components/property-links";
+import { PropertyReviews } from "@/components/property-reviews";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -102,13 +105,29 @@ export default async function HotelDetailPage({
             {hotel.address_line ? `${hotel.address_line}, ` : ""}
             {hotel.city}, {hotel.country_code}
           </p>
+          {hotel.phone ? (
+            <a
+              href={`tel:${hotel.phone}`}
+              className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
+            >
+              <Phone className="size-3.5" /> {hotel.phone}
+            </a>
+          ) : null}
+          <PropertyLinks links={hotel.property_links} className="mt-2" />
         </div>
-        {hotel.star_rating ? (
-          <Badge variant="secondary" className="gap-1 text-base">
-            <Star className="size-4 fill-brand-gold text-brand-gold" />
-            {hotel.star_rating}-star hotel
-          </Badge>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {hotel.booking_mode === "manual" ? (
+            // Manual hotels are confirmed by STS staff — the page must not
+            // read as live availability.
+            <Badge variant="outline" className="text-muted-foreground">Booking on request</Badge>
+          ) : null}
+          {hotel.star_rating ? (
+            <Badge variant="secondary" className="gap-1 text-base">
+              <Star className="size-4 fill-brand-gold text-brand-gold" />
+              {hotel.star_rating}-star hotel
+            </Badge>
+          ) : null}
+        </div>
       </div>
 
       {hotel.description ? (
@@ -193,10 +212,18 @@ export default async function HotelDetailPage({
                   </div>
                   <div className="flex items-center justify-between gap-3 border-t border-border p-5 sm:w-48 sm:flex-col sm:items-end sm:justify-center sm:border-t-0 sm:border-l">
                     <p className="text-right">
-                      <span className="font-heading text-xl font-bold text-primary">
-                        {room.currency} {room.base_price.toFixed(0)}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">per night</span>
+                      {room.base_price > 0 ? (
+                        <>
+                          <span className="font-heading text-xl font-bold text-primary">
+                            {room.currency} {room.base_price.toFixed(0)}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">per night</span>
+                        </>
+                      ) : (
+                        <span className="font-heading text-base font-bold text-primary">
+                          Price on request
+                        </span>
+                      )}
                       {soldOut ? (
                         <span className="mt-1 block text-xs font-semibold text-destructive">
                           Sold out for your dates
@@ -213,6 +240,7 @@ export default async function HotelDetailPage({
                       <BookingForm
                         hotelId={hotel.id}
                         room={room}
+                        bookingMode={hotel.booking_mode === "instant" ? "instant" : "manual"}
                         defaults={{ checkIn, checkOut, guests }}
                         bookedForSlot={<AgencyBookingSlot />}
                       />
@@ -226,6 +254,10 @@ export default async function HotelDetailPage({
       ) : (
         <p className="mt-4 text-muted-foreground">No rooms are currently available at this hotel.</p>
       )}
+
+      <div className="mt-8">
+        <PropertyReviews reviews={hotel.property_reviews} />
+      </div>
     </div>
   );
 }

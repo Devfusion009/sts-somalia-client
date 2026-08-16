@@ -40,6 +40,10 @@ export function HallBookingForm({
   const [startDate, setStartDate] = useState("");
 
   const options = eventTypes.length > 0 ? eventTypes : ["wedding", "conference", "other"];
+  const perPerson = priceUnit === "per_person";
+  // Per-person and price-on-request venues confirm the final price before the
+  // booking completes — the request is sent without payment.
+  const isRequestFirst = perPerson || basePrice === 0;
 
   return (
     <form action={formAction} className="space-y-4">
@@ -138,21 +142,51 @@ export function HallBookingForm({
 
       <Separator />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-muted-foreground">Venue fee</p>
-          <p className="font-heading text-xl font-bold text-primary">
-            {currency} {basePrice.toFixed(0)}
-            <span className="text-xs font-normal text-muted-foreground">
-              {" "}
-              {priceUnitLabel(priceUnit)}
-            </span>
-          </p>
+      {/* Per-person venues estimate by headcount; the venue confirms the
+          final price before the booking completes, so the request goes in
+          WITHOUT payment. Fixed-price venues keep the pay-now flow. */}
+      {isRequestFirst ? (
+        <div className="space-y-3">
+          <div className="rounded-lg bg-muted/60 p-3">
+            {perPerson && basePrice > 0 ? (
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  {currency} {basePrice.toFixed(0)} per person × {guests} guest{guests > 1 ? "s" : ""}
+                </p>
+                <p className="font-heading text-xl font-bold text-primary">
+                  {currency} {(basePrice * guests).toFixed(0)}
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">estimated</span>
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm font-medium">Price on request</p>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">
+              The venue confirms your final price before the booking is completed — you won&apos;t pay
+              anything until then.
+            </p>
+          </div>
+          <SubmitButton pendingText="Sending request…" className="w-full gap-1.5">
+            Request Booking <ArrowRight className="size-4" />
+          </SubmitButton>
         </div>
-        <SubmitButton pendingText="Reserving…" className="gap-1.5">
-          Reserve &amp; Pay <ArrowRight className="size-4" />
-        </SubmitButton>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground">Venue fee</p>
+            <p className="font-heading text-xl font-bold text-primary">
+              {currency} {basePrice.toFixed(0)}
+              <span className="text-xs font-normal text-muted-foreground">
+                {" "}
+                {priceUnitLabel(priceUnit)}
+              </span>
+            </p>
+          </div>
+          <SubmitButton pendingText="Reserving…" className="gap-1.5">
+            Reserve &amp; Pay <ArrowRight className="size-4" />
+          </SubmitButton>
+        </div>
+      )}
 
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <CalendarDays className="size-3.5" />

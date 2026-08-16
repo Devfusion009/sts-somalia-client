@@ -85,6 +85,16 @@ export async function createHallBooking(
   const access = await assertAgencyCanBookProduct(supabase, agencyId, "hall");
   if (!access.ok) return { error: access.message };
   const agencyCustomerId = await resolveBookedForCustomer(supabase, agencyId, formData);
+
+  // Per-person venues price by headcount: estimate = rate × expected guests.
+  // The stored price is an ESTIMATE the venue confirms (admin adjusts it via
+  // updateHallBookingPrice before confirming) — which is also why these
+  // requests skip checkout below.
+  const estimatedPrice =
+    venue.price_unit === "per_person"
+      ? Number(venue.base_price) * d.expectedGuests
+      : Number(venue.base_price);
+
   const { data: booking, error: bookingError } = await supabase
     .from("hall_bookings")
     .insert({
@@ -100,7 +110,7 @@ export async function createHallBooking(
       end_time: d.endTime ?? null,
       expected_guests: d.expectedGuests,
       setup_requirements: d.setupRequirements ?? null,
-      price: venue.base_price,
+      price: estimatedPrice,
       currency: venue.currency,
     })
     .select()
@@ -116,9 +126,18 @@ export async function createHallBooking(
     agencyCustomerId,
     currency: venue.currency,
     itemType: "hall",
-    price: Number(venue.base_price),
+    price: estimatedPrice,
     hallBookingId: booking.id,
   });
+
+  // Per-person and price-on-request venues confirm the FINAL price before the
+  // booking completes — charging the estimate up front would mean refund
+  // gymnastics whenever the venue quotes differently. The request lands in
+  // the admin queue; the customer pays from their booking page once the
+  // price is confirmed. Fixed-price venues keep the pay-now flow.
+  if (venue.price_unit === "per_person" || Number(venue.base_price) === 0) {
+    redirect(`/account/bookings/${order.id}?requested=1`);
+  }
 
   redirect(`/checkout/${order.id}`);
 }

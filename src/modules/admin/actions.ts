@@ -283,14 +283,16 @@ const venueSchema = z.object({
   description: z.string().optional(),
   city: z.string().min(2),
   address: z.string().optional(),
+  phone: z.string().optional(),
   capacitySeated: z.coerce.number().int().min(1).optional(),
   capacityStanding: z.coerce.number().int().min(1).optional(),
   sizeSqm: z.coerce.number().min(0).optional(),
   amenities: z.string().optional(),
   eventTypes: z.string().optional(),
+  links: z.string().optional(),
   basePrice: z.coerce.number().min(0),
   currency: z.string().min(3).max(3),
-  priceUnit: z.enum(["per_event", "per_day", "per_hour"]),
+  priceUnit: z.enum(["per_event", "per_day", "per_hour", "per_person"]),
   isFeatured: z.boolean(),
   status: z.enum(["draft", "pending_review", "published", "suspended"]),
 });
@@ -303,6 +305,43 @@ function commaList(input: string | undefined) {
     .filter(Boolean);
 }
 
+/** "Label | https://url" per line — the admin-facing format for the property_links textarea, shared by venues and hotels. */
+function parseLinks(input: string | undefined): Array<{ label: string; url: string }> {
+  if (!input) return [];
+  return input
+    .split("\n")
+    .map((line) => {
+      const [label, ...rest] = line.split("|");
+      return { label: label?.trim() ?? "", url: rest.join("|").trim() };
+    })
+    .filter((l) => l.label && l.url);
+}
+
+/** Replaces every property_links row for one hotel/venue with the freshly parsed set — same "full replace on save" semantics this form already uses for amenities/event types. */
+async function replacePropertyLinks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  parent: { hotelId?: string; venueId?: string },
+  links: Array<{ label: string; url: string }>
+) {
+  if (parent.hotelId) {
+    await supabase.from("property_links").delete().eq("hotel_id", parent.hotelId);
+    if (links.length > 0) {
+      const hotelId = parent.hotelId;
+      await supabase
+        .from("property_links")
+        .insert(links.map((l, i) => ({ hotel_id: hotelId, label: l.label, url: l.url, sort_order: i })));
+    }
+  } else if (parent.venueId) {
+    await supabase.from("property_links").delete().eq("venue_id", parent.venueId);
+    if (links.length > 0) {
+      const venueId = parent.venueId;
+      await supabase
+        .from("property_links")
+        .insert(links.map((l, i) => ({ venue_id: venueId, label: l.label, url: l.url, sort_order: i })));
+    }
+  }
+}
+
 function venueInput(formData: FormData) {
   return {
     name: formData.get("name"),
@@ -310,11 +349,13 @@ function venueInput(formData: FormData) {
     description: formData.get("description") || undefined,
     city: formData.get("city"),
     address: formData.get("address") || undefined,
+    phone: formData.get("phone") || undefined,
     capacitySeated: formData.get("capacitySeated") || undefined,
     capacityStanding: formData.get("capacityStanding") || undefined,
     sizeSqm: formData.get("sizeSqm") || undefined,
     amenities: formData.get("amenities") || undefined,
     eventTypes: formData.get("eventTypes") || undefined,
+    links: formData.get("links") || undefined,
     basePrice: formData.get("basePrice"),
     currency: formData.get("currency"),
     priceUnit: formData.get("priceUnit") ?? "per_event",
@@ -330,6 +371,7 @@ function venueRow(data: z.infer<typeof venueSchema>) {
     description: data.description ?? null,
     city: data.city,
     address: data.address ?? null,
+    phone: data.phone ?? null,
     capacity_seated: data.capacitySeated ?? null,
     capacity_standing: data.capacityStanding ?? null,
     size_sqm: data.sizeSqm ?? null,
@@ -349,10 +391,13 @@ export async function createVenue(_prev: ActionState, formData: FormData): Promi
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: venue, error } = await supabase
     .from("event_venues")
-    .insert({ ...venueRow(parsed.data), slug: slugify(parsed.data.name) });
-  if (error) return { error: error.message };
+    .insert({ ...venueRow(parsed.data), slug: slugify(parsed.data.name) })
+    .select("id")
+    .single();
+  if (error || !venue) return { error: error?.message ?? "Could not create the venue." };
+  await replacePropertyLinks(supabase, { venueId: venue.id }, parseLinks(parsed.data.links));
   revalidatePath("/admin/events");
   revalidatePath("/events");
   return { error: null };
@@ -367,6 +412,7 @@ export async function updateVenue(_prev: ActionState, formData: FormData): Promi
   const supabase = await createClient();
   const { error } = await supabase.from("event_venues").update(venueRow(parsed.data)).eq("id", id);
   if (error) return { error: error.message };
+  await replacePropertyLinks(supabase, { venueId: id }, parseLinks(parsed.data.links));
   revalidatePath("/admin/events");
   revalidatePath("/events");
   return { error: null };
@@ -381,6 +427,27 @@ const hallBookingStatuses = [
   "no_show",
   "failed",
 ] as const;
+
+/**
+ * Declining a manual request must also close its UNPAID order — otherwise
+ * the customer's bookings page keeps showing "pending payment" for a stay
+ * nobody granted. Paid orders are left alone: money moved, so the refund
+ * flow owns those.
+ */
+async function cancelUnpaidOrderForBooking(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  bookingColumn: "hall_booking_id" | "hotel_booking_id",
+  bookingId: string
+) {
+  const { data: item } = await supabase
+    .from("order_items")
+    .select("order:order_id (id, status)")
+    .eq(bookingColumn, bookingId)
+    .maybeSingle();
+  if (item?.order && (item.order.status === "pending_payment" || item.order.status === "held")) {
+    await supabase.from("orders").update({ status: "cancelled" }).eq("id", item.order.id);
+  }
+}
 
 export async function updateHallBookingStatus(
   _prev: ActionState,
@@ -399,7 +466,50 @@ export async function updateHallBookingStatus(
     .update({ status: status as (typeof hallBookingStatuses)[number] })
     .eq("id", bookingId);
   if (error) return { error: error.message };
+  if (status === "cancelled") await cancelUnpaidOrderForBooking(supabase, "hall_booking_id", bookingId);
   revalidatePath("/admin/events");
+  revalidatePath("/admin/queue");
+  return { error: null };
+}
+
+const hotelBookingStatuses = [
+  "pending",
+  "waitlisted",
+  "confirmed",
+  "cancelled",
+  "completed",
+  "refunded",
+  "no_show",
+  "failed",
+] as const;
+
+/**
+ * Admin-side hotel booking status control for the manual-booking queue —
+ * previously only the hotel partner could move a hotel booking's status.
+ * Promoting a waitlisted booking runs the DB-side availability re-check
+ * (reserve_inventory_on_waitlist_promotion), so a stale waitlist entry
+ * whose nights are still full fails loudly here instead of double-booking.
+ */
+export async function updateHotelBookingStatus(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  await requirePlatformAdmin();
+  const bookingId = String(formData.get("bookingId"));
+  const status = String(formData.get("status"));
+  if (!hotelBookingStatuses.includes(status as (typeof hotelBookingStatuses)[number])) {
+    return { error: "Invalid status." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("hotel_bookings")
+    .update({ status: status as (typeof hotelBookingStatuses)[number] })
+    .eq("id", bookingId);
+  if (error) return { error: error.message };
+  if (status === "cancelled") await cancelUnpaidOrderForBooking(supabase, "hotel_booking_id", bookingId);
+  revalidatePath("/admin/queue");
+  revalidatePath("/admin/orders");
   return { error: null };
 }
 
@@ -434,5 +544,49 @@ export async function updateHallBookingPrice(
   }
 
   revalidatePath("/admin/events");
+  revalidatePath("/admin/queue");
+  return { error: null };
+}
+
+/**
+ * Quote/adjust a manual hotel booking's price; keeps the unpaid order's
+ * totals in sync. The seeded STS-catalog hotels have no room rates yet
+ * (price on request) — this is where staff set the real price before
+ * confirming the request, mirroring updateHallBookingPrice.
+ */
+export async function updateHotelBookingPrice(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  await requirePlatformAdmin();
+  const bookingId = String(formData.get("bookingId"));
+  const price = Number(formData.get("price"));
+  if (!Number.isFinite(price) || price < 0) return { error: "Enter a valid price." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("hotel_bookings")
+    .update({ total_price: price })
+    .eq("id", bookingId);
+  if (error) return { error: error.message };
+
+  const { data: item } = await supabase
+    .from("order_items")
+    .select("id, order:order_id (id, status)")
+    .eq("hotel_booking_id", bookingId)
+    .maybeSingle();
+  if (item?.order && item.order.status === "pending_payment") {
+    await supabase
+      .from("order_items")
+      .update({ unit_price: price, total_price: price })
+      .eq("id", item.id);
+    await supabase
+      .from("orders")
+      .update({ subtotal: price, total: price })
+      .eq("id", item.order.id);
+  }
+
+  revalidatePath("/admin/queue");
+  revalidatePath("/admin/orders");
   return { error: null };
 }

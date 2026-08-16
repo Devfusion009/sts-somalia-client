@@ -24,7 +24,7 @@ export function ReviewerPicker({
         name="reviewerId"
         defaultValue={currentReviewerId ?? "unassigned"}
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="border-input h-10 w-full rounded-md border bg-transparent px-3.5 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
         <option value="unassigned">Unassigned</option>
         {admins.map((admin) => (

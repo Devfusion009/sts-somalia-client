@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { getActiveProviderCredentials } from "./credentials";
+import { getRedisClient } from "@/lib/redis";
 
 /**
  * Hotelbeds Booking API — always hits the TEST/sandbox host. A freshly
@@ -19,9 +20,41 @@ const CONTENT_BASE_URL = "https://api.test.hotelbeds.com/hotel-content-api/1.0";
 // destination list.
 const MARKET_COUNTRY_CODES = ["SO", "AE", "SA", "KE", "ET", "TR", "EG", "QA"];
 
+// Was an in-process Map — broke silently across serverless cold starts (a
+// fresh instance = an empty cache, no error, just quietly slower and more
+// Hotelbeds calls than intended) and was never shared between concurrent
+// instances. Redis-backed instead: same freshness window and stale-on-
+// failure fallback behavior, just actually shared and durable across
+// restarts.
 type DestinationCacheEntry = { destinations: Array<{ code: string; name: string }>; fetchedAt: number };
-const destinationCache = new Map<string, DestinationCacheEntry>();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+// Redis key expiry is a safety net, not the freshness mechanism — that's
+// CACHE_TTL_MS, checked in application code below. Deliberately much
+// longer: a failed live fetch falls back to whatever's cached even past
+// the 24h freshness window (destination codes barely ever change; a stale
+// list beats an empty one), so the entry needs to still be here for that.
+const REDIS_KEY_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+function destinationCacheKey(countryCode: string): string {
+  return `hotelbeds:destinations:${countryCode}`;
+}
+
+async function readDestinationCache(countryCode: string): Promise<DestinationCacheEntry | null> {
+  try {
+    const raw = await getRedisClient().get(destinationCacheKey(countryCode));
+    return raw ? (JSON.parse(raw) as DestinationCacheEntry) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeDestinationCache(countryCode: string, entry: DestinationCacheEntry): Promise<void> {
+  try {
+    await getRedisClient().set(destinationCacheKey(countryCode), JSON.stringify(entry), "EX", REDIS_KEY_TTL_SECONDS);
+  } catch {
+    // Best-effort — a write failure just means the next call refetches live.
+  }
+}
 
 function authHeaders(apiKey: string, secret: string): Record<string, string> {
   const timestamp = Math.floor(Date.now() / 1000);
@@ -39,7 +72,7 @@ async function fetchDestinationsForCountry(
   apiKey: string,
   secret: string
 ): Promise<Array<{ code: string; name: string }>> {
-  const cached = destinationCache.get(countryCode);
+  const cached = await readDestinationCache(countryCode);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.destinations;
 
   const res = await fetch(
@@ -53,7 +86,7 @@ async function fetchDestinationsForCountry(
     .filter((d) => d.code && d.name?.content)
     .map((d) => ({ code: d.code!, name: d.name!.content! }));
 
-  destinationCache.set(countryCode, { destinations, fetchedAt: Date.now() });
+  await writeDestinationCache(countryCode, { destinations, fetchedAt: Date.now() });
   return destinations;
 }
 

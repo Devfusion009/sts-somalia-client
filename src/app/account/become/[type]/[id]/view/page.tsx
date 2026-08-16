@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: "Application Details" };
 const DOCUMENT_BUCKET = "kyc-documents";
 
 function isKind(value: string): value is ApplicationKind {
-  return value === "agency" || value === "hotel_partner" || value === "affiliate";
+  return value === "agency" || value === "hotel_partner" || value === "affiliate" || value === "venue_partner";
 }
 
 const STATUS_META: Record<string, { label: string; className: string; icon: typeof CheckCircle2 }> = {

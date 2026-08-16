@@ -3,25 +3,28 @@
 // forms) need these at runtime in the browser, while the queries module
 // (partner-accounts.ts, server-only) re-exports them for server callers.
 
-export type PartnerAccountType = "agency" | "hotel_partner" | "affiliate";
+export type PartnerAccountType = "agency" | "hotel_partner" | "affiliate" | "venue_partner";
 export type PartnerAccountStatus = "onboarding" | "live" | "suspended" | "offboarded";
 
 export const ACCOUNT_TYPE_FROM_SLUG: Record<string, PartnerAccountType> = {
   agency: "agency",
   "hotel-partner": "hotel_partner",
   affiliate: "affiliate",
+  "venue-partner": "venue_partner",
 };
 
 export const ACCOUNT_SLUG_FROM_TYPE: Record<PartnerAccountType, string> = {
   agency: "agency",
   hotel_partner: "hotel-partner",
   affiliate: "affiliate",
+  venue_partner: "venue-partner",
 };
 
 export const ACCOUNT_TYPE_LABEL: Record<PartnerAccountType, string> = {
   agency: "Travel Agency",
   hotel_partner: "Hotel Partner",
   affiliate: "Affiliate",
+  venue_partner: "Venue Partner",
 };
 
 /**
@@ -41,6 +44,7 @@ export const ENTITY_TABLE = {
   agency: "agencies",
   hotel_partner: "hotel_partners",
   affiliate: "affiliates",
+  venue_partner: "venue_partners",
 } as const;
 
 export type AccountMember = {

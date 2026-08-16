@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, Home, Landmark, MapPin, Ruler, Users } from "lucide-react";
+import { ChevronRight, Home, Landmark, MapPin, Phone, Ruler, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MediaPlaceholder } from "@/components/media-placeholder";
+import { PropertyLinks } from "@/components/property-links";
+import { PropertyReviews } from "@/components/property-reviews";
 import { venueImageUrls } from "@/modules/events/images";
 import { getVenueBySlug } from "@/modules/events/queries";
 import {
@@ -79,16 +81,30 @@ export default async function VenueDetailPage({
                 {venue.address ? `${venue.address}, ` : ""}
                 {venue.city}
               </p>
+              {venue.phone ? (
+                <a
+                  href={`tel:${venue.phone}`}
+                  className="mt-1 inline-flex items-center gap-1 text-sm text-white/85 hover:text-white"
+                >
+                  <Phone className="size-3.5" /> {venue.phone}
+                </a>
+              ) : null}
             </div>
             <div className="rounded-xl bg-white/10 px-4 py-2 text-right backdrop-blur">
-              <p className="text-[10px] text-white/70 uppercase">From</p>
-              <p className="font-heading text-xl font-bold text-white">
-                {venue.currency} {Number(venue.base_price).toFixed(0)}
-                <span className="text-xs font-normal text-white/70">
-                  {" "}
-                  {priceUnitLabel(venue.price_unit)}
-                </span>
-              </p>
+              {Number(venue.base_price) > 0 ? (
+                <>
+                  <p className="text-[10px] text-white/70 uppercase">From</p>
+                  <p className="font-heading text-xl font-bold text-white">
+                    {venue.currency} {Number(venue.base_price).toFixed(0)}
+                    <span className="text-xs font-normal text-white/70">
+                      {" "}
+                      {priceUnitLabel(venue.price_unit)}
+                    </span>
+                  </p>
+                </>
+              ) : (
+                <p className="font-heading text-lg font-bold text-white">Price on request</p>
+              )}
             </div>
           </div>
         </div>
@@ -140,6 +156,7 @@ export default async function VenueDetailPage({
             <p className="mt-2 leading-relaxed text-muted-foreground">
               {venue.description ?? "Contact our events team for full details about this venue."}
             </p>
+            <PropertyLinks links={venue.property_links} className="mt-3" />
           </section>
 
           {/* Perfect for */}
@@ -181,6 +198,8 @@ export default async function VenueDetailPage({
               </div>
             </section>
           ) : null}
+
+          <PropertyReviews reviews={venue.property_reviews} />
         </div>
 
         {/* Booking card */}

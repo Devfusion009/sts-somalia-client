@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useCallback, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowRight, ArrowLeft, Check, CloudUpload, FileCheck2, Loader2, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -32,11 +33,19 @@ import {
   VOLUME_RANGES,
   PRODUCTS,
   TRAFFIC_SOURCES,
+  AUDIENCE_LOCATIONS,
+  AUDIENCE_LOCATION_LABELS,
+  VENUE_EVENT_TYPES,
   PROPERTY_TYPES,
+  PROPERTY_TYPE_LABELS,
   STAR_RATINGS,
+  STAR_RATING_LABELS,
   AMENITIES,
+  AMENITY_LABELS,
   CANCELLATION_POLICIES,
+  CANCELLATION_POLICY_LABELS,
   PAYOUT_FREQUENCIES,
+  PAYOUT_FREQUENCY_LABELS,
   docSlotsFor,
   stepLabel,
   type ApplicationKind,
@@ -84,6 +93,63 @@ function useAutosave(formRef: React.RefObject<HTMLFormElement | null>, formActio
  */
 function isSaved(state: ActionState, pending: boolean): boolean {
   return !pending && state !== null && state.error === null;
+}
+
+/**
+ * Restores plain <Input>/<Textarea> fields after a "Continue" click that
+ * comes back with a validation error (e.g. a required OptionPicker field
+ * left unset while everything else was filled in).
+ *
+ * "Continue" is deliberately still a real submit — that's what lets
+ * redirect() on success turn into an actual page navigation; routing it
+ * through the same non-native dispatch bypass useAutosave uses (tried
+ * first) silently breaks that: the action ran and persisted correctly, but
+ * the browser never left the page, since Next.js's redirect-to-navigation
+ * handling is wired to the form's real submit event, not to calling the
+ * useActionState dispatcher directly.
+ *
+ * So the real submit stays, and with it React 19's post-settle reset of
+ * uncontrolled fields to their defaultValue — invisible on success (the
+ * page navigates away before it'd be seen) but not on a validation error,
+ * where the same form instance stays mounted and defaultValue is still
+ * whatever the page's ORIGINAL server data was. For a field never
+ * autosaved yet (this step's whole schema validates as one unit, so
+ * autosave fails right alongside "Continue" until every required field is
+ * set), that default is empty — so the reset wipes it to blank, not back
+ * to what was typed. OptionPicker/BucketPicker/etc. are unaffected: their
+ * hidden inputs are React-controlled (value={state}), which this reset
+ * mechanism never touches.
+ *
+ * Snapshots the form on every real submit, then replays that snapshot onto
+ * the DOM the moment an error comes back — after React's own reset has
+ * already run, so this always gets the last word.
+ */
+function useRestoreOnError(formRef: React.RefObject<HTMLFormElement | null>, state: ActionState) {
+  const snapshotRef = useRef<Record<string, string> | null>(null);
+
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const capture = () => {
+      snapshotRef.current = Object.fromEntries(
+        Array.from(new FormData(form).entries(), ([k, v]) => [k, String(v)])
+      );
+    };
+    form.addEventListener("submit", capture);
+    return () => form.removeEventListener("submit", capture);
+  }, [formRef]);
+
+  useEffect(() => {
+    const snapshot = snapshotRef.current;
+    const form = formRef.current;
+    if (!state?.error || !snapshot || !form) return;
+    for (const el of Array.from(form.elements)) {
+      if (!(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement)) continue;
+      if (el.type === "checkbox" || el.type === "radio" || el.type === "file") continue;
+      if (!el.name || !(el.name in snapshot)) continue;
+      el.value = snapshot[el.name];
+    }
+  }, [state, formRef]);
 }
 
 function StepNav({
@@ -135,7 +201,7 @@ function ErrorAlert({ state }: { state: ActionState }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Step 1 — business details                                                  */
+/* Step 1 — business details (agency / hotel_partner) or "about you" (affiliate) */
 /* -------------------------------------------------------------------------- */
 export function StepBusiness({ kind, application, backHref }: { kind: ApplicationKind; application: AppRow; backHref: string }) {
   const [state, formAction, pending] = useActionState(saveStep1, null);
@@ -143,6 +209,44 @@ export function StepBusiness({ kind, application, backHref }: { kind: Applicatio
   const formRef = useRef<HTMLFormElement>(null);
   const autosave = useAutosave(formRef, formAction);
   const saved = isSaved(state, pending);
+  useRestoreOnError(formRef, state);
+
+  if (kind === "affiliate") {
+    return (
+      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
+        <input type="hidden" name="kind" value={kind} />
+        <input type="hidden" name="applicationId" value={application.id} />
+        <ErrorAlert state={state} />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Full name *</Label>
+            <Input name="fullName" defaultValue={s(d.fullName)} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label>City *</Label>
+            <LocationField name="city" defaultValue={s(d.city)} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Mobile number *</Label>
+            <PhoneField name="mobile" defaultValue={s(d.mobile)} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Email *</Label>
+            <Input name="email" type="email" defaultValue={s(d.email)} required />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Where is your audience mainly based? *</Label>
+            <OptionPicker
+              name="audienceLocation"
+              defaultValue={s(d.audienceLocation)}
+              options={AUDIENCE_LOCATIONS.map((v) => ({ value: v, label: AUDIENCE_LOCATION_LABELS[v] }))}
+            />
+          </div>
+        </div>
+        <StepNav backHref={backHref} saving={pending} saved={saved} />
+      </form>
+    );
+  }
 
   return (
     <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
@@ -233,7 +337,7 @@ export function StepBusiness({ kind, application, backHref }: { kind: Applicatio
 }
 
 /* -------------------------------------------------------------------------- */
-/* Step 2 — authorized contact                                                */
+/* Step 2 — authorized contact (agency / hotel_partner) or identity verification (affiliate) */
 /* -------------------------------------------------------------------------- */
 export function StepContact({ kind, application }: { kind: ApplicationKind; application: AppRow }) {
   const [state, formAction, pending] = useActionState(saveStep2, null);
@@ -241,6 +345,25 @@ export function StepContact({ kind, application }: { kind: ApplicationKind; appl
   const formRef = useRef<HTMLFormElement>(null);
   const autosave = useAutosave(formRef, formAction);
   const saved = isSaved(state, pending);
+  useRestoreOnError(formRef, state);
+
+  if (kind === "affiliate") {
+    return (
+      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
+        <input type="hidden" name="kind" value={kind} />
+        <input type="hidden" name="applicationId" value={application.id} />
+        <ErrorAlert state={state} />
+        <div className="space-y-1.5">
+          <Label>National ID or passport number *</Label>
+          <Input name="idNumber" defaultValue={s(d.idNumber)} required />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          For payout verification only — you&apos;ll upload a copy in the Documents step.
+        </p>
+        <StepNav backHref={`/account/become/${kind}/${application.id}?step=1`} saving={pending} saved={saved} />
+      </form>
+    );
+  }
 
   return (
     <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
@@ -278,52 +401,6 @@ export function StepContact({ kind, application }: { kind: ApplicationKind; appl
     </form>
   );
 }
-
-const PROPERTY_TYPE_LABELS: Record<string, string> = {
-  hotel: "Hotel",
-  aparthotel: "Aparthotel / Serviced apartments",
-  guesthouse: "Guesthouse",
-  resort: "Resort",
-  hostel: "Hostel",
-  villa: "Villa",
-  boutique_bnb: "Boutique / B&B",
-};
-
-const STAR_RATING_LABELS: Record<string, string> = {
-  unrated: "Not officially rated",
-  "1": "1 star",
-  "2": "2 stars",
-  "3": "3 stars",
-  "4": "4 stars",
-  "5": "5 stars",
-};
-
-const AMENITY_LABELS: Record<string, string> = {
-  wifi: "Free WiFi",
-  parking: "Parking",
-  pool: "Swimming pool",
-  breakfast_included: "Breakfast included",
-  airport_shuttle: "Airport shuttle",
-  air_conditioning: "Air conditioning",
-  restaurant: "On-site restaurant",
-  gym: "Gym / fitness center",
-  spa: "Spa",
-  elevator: "Elevator",
-  front_desk_24h: "24-hour front desk",
-  non_smoking_rooms: "Non-smoking rooms available",
-};
-
-const CANCELLATION_POLICY_LABELS: Record<string, { label: string; hint: string }> = {
-  flexible: { label: "Flexible", hint: "Free cancellation up to 24h before check-in" },
-  moderate: { label: "Moderate", hint: "Free cancellation up to 5 days before check-in" },
-  strict: { label: "Strict", hint: "Non-refundable" },
-};
-
-const PAYOUT_FREQUENCY_LABELS: Record<string, string> = {
-  weekly: "Weekly",
-  biweekly: "Every 2 weeks",
-  monthly: "Monthly",
-};
 
 function AmenitiesField({ initial }: { initial: string[] }) {
   const [checked, setChecked] = useState<string[]>(initial);
@@ -372,6 +449,28 @@ function ProductsField({ initial }: { initial: string[] }) {
   );
 }
 
+function VenueEventTypesField({ initial }: { initial: string[] }) {
+  const [checked, setChecked] = useState<string[]>(initial);
+  return (
+    <div className="space-y-1.5">
+      <Label>Events your venue hosts</Label>
+      <div className="flex flex-wrap gap-2">
+        {VENUE_EVENT_TYPES.map((t) => (
+          <label key={t} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={checked.includes(t)}
+              onChange={(e) => setChecked((prev) => (e.target.checked ? [...prev, t] : prev.filter((v) => v !== t)))}
+            />
+            {t[0].toUpperCase() + t.slice(1)}
+          </label>
+        ))}
+      </div>
+      <input type="hidden" name="eventTypes" value={checked.join(",")} />
+    </div>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /* Step 3 — type-specific operations                                          */
 /* -------------------------------------------------------------------------- */
@@ -382,6 +481,7 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
   const formRef = useRef<HTMLFormElement>(null);
   const autosave = useAutosave(formRef, formAction);
   const saved = isSaved(state, pending);
+  useRestoreOnError(formRef, state);
 
   if (kind === "hotel_partner") {
     const initialRoomTypes = Array.isArray(d.roomTypes) ? (d.roomTypes as RoomTypeRow[]) : [];
@@ -467,6 +567,44 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
     );
   }
 
+  if (kind === "venue_partner") {
+    const initialEventTypes = Array.isArray(d.eventTypes) ? (d.eventTypes as string[]) : [];
+    return (
+      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
+        <input type="hidden" name="kind" value={kind} />
+        <input type="hidden" name="applicationId" value={application.id} />
+        <ErrorAlert state={state} />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Venue name *</Label>
+            <Input name="venueName" defaultValue={s(d.venueName)} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Location / city *</Label>
+            <LocationField name="location" defaultValue={s(d.location)} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Seated capacity</Label>
+            <Input name="seatedCapacity" type="number" min="1" defaultValue={s(d.seatedCapacity)} placeholder="e.g. 300" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Standing capacity *</Label>
+            <Input name="standingCapacity" type="number" min="1" defaultValue={s(d.standingCapacity)} placeholder="e.g. 500" required />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Indicative price (USD, optional)</Label>
+            <Input name="indicativePrice" type="number" min="0" defaultValue={s(d.indicativePrice)} placeholder="e.g. 1500 per event" />
+          </div>
+        </div>
+        <VenueEventTypesField initial={initialEventTypes} />
+        <p className="text-xs text-muted-foreground">
+          Photos and live availability are set up in the Venue Portal once you&apos;re approved.
+        </p>
+        <StepNav backHref={backHref} saving={pending} saved={saved} />
+      </form>
+    );
+  }
+
   if (kind === "affiliate") {
     return (
       <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
@@ -499,6 +637,16 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
               options={TRAFFIC_SOURCES.map((t) => ({ value: t, label: t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) }))}
             />
           </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label>How do you plan to promote STS Somalia? *</Label>
+          <Textarea
+            name="promotionPlan"
+            rows={3}
+            defaultValue={s(d.promotionPlan)}
+            placeholder="e.g. I post Umrah travel tips to my Instagram followers and share deals in a Somali diaspora WhatsApp group."
+            required
+          />
         </div>
         <StepNav backHref={backHref} saving={pending} saved={saved} />
       </form>
@@ -560,13 +708,14 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
   const formRef = useRef<HTMLFormElement>(null);
   const autosave = useAutosave(formRef, formAction);
   const saved = isSaved(state, pending);
+  useRestoreOnError(formRef, state);
   const backHref = `/account/become/${kind}/${application.id}?step=3`;
 
-  // A hotel is a supplier: it's paid out for completed stays, not billed —
-  // so instead of the agency's "how you'll pay us" wallet/credit-line
-  // choice, it only picks a payout cadence, and bank details are mandatory
-  // (they're the whole point of this step for a hotel).
-  if (kind === "hotel_partner") {
+  // A hotel or venue is a supplier: it's paid out for completed stays/events,
+  // not billed — so instead of the agency's "how you'll pay us" wallet/
+  // credit-line choice, it only picks a payout cadence, and bank details are
+  // mandatory (they're the whole point of this step for a supplier).
+  if (kind === "hotel_partner" || kind === "venue_partner") {
     return (
       <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
         <input type="hidden" name="kind" value={kind} />
@@ -582,8 +731,9 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          Guests pay STS Somalia at booking. Your share for completed stays is paid out to the account below on this
-          schedule, less the platform commission.
+          {kind === "hotel_partner" ? "Guests" : "Customers"} pay STS Somalia at booking. Your share for completed{" "}
+          {kind === "hotel_partner" ? "stays" : "events"} is paid out to the account below on this schedule, less the
+          platform commission.
         </p>
 
         <Separator />
@@ -789,6 +939,8 @@ function SummaryRow({ label, value }: { label: string; value: unknown }) {
 
 export function StepReview({ kind, application }: { kind: ApplicationKind; application: AppRow }) {
   const [state, formAction] = useActionState(submitApplication, null);
+  const formRef = useRef<HTMLFormElement>(null);
+  useRestoreOnError(formRef, state);
   const d = application.business_details;
   const refs = Array.isArray(application.document_refs) ? (application.document_refs as DocumentRef[]) : [];
   const uploadedKeys = new Set(refs.map((r) => r.key));
@@ -798,29 +950,50 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
     <div className="space-y-6">
       <div className="rounded-xl border border-border p-4">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-semibold">Business details</p>
+          <p className="text-sm font-semibold">{stepLabel(kind, 1)}</p>
           <Link href={`/account/become/${kind}/${application.id}?step=1`} className="text-xs text-primary hover:underline">
             Edit
           </Link>
         </div>
-        <SummaryRow label="Legal business name" value={d.legalBusinessName} />
-        <SummaryRow label="Trading name" value={d.tradingName} />
-        <SummaryRow label="Business type" value={d.businessType} />
-        <SummaryRow label="City" value={d.officeCity} />
-        <SummaryRow label="Business phone" value={d.businessPhone} />
-        <SummaryRow label="Business email" value={d.businessEmail} />
+        {kind === "affiliate" ? (
+          <>
+            <SummaryRow label="Full name" value={d.fullName} />
+            <SummaryRow label="City" value={d.city} />
+            <SummaryRow
+              label="Audience location"
+              value={d.audienceLocation ? ((AUDIENCE_LOCATION_LABELS as Record<string, string>)[String(d.audienceLocation)] ?? String(d.audienceLocation)) : null}
+            />
+            <SummaryRow label="Mobile" value={d.mobile} />
+            <SummaryRow label="Email" value={d.email} />
+          </>
+        ) : (
+          <>
+            <SummaryRow label="Legal business name" value={d.legalBusinessName} />
+            <SummaryRow label="Trading name" value={d.tradingName} />
+            <SummaryRow label="Business type" value={d.businessType} />
+            <SummaryRow label="City" value={d.officeCity} />
+            <SummaryRow label="Business phone" value={d.businessPhone} />
+            <SummaryRow label="Business email" value={d.businessEmail} />
+          </>
+        )}
       </div>
 
       <div className="rounded-xl border border-border p-4">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-semibold">Authorized contact</p>
+          <p className="text-sm font-semibold">{stepLabel(kind, 2)}</p>
           <Link href={`/account/become/${kind}/${application.id}?step=2`} className="text-xs text-primary hover:underline">
             Edit
           </Link>
         </div>
-        <SummaryRow label="Name" value={d.contactFullName} />
-        <SummaryRow label="Role" value={d.contactRole} />
-        <SummaryRow label="Mobile" value={d.contactMobile} />
+        {kind === "affiliate" ? (
+          <SummaryRow label="ID number" value={d.idNumber} />
+        ) : (
+          <>
+            <SummaryRow label="Name" value={d.contactFullName} />
+            <SummaryRow label="Role" value={d.contactRole} />
+            <SummaryRow label="Mobile" value={d.contactMobile} />
+          </>
+        )}
       </div>
 
       <div className="rounded-xl border border-border p-4">
@@ -856,8 +1029,26 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
               }
             />
           </>
+        ) : kind === "venue_partner" ? (
+          <>
+            <SummaryRow label="Venue" value={d.venueName} />
+            <SummaryRow label="Location" value={d.location} />
+            <SummaryRow
+              label="Capacity"
+              value={
+                d.standingCapacity
+                  ? `${d.seatedCapacity ? `${d.seatedCapacity} seated · ` : ""}${d.standingCapacity} standing`
+                  : null
+              }
+            />
+            <SummaryRow label="Event types" value={d.eventTypes} />
+            <SummaryRow label="Indicative price" value={d.indicativePrice ? `USD ${d.indicativePrice}` : null} />
+          </>
         ) : (
-          <SummaryRow label="Traffic source" value={d.trafficSource} />
+          <>
+            <SummaryRow label="Traffic source" value={d.trafficSource} />
+            <SummaryRow label="Promotion plan" value={d.promotionPlan} />
+          </>
         )}
       </div>
 
@@ -869,7 +1060,7 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
               Edit
             </Link>
           </div>
-          {kind === "hotel_partner" ? (
+          {kind === "hotel_partner" || kind === "venue_partner" ? (
             <SummaryRow label="Payout frequency" value={d.payoutFrequency ? PAYOUT_FREQUENCY_LABELS[String(d.payoutFrequency)] : null} />
           ) : (
             <SummaryRow label="Payment model" value={d.paymentModel === "credit_line" ? "Credit line" : "Prepaid wallet"} />
@@ -907,7 +1098,7 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
         ) : null}
       </div>
 
-      <form action={formAction} className="space-y-4">
+      <form ref={formRef} action={formAction} className="space-y-4">
         <input type="hidden" name="kind" value={kind} />
         <input type="hidden" name="applicationId" value={application.id} />
         <ErrorAlert state={state} />
@@ -921,7 +1112,7 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
             .
           </span>
         </label>
-        <StepNav backHref={`/account/become/${kind}/${application.id}?step=5`} nextLabel="Submit Application" />
+<StepNav backHref={`/account/become/${kind}/${application.id}?step=5`} nextLabel="Submit Application" />
       </form>
     </div>
   );

@@ -9,10 +9,12 @@ import {
   Plane,
   FileText,
   Landmark,
+  PartyPopper,
   Download,
   Trophy,
   ArrowUpRight,
   ArrowDownRight,
+  ArrowRight,
   BellRing,
   type LucideIcon,
 } from "lucide-react";
@@ -60,6 +62,7 @@ const ROLE_CHART_LABELS: Record<AppRole, string> = {
   agent: "Agents",
   hotel_partner: "Hotel Partners",
   affiliate: "Affiliates",
+  venue_partner: "Venue Partners",
   admin: "Admins",
 };
 
@@ -78,11 +81,17 @@ const TONES = {
 
 type Tone = keyof typeof TONES;
 
+// Missing a "hall" entry here previously meant IconChip rendered
+// <undefined /> the moment any order's first item was a hall booking —
+// React throws "Element type is invalid" and the whole dashboard 500s.
+// hall was added to order_item_type before this map existed and never
+// got wired in since no hall order had reached "recent orders" yet.
 const ITEM_TYPE_ICON: Record<string, LucideIcon> = {
   hotel: Building2,
   flight: Plane,
   visa: FileText,
   umrah: Landmark,
+  hall: PartyPopper,
 };
 
 const ITEM_TYPE_TONE: Record<string, Tone> = {
@@ -90,6 +99,7 @@ const ITEM_TYPE_TONE: Record<string, Tone> = {
   flight: "violet",
   visa: "blue",
   umrah: "gold",
+  hall: "orange",
 };
 
 /** Soft lift so white cards separate from the tinted page background. */
@@ -160,6 +170,7 @@ export default async function AdminDashboardPage({
           value={stats.totalUsers}
           change={percentChange(statTrends.users.current, statTrends.users.previous)}
           series={statTrends.users.series}
+          href="/admin/users"
         />
         <StatCard
           icon={ShoppingCart}
@@ -168,6 +179,7 @@ export default async function AdminDashboardPage({
           value={stats.totalOrders}
           change={percentChange(statTrends.orders.current, statTrends.orders.previous)}
           series={statTrends.orders.series}
+          href="/admin/orders"
         />
         <StatCard
           icon={DollarSign}
@@ -176,12 +188,14 @@ export default async function AdminDashboardPage({
           value={`$${stats.revenue.toFixed(0)}`}
           change={percentChange(statTrends.revenue.current, statTrends.revenue.previous)}
           series={statTrends.revenue.series}
+          href="/admin/orders?filter=paid"
         />
         <StatCard
           icon={ClipboardCheck}
           tone="violet"
           label="Pending applications"
           value={stats.pendingApplications}
+          href="/admin/applications?status=pending"
         />
       </div>
 
@@ -196,7 +210,7 @@ export default async function AdminDashboardPage({
                 {stats.pendingApplications} application{stats.pendingApplications > 1 ? "s" : ""} waiting for review
                 <span className="font-normal text-muted-foreground">
                   {" "}
-                  · {stats.pendingAgency} agency, {stats.pendingPartner} partner, {stats.pendingAffiliate} affiliate
+                  · {stats.pendingAgency} agency, {stats.pendingPartner} partner, {stats.pendingVenue} venue, {stats.pendingAffiliate} affiliate
                 </span>
               </p>
             </div>
@@ -513,6 +527,7 @@ function StatCard({
   value,
   change,
   series,
+  href,
 }: {
   icon: LucideIcon;
   tone: Tone;
@@ -520,12 +535,15 @@ function StatCard({
   value: string | number;
   change?: number | null;
   series?: number[];
+  /** Where "View all" takes the admin to review the underlying records — e.g. the users table, the filtered order list. Omit to render the card without the link. */
+  href?: string;
 }) {
   const positive = (change ?? 0) >= 0;
   return (
     <Card className={CARD}>
       {/* Two right-aligned slots stacked down the card: the delta pill sits
-          with the label, the sparkline with the value it summarises. */}
+          with the label, the sparkline with the value it summarises. "View
+          all" is a third row rather than crowding either of those. */}
       <CardContent className="flex flex-1 flex-col justify-between gap-2.5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -538,6 +556,14 @@ function StatCard({
           <p className="font-heading text-[26px] leading-none font-bold tracking-tight tabular-nums">{value}</p>
           {series && series.length > 1 ? <Sparkline data={series} positive={positive} /> : null}
         </div>
+        {href ? (
+          <Link
+            href={href}
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+          >
+            View all <ArrowRight className="size-3" />
+          </Link>
+        ) : null}
       </CardContent>
     </Card>
   );

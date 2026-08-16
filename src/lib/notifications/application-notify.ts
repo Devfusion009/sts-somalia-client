@@ -3,18 +3,20 @@ import { sendEmail } from "./email";
 import { sendWhatsAppMessage } from "./whatsapp-send";
 import { getIntegrations } from "@/lib/integrations";
 
-export type ApplicationType = "agency" | "hotel_partner" | "affiliate";
+export type ApplicationType = "agency" | "hotel_partner" | "affiliate" | "venue_partner";
 
 const PORTAL_LABEL: Record<ApplicationType, string> = {
   agency: "Agent Portal",
   hotel_partner: "Hotel Partner Portal",
   affiliate: "Affiliate Dashboard",
+  venue_partner: "Venue Portal",
 };
 
 const PORTAL_HREF: Record<ApplicationType, string> = {
   agency: "/agent",
   hotel_partner: "/partner",
   affiliate: "/affiliate",
+  venue_partner: "/venue",
 };
 
 function emailShell(title: string, bodyHtml: string): string {

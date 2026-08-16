@@ -1,0 +1,135 @@
+# Runs the app in a container against your ALREADY-running local Supabase.
+# Deliberately does NOT try to also define Postgres/Auth/Storage/etc. as
+# services here: `supabase start` already manages its own Docker Compose
+# stack (run `docker ps` and look for the supabase_* containers — you've
+# been using Docker this whole time without a docker-compose.yml in sight).
+# Two tools each owning their own slice of infrastructure and talking over
+# the network is normal, not a compromise — trying to fold Supabase's stack
+# into this file would mean re-implementing what the Supabase CLI already
+# does correctly.
+#
+# One-time host setup (skip if already done for portal-subdomain testing —
+# see .env.example): the app needs to reach Supabase at the SAME hostname
+# from two different vantage points — your browser (running on this
+# machine) and this container's server-side code (a different network
+# namespace) — because NEXT_PUBLIC_SUPABASE_URL is inlined into the JS
+# bundle ONCE at build time and read by both. `host.docker.internal` is
+# Docker's own standard name for "the machine running the containers" —
+# containers get it automatically (below); your own machine doesn't
+# resolve it by default, so add it once:
+#   echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+#
+#   npm run db:start   (if it isn't running already)
+#   npm run docker:up
+#
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # host.docker.internal, not 127.0.0.1 — must resolve identically
+        # for the browser (via the /etc/hosts line above) and for
+        # server-side code running inside this container (Docker resolves
+        # it natively there, no extra_hosts even needed on Docker Desktop;
+        # Linux needs the explicit mapping below).
+        NEXT_PUBLIC_SUPABASE_URL: http://host.docker.internal:54321
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
+        NEXT_PUBLIC_SITE_URL: http://localhost:3000
+        # Must match .env.local's value exactly — this is what makes portal
+        # links computed in CLIENT components (e.g. the "Continue to Agent
+        # Portal" button) resolve to the right subdomain. See the comment
+        # on this ARG in the Dockerfile for the actual bug this fixes.
+        NEXT_PUBLIC_APP_HOST: stssomalia.test:3000
+
+    # Standard bridge networking — Docker's default, portable across Linux/
+    # Mac/Windows and the same model real orchestrators (Kubernetes, ECS)
+    # use: every container gets its own network namespace and reaches the
+    # outside world through an explicit gateway, not by sharing the host's
+    # network stack wholesale. `network_mode: host` (an earlier draft of
+    # this file used it) is a Linux-only shortcut that skips this
+    # entirely — convenient locally, but it teaches the wrong mental model
+    # and silently stops working on Mac/Windows Docker Desktop.
+    ports:
+      - "3000:3000"
+
+    # host-gateway is a literal keyword Docker resolves to the host
+    # machine's real IP from inside this container — this is what makes
+    # host.docker.internal work on Linux. (Docker Desktop on Mac/Windows
+    # sets this up automatically; harmless to keep here for portability.)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    env_file:
+      # Runtime-only secrets — SUPABASE_SECRET_KEY, INTEGRATIONS_ENCRYPTION_KEY
+      # — injected into the running container's process environment, never
+      # baked into an image layer. Reuses your existing local file;
+      # .env.production.local is never referenced here and can't be (see
+      # .dockerignore — it never enters the build context in the first
+      # place). DATABASE_URL is deliberately not overridden below — the
+      # running app never reads it (only `supabase` CLI tooling on your
+      # host does), so its 127.0.0.1 value from .env.local is harmless here.
+      #
+      # CORRECTED — a prior version of this comment claimed NEXT_PUBLIC_*
+      # is ALWAYS statically frozen at build time, everywhere, based on
+      # testing NEXT_PUBLIC_SUPABASE_URL (true for that one — verified, it's
+      # read from Node.js-runtime Server Component/Action code). That claim
+      # was too broad: src/proxy.ts runs in Next's EDGE runtime, a
+      # genuinely different execution context, and DOES read
+      # NEXT_PUBLIC_APP_HOST live from process.env at request time. Proven
+      # by this file's .env.local supplying
+      # NEXT_PUBLIC_APP_HOST=stssomalia.test:3000 — that's INTENDED here,
+      # not a leak (see below), and it's what makes admin.stssomalia.test
+      # actually work as a separate portal. Lesson: which Next.js runtime
+      # (Node.js vs. Edge) executes a given file changes whether
+      # NEXT_PUBLIC_* is build-time-frozen or read live — not just "client
+      # vs. server" as the general mental model suggests.
+      #
+      # NEXT_PUBLIC_APP_HOST specifically is INTENTIONALLY left to flow
+      # through from .env.local, not overridden — real portal isolation
+      # (admin.stssomalia.test as its OWN origin, /admin unreachable on the
+      # bare host) is the actual desired architecture here, not a Docker
+      # inconvenience to route around. A previous version of this file
+      # overrode it to "" to make localhost:3000/agent/login work directly —
+      # that "fixed" the wrong problem: that 404 was the isolation working
+      # as designed, not a bug. Use admin.stssomalia.test:3000 (already
+      # mapped in /etc/hosts) and agent.stssomalia.test:3000 to reach the
+      # portals, not bare localhost:3000/admin or /agent.
+      - .env.local
+
+    environment:
+      # REDIS_URL: read dynamically via process.env at request time (see
+      # src/lib/redis.ts) — like NEXT_PUBLIC_APP_HOST above, this genuinely
+      # CAN differ correctly per environment: `redis`, not an IP or
+      # host.docker.internal, is the redis service's name below — Compose
+      # gives every service in this file DNS resolution for every other
+      # service's name, on the private network Compose creates for this
+      # project. Overrides .env.local's REDIS_URL=redis://127.0.0.1:6379
+      # (correct for plain `npm run dev`, talking to the published port).
+      REDIS_URL: redis://redis:6379
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  redis:
+    # A cache, not a database — no volume mounted below is deliberate.
+    # Everything Redis holds here (see src/lib/redis.ts, hotelbeds.ts) is
+    # safely rebuildable from Supabase/Hotelbeds on a miss, so losing it on
+    # container restart just means the next few reads are cache misses, not
+    # data loss.
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

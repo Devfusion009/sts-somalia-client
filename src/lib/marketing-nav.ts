@@ -152,6 +152,7 @@ export const FOOTER_GROUPS: Array<{ heading: string; links: MegaLink[] }> = [
       { label: "Events & Halls", href: "/events" },
       { label: "Become a Travel Agent", href: "/agents" },
       { label: "List Your Hotel", href: "/partners" },
+      { label: "List Your Event Hall", href: "/venues" },
       { label: "Affiliate Programme", href: "/affiliates" },
       { label: "Terms & Conditions", href: "/terms" },
       { label: "Privacy Policy", href: "/privacy" },

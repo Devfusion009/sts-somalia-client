@@ -18,6 +18,11 @@ export const PARTNER_LINKS = [
     description: "Reach travelers across Somalia and beyond.",
   },
   {
+    href: "/venues",
+    label: "List Your Event Hall",
+    description: "Take booking requests for weddings, conferences and more.",
+  },
+  {
     href: "/affiliates",
     label: "Join the Affiliate Program",
     description: "Earn commission promoting STS trips.",

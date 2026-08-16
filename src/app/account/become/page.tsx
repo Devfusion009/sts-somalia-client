@@ -226,10 +226,11 @@ function ProgramPanel({
   );
 }
 
-const VALID_PROGRAMS = ["agent", "partner", "affiliate"] as const;
+const VALID_PROGRAMS = ["agent", "partner", "venue", "affiliate"] as const;
 const TAB_TO_KIND: Record<(typeof VALID_PROGRAMS)[number], ApplicationKind> = {
   agent: "agency",
   partner: "hotel_partner",
+  venue: "venue_partner",
   affiliate: "affiliate",
 };
 
@@ -247,7 +248,7 @@ export default async function BecomePartnerPage({
   const supabase = await createClient();
   const now = new Date().getTime();
 
-  const [agencyMember, hotelPartnerMember, affiliate, agencyApp, hotelApp, affiliateApp, recentApplications] = await Promise.all([
+  const [agencyMember, hotelPartnerMember, venuePartnerMember, affiliate, agencyApp, hotelApp, venueApp, affiliateApp, recentApplications] = await Promise.all([
     supabase.from("agency_members").select("agency_id").eq("profile_id", profile.id).eq("status", "active").maybeSingle(),
     supabase
       .from("hotel_partner_members")
@@ -255,9 +256,16 @@ export default async function BecomePartnerPage({
       .eq("profile_id", profile.id)
       .eq("status", "active")
       .maybeSingle(),
+    supabase
+      .from("venue_partner_members")
+      .select("partner_id")
+      .eq("profile_id", profile.id)
+      .eq("status", "active")
+      .maybeSingle(),
     supabase.from("affiliates").select("id").eq("profile_id", profile.id).maybeSingle(),
     getLatestApplication("agency", profile.id),
     getLatestApplication("hotel_partner", profile.id),
+    getLatestApplication("venue_partner", profile.id),
     getLatestApplication("affiliate", profile.id),
     getRecentApplications(profile.id),
   ]);
@@ -296,6 +304,7 @@ export default async function BecomePartnerPage({
         <TabsList>
           <TabsTrigger value="agent">Travel Agent</TabsTrigger>
           <TabsTrigger value="partner">Hotel Partner</TabsTrigger>
+          <TabsTrigger value="venue">Event Venue</TabsTrigger>
           <TabsTrigger value="affiliate">Affiliate</TabsTrigger>
         </TabsList>
 
@@ -319,6 +328,18 @@ export default async function BecomePartnerPage({
             </CardHeader>
             <CardContent className="space-y-4">
               <ProgramPanel kind={TAB_TO_KIND.partner} app={hotelApp} isMember={!!hotelPartnerMember.data} isApproved={false} now={now} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="venue" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Event Venue Partner</CardTitle>
+              <CardDescription>List your event hall and manage booking requests.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ProgramPanel kind={TAB_TO_KIND.venue} app={venueApp} isMember={!!venuePartnerMember.data} isApproved={false} now={now} />
             </CardContent>
           </Card>
         </TabsContent>

@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { detailRows } from "@/lib/format-detail";
 import {
   getPartnerAccount,
   evaluateAutoLive,
@@ -22,6 +21,11 @@ import {
   ACCOUNT_TYPE_LABEL,
   type PartnerAccountStatus,
 } from "@/modules/admin/partner-accounts";
+import {
+  BusinessDetailsCard,
+  AffiliateDetailCards,
+  type Details,
+} from "@/modules/partner-applications/components/detail-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -36,6 +40,7 @@ import {
   SendReminderButton,
   AddMemberForm,
   MemberRowControls,
+  AffiliateCommissionPayoutForm,
 } from "./console-forms";
 
 export const metadata: Metadata = { title: "Partner Account" };
@@ -95,7 +100,8 @@ export default async function PartnerAccountConsolePage({
     })
   );
 
-  const typeSpecificTabLabel = type === "agency" ? "Portfolio" : type === "hotel_partner" ? "Properties" : "Affiliate";
+  const typeSpecificTabLabel =
+    type === "agency" ? "Portfolio" : type === "hotel_partner" ? "Properties" : type === "venue_partner" ? "Venues" : "Affiliate";
 
   return (
     <div className="space-y-6">
@@ -190,22 +196,11 @@ export default async function PartnerAccountConsolePage({
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Business details</CardTitle>
-              <CardDescription>As submitted on the application.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-                {detailRows(application.business_details).map(([label, value]) => (
-                  <div key={label}>
-                    <dt className="text-xs text-muted-foreground">{label}</dt>
-                    <dd className="text-sm font-medium break-words">{value || "—"}</dd>
-                  </div>
-                ))}
-              </dl>
-            </CardContent>
-          </Card>
+          {type === "affiliate" ? (
+            <AffiliateDetailCards details={(application.business_details ?? {}) as Details} />
+          ) : (
+            <BusinessDetailsCard kind={type} details={(application.business_details ?? {}) as Details} />
+          )}
         </TabsContent>
 
         {/* ------------------------------ Onboarding ----------------------------- */}
@@ -304,6 +299,41 @@ export default async function PartnerAccountConsolePage({
                 </Card>
               ))
             )
+          ) : type === "venue_partner" ? (
+            detail.venues.length === 0 ? (
+              <Card>
+                <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                  No venues listed yet — the partner creates these in their own Venue Portal.
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="overflow-hidden py-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Venue</TableHead>
+                      <TableHead>City</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Base price</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detail.venues.map((venue) => (
+                      <TableRow key={venue.id}>
+                        <TableCell className="font-medium">{venue.name}</TableCell>
+                        <TableCell>{venue.city}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="capitalize">
+                            {venue.status.replace(/_/g, " ")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{money(venue.basePrice, venue.currency)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            )
           ) : type === "agency" ? (
             <>
               <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
@@ -395,6 +425,21 @@ export default async function PartnerAccountConsolePage({
               />
             </CardContent>
           </Card>
+
+          {type === "affiliate" && detail.affiliateSnapshot ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Record Commission Payout</CardTitle>
+                <CardDescription>
+                  Total earned {money(detail.affiliateSnapshot.totalEarned)} · total paid out{" "}
+                  {money(detail.affiliateSnapshot.totalPaid)}.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AffiliateCommissionPayoutForm accountId={account.id} affiliateId={detail.affiliateSnapshot.id} />
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card className="overflow-hidden py-0">
             <CardHeader className="border-b border-border !py-4">

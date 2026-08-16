@@ -89,12 +89,28 @@ export async function readEdgeSession(request: NextRequest): Promise<EdgeSession
   if (!token) return { kind: "none" };
 
   try {
-    // Signature, expiry and issuer are all checked. An expired token is
-    // rejected here, so the portal boundary can't be held open by a stale
-    // cookie the browser happens to still be sending.
-    const { payload } = await jwtVerify(token, jwks, {
-      issuer: `${SUPABASE_URL}/auth/v1`,
-    });
+    // Signature and expiry are checked. An expired token is rejected here,
+    // so the portal boundary can't be held open by a stale cookie the
+    // browser happens to still be sending.
+    //
+    // Deliberately NOT constraining `issuer` here (an earlier version did,
+    // pinned to `${NEXT_PUBLIC_SUPABASE_URL}/auth/v1`) — that assumes
+    // Supabase's own self-reported `iss` claim always equals whatever URL
+    // this app uses to REACH Supabase, which isn't guaranteed. It broke
+    // specifically in Docker: NEXT_PUBLIC_SUPABASE_URL has to be
+    // host.docker.internal there (see docker-compose.yml) so the browser
+    // and this container can both reach Supabase, but Supabase's actual
+    // `iss` claim is fixed to its own local config (127.0.0.1) regardless
+    // of which hostname a given client used to reach it — a real,
+    // reproducible mismatch, confirmed via temporary diagnostic logging
+    // ("unexpected iss claim value"). It happened to never surface outside
+    // Docker only because NEXT_PUBLIC_SUPABASE_URL and Supabase's real
+    // issuer coincidentally were the same string (both 127.0.0.1) there.
+    // Signature verification against `jwks` — fetched from THIS specific
+    // Supabase instance's JWKS endpoint — already proves the token was
+    // genuinely issued by this instance; the issuer string is redundant on
+    // top of that, not an additional real guarantee.
+    const { payload } = await jwtVerify(token, jwks);
 
     const claim = payload.is_platform_admin;
     return {

@@ -56,7 +56,7 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
 
   const { data: room, error: roomError } = await supabase
     .from("hotel_rooms")
-    .select("id, hotel_id, base_price, currency, status")
+    .select("id, hotel_id, base_price, currency, status, hotel:hotels(booking_mode)")
     .eq("id", roomId)
     .eq("hotel_id", hotelId)
     .eq("status", "published")
@@ -65,37 +65,78 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
   if (roomError || !room) {
     return { error: "This room is no longer available." };
   }
+  const isManualHotel = (room.hotel as { booking_mode?: string } | null)?.booking_mode !== "instant";
 
   const nights = Math.max(
     1,
     Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24))
   );
-  const totalPrice = room.base_price * numRooms * nights;
+
+  // Nightly pricing honors the partner's per-date price_override — the same
+  // pattern Umrah departures already use (price_override ?? base_price).
+  // Before this, a partner setting a seasonal rate changed what their portal
+  // displayed but not what the customer was actually charged.
+  const { data: inventoryRows } = await supabase
+    .from("hotel_room_inventory")
+    .select("date, price_override")
+    .eq("room_id", room.id)
+    .gte("date", checkIn)
+    .lt("date", checkOut);
+  const overrideByDate = new Map(
+    (inventoryRows ?? [])
+      .filter((r) => r.price_override !== null)
+      .map((r) => [r.date, Number(r.price_override)])
+  );
+  let totalPrice = 0;
+  const cursor = new Date(`${checkIn}T00:00:00Z`);
+  for (let i = 0; i < nights; i++) {
+    const iso = cursor.toISOString().slice(0, 10);
+    totalPrice += (overrideByDate.get(iso) ?? room.base_price) * numRooms;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
   const agencyId = await getActiveAgencyId(supabase, profile.id);
   const access = await assertAgencyCanBookProduct(supabase, agencyId, "hotel");
   if (!access.ok) return { error: access.message };
   const agencyCustomerId = await resolveBookedForCustomer(supabase, agencyId, formData);
 
-  const { data: booking, error: bookingError } = await supabase
+  const bookingRow = {
+    hotel_id: room.hotel_id,
+    room_id: room.id,
+    customer_id: profile.id,
+    booked_by: profile.id,
+    agency_id: agencyId,
+    check_in: checkIn,
+    check_out: checkOut,
+    num_rooms: numRooms,
+    num_adults: numAdults,
+    num_children: numChildren,
+    special_requests: specialRequests || null,
+    guest_details: guestDetails,
+    total_price: totalPrice,
+    currency: room.currency,
+  };
+
+  let { data: booking, error: bookingError } = await supabase
     .from("hotel_bookings")
-    .insert({
-      hotel_id: room.hotel_id,
-      room_id: room.id,
-      customer_id: profile.id,
-      booked_by: profile.id,
-      agency_id: agencyId,
-      check_in: checkIn,
-      check_out: checkOut,
-      num_rooms: numRooms,
-      num_adults: numAdults,
-      num_children: numChildren,
-      special_requests: specialRequests || null,
-      guest_details: guestDetails,
-      total_price: totalPrice,
-      currency: room.currency,
-    })
+    .insert(bookingRow)
     .select()
     .single();
+
+  // Manual-booking workflow: full nights don't reject the request. The
+  // reserve trigger raises 'not enough rooms available on <date>' — catch
+  // exactly that and park the request as 'waitlisted' instead (the trigger
+  // skips reservation for waitlisted rows). Staff work it from the admin
+  // queue; promotion re-checks availability at that moment.
+  let waitlisted = false;
+  if (bookingError?.message.includes("not enough rooms available")) {
+    waitlisted = true;
+    ({ data: booking, error: bookingError } = await supabase
+      .from("hotel_bookings")
+      .insert({ ...bookingRow, status: "waitlisted" })
+      .select()
+      .single());
+  }
 
   if (bookingError || !booking) {
     return { error: bookingError?.message ?? "Could not create booking." };
@@ -120,6 +161,21 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
     });
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not create order." };
+  }
+
+  // A waitlisted request has no confirmed room yet, so pushing the customer
+  // into payment would charge them for nights nobody has granted. They land
+  // on their booking's tracking page instead; checkout happens after staff
+  // confirm a slot.
+  if (waitlisted) {
+    redirect(`/account/bookings/${order.id}?waitlisted=1`);
+  }
+
+  // Manual-booking hotels (no live API): the booking is a REQUEST until STS
+  // checks with the hotel and confirms it. Payment only happens after
+  // confirmation, from the customer's booking page — never at request time.
+  if (isManualHotel && !hold) {
+    redirect(`/account/bookings/${order.id}?requested=1`);
   }
 
   redirect(`/checkout/${order.id}`);

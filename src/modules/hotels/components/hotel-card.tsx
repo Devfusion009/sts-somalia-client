@@ -17,6 +17,8 @@ export type HotelCardData = {
   image: string | null;
   minPrice: number | null;
   currency: string;
+  /** 'manual' hotels are request-based (no live availability, STS confirms); 'instant' pay at checkout. */
+  bookingMode?: "manual" | "instant";
   /** Set for results pulled live from an admin-activated third-party supplier (e.g. Hotelbeds) rather than our own partner listings. */
   externalSource?: string;
 };
@@ -48,6 +50,12 @@ export function HotelCard({ hotel }: { hotel: HotelCardData }) {
             <Globe className="size-3" />
             via {hotel.externalSource}
           </Badge>
+        ) : hotel.bookingMode === "manual" ? (
+          // Not connected to a live API — bookings are requests STS confirms
+          // by hand, and the card must never suggest instant availability.
+          <Badge variant="outline" className="absolute top-3 left-3 border-transparent bg-background/95 text-muted-foreground shadow-sm">
+            Booking on request
+          </Badge>
         ) : null}
       </div>
       <CardContent className="flex flex-1 flex-col gap-2 p-4">
@@ -76,7 +84,7 @@ export function HotelCard({ hotel }: { hotel: HotelCardData }) {
           </div>
         ) : null}
         <div className="mt-auto flex items-end justify-between pt-2">
-          {hotel.minPrice !== null ? (
+          {hotel.minPrice !== null && hotel.minPrice > 0 ? (
             <p className="text-sm">
               <span className="block text-[10px] text-muted-foreground uppercase">From</span>
               <span className="font-heading text-lg font-bold text-primary">
@@ -84,6 +92,8 @@ export function HotelCard({ hotel }: { hotel: HotelCardData }) {
               </span>{" "}
               <span className="text-xs text-muted-foreground">/ night</span>
             </p>
+          ) : hotel.minPrice === 0 ? (
+            <p className="font-heading text-sm font-bold text-primary">Price on request</p>
           ) : (
             <span />
           )}

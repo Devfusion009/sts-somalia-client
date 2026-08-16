@@ -111,21 +111,27 @@ export type PortalAccent = "customer" | "agent" | "admin";
 // redesign. Same rounded-card/icon-in-a-circle visual language throughout;
 // only the accent color changes so B2C, agent, and admin read as distinct
 // products at a glance rather than one shell with swapped labels.
-const ACCENT_STYLES: Record<PortalAccent, { bar: string; badge: string; iconBg: string }> = {
+const ACCENT_STYLES: Record<PortalAccent, { bar: string; badge: string; iconBg: string; activeText: string; ring: string }> = {
   customer: {
     bar: "bg-primary",
     badge: "border-primary/25 bg-primary/10 text-primary",
     iconBg: "bg-sidebar-primary",
+    activeText: "text-primary",
+    ring: "ring-primary/20",
   },
   agent: {
     bar: "bg-amber-500",
     badge: "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-400",
     iconBg: "bg-amber-500",
+    activeText: "text-amber-600 dark:text-amber-400",
+    ring: "ring-amber-500/20",
   },
   admin: {
     bar: "bg-blue-500",
     badge: "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-400",
     iconBg: "bg-blue-500",
+    activeText: "text-blue-600 dark:text-blue-400",
+    ring: "ring-blue-500/20",
   },
 };
 
@@ -144,8 +150,17 @@ const ACCENT_STYLES: Record<PortalAccent, { bar: string; badge: string; iconBg: 
  * button with no group header visible, so filtering by group would just
  * make icons vanish for no visible reason.
  */
-function NavGroups({ navGroups, activeHref }: { navGroups: PortalNavGroup[]; activeHref: string | undefined }) {
+function NavGroups({
+  navGroups,
+  activeHref,
+  accent,
+}: {
+  navGroups: PortalNavGroup[];
+  activeHref: string | undefined;
+  accent: PortalAccent;
+}) {
   const { state } = useSidebar();
+  const styles = ACCENT_STYLES[accent];
 
   // Both sides normalised: nav items carry the canonical "/admin/..." path
   // while the address bar shows the proxy-rewritten "/..." on a portal
@@ -218,11 +233,20 @@ function NavGroups({ navGroups, activeHref }: { navGroups: PortalNavGroup[]; act
                 <SidebarMenu>
                   {group.items.map((item) => {
                     const Icon = PORTAL_ICONS[item.icon];
+                    const active = isActiveItem(item.href);
                     return (
                       <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton
-                          isActive={isActiveItem(item.href)}
+                          isActive={active}
                           tooltip={item.label}
+                          // The base variant only flat-tints the background on
+                          // active — an accent-colored left rail + tinted icon
+                          // is what makes the active item read as "you are
+                          // here" rather than "this happens to be gray".
+                          className={cn(
+                            "border-l-2 border-transparent pl-[calc(0.5rem-2px)]",
+                            active && `border-current ${styles.activeText} [&_svg]:text-current`
+                          )}
                           render={<Link href={item.href} />}
                         >
                           <Icon />
@@ -331,14 +355,21 @@ export function PortalShell({
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
-          <NavGroups navGroups={navGroups} activeHref={activeHref} />
+          <NavGroups navGroups={navGroups} activeHref={activeHref} accent={accent} />
+          {/* An exit hatch, not a destination — separated from real nav items
+              and deliberately muted so it doesn't compete with them. */}
           <SidebarGroup className="mt-auto">
+            <Separator className="mb-2 group-data-[collapsible=icon]:hidden" />
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Back to website" render={<Link href={homeHref} />}>
+                  <SidebarMenuButton
+                    tooltip="Back to website"
+                    className="text-sidebar-foreground/60 hover:text-sidebar-foreground [&_svg]:size-3.5"
+                    render={<Link href={homeHref} />}
+                  >
                     <ExternalLink />
-                    <span>Back to website</span>
+                    <span className="text-xs">Back to website</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -348,20 +379,30 @@ export function PortalShell({
         <SidebarFooter>
           <Separator className="mb-2" />
           <SidebarMenu>
-            <SidebarMenuItem className="flex items-center gap-2 px-2 py-1">
-              <Avatar className="size-8">
-                <AvatarFallback className="text-xs">{initials(profileName, profileEmail)}</AvatarFallback>
+            <SidebarMenuItem className="flex items-center gap-2.5 rounded-lg bg-sidebar-accent/50 px-2.5 py-2 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:px-0">
+              <Avatar className={`size-9 shrink-0 ring-2 ${styles.ring}`}>
+                <AvatarFallback className="text-xs font-semibold">{initials(profileName, profileEmail)}</AvatarFallback>
               </Avatar>
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium">{profileName || "Account"}</span>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5 group-data-[collapsible=icon]:hidden">
+                <span className="truncate text-sm leading-none font-medium">{profileName || "Account"}</span>
                 <Badge variant="outline" className={`w-fit text-[10px] ${styles.badge}`}>
                   {roleLabel}
                 </Badge>
               </div>
             </SidebarMenuItem>
-            <SidebarMenuItem>
+            <SidebarMenuItem className="mt-1">
               <form action={signOutAction}>
-                <SidebarMenuButton render={<button type="submit" className="w-full" />}>
+                {/* A real account action, not just another nav link — a
+                    destructive-tinted hover signals "this ends your session"
+                    the way sign-out affordances read in most B2B consoles. */}
+                <SidebarMenuButton
+                  render={
+                    <button
+                      type="submit"
+                      className="w-full text-sidebar-foreground/80 hover:bg-destructive/10 hover:text-destructive [&_svg]:hover:text-destructive"
+                    />
+                  }
+                >
                   <LogOut />
                   <span>Sign out</span>
                 </SidebarMenuButton>

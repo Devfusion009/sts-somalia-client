@@ -25,6 +25,7 @@ import {
   adminUpdatePartnerMemberRole,
   adminRemovePartnerMember,
 } from "@/modules/admin/partner-account-actions";
+import { recordAffiliateCommissionPayout } from "@/modules/affiliates/admin-actions";
 import type { AccountMember, PartnerAccountType } from "@/modules/admin/partner-account-shared";
 
 const selectClass =
@@ -111,6 +112,58 @@ export function AccountNotesForm({ accountId, initialNotes }: { accountId: strin
   );
 }
 
+/**
+ * Records a commission payout already sent outside the system (bank
+ * transfer, EVC Plus, etc.) and marks matching approved conversions as
+ * paid. Direct affiliate-side counterpart to the agency finance console's
+ * CommissionPayoutForm (agencies/[id]/agency-admin-forms.tsx) — same
+ * shape, adapted to the two-id situation this generic partner console has
+ * that the agency's own dedicated console doesn't: affiliateId is what
+ * the RPC/commission_payouts key on, accountId is what this page's URL
+ * (and revalidatePath) is keyed on.
+ */
+export function AffiliateCommissionPayoutForm({ accountId, affiliateId }: { accountId: string; affiliateId: string }) {
+  const [state, formAction] = useActionState(recordAffiliateCommissionPayout, null);
+  return (
+    <form action={formAction} className="space-y-3">
+      <input type="hidden" name="accountId" value={accountId} />
+      <input type="hidden" name="affiliateId" value={affiliateId} />
+      <ErrorAlert state={state} />
+      <div className="space-y-1.5">
+        <Label htmlFor="payoutAmount">Amount (USD)</Label>
+        <Input id="payoutAmount" name="amount" type="number" step="0.01" min="0.01" placeholder="250" required />
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="payoutMethod">Method</Label>
+          <Input id="payoutMethod" name="method" placeholder="Bank transfer" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="payoutReference">Reference</Label>
+          <Input id="payoutReference" name="reference" placeholder="TXN-20260814-1" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="periodStart">Period start (optional)</Label>
+          <Input id="periodStart" name="periodStart" type="date" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="periodEnd">Period end (optional)</Label>
+          <Input id="periodEnd" name="periodEnd" type="date" />
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Marks approved conversions in this period (or all approved conversions, if left blank) as paid.
+      </p>
+      <div className="flex items-center gap-3">
+        <SubmitButton pendingText="Recording…">Record payout</SubmitButton>
+        <SavedHint state={state} />
+      </div>
+    </form>
+  );
+}
+
 export function SendReminderButton({ accountId }: { accountId: string }) {
   const [state, formAction] = useActionState(sendOnboardingReminder, null);
   return (
@@ -141,6 +194,7 @@ const ROLE_OPTIONS: Record<Exclude<PartnerAccountType, "affiliate">, Array<{ val
     { value: "viewer", label: "Viewer" },
   ],
   hotel_partner: [{ value: "staff", label: "Staff" }],
+  venue_partner: [{ value: "staff", label: "Staff" }],
 };
 
 export function AddMemberForm({ accountId, type }: { accountId: string; type: Exclude<PartnerAccountType, "affiliate"> }) {

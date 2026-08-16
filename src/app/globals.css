@@ -201,3 +201,38 @@
     @apply font-heading;
   }
 }
+
+/* Admin alert bell — emergency-light treatment while unhandled new-order
+   alerts exist: the bell itself rings (rotate wiggle) and a red pulse
+   radiates outward, siren-style. CSS-only so a stalled JS frame loop can
+   never freeze the alert; disabled wholesale for reduced-motion users. */
+@keyframes bell-ring {
+  0%, 60%, 100% { transform: rotate(0); }
+  10% { transform: rotate(16deg); }
+  20% { transform: rotate(-13deg); }
+  30% { transform: rotate(10deg); }
+  40% { transform: rotate(-7deg); }
+  50% { transform: rotate(3deg); }
+}
+
+@keyframes alert-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--destructive) 55%, transparent); }
+  70% { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.animate-bell-ring {
+  animation: bell-ring 1.4s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+.animate-alert-pulse {
+  animation: alert-pulse 1.4s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-bell-ring,
+  .animate-alert-pulse {
+    animation: none;
+  }
+}

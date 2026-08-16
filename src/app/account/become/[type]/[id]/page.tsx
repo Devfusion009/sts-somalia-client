@@ -18,7 +18,7 @@ import {
 export const metadata: Metadata = { title: "Partner Application" };
 
 function isKind(value: string): value is ApplicationKind {
-  return value === "agency" || value === "hotel_partner" || value === "affiliate";
+  return value === "agency" || value === "hotel_partner" || value === "affiliate" || value === "venue_partner";
 }
 
 export default async function PartnerApplicationWizardPage({

@@ -1,0 +1,31 @@
+# Everything the image needs comes in as either a Docker build ARG
+# (NEXT_PUBLIC_* — see Dockerfile) or a runtime env var injected by
+# docker-compose (env_file/environment) — never as a file. Excluding every
+# .env* file means .env.production.local (hosted Supabase credentials,
+# see the memory of that exact gotcha) has NO path into the build context,
+# let alone the image. There is nothing to accidentally COPY.
+.env*
+!.env.example
+
+node_modules
+.next
+.git
+
+# Not read at runtime by the app itself — migrations are applied via the
+# Supabase CLI against the database directly, not by this image.
+supabase
+
+# One-off scripts run manually with `node scripts/x.mjs`, not part of the
+# running app.
+scripts
+
+docs
+*.md
+ADMIN_CREDENTIALS.local.md
+*.credentials.local
+.claude
+.vercel
+image.png
+coverage
+*.tsbuildinfo
+npm-debug.log*

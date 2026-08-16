@@ -7,6 +7,13 @@ import type { NextConfig } from "next";
 const appHost = process.env.NEXT_PUBLIC_APP_HOST?.split(":")[0];
 
 const nextConfig: NextConfig = {
+  // Traces the minimal set of files this app actually needs at runtime
+  // into .next/standalone (no full node_modules, no source) — what the
+  // Dockerfile's runner stage copies. Without this, a Docker image would
+  // have to ship the entire node_modules tree. No effect outside `next
+  // build`/Docker; `next dev` ignores it. See
+  // node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/output.md
+  output: "standalone",
   // Next.js blocks cross-origin requests to dev-only assets/endpoints from
   // any host other than localhost by default (a real security feature —
   // prevents a malicious page from reaching your dev server via DNS

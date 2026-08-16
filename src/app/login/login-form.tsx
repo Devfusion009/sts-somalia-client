@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, Briefcase, Globe2, Headset, ShieldCheck, Wallet } from "lucide-react";
+import { AlertCircle, ArrowRight, Briefcase, Globe2, Headset, PlaneTakeoff, ShieldCheck, Wallet } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/password-input";
@@ -58,17 +58,52 @@ export function LoginForm({ redirectTo, notice }: { redirectTo?: string; notice?
 
   return (
     <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl shadow-xl lg:grid-cols-2">
-      <div className="hidden flex-col justify-between bg-primary p-10 text-primary-foreground lg:flex">
-        <div>
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-primary via-primary to-[#00594c] p-10 text-primary-foreground lg:flex">
+        {/* Ambient brand-accent glow — warm counterpoint to the cool teal, gives the
+            panel depth instead of a flat fill. */}
+        <div className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-brand-gold/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 -left-20 size-80 rounded-full bg-white/10 blur-3xl" />
+
+        {/* Fine dot-grid texture, evoking a world map graticule. */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.08]"
+          style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "22px 22px" }}
+        />
+
+        {/* Dashed flight route connecting two waypoints, plane mid-flight — a
+            quiet travel motif behind the copy, not competing with it. */}
+        <svg
+          className="pointer-events-none absolute inset-0 h-full w-full opacity-25"
+          viewBox="0 0 400 600"
+          preserveAspectRatio="none"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M40 500 C 150 420, 110 300, 230 250 S 360 130 355 55"
+            stroke="white"
+            strokeWidth="1.5"
+            strokeDasharray="2 9"
+            strokeLinecap="round"
+          />
+          <circle cx="40" cy="500" r="4.5" fill="white" />
+          <circle cx="355" cy="55" r="4.5" className="fill-brand-gold" />
+        </svg>
+        <PlaneTakeoff
+          className="pointer-events-none absolute top-[38%] right-[16%] size-8 -rotate-12 text-white/30"
+          aria-hidden="true"
+        />
+
+        <div className="relative z-10">
           <h2 className="font-heading text-2xl font-semibold">Welcome back to STS Somalia</h2>
           <p className="mt-2 text-sm text-primary-foreground/80">
             Flights, hotels, visas, and Umrah packages — booked with confidence.
           </p>
         </div>
-        <ul className="space-y-6">
+        <ul className="relative z-10 space-y-6">
           {VALUE_PROPS.map((v) => (
             <li key={v.title} className="flex items-start gap-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-foreground/10">
+              <span className="ring-1 ring-primary-foreground/15 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-foreground/10 backdrop-blur-sm">
                 <v.icon className="size-4.5" />
               </span>
               <div>
@@ -78,7 +113,7 @@ export function LoginForm({ redirectTo, notice }: { redirectTo?: string; notice?
             </li>
           ))}
         </ul>
-        <p className="text-xs text-primary-foreground/60">Scout Travel Solution</p>
+        <p className="relative z-10 text-xs text-primary-foreground/60">Scout Travel Solution</p>
       </div>
 
       <Card className="rounded-none border-0 shadow-none">

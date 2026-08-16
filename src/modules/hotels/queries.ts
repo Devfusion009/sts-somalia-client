@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { HotelCardData } from "@/modules/hotels/components/hotel-card";
 import { hotelImageUrls } from "@/modules/hotels/images";
 import { searchHotelbedsAvailability } from "@/lib/provider-runtime/hotelbeds";
+import { cachedRead } from "@/lib/redis";
 
 function toCardData(hotel: {
   id: string;
@@ -14,6 +15,7 @@ function toCardData(hotel: {
   star_rating: number | null;
   amenities: unknown;
   images: unknown;
+  booking_mode: string;
   hotel_rooms: { base_price: number; currency: string }[];
 }): HotelCardData {
   const prices = hotel.hotel_rooms.map((r) => r.base_price);
@@ -31,22 +33,31 @@ function toCardData(hotel: {
     image: hotelImageUrls(hotel.images)[0] ?? null,
     minPrice: prices.length ? Math.min(...prices) : null,
     currency: hotel.hotel_rooms[0]?.currency ?? "USD",
+    bookingMode: hotel.booking_mode === "instant" ? "instant" : "manual",
   };
 }
 
 const CARD_SELECT =
-  "id, slug, name, description, city, country_code, star_rating, amenities, images, hotel_rooms(base_price, currency)";
+  "id, slug, name, description, city, country_code, star_rating, amenities, images, booking_mode, hotel_rooms(base_price, currency)";
 
+// Marketing pages render this on every load with no filters — a good,
+// simple cache-aside target: published hotels don't change minute to
+// minute, so a short TTL trades a little staleness for cutting repeat
+// Supabase load. searchHotels() below is NOT cached the same way — it
+// blends in live third-party availability tied to specific dates, where
+// stale results mean showing a room that's no longer bookable.
 export async function getFeaturedHotels(limit = 4): Promise<HotelCardData[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("hotels")
-    .select(CARD_SELECT)
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  return cachedRead(`hotels:featured:${limit}`, 300, async () => {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("hotels")
+      .select(CARD_SELECT)
+      .eq("status", "published")
+      .order("created_at", { ascending: false })
+      .limit(limit);
 
-  return (data ?? []).map(toCardData);
+    return (data ?? []).map(toCardData);
+  });
 }
 
 export async function searchHotels(filters: {
@@ -100,7 +111,7 @@ export async function getHotelBySlug(slug: string) {
   const { data } = await supabase
     .from("hotels")
     .select(
-      "id, slug, name, description, address_line, city, country_code, star_rating, amenities, images, status, hotel_rooms(id, name, description, max_occupancy, bed_type, size_sqm, amenities, images, base_price, currency, status)"
+      "id, slug, name, description, address_line, city, country_code, star_rating, amenities, images, status, booking_mode, phone, property_links(label, url, sort_order), property_reviews(id, author_name, rating, body, created_at), hotel_rooms(id, name, description, max_occupancy, bed_type, size_sqm, amenities, images, base_price, currency, status)"
     )
     .eq("slug", slug)
     .eq("status", "published")

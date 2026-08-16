@@ -52,6 +52,15 @@ photography of the actual cities before launch if literal accuracy matters.
 | hotels-hero-bg.webp | soul_location | Grand hotel facade at golden hour — hotels hero backdrop |
 | hotel-lobby / -pool / -breakfast / -budget / -suite / -exterior / -reception / -terrace / -family / -business .webp | soul_location | Hotel interiors and exteriors for the property rails |
 
+### Fourth batch (2026-08-14) — 2 more landing carousel slides
+
+| File | Model | Subject |
+| --- | --- | --- |
+| slide-istanbul.webp | soul_location | Bosphorus suspension bridge at blue hour, distant mosque silhouettes — landing carousel |
+| slide-nairobi.webp | soul_location | Distant East African city skyline silhouette at golden hour — landing carousel |
+
+First Nairobi generation was discarded before use: it rendered legible (and garbled) building signage resembling a real corporate tenant, and was cluttered with rooftop equipment — regenerated with an explicit "no readable text/signage, uncluttered" prompt.
+
 These depict generic hospitality settings, not the actual partner properties.
 Swap for real photography of each hotel before launch — a guest seeing a room
 that isn't the one they booked is a trust problem, not just a design one.

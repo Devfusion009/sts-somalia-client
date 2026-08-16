@@ -13,24 +13,28 @@ const TABLE = {
   agency: "agency_applications",
   hotel_partner: "hotel_partner_applications",
   affiliate: "affiliate_applications",
+  venue_partner: "venue_partner_applications",
 } as const;
 
 const APPROVE_RPC = {
   agency: "approve_agency_application",
   hotel_partner: "approve_hotel_partner_application",
   affiliate: "approve_affiliate_application",
+  venue_partner: "approve_venue_partner_application",
 } as const;
 
 const REJECT_RPC = {
   agency: "reject_agency_application",
   hotel_partner: "reject_hotel_partner_application",
   affiliate: "reject_affiliate_application",
+  venue_partner: "reject_venue_partner_application",
 } as const;
 
-const NOTIFY_TYPE: Record<ApplicationType, "agency" | "hotel_partner" | "affiliate"> = {
+const NOTIFY_TYPE: Record<ApplicationType, "agency" | "hotel_partner" | "affiliate" | "venue_partner"> = {
   agency: "agency",
   hotel_partner: "hotel_partner",
   affiliate: "affiliate",
+  venue_partner: "venue_partner",
 };
 
 /** Wizard PRODUCTS values (plural) -> order_item_type enum (singular), for allowed_products. */
@@ -72,6 +76,7 @@ const APPLICATION_SLUG: Record<ApplicationType, string> = {
   agency: "agency",
   hotel_partner: "hotel-partner",
   affiliate: "affiliate",
+  venue_partner: "venue-partner",
 };
 
 /**

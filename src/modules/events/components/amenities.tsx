@@ -80,6 +80,8 @@ export function priceUnitLabel(unit: string) {
       return "per day";
     case "per_hour":
       return "per hour";
+    case "per_person":
+      return "per person";
     default:
       return "per event";
   }

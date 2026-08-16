@@ -25,6 +25,9 @@ const NAV_GROUPS: PortalNavGroup[] = [
   {
     label: "Operations",
     items: [
+      // First in the group: the queue is the "what needs my hands right now"
+      // surface for the manual-booking workflow — FIFO booking requests.
+      { href: "/admin/queue", label: "Order Queue", icon: "bookings" },
       { href: "/admin/calendar", label: "Booking Calendar", icon: "calendar" },
       { href: "/admin/orders", label: "Orders & Payments", icon: "orders" },
       { href: "/admin/refunds", label: "Refund Requests", icon: "refund" },

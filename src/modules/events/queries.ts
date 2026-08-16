@@ -28,7 +28,7 @@ export async function getVenueBySlug(slug: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("event_venues")
-    .select("*")
+    .select("*, property_links(label, url, sort_order), property_reviews(id, author_name, rating, body, created_at)")
     .eq("slug", slug)
     .eq("status", "published")
     .maybeSingle();

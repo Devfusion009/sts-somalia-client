@@ -43,11 +43,14 @@ import { AdminEventForm } from "./admin-event-form";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const KIND_META: Record<CalendarBookingKind, { label: string; icon: typeof BedDouble; dot: string; chip: string }> = {
-  hotel: { label: "Hotel", icon: BedDouble, dot: "bg-chart-3", chip: "bg-chart-3/15 text-chart-3" },
-  flight: { label: "Flight", icon: Plane, dot: "bg-chart-4", chip: "bg-chart-4/15 text-chart-4" },
-  umrah: { label: "Umrah", icon: Landmark, dot: "bg-chart-1", chip: "bg-chart-1/15 text-chart-1" },
-  hall: { label: "Event Hall", icon: PartyPopper, dot: "bg-chart-5", chip: "bg-chart-5/15 text-chart-5" },
+const KIND_META: Record<
+  CalendarBookingKind,
+  { label: string; icon: typeof BedDouble; dot: string; iconColor: string; chip: string }
+> = {
+  hotel: { label: "Hotel", icon: BedDouble, dot: "bg-chart-3", iconColor: "text-chart-3", chip: "bg-chart-3/15 text-chart-3" },
+  flight: { label: "Flight", icon: Plane, dot: "bg-chart-4", iconColor: "text-chart-4", chip: "bg-chart-4/15 text-chart-4" },
+  umrah: { label: "Umrah", icon: Landmark, dot: "bg-chart-1", iconColor: "text-chart-1", chip: "bg-chart-1/15 text-chart-1" },
+  hall: { label: "Event Hall", icon: PartyPopper, dot: "bg-chart-5", iconColor: "text-chart-5", chip: "bg-chart-5/15 text-chart-5" },
 };
 
 const HOLIDAY_CHIP = "bg-primary text-primary-foreground";
@@ -266,15 +269,30 @@ export function AdminEventCalendar({
                       </span>
                     </span>
                   ))}
-                  {shownEvents.map((e) => (
-                    <span
-                      key={`${e.kind}-${e.id}`}
-                      className="flex items-center gap-1 truncate text-[10px] font-medium text-foreground"
-                    >
-                      <span className={cn("size-1.5 shrink-0 rounded-full", KIND_META[e.kind].dot)} />
-                      <span className="truncate">{e.customerName ?? e.title}</span>
-                    </span>
-                  ))}
+                  {shownEvents.map((e) => {
+                    // Purpose first, customer second: a bare customer name
+                    // repeated across a multi-day booking's whole date range
+                    // (e.g. a 7-night Umrah trip) reads as unrelated same-name
+                    // entries with no way to tell what was booked without
+                    // opening the day. The kind icon + label makes the type
+                    // legible at a glance and ties the repeated cells together
+                    // as one booking spanning the week.
+                    const meta = KIND_META[e.kind];
+                    const Icon = meta.icon;
+                    return (
+                      <span
+                        key={`${e.kind}-${e.id}`}
+                        className="flex items-center gap-1 truncate text-[10px] font-medium text-foreground"
+                        title={`${meta.label} — ${e.title}${e.customerName ? ` (${e.customerName})` : ""}`}
+                      >
+                        <Icon className={cn("size-2.5 shrink-0", meta.iconColor)} />
+                        <span className="truncate">
+                          {meta.label}
+                          {e.customerName ? ` · ${e.customerName}` : ""}
+                        </span>
+                      </span>
+                    );
+                  })}
                   {overflow > 0 ? <span className="text-[10px] text-muted-foreground">+{overflow} more</span> : null}
                 </div>
               </button>

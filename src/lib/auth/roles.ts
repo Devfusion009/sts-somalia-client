@@ -15,6 +15,7 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   agent: "Travel Agent",
   hotel_partner: "Hotel Partner",
   affiliate: "Affiliate",
+  venue_partner: "Venue Partner",
   admin: "Admin",
 };
 
@@ -94,6 +95,7 @@ export function accountRoleBadges(account: {
 export const PORTAL_BY_ROLE: Partial<Record<AppRole, { href: string; label: string }>> = {
   hotel_partner: { href: "/partner", label: "Partner Portal" },
   affiliate: { href: "/affiliate", label: "Affiliate Dashboard" },
+  venue_partner: { href: "/venue", label: "Venue Portal" },
 };
 
 /**

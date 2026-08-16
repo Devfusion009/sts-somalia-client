@@ -29,10 +29,21 @@ import { createVenue, updateVenue } from "@/modules/admin/actions";
 import type { ActionState } from "@/lib/auth/actions";
 import type { Database } from "@/lib/types/database.types";
 
-type Venue = Database["public"]["Tables"]["event_venues"]["Row"];
+type Venue = Database["public"]["Tables"]["event_venues"]["Row"] & {
+  property_links?: Array<{ label: string; url: string; sort_order: number }>;
+};
 
 function jsonList(raw: unknown): string {
   return Array.isArray(raw) ? raw.map((v) => String(v).replace(/_/g, " ")).join(", ") : "";
+}
+
+/** Inverse of parseLinks() in admin/actions.ts — prefills the textarea so re-saving without touching it doesn't wipe existing links. */
+function linksList(links: Venue["property_links"]): string {
+  if (!links || links.length === 0) return "";
+  return [...links]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((l) => `${l.label} | ${l.url}`)
+    .join("\n");
 }
 
 export function VenueForm({ venue }: { venue?: Venue }) {
@@ -105,9 +116,15 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                 defaultValue={venue?.description ?? ""}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="venue-address">Address</Label>
-              <Input id="venue-address" name="address" defaultValue={venue?.address ?? ""} />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="venue-address">Address</Label>
+                <Input id="venue-address" name="address" defaultValue={venue?.address ?? ""} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="venue-phone">Phone</Label>
+                <Input id="venue-phone" name="phone" type="tel" defaultValue={venue?.phone ?? ""} />
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
@@ -161,6 +178,19 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                 placeholder="wedding, conference, graduation"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="venue-links">Links (one per line: Label | URL)</Label>
+              <Textarea
+                id="venue-links"
+                name="links"
+                rows={3}
+                defaultValue={linksList(venue?.property_links)}
+                placeholder={"Website | https://example.so/\nWhatsApp | https://wa.me/252..."}
+              />
+              <p className="text-xs text-muted-foreground">
+                Replaces every link on save — leave existing lines in place to keep them.
+              </p>
+            </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="venue-price">Base price</Label>
@@ -194,6 +224,7 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                     <SelectItem value="per_event">Per event</SelectItem>
                     <SelectItem value="per_day">Per day</SelectItem>
                     <SelectItem value="per_hour">Per hour</SelectItem>
+                    <SelectItem value="per_person">Per person</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

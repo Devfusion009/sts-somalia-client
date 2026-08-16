@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,22 @@ export function PortalLoginForm({
   redirectTo?: string;
 }) {
   const [state, formAction] = useActionState(action, null);
+
+  // A plain window.location assignment, not router.push() or redirect() —
+  // deliberate. See the comment on signInToPortalAction in lib/auth/actions:
+  // Next.js 16.2.12's own Server-Action-redirect-following client code has a
+  // real bug on pages reached via proxy.ts's subdomain rewrite (sends its
+  // follow-up request to the wrong host). The action returns the
+  // destination as plain state instead of calling redirect() itself, and
+  // this performs a real, unambiguous browser navigation — window.location
+  // always resolves relative to the actual current origin, sidestepping
+  // whatever internal host resolution the framework's own mechanism gets
+  // wrong.
+  useEffect(() => {
+    if (state?.destination) {
+      window.location.href = state.destination;
+    }
+  }, [state]);
 
   return (
     <Card>

@@ -12,6 +12,7 @@ export async function getDashboardStats() {
     { count: pendingAgency },
     { count: pendingPartner },
     { count: pendingAffiliate },
+    { count: pendingVenue },
   ] = await Promise.all([
     supabase.from("profiles").select("role"),
     supabase.from("orders").select("*", { count: "exact", head: true }),
@@ -19,6 +20,7 @@ export async function getDashboardStats() {
     supabase.from("agency_applications").select("*", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("hotel_partner_applications").select("*", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("affiliate_applications").select("*", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("venue_partner_applications").select("*", { count: "exact", head: true }).eq("status", "pending"),
   ]);
 
   const usersByRole: Record<string, number> = {};
@@ -33,10 +35,11 @@ export async function getDashboardStats() {
     totalUsers: profiles?.length ?? 0,
     totalOrders: totalOrders ?? 0,
     revenue,
-    pendingApplications: (pendingAgency ?? 0) + (pendingPartner ?? 0) + (pendingAffiliate ?? 0),
+    pendingApplications: (pendingAgency ?? 0) + (pendingPartner ?? 0) + (pendingAffiliate ?? 0) + (pendingVenue ?? 0),
     pendingAgency: pendingAgency ?? 0,
     pendingPartner: pendingPartner ?? 0,
     pendingAffiliate: pendingAffiliate ?? 0,
+    pendingVenue: pendingVenue ?? 0,
   };
 }
 
@@ -82,6 +85,7 @@ const APPLICATION_NAME_COLUMN = {
   agency: "agency_name",
   hotel_partner: "business_name",
   affiliate: "reference_number", // affiliate has no business-name field; search falls back to ref/applicant
+  venue_partner: "business_name",
 } as const;
 
 /**
@@ -104,13 +108,13 @@ export type ApplicationQueueRow = {
   agency_name?: string;
   business_name?: string;
   notes?: string | null;
-  applicant: { full_name: string | null; email: string } | null;
+  applicant: { full_name: string | null; email: string; phone: string | null } | null;
   reviewer: { full_name: string | null; email: string } | null;
 };
 
 /** Never shows drafts — those are only ever visible to the applicant themselves. */
 async function queryApplications(
-  table: "agency_applications" | "hotel_partner_applications" | "affiliate_applications",
+  table: "agency_applications" | "hotel_partner_applications" | "affiliate_applications" | "venue_partner_applications",
   applicantFk: string,
   filters: ApplicationQueueFilters
 ): Promise<ApplicationQueueRow[]> {
@@ -123,10 +127,22 @@ async function queryApplications(
     .neq("status", "draft");
 
   if (filters.status) query = query.eq("status", filters.status as never);
-  if (filters.dateFrom) query = query.gte("created_at", filters.dateFrom);
-  if (filters.dateTo) query = query.lte("created_at", `${filters.dateTo}T23:59:59`);
+  // "Submitted between" filters the submitted_at column, not created_at — a
+  // drafted-then-later-submitted application should match by when it was
+  // actually submitted, matching the label and the "Submitted" table column.
+  if (filters.dateFrom) query = query.gte("submitted_at", filters.dateFrom);
+  if (filters.dateTo) query = query.lte("submitted_at", `${filters.dateTo}T23:59:59`);
   if (filters.search) {
-    const nameCol = APPLICATION_NAME_COLUMN[table === "agency_applications" ? "agency" : table === "hotel_partner_applications" ? "hotel_partner" : "affiliate"];
+    const nameCol =
+      APPLICATION_NAME_COLUMN[
+        table === "agency_applications"
+          ? "agency"
+          : table === "hotel_partner_applications"
+            ? "hotel_partner"
+            : table === "venue_partner_applications"
+              ? "venue_partner"
+              : "affiliate"
+      ];
     query = query.or(`reference_number.ilike.%${filters.search}%,${nameCol}.ilike.%${filters.search}%`);
   }
 
@@ -135,20 +151,25 @@ async function queryApplications(
 }
 
 export async function getApplicationsForAdmin(filters: ApplicationQueueFilters = {}) {
-  const [agency, partner, affiliate] = await Promise.all([
+  const [agency, partner, affiliate, venue] = await Promise.all([
     queryApplications("agency_applications", "agency_applications_applicant_id_fkey", filters),
     queryApplications("hotel_partner_applications", "hotel_partner_applications_applicant_id_fkey", filters),
     queryApplications("affiliate_applications", "affiliate_applications_applicant_id_fkey", filters),
+    queryApplications("venue_partner_applications", "venue_partner_applications_applicant_id_fkey", filters),
   ]);
-  return { agency, partner, affiliate };
+  return { agency, partner, affiliate, venue };
 }
 
-export type ApplicationType = "agency" | "hotel_partner" | "affiliate";
+export type ApplicationType = "agency" | "hotel_partner" | "affiliate" | "venue_partner";
 
-const APPLICATION_TABLE: Record<ApplicationType, "agency_applications" | "hotel_partner_applications" | "affiliate_applications"> = {
+const APPLICATION_TABLE: Record<
+  ApplicationType,
+  "agency_applications" | "hotel_partner_applications" | "affiliate_applications" | "venue_partner_applications"
+> = {
   agency: "agency_applications",
   hotel_partner: "hotel_partner_applications",
   affiliate: "affiliate_applications",
+  venue_partner: "venue_partner_applications",
 };
 
 /**
@@ -177,6 +198,17 @@ export async function getApplicationDetail(type: ApplicationType, id: string) {
       .from("hotel_partner_applications")
       .select(
         "*, applicant:profiles!hotel_partner_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!hotel_partner_applications_assigned_reviewer_fkey(full_name, email)"
+      )
+      .eq("id", id)
+      .maybeSingle();
+    return data;
+  }
+
+  if (type === "venue_partner") {
+    const { data } = await supabase
+      .from("venue_partner_applications")
+      .select(
+        "*, applicant:profiles!venue_partner_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!venue_partner_applications_assigned_reviewer_fkey(full_name, email)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -461,7 +493,7 @@ export async function getVenuesAdmin() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("event_venues")
-    .select("*")
+    .select("*, property_links(label, url, sort_order)")
     .order("created_at", { ascending: false });
   return data ?? [];
 }

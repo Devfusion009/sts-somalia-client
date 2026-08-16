@@ -143,7 +143,9 @@ export async function savePartnerCommercialTerms(_prev: ActionState, formData: F
           .eq("id", account.entity_id)
       : account.type === "hotel_partner"
         ? await supabase.from("hotel_partners").update({ commission_rate: rate }).eq("id", account.entity_id)
-        : await supabase.from("affiliates").update({ commission_rate: rate }).eq("id", account.entity_id);
+        : account.type === "venue_partner"
+          ? await supabase.from("venue_partners").update({ commission_rate: rate }).eq("id", account.entity_id)
+          : await supabase.from("affiliates").update({ commission_rate: rate }).eq("id", account.entity_id);
   if (entityError) return { error: entityError.message };
 
   const { error } = await supabase
@@ -231,14 +233,23 @@ export async function sendOnboardingReminder(
             .eq("status", "active")
             .limit(1)
             .maybeSingle()
-        : await supabase
-            .from("hotel_partner_members")
-            .select("profile:profiles(id, email)")
-            .eq("partner_id", account.entity_id)
-            .eq("role_in_partner", "owner")
-            .eq("status", "active")
-            .limit(1)
-            .maybeSingle();
+        : account.type === "venue_partner"
+          ? await supabase
+              .from("venue_partner_members")
+              .select("profile:profiles(id, email)")
+              .eq("partner_id", account.entity_id)
+              .eq("role_in_partner", "owner")
+              .eq("status", "active")
+              .limit(1)
+              .maybeSingle()
+          : await supabase
+              .from("hotel_partner_members")
+              .select("profile:profiles(id, email)")
+              .eq("partner_id", account.entity_id)
+              .eq("role_in_partner", "owner")
+              .eq("status", "active")
+              .limit(1)
+              .maybeSingle();
     const profile = data?.profile as unknown as { id: string; email: string } | null;
     ownerProfileId = profile?.id ?? null;
     ownerEmail = profile?.email ?? null;
@@ -324,7 +335,12 @@ export async function adminAddPartnerMember(_prev: ActionState, formData: FormDa
     account.type === "agency"
       ? { agency_id: account.entity_id, profile_id: target.id, role_in_agency: parsed.data.role, status: "active" }
       : { partner_id: account.entity_id, profile_id: target.id, role_in_partner: parsed.data.role, status: "active" };
-  const table = account.type === "agency" ? "agency_members" : "hotel_partner_members";
+  const table =
+    account.type === "agency"
+      ? "agency_members"
+      : account.type === "venue_partner"
+        ? "venue_partner_members"
+        : "hotel_partner_members";
   const { error } = await supabase.from(table).insert(row as never);
   if (error) {
     if (error.code === "23505") return { error: "That person is already on this team." };
@@ -372,12 +388,19 @@ export async function adminUpdatePartnerMemberRole(_prev: ActionState, formData:
           .eq("id", parsed.data.memberId)
           .eq("agency_id", account.entity_id)
           .neq("role_in_agency", "owner")
-      : await supabase
-          .from("hotel_partner_members")
-          .update({ role_in_partner: parsed.data.role as "staff" })
-          .eq("id", parsed.data.memberId)
-          .eq("partner_id", account.entity_id)
-          .neq("role_in_partner", "owner");
+      : account.type === "venue_partner"
+        ? await supabase
+            .from("venue_partner_members")
+            .update({ role_in_partner: parsed.data.role as "staff" })
+            .eq("id", parsed.data.memberId)
+            .eq("partner_id", account.entity_id)
+            .neq("role_in_partner", "owner")
+        : await supabase
+            .from("hotel_partner_members")
+            .update({ role_in_partner: parsed.data.role as "staff" })
+            .eq("id", parsed.data.memberId)
+            .eq("partner_id", account.entity_id)
+            .neq("role_in_partner", "owner");
   if (error) return { error: error.message };
 
   await supabase.from("partner_account_events").insert({
@@ -417,12 +440,19 @@ export async function adminRemovePartnerMember(_prev: ActionState, formData: For
           .eq("id", parsed.data.memberId)
           .eq("agency_id", account.entity_id)
           .neq("role_in_agency", "owner")
-      : await supabase
-          .from("hotel_partner_members")
-          .update({ status: "removed" })
-          .eq("id", parsed.data.memberId)
-          .eq("partner_id", account.entity_id)
-          .neq("role_in_partner", "owner");
+      : account.type === "venue_partner"
+        ? await supabase
+            .from("venue_partner_members")
+            .update({ status: "removed" })
+            .eq("id", parsed.data.memberId)
+            .eq("partner_id", account.entity_id)
+            .neq("role_in_partner", "owner")
+        : await supabase
+            .from("hotel_partner_members")
+            .update({ status: "removed" })
+            .eq("id", parsed.data.memberId)
+            .eq("partner_id", account.entity_id)
+            .neq("role_in_partner", "owner");
   if (error) return { error: error.message };
 
   await supabase.from("partner_account_events").insert({

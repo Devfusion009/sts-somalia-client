@@ -78,6 +78,46 @@ const REQUEST_KIND_LABEL: Record<string, string> = {
   modification: "Change request",
 };
 
+/**
+ * Hotels and halls are manual bookings (no supplier APIs in Somalia): a
+ * request goes into the staff queue and a human confirms it. These tracks
+ * show the customer exactly where their request is — including the
+ * waitlisted case, where the dates were full and the request is parked
+ * until a slot frees up.
+ */
+const HOTEL_STAGES: TimelineStage[] = [
+  { key: "requested", label: "Request received", description: "Waiting in the booking queue", icon: Send },
+  { key: "confirmed", label: "Booking confirmed", description: "Room allocated by the hotel", icon: Ticket },
+  { key: "stay", label: "Your stay", icon: Landmark },
+  { key: "completed", label: "Completed", icon: Users },
+];
+
+const HALL_STAGES: TimelineStage[] = [
+  { key: "requested", label: "Request received", description: "Waiting in the booking queue", icon: Send },
+  { key: "confirmed", label: "Booking confirmed", description: "Venue reserved for your event", icon: Ticket },
+  { key: "event", label: "Event day", icon: Landmark },
+  { key: "completed", label: "Completed", icon: Users },
+];
+
+function manualBookingStageIndex(status: string): { index: number; outcome: "pending" | "success" | "failed" } {
+  switch (status) {
+    case "pending":
+    case "waitlisted":
+      return { index: 0, outcome: "pending" };
+    case "confirmed":
+      return { index: 1, outcome: "pending" };
+    case "completed":
+      return { index: 3, outcome: "success" };
+    case "cancelled":
+    case "refunded":
+    case "no_show":
+    case "failed":
+      return { index: 3, outcome: "failed" };
+    default:
+      return { index: 0, outcome: "pending" };
+  }
+}
+
 export default async function BookingDetailPage({
   params,
 }: {
@@ -101,6 +141,10 @@ export default async function BookingDetailPage({
 
   const isPaid = ["paid", "processing", "completed"].includes(order.status);
   const isCancellableDirectly = order.status === "held" || order.status === "pending_payment";
+  // Manual (request-first) bookings: the order stays unpaid until staff
+  // confirm the booking and its final price — at which point the customer
+  // pays from this page.
+  const awaitingPayment = order.status === "pending_payment";
   const voucherAvailable = isPaid;
 
   const umrahItem = order.order_items.find((i) => i.item_type === "umrah");
@@ -118,6 +162,11 @@ export default async function BookingDetailPage({
     : null;
 
   const openRequests = requests.filter((r) => r.status === "requested" || r.status === "in_review");
+
+  const hotelItem = order.order_items.find((i) => i.item_type === "hotel");
+  const hotelStatus = (hotelItem?.hotel_booking as { status?: string } | null)?.status ?? null;
+  const hallItem = order.order_items.find((i) => i.item_type === "hall");
+  const hallStatus = (hallItem?.hall_booking as { status?: string } | null)?.status ?? null;
 
   return (
     <div className="space-y-6">
@@ -243,6 +292,76 @@ export default async function BookingDetailPage({
           </ul>
         </CardContent>
       </Card>
+
+      {/* Hotel progress (manual booking) */}
+      {hotelStatus ? (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+              Hotel booking progress
+              {hotelStatus === "waitlisted" ? (
+                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Waitlisted</Badge>
+              ) : hotelStatus === "pending" && awaitingPayment ? (
+                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Requested</Badge>
+              ) : null}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {hotelStatus === "waitlisted" ? (
+              <Alert>
+                <AlertDescription>
+                  Your dates are currently full, so your request is in the queue. Our team will confirm
+                  as soon as a room frees up — you won&apos;t be charged until then.
+                </AlertDescription>
+              </Alert>
+            ) : hotelStatus === "pending" && awaitingPayment ? (
+              <Alert>
+                <AlertDescription>
+                  Your request is with our team — we&apos;re checking with the hotel and will confirm
+                  your booking and final price. You won&apos;t pay anything until it&apos;s confirmed.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            <StatusTimeline
+              stages={HOTEL_STAGES}
+              currentIndex={manualBookingStageIndex(hotelStatus).index}
+              outcome={manualBookingStageIndex(hotelStatus).outcome}
+            />
+            <PayAfterConfirmation show={hotelStatus === "confirmed" && awaitingPayment} orderId={orderId} total={order.total} currency={order.currency} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Hall progress (manual booking) */}
+      {hallStatus ? (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+              Event booking progress
+              {hallStatus === "pending" && awaitingPayment ? (
+                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Requested</Badge>
+              ) : null}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {hallStatus === "pending" && awaitingPayment ? (
+              <Alert>
+                <AlertDescription>
+                  Your request is with the venue — they confirm availability and your final price
+                  (based on your guest count) before the booking is completed. You won&apos;t pay
+                  anything until then.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            <StatusTimeline
+              stages={HALL_STAGES}
+              currentIndex={manualBookingStageIndex(hallStatus).index}
+              outcome={manualBookingStageIndex(hallStatus).outcome}
+            />
+            <PayAfterConfirmation show={hallStatus === "confirmed" && awaitingPayment} orderId={orderId} total={order.total} currency={order.currency} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Umrah progress */}
       {umrahBookingStatus ? (
@@ -384,6 +503,38 @@ export default async function BookingDetailPage({
       <p className="text-xs text-muted-foreground">
         Booked by {profile.full_name ?? profile.email} · Reference {order.order_number}
       </p>
+    </div>
+  );
+}
+
+/**
+ * The moment a manual (request-first) booking is confirmed, its confirmed
+ * final price becomes payable — this is the customer's path into checkout,
+ * which never existed at request time.
+ */
+function PayAfterConfirmation({
+  show,
+  orderId,
+  total,
+  currency,
+}: {
+  show: boolean;
+  orderId: string;
+  total: number | string;
+  currency: string;
+}) {
+  if (!show) return null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+      <div>
+        <p className="text-sm font-medium">Your booking is confirmed — complete payment to lock it in.</p>
+        <p className="text-xs text-muted-foreground">
+          Final confirmed price: {formatMoney(Number(total), currency)}
+        </p>
+      </div>
+      <Button className="gap-1.5" render={<Link href={`/checkout/${orderId}`} />}>
+        <CreditCard className="size-4" /> Complete payment
+      </Button>
     </div>
   );
 }

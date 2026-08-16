@@ -71,18 +71,18 @@ export function ApplicationActions({
   }, [rejectState, infoState, router]);
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex gap-2">
-        <Button size="sm" onClick={() => setApproveOpen(true)}>
-          <Check /> Approve
+    <div className="flex w-full flex-col gap-2">
+      <div className="flex w-full flex-col gap-2">
+        <Button className="gap-1.5" onClick={() => setApproveOpen(true)}>
+          <Check className="size-4" /> Approve
         </Button>
 
-        <Button size="sm" variant="outline" onClick={() => setInfoOpen(true)}>
-          <MessageCircleQuestion /> More info
+        <Button variant="outline" className="gap-1.5" onClick={() => setInfoOpen(true)}>
+          <MessageCircleQuestion className="size-4" /> More info
         </Button>
 
-        <Button size="sm" variant="destructive" onClick={() => setRejectOpen(true)}>
-          <X /> Reject
+        <Button variant="destructive" className="gap-1.5" onClick={() => setRejectOpen(true)}>
+          <X className="size-4" /> Reject
         </Button>
 
         <AlertDialog open={approveOpen} onOpenChange={setApproveOpen}>

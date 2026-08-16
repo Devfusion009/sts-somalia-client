@@ -5,10 +5,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { portalForProfile } from "@/lib/auth/roles";
-import { portalHref, portalLoginHref, rootOrigin } from "@/lib/subdomain";
+import { portalLoginHref, pathPrefixFor, rootOrigin } from "@/lib/subdomain";
 import { recordLoginEvent } from "@/modules/auth/security-actions";
 
-export type ActionState = { error: string | null } | null;
+export type ActionState = { error: string | null; destination?: string } | null;
 
 const credentialsSchema = z.object({
   email: z.string().email("Enter a valid email address."),
@@ -79,15 +79,31 @@ export async function signInAction(
     }
 
     if (profile) {
-      const portal = portalForProfile(profile);
-      // Only follow SAME-ORIGIN portal destinations. When subdomains are
-      // configured, sessions are host-only, so sending an agent from the
-      // customer login straight to agent.<host> would land them on that
-      // portal's sign-in page immediately after signing in — they have to
-      // authenticate on that origin. /partner and /affiliate are paths on this
-      // same host and still work, so those are followed as before.
-      const crossOrigin = portal?.href.startsWith("http") ?? false;
-      roleDestination = portal && !crossOrigin ? portal.href : "/";
+      // affiliate, hotel_partner, and venue_partner are deliberately NOT
+      // treated as separate portal citizens here, unlike agent: none of the
+      // three has a dedicated login page (only /agent/login and
+      // /admin/login exist), so this shared customer form is the ONLY door
+      // they ever sign in through. Each is, by design, still first and
+      // foremost the same B2C account that applied — landing on /account
+      // (which already surfaces a "You have access to the X Portal" banner
+      // via portalForProfile, see account/page.tsx) keeps that account
+      // usable as a customer while still surfacing the partner capability,
+      // rather than the login silently swapping their B2C dashboard out for
+      // good. Confirmed for affiliate 2026-08-14; hotel_partner reported the
+      // same "landed in the Partner Portal instead of my B2C account" 2026-08-16.
+      if (profile.role === "affiliate" || profile.role === "hotel_partner" || profile.role === "venue_partner") {
+        roleDestination = "/account";
+      } else {
+        const portal = portalForProfile(profile);
+        // Only follow SAME-ORIGIN portal destinations. When subdomains are
+        // configured, sessions are host-only, so sending an agent from the
+        // customer login straight to agent.<host> would land them on that
+        // portal's sign-in page immediately after signing in — they have to
+        // authenticate on that origin. /partner is a path on this same host
+        // and still works, so that's followed as before.
+        const crossOrigin = portal?.href.startsWith("http") ?? false;
+        roleDestination = portal && !crossOrigin ? portal.href : "/";
+      }
     }
   }
 
@@ -112,20 +128,26 @@ const PORTAL_LOGIN_META: Record<PortalKind, { audienceError: string }> = {
 };
 
 /**
- * Subdomain-aware portal destination (absolute cross-origin URL once
- * NEXT_PUBLIC_APP_HOST is set, relative path otherwise) — same fallback
- * shape as portalForProfile() in lib/auth/roles.ts. A hardcoded relative
- * "/agent" would 404 on the root host once proxy.ts's subdomain block is
- * active (see docs/B2B-PORTAL-SEPARATION-BUILD-PROMPT.md).
- *
- * This action is only ever submitted FROM the portal's own origin now (the
- * dedicated /agent/login and /admin/login pages). It must stay that way:
- * sessions are host-only, so credentials posted from the public host write
- * the cookie there and the portal redirected to cannot read it. See the note
- * on portalLoginHref in lib/subdomain.ts.
+ * Default post-login destination for signInToPortalAction — deliberately a
+ * RELATIVE path ("/admin", "/agent"), not portalHref()'s absolute
+ * cross-origin URL. This action is only ever submitted FROM the portal's
+ * own origin (the dedicated /agent/login and /admin/login pages — see the
+ * comment on portalLoginHref in lib/subdomain.ts for why it must stay that
+ * way), so the redirect target is always same-origin in practice, and a
+ * relative path avoids a genuine Next.js 16.2.12 quirk: `redirect()` to an
+ * ABSOLUTE url pointing at the request's OWN origin was observed sending
+ * the browser's follow-up request with Host: localhost instead of the
+ * actual subdomain host — landing on proxy.ts's root-host isolation block
+ * (a 404) instead of the portal. Confirmed via temporary diagnostic
+ * logging: the Server Action itself completed successfully (credentials
+ * verified, admin check passed, MFA check passed) every time — the failure
+ * was purely in how the client followed the resulting redirect. A relative
+ * path never has this ambiguity: proxy.ts's own rewrite (or direct
+ * Next.js routing in path-based/Phase-1 mode) resolves it on whatever
+ * origin the browser is already on.
  */
 function portalDestination(portal: PortalKind): string {
-  return portalHref(portal);
+  return pathPrefixFor(portal);
 }
 
 async function hasActiveAgencyMembership(
@@ -202,10 +224,27 @@ async function signInToPortalAction(
 
   const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (aal?.currentLevel === "aal1" && aal.nextLevel === "aal2") {
-    redirect(`/login/verify-2fa?redirect_to=${encodeURIComponent(finalDestination)}`);
+    return {
+      error: null,
+      destination: `/login/verify-2fa?redirect_to=${encodeURIComponent(finalDestination)}`,
+    };
   }
 
-  redirect(finalDestination);
+  // A plain redirect() here — the framework-native way to do this — hits a
+  // real Next.js 16.2.12 App Router bug: on a page reached via proxy.ts's
+  // subdomain rewrite, the client's Server-Action-redirect-following code
+  // sends its follow-up request with Host: localhost instead of the actual
+  // subdomain host, landing on proxy.ts's OWN root-host isolation block (a
+  // 404) instead of the portal — a real, reproducible framework defect,
+  // not anything wrong with the destination path itself (confirmed via
+  // temporary diagnostic logging: the exact same wrong "localhost" host
+  // appeared whether finalDestination was relative or absolute, and even
+  // after setting NEXT_PUBLIC_SITE_URL to an unrelated marker value, ruling
+  // that out as the source too). Returning the destination as state instead
+  // and letting the CLIENT perform a plain browser navigation (see
+  // PortalLoginForm) sidesteps Next's redirect-following code entirely —
+  // window.location.href is unambiguous about which origin it's on.
+  return { error: null, destination: finalDestination };
 }
 
 export const signInToAgentPortalAction = signInToPortalAction.bind(null, "agent");

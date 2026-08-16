@@ -1,9 +1,24 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft, ExternalLink, History } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  ArrowLeft,
+  ExternalLink,
+  History,
+  User,
+  Building2,
+  BedDouble,
+  PartyPopper,
+  Gavel,
+  UserCog,
+  StickyNote,
+  Folder,
+  FileText,
+  FileImage,
+  File as FileIcon,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { detailRows } from "@/lib/format-detail";
 import {
   getApplicationDetail,
   getApplicationAuditTrail,
@@ -16,12 +31,19 @@ import { getAccountIdsByApplication } from "@/modules/admin/partner-accounts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 import { ApplicationActions } from "../../application-actions";
 import { ReviewerPicker } from "../reviewer-picker";
 import { InternalNotesForm } from "../internal-notes-form";
 import { DocumentReviewControls } from "../document-review-controls";
+import {
+  SectionTitle,
+  DetailGrid,
+  BusinessDetailsCard,
+  AffiliateDetailCards,
+  type Details,
+} from "@/modules/partner-applications/components/detail-cards";
 
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-brand-gold/15 text-brand-gold",
@@ -35,12 +57,21 @@ const TYPE_FROM_SLUG: Record<string, ApplicationType> = {
   agency: "agency",
   "hotel-partner": "hotel_partner",
   affiliate: "affiliate",
+  "venue-partner": "venue_partner",
 };
 
 const TYPE_LABEL: Record<ApplicationType, string> = {
   agency: "Travel Agent",
   hotel_partner: "Hotel Partner",
   affiliate: "Affiliate",
+  venue_partner: "Venue Partner",
+};
+
+const TYPE_ICON: Record<ApplicationType, LucideIcon> = {
+  agency: Building2,
+  hotel_partner: BedDouble,
+  venue_partner: PartyPopper,
+  affiliate: User,
 };
 
 const DOCUMENT_BUCKET = "kyc-documents";
@@ -55,21 +86,31 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function DetailGrid({ rows }: { rows: Array<[string, string]> }) {
-  if (rows.length === 0) return <p className="text-sm text-muted-foreground">No details submitted yet.</p>;
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "heic"]);
+
+/** A quiet plain-text row read as a wall of filenames — a colored file-type chip (PDF red, image blue) makes each document scannable at a glance. */
+function DocFileIcon({ fileName }: { fileName: string }) {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "pdf") {
+    return (
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+        <FileText className="size-5" />
+      </span>
+    );
+  }
+  if (IMAGE_EXTENSIONS.has(ext)) {
+    return (
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-chart-3/10 text-chart-3">
+        <FileImage className="size-5" />
+      </span>
+    );
+  }
   return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-      {rows.map(([label, value]) => (
-        <div key={label}>
-          <dt className="text-xs text-muted-foreground">{label}</dt>
-          <dd className="text-sm font-medium break-words">{value || "—"}</dd>
-        </div>
-      ))}
-    </dl>
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+      <FileIcon className="size-5" />
+    </span>
   );
 }
-
-const businessDetailRows = detailRows;
 
 export default async function ApplicationDetailPage({
   params,
@@ -112,6 +153,7 @@ export default async function ApplicationDetailPage({
   const applicant = application.applicant as unknown as { full_name: string | null; email: string; phone: string | null } | null;
   const reviewer = application.reviewer as unknown as { full_name: string | null; email: string } | null;
   const isActionable = application.status === "pending" || application.status === "under_review";
+  const TypeIcon = TYPE_ICON[type];
 
   return (
     <div className="space-y-6">
@@ -120,12 +162,17 @@ export default async function ApplicationDetailPage({
       </Button>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-xl font-semibold">{name}</h1>
-          <p className="text-sm text-muted-foreground">
-            <span className="font-mono">{application.reference_number ?? id}</span> · {TYPE_LABEL[type]} ·{" "}
-            {format(new Date(application.submitted_at ?? application.created_at), "dd MMM yyyy, hh:mm a")}
-          </p>
+        <div className="flex items-center gap-3">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <TypeIcon className="size-5" />
+          </span>
+          <div>
+            <h1 className="font-heading text-xl font-semibold">{name}</h1>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-mono">{application.reference_number ?? id}</span> · {TYPE_LABEL[type]} ·{" "}
+              {format(new Date(application.submitted_at ?? application.created_at), "dd MMM yyyy, hh:mm a")}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge status={application.status} />
@@ -137,10 +184,7 @@ export default async function ApplicationDetailPage({
             </form>
           ) : null}
           {application.status === "approved" && partnerAccountId ? (
-            <Button
-              size="sm"
-              render={<Link href={`/admin/partners/${slug}/${partnerAccountId}`} />}
-            >
+            <Button size="sm" render={<Link href={`/admin/partners/${slug}/${partnerAccountId}`} />}>
               Manage Partner Account
             </Button>
           ) : null}
@@ -162,7 +206,7 @@ export default async function ApplicationDetailPage({
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Applicant</CardTitle>
+              <SectionTitle icon={User}>Applicant</SectionTitle>
             </CardHeader>
             <CardContent>
               <DetailGrid
@@ -175,21 +219,17 @@ export default async function ApplicationDetailPage({
             </CardContent>
           </Card>
 
-          {type !== "affiliate" || Object.keys((application as { business_details?: unknown }).business_details ?? {}).length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Business Details</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <DetailGrid rows={businessDetailRows((application as { business_details?: unknown }).business_details)} />
-              </CardContent>
-            </Card>
-          ) : null}
+          {(() => {
+            const details = ((application as { business_details?: unknown }).business_details ?? {}) as Details;
+            if (Object.keys(details).length === 0) return null;
+            if (type === "affiliate") return <AffiliateDetailCards details={details} />;
+            return <BusinessDetailsCard kind={type} details={details} />;
+          })()}
 
           {type === "affiliate" && (application as { notes?: string }).notes ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Notes from applicant</CardTitle>
+                <SectionTitle icon={StickyNote}>Notes from applicant</SectionTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm">{(application as { notes: string }).notes}</p>
@@ -199,14 +239,16 @@ export default async function ApplicationDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">
-                Documents ({signedDocs.length})
-                {signedDocs.length > 0 ? (
-                  <span className="ml-2 text-xs font-normal text-muted-foreground">
-                    {signedDocs.filter((d) => documentReviews.get(d.key)?.status === "verified").length} verified
-                  </span>
-                ) : null}
-              </CardTitle>
+              <SectionTitle icon={Folder}>
+                <span>
+                  Documents ({signedDocs.length})
+                  {signedDocs.length > 0 ? (
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      {signedDocs.filter((d) => documentReviews.get(d.key)?.status === "verified").length} verified
+                    </span>
+                  ) : null}
+                </span>
+              </SectionTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -216,11 +258,14 @@ export default async function ApplicationDetailPage({
                   return (
                     <div key={doc.storage_path} className="rounded-lg border border-border p-3">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{doc.label}</p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {doc.file_name} · uploaded {format(new Date(doc.uploaded_at), "dd MMM yyyy, hh:mm a")}
-                          </p>
+                        <div className="flex min-w-0 items-center gap-3">
+                          <DocFileIcon fileName={doc.file_name} />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{doc.label}</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {doc.file_name} · uploaded {format(new Date(doc.uploaded_at), "dd MMM yyyy, hh:mm a")}
+                            </p>
+                          </div>
                         </div>
                         {doc.url ? (
                           <Button
@@ -252,15 +297,13 @@ export default async function ApplicationDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <History className="size-4" /> Audit trail
-              </CardTitle>
+              <SectionTitle icon={History}>Audit trail</SectionTitle>
             </CardHeader>
             <CardContent>
               {auditTrail.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No changes recorded yet.</p>
               ) : (
-                <ol className="space-y-3">
+                <ol className="max-h-80 space-y-3 overflow-y-auto pr-2">
                   {auditTrail.map((event) => {
                     const actor = event.actor as unknown as { full_name: string | null; email: string } | null;
                     return (
@@ -288,7 +331,7 @@ export default async function ApplicationDetailPage({
           {isActionable ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Decision</CardTitle>
+                <SectionTitle icon={Gavel}>Decision</SectionTitle>
               </CardHeader>
               <CardContent>
                 <ApplicationActions applicationId={application.id} type={type} />
@@ -298,7 +341,7 @@ export default async function ApplicationDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Assigned reviewer</CardTitle>
+              <SectionTitle icon={UserCog}>Assigned reviewer</SectionTitle>
             </CardHeader>
             <CardContent>
               <ReviewerPicker
@@ -315,7 +358,7 @@ export default async function ApplicationDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Internal notes</CardTitle>
+              <SectionTitle icon={StickyNote}>Internal notes</SectionTitle>
             </CardHeader>
             <CardContent>
               <InternalNotesForm applicationId={application.id} type={type} initialNotes={application.internal_notes} />

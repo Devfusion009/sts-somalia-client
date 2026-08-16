@@ -81,7 +81,7 @@ export type RecentApplication = {
   name: string | null;
 };
 
-const KINDS: ApplicationKind[] = ["agency", "hotel_partner", "affiliate"];
+const KINDS: ApplicationKind[] = ["agency", "hotel_partner", "affiliate", "venue_partner"];
 
 /** Full application history across all three programs, newest first — for the "Recent applications" list. */
 export async function getRecentApplications(userId: string, limit = 10): Promise<RecentApplication[]> {

@@ -183,14 +183,20 @@ export default async function EventsPage({
 
                       <div className="mt-auto flex items-end justify-between pt-2">
                         <div>
-                          <p className="text-[10px] text-muted-foreground uppercase">From</p>
-                          <p className="font-heading text-lg font-bold text-primary">
-                            {venue.currency} {Number(venue.base_price).toFixed(0)}
-                            <span className="text-xs font-normal text-muted-foreground">
-                              {" "}
-                              {priceUnitLabel(venue.price_unit)}
-                            </span>
-                          </p>
+                          {Number(venue.base_price) > 0 ? (
+                            <>
+                              <p className="text-[10px] text-muted-foreground uppercase">From</p>
+                              <p className="font-heading text-lg font-bold text-primary">
+                                {venue.currency} {Number(venue.base_price).toFixed(0)}
+                                <span className="text-xs font-normal text-muted-foreground">
+                                  {" "}
+                                  {priceUnitLabel(venue.price_unit)}
+                                </span>
+                              </p>
+                            </>
+                          ) : (
+                            <p className="font-heading text-sm font-bold text-primary">Price on request</p>
+                          )}
                         </div>
                         <span className="flex items-center gap-1 text-sm font-semibold text-primary">
                           View Venue <ArrowRight className="size-4" />
