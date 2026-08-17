@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireUser } from "@/lib/auth/session";
+import { requireUserForPortal } from "@/lib/auth/session";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { agencyLogoUrl } from "@/modules/agencies/logo";
 import { getMyPartnerAccountId, getPartnerAccount } from "@/modules/admin/partner-accounts";
@@ -63,7 +63,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
   // role value on their profile (whichever was approved last), but keeps
   // every membership row they were actually granted — gating on role alone
   // would incorrectly lock them out of programs they still belong to.
-  const profile = await requireUser();
+  const profile = await requireUserForPortal("agent");
   const membership = await getMyAgency(profile.id);
 
   if (!membership) {
