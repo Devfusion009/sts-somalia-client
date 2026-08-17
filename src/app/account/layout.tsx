@@ -1,6 +1,8 @@
 import { requireUser } from "@/lib/auth/session";
 import { roleLabel } from "@/lib/auth/roles";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
+import { CustomerNotificationBell } from "@/components/portal/customer-notification-bell";
+import { getUnreadNotifications } from "@/modules/notifications/queries";
 
 // "Become a Partner" (/account/become) also stays reachable from the public
 // marketing site (/agents, /partners, /affiliates, and the footer) and from
@@ -41,6 +43,7 @@ const NAV_GROUPS: PortalNavGroup[] = [
 
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireUser();
+  const notifications = await getUnreadNotifications(profile.id, { limit: 10 });
 
   return (
     <PortalShell
@@ -49,6 +52,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
       navGroups={NAV_GROUPS}
       profileName={profile.full_name}
       profileEmail={profile.email}
+      headerExtra={<CustomerNotificationBell notifications={notifications} />}
     >
       {children}
     </PortalShell>

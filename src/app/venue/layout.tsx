@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
 import { getMyVenuePartnerId, getMyVenuePartner } from "@/modules/events/venue-partner-queries";
+import { getMyPartnerAccountId, getPartnerAccount } from "@/modules/admin/partner-accounts";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
+import { OnboardingStatusBanner } from "@/components/portal/onboarding-status-banner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -59,6 +61,9 @@ export default async function VenuePartnerLayout({ children }: { children: React
     return <PortalSuspendedNotice portalLabel="Venue Portal" />;
   }
 
+  const accountId = await getMyPartnerAccountId("venue_partner", partnerId);
+  const account = accountId ? await getPartnerAccount(accountId) : null;
+
   return (
     <PortalShell
       portalName="Venue Portal"
@@ -67,6 +72,7 @@ export default async function VenuePartnerLayout({ children }: { children: React
       profileName={profile.full_name}
       profileEmail={profile.email}
     >
+      {account ? <OnboardingStatusBanner checklist={account.checklist} portalLabel="the Venue Portal" /> : null}
       {children}
     </PortalShell>
   );

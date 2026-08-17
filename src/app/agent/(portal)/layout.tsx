@@ -3,8 +3,10 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { agencyLogoUrl } from "@/modules/agencies/logo";
+import { getMyPartnerAccountId, getPartnerAccount } from "@/modules/admin/partner-accounts";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
+import { OnboardingStatusBanner } from "@/components/portal/onboarding-status-banner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -87,6 +89,9 @@ export default async function AgentLayout({ children }: { children: React.ReactN
     return <PortalSuspendedNotice portalLabel="Agent Portal" />;
   }
 
+  const accountId = await getMyPartnerAccountId("agency", membership.agency.id);
+  const account = accountId ? await getPartnerAccount(accountId) : null;
+
   return (
     <PortalShell
       portalName="Agent Portal"
@@ -105,6 +110,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
       accent="agent"
       brandLogoUrl={agencyLogoUrl(membership.agency.logo_path)}
     >
+      {account ? <OnboardingStatusBanner checklist={account.checklist} portalLabel="the Agent Portal" /> : null}
       {children}
     </PortalShell>
   );

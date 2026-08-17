@@ -59,15 +59,15 @@ export function NewHotelForm() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="status">Status</Label>
+          {/* Publishing is admin-only — STS reviews the listing (and your
+              KYC) before it goes live to real customers. */}
           <Select name="status" defaultValue="draft">
             <SelectTrigger id="status" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="pending_review">Pending review</SelectItem>
-              <SelectItem value="published">Published</SelectItem>
-              <SelectItem value="suspended">Suspended</SelectItem>
+              <SelectItem value="draft">Draft — keep working on it</SelectItem>
+              <SelectItem value="pending_review">Submit for review</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -590,3 +590,37 @@ export async function updateHotelBookingPrice(
   revalidatePath("/admin/orders");
   return { error: null };
 }
+
+// ---------------------------------------------------------------------------
+// Hotel/room publish gate — the partner-facing forms (partner-actions.ts)
+// only ever write 'draft'/'pending_review'; going to 'published' (real,
+// bookable-by-customers) or 'suspended' is admin-only, from here. Mirrors
+// the venue_partner pattern this codebase already used correctly for venues.
+// ---------------------------------------------------------------------------
+const listingStatuses: ListingStatus[] = ["draft", "pending_review", "published", "suspended"];
+
+export async function adminSetHotelStatus(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requirePlatformAdmin();
+  const hotelId = String(formData.get("hotelId"));
+  const status = String(formData.get("status")) as ListingStatus;
+  if (!listingStatuses.includes(status)) return { error: "Invalid status." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("hotels").update({ status }).eq("id", hotelId);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/partners");
+  return { error: null };
+}
+
+export async function adminSetRoomStatus(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requirePlatformAdmin();
+  const roomId = String(formData.get("roomId"));
+  const status = String(formData.get("status")) as ListingStatus;
+  if (!listingStatuses.includes(status)) return { error: "Invalid status." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("hotel_rooms").update({ status }).eq("id", roomId);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/partners");
+  return { error: null };
+}

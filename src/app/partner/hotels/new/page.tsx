@@ -11,7 +11,7 @@ export default function NewHotelPage() {
       <Card>
         <CardHeader>
           <CardTitle>Hotel details</CardTitle>
-          <CardDescription>You control the status yourself — set it to Published when ready.</CardDescription>
+          <CardDescription>Submit for review when ready — STS verifies and publishes it for you.</CardDescription>
         </CardHeader>
         <CardContent>
           <NewHotelForm />

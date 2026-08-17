@@ -46,7 +46,7 @@ const PRODUCT_TO_ITEM_TYPE: Record<string, "flight" | "hotel" | "visa" | "umrah"
   halls: "hall",
 };
 
-type ApplicantInfo = { email: string; phone: string | null; referenceNumber: string };
+type ApplicantInfo = { applicantId: string; email: string; phone: string | null; referenceNumber: string };
 
 async function loadApplicantInfo(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -60,16 +60,70 @@ async function loadApplicantInfo(
   // null here and made every approval/rejection notification a no-op.
   const { data } = (await supabase
     .from(TABLE[type])
-    .select(`reference_number, applicant:profiles!${TABLE[type]}_applicant_id_fkey!inner(email, phone)`)
+    .select(`applicant_id, reference_number, applicant:profiles!${TABLE[type]}_applicant_id_fkey!inner(email, phone)`)
     .eq("id", applicationId)
-    .maybeSingle()) as { data: { reference_number: string | null; applicant: unknown } | null };
+    .maybeSingle()) as { data: { applicant_id: string; reference_number: string | null; applicant: unknown } | null };
   if (!data) return null;
   const applicant = data.applicant as { email: string; phone: string | null };
   return {
+    applicantId: data.applicant_id,
     email: applicant.email,
     phone: applicant.phone,
     referenceNumber: data.reference_number ?? applicationId,
   };
+}
+
+const IN_APP_NOTIFICATION_CONTENT: Record<
+  "approved" | "rejected" | "more_info_requested",
+  (type: ApplicationType, referenceNumber: string, message?: string | null) => { title: string; body: string }
+> = {
+  approved: (type, ref) => ({
+    title: "Your partner application was approved",
+    body: `${TYPE_LABEL_FOR_NOTIFY[type]} application ${ref} is approved — open your new portal from Partner Applications.`,
+  }),
+  rejected: (type, ref, message) => ({
+    title: "Your partner application wasn't approved",
+    body: `${TYPE_LABEL_FOR_NOTIFY[type]} application ${ref} wasn't approved.${message ? ` Reason: ${message}` : ""}`,
+  }),
+  more_info_requested: (type, ref, message) => ({
+    title: "Action needed on your partner application",
+    body: `${TYPE_LABEL_FOR_NOTIFY[type]} application ${ref} needs more information.${message ? ` ${message}` : ""}`,
+  }),
+};
+
+const TYPE_LABEL_FOR_NOTIFY: Record<ApplicationType, string> = {
+  agency: "Travel Agent",
+  hotel_partner: "Hotel Partner",
+  affiliate: "Affiliate",
+  venue_partner: "Venue Partner",
+};
+
+/**
+ * The in-app counterpart to notifyApplicant() (email/WhatsApp) — the one
+ * that actually works today regardless of whether Resend/Twilio are
+ * configured. Surfaced via the same notification bell pattern already
+ * built for admin (CustomerNotificationBell, mounted in account/layout.tsx
+ * through PortalShell's headerExtra). Never throws: same best-effort
+ * contract as notifyApplicant.
+ */
+async function notifyApplicantInApp(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  params: {
+    profileId: string;
+    type: ApplicationType;
+    referenceNumber: string;
+    event: "approved" | "rejected" | "more_info_requested";
+    message?: string | null;
+  }
+) {
+  const { title, body } = IN_APP_NOTIFICATION_CONTENT[params.event](params.type, params.referenceNumber, params.message);
+  await supabase.from("notifications").insert({
+    profile_id: params.profileId,
+    type: `application_${params.event}`,
+    title,
+    body,
+    data: { applicationType: params.type, referenceNumber: params.referenceNumber },
+  });
 }
 
 const APPLICATION_SLUG: Record<ApplicationType, string> = {
@@ -135,6 +189,12 @@ export async function approveApplication(
       event: "approved",
     });
     emailSent = result.emailSent;
+    await notifyApplicantInApp(supabase, {
+      profileId: info.applicantId,
+      type,
+      referenceNumber: info.referenceNumber,
+      event: "approved",
+    });
   }
 
   revalidatePath("/admin/applications");
@@ -184,6 +244,13 @@ export async function rejectApplication(
       message: parsed.data.notes,
     });
     emailSent = result.emailSent;
+    await notifyApplicantInApp(supabase, {
+      profileId: info.applicantId,
+      type,
+      referenceNumber: info.referenceNumber,
+      event: "rejected",
+      message: parsed.data.notes,
+    });
   }
 
   revalidatePath("/admin/applications");
@@ -239,6 +306,13 @@ export async function requestMoreInfo(
       message: parsed.data.message,
     });
     emailSent = result.emailSent;
+    await notifyApplicantInApp(supabase, {
+      profileId: info.applicantId,
+      type,
+      referenceNumber: info.referenceNumber,
+      event: "more_info_requested",
+      message: parsed.data.message,
+    });
   }
 
   revalidatePath("/admin/applications");
@@ -347,6 +421,31 @@ export async function setDocumentReviewStatus(type: ApplicationType, _prev: Acti
     { onConflict: "application_type,application_id,doc_key" }
   );
   if (error) return { error: error.message };
+
+  // A rejected document used to be silent — no signal reached the
+  // applicant at all unless the admin separately clicked "Request more
+  // info" and manually retyped which document was wrong. This names the
+  // exact document, in-app, the moment it's rejected.
+  if (parsed.data.status === "rejected") {
+    const { data: appRow } = await supabase
+      .from(TABLE[type])
+      .select(`applicant_id, reference_number, document_refs`)
+      .eq("id", parsed.data.applicationId)
+      .maybeSingle();
+    if (appRow) {
+      const docs = Array.isArray(appRow.document_refs) ? (appRow.document_refs as Array<{ key: string; label: string }>) : [];
+      const docLabel = docs.find((d) => d.key === parsed.data.docKey)?.label ?? parsed.data.docKey;
+      await supabase.from("notifications").insert({
+        profile_id: appRow.applicant_id,
+        type: "application_document_rejected",
+        title: "A document needs correction",
+        body: `"${docLabel}" on your ${TYPE_LABEL_FOR_NOTIFY[type]} application (${appRow.reference_number}) needs to be re-uploaded.${
+          parsed.data.note ? ` ${parsed.data.note}` : ""
+        }`,
+        data: { applicationType: type, applicationId: parsed.data.applicationId, docKey: parsed.data.docKey },
+      });
+    }
+  }
 
   revalidatePath(`/admin/applications/${type.replace("_", "-")}/${parsed.data.applicationId}`);
   return { error: null };

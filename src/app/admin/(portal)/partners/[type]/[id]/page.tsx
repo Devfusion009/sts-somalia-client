@@ -11,6 +11,7 @@ import {
   BedDouble,
   Landmark,
   Link2,
+  ShieldAlert,
 } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -34,6 +35,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { StatusActions } from "./status-actions";
+import { ListingStatusControl } from "./listing-status-control";
 import {
   CommercialTermsForm,
   AccountNotesForm,
@@ -91,6 +93,7 @@ export default async function PartnerAccountConsolePage({
   const applicationHref = `/admin/applications/${slug}/${application.id}`;
   const doneCount = checklist.filter((i) => i.done).length;
   const progressPct = Math.round((doneCount / checklist.length) * 100);
+  const docsVerified = checklist.find((i) => i.key === "docs_verified")?.done ?? false;
 
   const supabase = await createClient();
   const signedDocs = await Promise.all(
@@ -252,7 +255,15 @@ export default async function PartnerAccountConsolePage({
                 </CardContent>
               </Card>
             ) : (
-              detail.hotels.map((hotel) => (
+              <>
+                {!docsVerified && detail.hotels.some((h) => h.status === "published") ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    <ShieldAlert className="size-4 shrink-0" />
+                    This partner has a published (live, bookable) property, but KYC documents
+                    aren&apos;t all verified yet — check the Documents tab.
+                  </div>
+                ) : null}
+                {detail.hotels.map((hotel) => (
                 <Card key={hotel.id} className="overflow-hidden py-0">
                   <CardHeader className="border-b border-border !py-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -263,9 +274,7 @@ export default async function PartnerAccountConsolePage({
                           {hotel.star_rating ? ` · ${hotel.star_rating}★` : ""}
                         </span>
                       </CardTitle>
-                      <Badge variant="secondary" className="capitalize">
-                        {hotel.status.replace(/_/g, " ")}
-                      </Badge>
+                      <ListingStatusControl kind="hotel" id={hotel.id} currentStatus={hotel.status} />
                     </div>
                   </CardHeader>
                   {hotel.rooms.length === 0 ? (
@@ -286,9 +295,7 @@ export default async function PartnerAccountConsolePage({
                           <TableRow key={room.id}>
                             <TableCell className="font-medium">{room.name}</TableCell>
                             <TableCell>
-                              <Badge variant="secondary" className="capitalize">
-                                {room.status.replace(/_/g, " ")}
-                              </Badge>
+                              <ListingStatusControl kind="room" id={room.id} currentStatus={room.status} />
                             </TableCell>
                             <TableCell className="text-right">{money(room.base_price, room.currency)}</TableCell>
                           </TableRow>
@@ -297,7 +304,8 @@ export default async function PartnerAccountConsolePage({
                     </Table>
                   )}
                 </Card>
-              ))
+                ))}
+              </>
             )
           ) : type === "venue_partner" ? (
             detail.venues.length === 0 ? (

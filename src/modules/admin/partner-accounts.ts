@@ -172,6 +172,25 @@ export async function getPartnerAccountsIndex() {
   return accounts.map((a) => ({ ...a, name: names.get(a.entity_id) ?? "—" }));
 }
 
+/**
+ * Looks up the current partner's own account id (the "STS-XX-2026-NNNNNN"
+ * reference), so their own portal layout can pull the same onboarding
+ * checklist admin sees via getPartnerAccount() below — session-scoped, RLS
+ * now grants the owner read access (see the
+ * partner_reads_own_account_onboarding migration), so this is a plain
+ * lookup, no service-role bypass.
+ */
+export async function getMyPartnerAccountId(type: PartnerAccountType, entityId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("partner_accounts")
+    .select("id")
+    .eq("type", type)
+    .eq("entity_id", entityId)
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
 export async function getPartnerAccount(accountId: string): Promise<PartnerAccountDetail | null> {
   const supabase = await createClient();
 

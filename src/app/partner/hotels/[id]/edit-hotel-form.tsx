@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -79,17 +80,28 @@ export function EditHotelForm({ hotel }: { hotel: Hotel }) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="status">Status</Label>
-          <Select name="status" defaultValue={hotel.status}>
-            <SelectTrigger id="status" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="pending_review">Pending review</SelectItem>
-              <SelectItem value="published">Published</SelectItem>
-              <SelectItem value="suspended">Suspended</SelectItem>
-            </SelectContent>
-          </Select>
+          {["draft", "pending_review"].includes(hotel.status) ? (
+            <Select name="status" defaultValue={hotel.status}>
+              <SelectTrigger id="status" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">Draft — keep working on it</SelectItem>
+                <SelectItem value="pending_review">Submit for review</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            // Published/suspended is admin-only from here on — a hidden
+            // valid value satisfies the schema and the server ignores it
+            // for a hotel already past the partner's hands.
+            <div className="flex h-9 items-center gap-2">
+              <Badge variant="secondary" className="capitalize">
+                {hotel.status.replace(/_/g, " ")}
+              </Badge>
+              <span className="text-xs text-muted-foreground">Set by STS</span>
+              <input type="hidden" name="status" value="draft" />
+            </div>
+          )}
         </div>
       </div>
 

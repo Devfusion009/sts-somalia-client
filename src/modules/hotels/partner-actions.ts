@@ -8,7 +8,13 @@ import { requireUser } from "@/lib/auth/session";
 import { getMyPartnerId } from "@/modules/hotels/partner-queries";
 import type { ActionState } from "@/lib/auth/actions";
 
-const LISTING_STATUSES = ["draft", "pending_review", "published", "suspended"] as const;
+// Partner-facing forms deliberately exclude 'published': a partner could
+// previously self-publish a hotel/room straight to live, bookable-by-real-
+// customers status with zero admin review — no KYC check, no listing
+// review, nothing. Only admin can publish (adminSetHotelStatus /
+// adminSetRoomStatus in modules/admin/actions.ts), matching the
+// venue_partner pattern this codebase already uses correctly.
+const PARTNER_LISTING_STATUSES = ["draft", "pending_review"] as const;
 
 function slugify(name: string) {
   const base = name
@@ -43,7 +49,7 @@ const hotelSchema = z.object({
   addressLine: z.string().optional(),
   city: z.string().min(1, "Enter a city."),
   countryCode: z.string().min(2, "Enter a country code.").max(2),
-  status: z.enum(LISTING_STATUSES),
+  status: z.enum(PARTNER_LISTING_STATUSES),
 });
 
 export async function createHotel(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -119,6 +125,14 @@ export async function updateHotel(_prevState: ActionState, formData: FormData): 
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
+
+  // A hotel admin already published/suspended is out of the partner's
+  // hands — only touch status while it's still draft/pending_review, same
+  // guard venue_partner already uses. Otherwise an edit-and-save on a live
+  // listing would silently knock it back to draft.
+  const { data: current } = await supabase.from("hotels").select("status").eq("id", hotelId).maybeSingle();
+  const statusUpdate = current && ["draft", "pending_review"].includes(current.status) ? { status: parsed.data.status } : {};
+
   const { error } = await supabase
     .from("hotels")
     .update({
@@ -128,7 +142,7 @@ export async function updateHotel(_prevState: ActionState, formData: FormData): 
       address_line: parsed.data.addressLine ?? null,
       city: parsed.data.city,
       country_code: parsed.data.countryCode.toUpperCase(),
-      status: parsed.data.status,
+      ...statusUpdate,
     })
     .eq("id", hotelId)
     .eq("partner_id", partnerId);
@@ -146,7 +160,7 @@ const roomSchema = z.object({
   bedType: z.string().optional(),
   basePrice: z.coerce.number().min(0),
   currency: z.string().min(3).max(3).default("USD"),
-  status: z.enum(LISTING_STATUSES),
+  status: z.enum(PARTNER_LISTING_STATUSES),
 });
 
 async function assertOwnsHotel(supabase: Awaited<ReturnType<typeof createClient>>, hotelId: string, partnerId: string) {
@@ -234,6 +248,10 @@ export async function updateRoom(_prevState: ActionState, formData: FormData): P
     return { error: "Hotel not found." };
   }
 
+  // Same admin-owns-published guard as updateHotel above.
+  const { data: current } = await supabase.from("hotel_rooms").select("status").eq("id", roomId).maybeSingle();
+  const statusUpdate = current && ["draft", "pending_review"].includes(current.status) ? { status: parsed.data.status } : {};
+
   const { error } = await supabase
     .from("hotel_rooms")
     .update({
@@ -243,7 +261,7 @@ export async function updateRoom(_prevState: ActionState, formData: FormData): P
       bed_type: parsed.data.bedType ?? null,
       base_price: parsed.data.basePrice,
       currency: parsed.data.currency.toUpperCase(),
-      status: parsed.data.status,
+      ...statusUpdate,
     })
     .eq("id", roomId)
     .eq("hotel_id", hotelId);
