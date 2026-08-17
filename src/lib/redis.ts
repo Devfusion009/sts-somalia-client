@@ -21,15 +21,22 @@ let client: Redis | undefined;
  * cachedRead() doesn't cover — e.g. falling back to a STALE value on a
  * failed refetch rather than treating "no fresh value" as "no value" (see
  * provider-runtime/hotelbeds.ts). Prefer cachedRead() unless you actually
- * need that.
+ * need that. Returns null when REDIS_URL isn't set (e.g. Vercel with no
+ * Redis provisioned) — callers must treat that the same as a failed op.
  */
-export function getRedisClient(): Redis {
+export function getRedisClient(): Redis | null {
   return getClient();
 }
 
-function getClient(): Redis {
+// The 127.0.0.1 default only makes sense for `npm run dev` / the Compose
+// network — on Vercel (or anywhere else without REDIS_URL set) that address
+// is meaningless, so skip creating a client entirely rather than attempting
+// and failing a real TCP connect on every cold start. cachedRead() already
+// treats "no client" as a cache miss, same as a failed op.
+function getClient(): Redis | null {
+  if (!process.env.REDIS_URL) return null;
   if (!client) {
-    client = new Redis(process.env.REDIS_URL ?? "redis://127.0.0.1:6379", {
+    client = new Redis(process.env.REDIS_URL, {
       // Fail fast per-command instead of queuing/retrying for a long time
       // while Redis is briefly unavailable (e.g. container still starting)
       // — cachedRead() below treats any failure as a cache miss regardless,
@@ -58,19 +65,25 @@ export async function cachedRead<T>(
   ttlSeconds: number,
   fetchFresh: () => Promise<T>
 ): Promise<T> {
-  try {
-    const hit = await getClient().get(key);
-    if (hit !== null) return JSON.parse(hit) as T;
-  } catch (err) {
-    console.error(`[redis] read failed for "${key}", falling back:`, (err as Error).message);
+  const redis = getClient();
+
+  if (redis) {
+    try {
+      const hit = await redis.get(key);
+      if (hit !== null) return JSON.parse(hit) as T;
+    } catch (err) {
+      console.error(`[redis] read failed for "${key}", falling back:`, (err as Error).message);
+    }
   }
 
   const value = await fetchFresh();
 
-  try {
-    await getClient().set(key, JSON.stringify(value), "EX", ttlSeconds);
-  } catch (err) {
-    console.error(`[redis] write failed for "${key}":`, (err as Error).message);
+  if (redis) {
+    try {
+      await redis.set(key, JSON.stringify(value), "EX", ttlSeconds);
+    } catch (err) {
+      console.error(`[redis] write failed for "${key}":`, (err as Error).message);
+    }
   }
 
   return value;

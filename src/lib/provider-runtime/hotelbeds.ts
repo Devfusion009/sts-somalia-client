@@ -40,8 +40,10 @@ function destinationCacheKey(countryCode: string): string {
 }
 
 async function readDestinationCache(countryCode: string): Promise<DestinationCacheEntry | null> {
+  const redis = getRedisClient();
+  if (!redis) return null;
   try {
-    const raw = await getRedisClient().get(destinationCacheKey(countryCode));
+    const raw = await redis.get(destinationCacheKey(countryCode));
     return raw ? (JSON.parse(raw) as DestinationCacheEntry) : null;
   } catch {
     return null;
@@ -49,8 +51,10 @@ async function readDestinationCache(countryCode: string): Promise<DestinationCac
 }
 
 async function writeDestinationCache(countryCode: string, entry: DestinationCacheEntry): Promise<void> {
+  const redis = getRedisClient();
+  if (!redis) return;
   try {
-    await getRedisClient().set(destinationCacheKey(countryCode), JSON.stringify(entry), "EX", REDIS_KEY_TTL_SECONDS);
+    await redis.set(destinationCacheKey(countryCode), JSON.stringify(entry), "EX", REDIS_KEY_TTL_SECONDS);
   } catch {
     // Best-effort — a write failure just means the next call refetches live.
   }
