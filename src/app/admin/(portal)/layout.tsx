@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requirePlatformAdmin } from "@/lib/auth/session";
+import { requireAdminPortalAccess } from "@/lib/auth/session";
 import { listVerifiedFactors } from "@/lib/auth/mfa";
 import { createClient } from "@/lib/supabase/server";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
@@ -96,7 +96,7 @@ export const metadata: Metadata = {
 const REQUIRE_ADMIN_MFA = false;
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const profile = await requirePlatformAdmin();
+  const profile = await requireAdminPortalAccess();
 
   // Mandatory TOTP enrollment for the admin console: an account can hold
   // is_platform_admin and still have zero verified factors (enrollment is

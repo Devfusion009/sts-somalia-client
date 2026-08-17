@@ -1,6 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
-import { rootOrigin } from "@/lib/subdomain";
+import { rootOrigin, portalLoginHref } from "@/lib/subdomain";
 import { createClient } from "@/lib/supabase/server";
 import { mfaChallengePending } from "@/lib/auth/mfa";
 import type { Database } from "@/lib/types/database.types";
@@ -80,5 +80,29 @@ export async function requirePlatformAdmin(): Promise<Profile> {
   if (!profile.is_platform_admin) {
     redirect(deniedDestination());
   }
+  return profile;
+}
+
+/**
+ * Same gate as requirePlatformAdmin(), but for the admin console's OWN
+ * layout specifically: an unauthenticated visitor is sent to the admin
+ * portal's dedicated sign-in (portalLoginHref("admin") — "/admin/login" in
+ * Phase 1/path-based mode, or the admin subdomain's "/login" once
+ * subdomains are configured) rather than the generic customer "/login".
+ *
+ * That distinction matters here specifically: the customer form actively
+ * REJECTS staff credentials (see signInAction) and points them at this same
+ * admin sign-in — so bouncing a signed-out admin to the customer form first
+ * is a dead end that reads as "the admin console is broken," not just a
+ * detour. Every other requirePlatformAdmin() call site is reached only from
+ * inside an already-authenticated admin session (a server action, an export
+ * route), where hitting this edge case at all means the session expired
+ * mid-request — a much rarer path where the generic redirect is fine.
+ */
+export async function requireAdminPortalAccess(): Promise<Profile> {
+  const profile = await getCurrentProfile();
+  if (!profile) redirect(portalLoginHref("admin"));
+  if (await mfaChallengePending()) redirect("/login/verify-2fa");
+  if (!profile.is_platform_admin) redirect(deniedDestination());
   return profile;
 }
