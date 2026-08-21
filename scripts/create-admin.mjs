@@ -36,7 +36,7 @@ function loadEnvFile(name) {
   );
 }
 
-const env = { ...loadEnvFile(".env.local"), ...process.env };
+const env = { ...loadEnvFile("apps/web/.env.local"), ...process.env };
 const url = env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL;
 const key = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
 

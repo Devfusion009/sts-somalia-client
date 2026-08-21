@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 // Dev-mode only (no effect on production builds — see allowedDevOrigins
@@ -28,20 +29,24 @@ const nextConfig: NextConfig = {
   // production has no such restriction (it's not a browser CORS thing).
   allowedDevOrigins: appHost ? [appHost, `*.${appHost}`] : undefined,
   turbopack: {
-    // Silences "Next.js inferred your workspace root..." (a stray lockfile
-    // one level up, at /home/subhadip-sasmal/package-lock.json, unrelated
-    // to this project, makes Turbopack guess wrong without this).
-    //
-    // MUST be the bare `__dirname` identifier, NOT `path.join(__dirname)` —
-    // they're the identical string at runtime, but path.join(__dirname)
-    // silently breaks proxy.ts entirely in this Next.js version (16.2.12):
-    // the build still reports "ƒ Proxy (Middleware)" and compiles it, but
-    // it never actually runs at request time — no rewrite, no block, no
-    // debug header, nothing, with zero error anywhere. Cost a long
-    // debugging session to isolate down to this one call vs. bare
-    // identifier difference. Re-test this (curl -I and look for a header
-    // your proxy sets) before ever changing this line again.
-    root: __dirname,
+    // Was the bare `__dirname` identifier pre-monorepo-split, when this
+    // file lived at the repo root — an earlier debugging session found
+    // that wrapping it (path.join(__dirname), even with zero effective
+    // path change) silently broke proxy.ts's execution in this Next.js
+    // version, so that comment insisted on the bare form. Now that this
+    // file lives at apps/web/next.config.ts, `__dirname` alone is the
+    // wrong value (it's apps/web, not the workspace root Turbopack needs
+    // to resolve the hoisted `next` package from — see the "couldn't find
+    // next/package.json" error this fixes) and auto-detection also picks
+    // the wrong lockfile (an unrelated one further up the home directory),
+    // so an explicit two-levels-up path is unavoidable here. This is
+    // Next's own documented pattern for exactly this monorepo layout (see
+    // node_modules/next/dist/docs/.../turbopack.md, "Root directory").
+    // VERIFIED after this change: proxy.ts's isolated-portal 404 still
+    // fires (curl -H "Host: stssomalia.test:3000" .../admin → plain-text
+    // 404, not the admin page) — re-run that check before trusting this
+    // line if it's ever touched again.
+    root: path.join(__dirname, "..", ".."),
   },
   experimental: {
     serverActions: {

@@ -1,0 +1,79 @@
+# syntax=docker/dockerfile:1
+#
+# Build context is the REPO ROOT (not apps/web) — npm workspaces needs the
+# root package.json + package-lock.json alongside every workspace member's
+# package.json to resolve dependencies correctly, including the in-repo
+# @sts/shared-types package apps/web imports. Same three-stage shape as the
+# pre-split Dockerfile (deps / dev / builder+runner) — see that file's
+# comments for the reasoning behind each stage; this only adds the
+# workspace-awareness the split now requires.
+
+FROM node:22-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY apps/web/package.json apps/web/package.json
+COPY packages/shared-types/package.json packages/shared-types/package.json
+RUN npm ci
+# npm workspaces hoists what it can to the root node_modules and leaves the
+# rest nested per-package — WHICH packages end up nested isn't something to
+# hardcode a guess about (verified locally: apps/web ended up with none,
+# apps/api kept one). Guarantee both COPY sources below always exist so the
+# later stages don't fail depending on npm's hoisting decision this week.
+RUN mkdir -p apps/web/node_modules
+
+FROM node:22-alpine AS dev
+WORKDIR /app
+ENV NODE_ENV=development
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY package.json package-lock.json ./
+COPY apps/web/package.json apps/web/package.json
+COPY packages/shared-types ./packages/shared-types
+EXPOSE 3000
+# -H 0.0.0.0 — see original Dockerfile's dev stage comment: without it,
+# `next dev` listens on the container's own loopback, unreachable through
+# the published port mapping.
+CMD ["npm", "run", "dev", "-w", "web", "--", "-H", "0.0.0.0", "-p", "3000"]
+
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY package.json package-lock.json ./
+COPY packages/shared-types ./packages/shared-types
+COPY apps/web ./apps/web
+
+# See the pre-split Dockerfile for why these are build ARGs, not runtime
+# env — NEXT_PUBLIC_* is inlined into the browser bundle during `next build`.
+ARG NEXT_PUBLIC_SUPABASE_URL=http://host.docker.internal:54321
+ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
+ARG NEXT_PUBLIC_SITE_URL=http://localhost:3000
+ARG NEXT_PUBLIC_APP_HOST=stssomalia.test:3000
+ARG NEXT_PUBLIC_API_URL=http://localhost:4000
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
+    NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL \
+    NEXT_PUBLIC_APP_HOST=$NEXT_PUBLIC_APP_HOST \
+    NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+RUN npm run build -w web
+
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+
+USER nextjs
+EXPOSE 3000
+ENV PORT=3000 \
+    HOSTNAME=0.0.0.0
+
+# next.config.ts's `output: standalone` traces into apps/web/.next/standalone
+# (mirroring the source path), so the entry point moves with it.
+CMD ["node", "apps/web/server.js"]

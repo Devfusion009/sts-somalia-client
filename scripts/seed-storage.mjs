@@ -41,7 +41,7 @@ function loadEnvFile(name) {
   );
 }
 
-const env = { ...loadEnvFile(".env.local"), ...process.env };
+const env = { ...loadEnvFile("apps/web/.env.local"), ...process.env };
 const url = env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL;
 // Service-role only: the buckets are admin-write, and this runs as a
 // maintenance task with no user session to borrow authority from.

@@ -23,10 +23,10 @@
 #   npm run docker:up
 #
 services:
-  app:
+  web:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: infra/docker/Dockerfile.web
       args:
         # host.docker.internal, not 127.0.0.1 — must resolve identically
         # for the browser (via the /etc/hosts line above) and for
@@ -41,6 +41,14 @@ services:
         # Portal" button) resolve to the right subdomain. See the comment
         # on this ARG in the Dockerfile for the actual bug this fixes.
         NEXT_PUBLIC_APP_HOST: stssomalia.test:3000
+        # Same host.docker.internal reasoning as NEXT_PUBLIC_SUPABASE_URL
+        # above, now applied to apps/api: the browser (external to Docker)
+        # and this container's own server-side fetches (the api-health
+        # page, and every real module that migrates after phase 0) both
+        # need this URL to resolve identically. api's container publishes
+        # 4000 to the host below, so host.docker.internal:4000 reaches it
+        # from both vantage points.
+        NEXT_PUBLIC_API_URL: http://host.docker.internal:4000
 
     # Standard bridge networking — Docker's default, portable across Linux/
     # Mac/Windows and the same model real orchestrators (Kubernetes, ECS)
@@ -95,7 +103,7 @@ services:
       # as designed, not a bug. Use admin.stssomalia.test:3000 (already
       # mapped in /etc/hosts) and agent.stssomalia.test:3000 to reach the
       # portals, not bare localhost:3000/admin or /agent.
-      - .env.local
+      - apps/web/.env.local
 
     environment:
       # REDIS_URL: read dynamically via process.env at request time (see
@@ -111,6 +119,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      api:
+        condition: service_started
 
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3000/api/health"]
@@ -118,6 +128,34 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+
+  api:
+    # Same context/build reasoning as web above — npm workspaces needs the
+    # root package.json + package-lock.json alongside apps/api's own
+    # package.json to resolve dependencies (including @sts/shared-types).
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    ports:
+      - "4000:4000"
+    env_file:
+      # Every business-data credential lives here now — SUPABASE_URL,
+      # SUPABASE_ANON_KEY, SUPABASE_SECRET_KEY. apps/web's env_file above
+      # no longer needs (and phase 1+ module migrations should stop
+      # reading) SUPABASE_SECRET_KEY once the module that used it moves.
+      - apps/api/.env.local
+    environment:
+      # Same host.docker.internal reasoning as web's NEXT_PUBLIC_SUPABASE_URL
+      # — Supabase itself isn't part of this Compose stack (see the top
+      # comment), it's the already-running local Supabase CLI stack.
+      SUPABASE_URL: http://host.docker.internal:54321
+      REDIS_URL: redis://redis:6379
+      WEB_ORIGIN: http://localhost:3000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
 
   redis:
     # A cache, not a database — no volume mounted below is deliberate.
