@@ -8,7 +8,15 @@ import type { Database } from "@/lib/types/database.types";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 
-const STATUSES: OrderStatus[] = ["pending_payment", "paid", "processing", "completed", "cancelled", "refunded"];
+const STATUSES: OrderStatus[] = [
+  "pending_payment",
+  "partially_paid",
+  "paid",
+  "processing",
+  "completed",
+  "cancelled",
+  "refunded",
+];
 
 export function OrderStatusSelect({ orderId, status }: { orderId: string; status: OrderStatus }) {
   const [state, formAction, isPending] = useActionState(updateOrderStatus, null);

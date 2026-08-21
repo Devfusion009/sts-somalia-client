@@ -22,7 +22,6 @@ export default async function AdminUmrahCatalogPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-semibold">Umrah Catalog</h1>
-          <p className="text-sm text-muted-foreground">Manage packages and their departures.</p>
         </div>
         <UmrahPackageForm />
       </div>

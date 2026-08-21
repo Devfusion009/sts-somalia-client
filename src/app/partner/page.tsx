@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ArrowRight, BedDouble, Building2, CalendarClock, Plus, Ticket, Wallet } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
-  getMyPartnerId,
+  getMyHotelScope,
   getMyPartner,
   getPartnerStats,
   getRecentPartnerBookings,
@@ -31,9 +31,9 @@ const BOOKING_BADGE: Record<string, string> = {
 
 export default async function PartnerDashboardPage() {
   const profile = await requireUser();
-  const partnerId = await getMyPartnerId(profile.id);
+  const scope = await getMyHotelScope(profile.id);
 
-  if (!partnerId) {
+  if (scope.hotelIds.length === 0) {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -44,9 +44,9 @@ export default async function PartnerDashboardPage() {
   }
 
   const [partner, stats, recent] = await Promise.all([
-    getMyPartner(partnerId),
-    getPartnerStats(partnerId),
-    getRecentPartnerBookings(partnerId),
+    scope.partnerId ? getMyPartner(scope.partnerId) : null,
+    getPartnerStats(scope.hotelIds),
+    getRecentPartnerBookings(scope.hotelIds),
   ]);
 
   return (
@@ -54,19 +54,25 @@ export default async function PartnerDashboardPage() {
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="font-heading text-2xl font-bold">{partner?.name ?? "Your account"}</h1>
-            <Badge variant="secondary" className="capitalize">
-              {partner?.status}
-            </Badge>
+            <h1 className="font-heading text-2xl font-bold">{partner?.name ?? "Your properties"}</h1>
+            {partner ? (
+              <Badge variant="secondary" className="capitalize">
+                {partner.status}
+              </Badge>
+            ) : (
+              <Badge variant="secondary">Manager</Badge>
+            )}
           </div>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Commission rate: {partner?.commission_rate}% · Here&apos;s how your properties are
-            performing.
+            {partner ? `Commission rate: ${partner.commission_rate}% · ` : ""}Here&apos;s how your
+            properties are performing.
           </p>
         </div>
-        <Button render={<Link href="/partner/hotels/new" />} className="gap-1.5">
-          <Plus className="size-4" /> Add hotel
-        </Button>
+        {scope.partnerId ? (
+          <Button render={<Link href="/partner/hotels/new" />} className="gap-1.5">
+            <Plus className="size-4" /> Add hotel
+          </Button>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">

@@ -20,7 +20,7 @@ export async function getAgencyOrders(agencyId: string) {
          hotel_booking:hotel_booking_id (id, status, check_in, check_out, num_rooms, guest_details, hotel:hotel_id (name)),
          flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at),
          visa_application:visa_application_id (id, application_ref, applicant_type, visa_type:visa_type_id (name, destination_country_code)),
-         umrah_booking:umrah_booking_id (id, num_pilgrims, package:package_id (name)),
+         umrah_booking:umrah_booking_id (id, num_pilgrims, booking_kind, status, package:package_id (name), custom_request:custom_request_id (reference, departure_date)),
          hall_booking:hall_booking_id (id, status, start_date, end_date, event_type, venue:venue_id (name))
        ),
        payments (*)`

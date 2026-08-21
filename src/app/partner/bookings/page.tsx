@@ -1,6 +1,8 @@
 import { requireUser } from "@/lib/auth/session";
-import { getMyPartnerId, getPartnerBookings } from "@/modules/hotels/partner-queries";
+import { getMyHotelScope, getPartnerBookings, getMyBookingManageableHotelIds } from "@/modules/hotels/partner-queries";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -11,11 +13,19 @@ import {
 } from "@/components/ui/table";
 import { BookingStatusControl } from "./booking-status-control";
 
+const STATUS_BADGE: Record<string, string> = {
+  pending: "bg-brand-gold/15 text-brand-gold",
+  confirmed: "bg-primary/10 text-primary",
+  completed: "bg-primary/10 text-primary",
+  cancelled: "bg-destructive/10 text-destructive",
+  refunded: "bg-destructive/10 text-destructive",
+};
+
 export default async function PartnerBookingsPage() {
   const profile = await requireUser();
-  const partnerId = await getMyPartnerId(profile.id);
+  const scope = await getMyHotelScope(profile.id);
 
-  if (!partnerId) {
+  if (scope.hotelIds.length === 0) {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -25,15 +35,15 @@ export default async function PartnerBookingsPage() {
     );
   }
 
-  const bookings = await getPartnerBookings(partnerId);
+  const [bookings, manageableHotelIds] = await Promise.all([
+    getPartnerBookings(scope.hotelIds),
+    getMyBookingManageableHotelIds(profile.id, scope),
+  ]);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Bookings</h1>
-        <p className="text-sm text-muted-foreground">
-          Bookings across all of your hotels — confirm or update their status as they come in.
-        </p>
       </div>
 
       {bookings.length === 0 ? (
@@ -71,7 +81,13 @@ export default async function PartnerBookingsPage() {
                     {b.currency} {b.total_price.toFixed(0)}
                   </TableCell>
                   <TableCell>
-                    <BookingStatusControl bookingId={b.id} status={b.status} />
+                    {manageableHotelIds.has(b.hotel_id) ? (
+                      <BookingStatusControl bookingId={b.id} status={b.status} />
+                    ) : (
+                      <Badge className={cn("border-transparent capitalize", STATUS_BADGE[b.status] ?? "bg-muted text-muted-foreground")}>
+                        {b.status.replace(/_/g, " ")}
+                      </Badge>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

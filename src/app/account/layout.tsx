@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth/session";
 import { roleLabel } from "@/lib/auth/roles";
+import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { CustomerNotificationBell } from "@/components/portal/customer-notification-bell";
 import { getUnreadNotifications } from "@/modules/notifications/queries";
@@ -43,7 +44,10 @@ const NAV_GROUPS: PortalNavGroup[] = [
 
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireUser();
-  const notifications = await getUnreadNotifications(profile.id, { limit: 10 });
+  const [notifications, contexts] = await Promise.all([
+    getUnreadNotifications(profile.id, { limit: 10 }),
+    getMyPartnerContexts(profile.id, profile.full_name),
+  ]);
 
   return (
     <PortalShell
@@ -52,6 +56,8 @@ export default async function AccountLayout({ children }: { children: React.Reac
       navGroups={NAV_GROUPS}
       profileName={profile.full_name}
       profileEmail={profile.email}
+      contexts={contexts}
+      isPlatformAdmin={profile.is_platform_admin}
       headerExtra={<CustomerNotificationBell notifications={notifications} />}
     >
       {children}

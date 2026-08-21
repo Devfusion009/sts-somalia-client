@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { ChevronRight, Home, ArrowLeft, CheckCircle2, XCircle, FileCheck2, ExternalLink } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, FileCheck2, ExternalLink } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { APP_CONFIG, docSlotsFor, type ApplicationKind } from "@/modules/partner-applications/config";
 import { getOwnedApplication, type DocumentRef } from "@/modules/partner-applications/queries";
-import { detailRows } from "@/lib/format-detail";
+import { BusinessDetailsCard, AffiliateDetailCards, type Details } from "@/modules/partner-applications/components/detail-cards";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,20 +25,6 @@ const STATUS_META: Record<string, { label: string; className: string; icon: type
   approved: { label: "Approved", className: "bg-primary/10 text-primary", icon: CheckCircle2 },
   rejected: { label: "Not approved", className: "bg-destructive/10 text-destructive", icon: XCircle },
 };
-
-function DetailGrid({ rows }: { rows: Array<[string, string]> }) {
-  if (rows.length === 0) return <p className="text-sm text-muted-foreground">No details submitted.</p>;
-  return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-      {rows.map(([label, value]) => (
-        <div key={label}>
-          <dt className="text-xs text-muted-foreground">{label}</dt>
-          <dd className="text-sm font-medium break-words">{value || "—"}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
 
 export default async function ApplicationViewPage({ params }: { params: Promise<{ type: string; id: string }> }) {
   const { type, id } = await params;
@@ -64,20 +50,11 @@ export default async function ApplicationViewPage({ params }: { params: Promise<
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-      <nav className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Link href="/" className="flex items-center gap-1 hover:text-foreground">
-          <Home className="size-3.5" /> Home
-        </Link>
-        <ChevronRight className="size-3" />
-        <Link href="/account/become" className="hover:text-foreground">
-          Become a Partner
-        </Link>
-        <ChevronRight className="size-3" />
-        <span className="font-medium text-foreground">{cfg.label} Application</span>
-      </nav>
-
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
+          <Link href="/account/become" className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="size-3.5" /> Become a Partner
+          </Link>
           <h1 className="font-heading text-2xl font-semibold">{cfg.label} Application</h1>
           <p className="text-sm text-muted-foreground">
             {application.reference_number ? <span className="font-mono">{application.reference_number}</span> : null}
@@ -98,14 +75,11 @@ export default async function ApplicationViewPage({ params }: { params: Promise<
       ) : null}
 
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Business Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DetailGrid rows={detailRows(d)} />
-          </CardContent>
-        </Card>
+        {type === "affiliate" ? (
+          <AffiliateDetailCards details={(d ?? {}) as Details} />
+        ) : (
+          <BusinessDetailsCard kind={type} details={(d ?? {}) as Details} />
+        )}
 
         <Card>
           <CardHeader>
@@ -134,10 +108,6 @@ export default async function ApplicationViewPage({ params }: { params: Promise<
           </CardContent>
         </Card>
       </div>
-
-      <Button variant="outline" className="mt-6 gap-1.5" render={<Link href="/account/become" />}>
-        <ArrowLeft className="size-3.5" /> Back to Become a Partner
-      </Button>
     </div>
   );
 }

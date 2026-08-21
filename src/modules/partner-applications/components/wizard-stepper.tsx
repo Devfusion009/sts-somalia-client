@@ -33,8 +33,13 @@ export function WizardStepper({
               >
                 {isDone ? <Check className="size-3.5" /> : step}
               </span>
-              <span className={cn("text-sm font-medium", isCurrent ? "text-primary" : isLocked ? "text-muted-foreground" : "")}>
-                {stepLabel(kind, step)}
+              <span className="flex flex-col">
+                <span className={cn("text-sm font-medium", isCurrent ? "text-primary" : isLocked ? "text-muted-foreground" : "")}>
+                  {stepLabel(kind, step)}
+                </span>
+                <span className={cn("text-xs", isCurrent ? "text-primary/70" : "text-muted-foreground")}>
+                  {isDone ? "Completed" : isCurrent ? "In Progress" : "Upcoming"}
+                </span>
               </span>
             </span>
           );

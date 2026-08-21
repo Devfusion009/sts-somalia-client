@@ -23,6 +23,7 @@ import { getAllOrders } from "@/modules/admin/queries";
 import { describeOrderItem, travelWindow, travelLength, orderTravelStart } from "@/modules/admin/order-items";
 import { adminConfirmPayment } from "@/modules/payments/actions";
 import { OrderStatusSelect } from "./order-status-select";
+import { RecordPaymentDialog } from "./record-payment-dialog";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Orders & Payments" };
@@ -49,6 +50,7 @@ const ORDER_STATUS_STYLES: Record<string, string> = {
   completed: "bg-primary/10 text-primary",
   processing: "bg-chart-3/10 text-chart-3",
   pending_payment: "bg-brand-gold/15 text-brand-gold",
+  partially_paid: "bg-brand-gold/15 text-brand-gold",
   held: "bg-brand-gold/15 text-brand-gold",
   cancelled: "bg-destructive/10 text-destructive",
   refunded: "bg-muted text-muted-foreground",
@@ -59,6 +61,7 @@ const FILTERS = [
   { key: "action", label: "Needs action" },
   { key: "upcoming", label: "Travelling soon" },
   { key: "pending_payment", label: "Unpaid" },
+  { key: "partially_paid", label: "Partially paid" },
   { key: "paid", label: "Paid" },
   { key: "cancelled", label: "Cancelled" },
 ] as const;
@@ -102,9 +105,6 @@ export default async function AdminOrdersPage({
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-semibold">Orders &amp; Payments</h1>
-        <p className="text-sm text-muted-foreground">
-          Every order across the platform, what was booked, and when the customer travels.
-        </p>
       </div>
 
       {/* The three numbers an operator opens this page to check. */}
@@ -189,6 +189,10 @@ export default async function AdminOrdersPage({
                 ? Math.round((new Date(start).setHours(0, 0, 0, 0) - today) / 86_400_000)
                 : null;
             const awaiting = order.payments.filter((p) => p.status === "requires_action");
+            const paidTotal = order.payments
+              .filter((p) => p.status === "succeeded")
+              .reduce((sum, p) => sum + Number(p.amount), 0);
+            const balanceDue = Number(order.total) - paidTotal;
 
             return (
               <Card
@@ -250,6 +254,16 @@ export default async function AdminOrdersPage({
                       <p className="font-heading text-xl font-bold">
                         {money(order.total, order.currency)}
                       </p>
+                      {order.status === "partially_paid" ? (
+                        <p className="text-xs">
+                          <span className="text-muted-foreground">
+                            {money(paidTotal, order.currency)} paid ·{" "}
+                          </span>
+                          <span className="font-semibold text-brand-gold">
+                            {money(balanceDue, order.currency)} due
+                          </span>
+                        </p>
+                      ) : null}
                       <p className="text-xs text-muted-foreground">
                         Placed {format(new Date(order.created_at), "d MMM yyyy")}
                         {order.paid_at
@@ -363,6 +377,9 @@ export default async function AdminOrdersPage({
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {balanceDue > 0.01 && !["cancelled", "refunded"].includes(order.status) ? (
+                        <RecordPaymentDialog orderId={order.id} remaining={balanceDue} currency={order.currency} />
+                      ) : null}
                       {daysToTravel !== null && daysToTravel >= 0 && daysToTravel <= 30 ? (
                         <Badge className="border-transparent bg-brand-accent text-brand-accent-foreground">
                           {daysToTravel === 0 ? "Departs today" : `Departs in ${daysToTravel}d`}

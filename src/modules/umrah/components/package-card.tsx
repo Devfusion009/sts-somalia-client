@@ -39,6 +39,10 @@ const TIER_STYLES: Record<string, string> = {
   vip: "bg-brand-gold/15 text-brand-gold",
   premium: "bg-chart-4/10 text-chart-4",
   standard: "bg-chart-2/10 text-chart-2",
+  // 'basic' is the entry rung of the Basic/Standard/Premium ladder the group
+  // product is sold on; 'economy' is the same rung under its older name and
+  // is kept so packages created before the rename still render a styled badge.
+  basic: "bg-chart-3/10 text-chart-3",
   economy: "bg-chart-3/10 text-chart-3",
 };
 
@@ -60,6 +64,7 @@ const TIER_LABELS: Record<string, string> = {
   vip: "VIP",
   premium: "Premium",
   standard: "Standard",
+  basic: "Basic",
   economy: "Economy",
 };
 

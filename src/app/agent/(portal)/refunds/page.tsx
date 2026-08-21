@@ -34,7 +34,6 @@ export default async function AgentRefundsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold">Refunds</h1>
-          <p className="text-sm text-muted-foreground">Refund requests for {membership.agency.name}, and their review status.</p>
         </div>
         {canRequest ? <RequestRefundForm orders={refundableOrders} /> : null}
       </div>

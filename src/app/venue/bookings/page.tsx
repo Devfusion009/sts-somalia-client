@@ -65,9 +65,6 @@ export default async function VenueBookingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-semibold">Booking Requests</h1>
-        <p className="text-sm text-muted-foreground">
-          Requests for your venues, oldest first — confirm or decline each one.
-        </p>
       </div>
 
       {bookings.length === 0 ? (

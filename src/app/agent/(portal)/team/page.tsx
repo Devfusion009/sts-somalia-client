@@ -49,9 +49,6 @@ export default async function AgentTeamPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold">Team</h1>
-          <p className="text-sm text-muted-foreground">
-            Everyone with access to {membership.agency.name}.
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <Badge className="gap-1.5 border-transparent bg-secondary text-secondary-foreground">

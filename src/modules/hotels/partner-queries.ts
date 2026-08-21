@@ -20,40 +20,62 @@ export async function getMyPartner(partnerId: string) {
   return data;
 }
 
-export async function getMyHotels(partnerId: string) {
+/**
+ * Every hotel the current user can operationally act on: every property
+ * their hotel_partner business owns, PLUS any single hotel admin assigned
+ * them to manage directly (hotel_managers — see 20260820000003). Backed by
+ * the my_operable_hotel_ids() SQL function so the two sources are unioned in
+ * one round trip; RLS (is_hotel_partner_member / is_hotel_manager) is the
+ * real authority, this is what the app layer filters queries by so a
+ * manager's dashboard/list views don't rely on trial-and-error against RLS.
+ *
+ * partnerId stays separate (not folded into hotelIds) because it also gates
+ * capabilities hotelIds alone can't express: creating a brand-new hotel, and
+ * editing an existing one's own core listing fields (name, address, star
+ * rating) — both business-owner-only, never a single-hotel manager's.
+ */
+export type HotelScope = { partnerId: string | null; hotelIds: string[] };
+
+export async function getMyHotelScope(profileId: string): Promise<HotelScope> {
+  const supabase = await createClient();
+  const [partnerId, { data: ids }] = await Promise.all([
+    getMyPartnerId(profileId),
+    supabase.rpc("my_operable_hotel_ids"),
+  ]);
+  return { partnerId, hotelIds: ids ?? [] };
+}
+
+export async function getMyHotels(hotelIds: string[]) {
+  if (hotelIds.length === 0) return [];
   const supabase = await createClient();
   const { data } = await supabase
     .from("hotels")
-    .select("id, name, slug, city, country_code, star_rating, images, status, hotel_rooms(id)")
-    .eq("partner_id", partnerId)
+    .select("id, name, slug, city, country_code, star_rating, images, status, partner_id, hotel_rooms(id)")
+    .in("id", hotelIds)
     .order("created_at", { ascending: false });
 
   return (data ?? []).map((h) => ({ ...h, roomCount: h.hotel_rooms.length }));
 }
 
-/** Scoped by partner_id in the query itself (not just relying on RLS) so a
- * partner can never fetch another partner's hotel by guessing an id. */
-export async function getHotelForEdit(hotelId: string, partnerId: string) {
+/** Scoped by hotelIds in the query itself (not just relying on RLS) so a
+ * user can never fetch a hotel outside their scope by guessing an id. */
+export async function getHotelForEdit(hotelId: string, hotelIds: string[]) {
+  if (!hotelIds.includes(hotelId)) return null;
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("hotels")
-    .select("*, hotel_rooms(*)")
-    .eq("id", hotelId)
-    .eq("partner_id", partnerId)
-    .maybeSingle();
+  const { data } = await supabase.from("hotels").select("*, hotel_rooms(*)").eq("id", hotelId).maybeSingle();
 
   return data;
 }
 
-/** Room + parent hotel, scoped by partner_id like getHotelForEdit. */
-export async function getRoomForInventory(roomId: string, hotelId: string, partnerId: string) {
+/** Room + parent hotel, scoped by hotelIds like getHotelForEdit. */
+export async function getRoomForInventory(roomId: string, hotelId: string, hotelIds: string[]) {
+  if (!hotelIds.includes(hotelId)) return null;
   const supabase = await createClient();
   const { data } = await supabase
     .from("hotel_rooms")
     .select("*, hotels!inner(id, name, partner_id)")
     .eq("id", roomId)
     .eq("hotel_id", hotelId)
-    .eq("hotels.partner_id", partnerId)
     .maybeSingle();
   return data;
 }
@@ -73,16 +95,44 @@ export async function getRoomInventory(roomId: string, days = 60) {
   return data ?? [];
 }
 
-export async function getPartnerBookings(partnerId: string) {
+/**
+ * The front-desk snapshot for one hotel: who's actually staying right now,
+ * arriving today, and leaving today — read straight off hotel_bookings
+ * (check_in/check_out + guest_details), not hotel_room_inventory (that
+ * table is caps/pricing per date, not an occupant list, and often has no
+ * row at all for a given night when no cap was ever set). 'confirmed' is
+ * the only status that means an actual stay — pending isn't guaranteed yet,
+ * cancelled/completed/refunded aren't current.
+ */
+export async function getHotelFrontDesk(hotelId: string, hotelIds: string[]) {
+  if (!hotelIds.includes(hotelId)) return { inHouse: [], arrivingToday: [], departingToday: [] };
   const supabase = await createClient();
-  const { data: hotels } = await supabase.from("hotels").select("id").eq("partner_id", partnerId);
-  const hotelIds = (hotels ?? []).map((h) => h.id);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data } = await supabase
+    .from("hotel_bookings")
+    .select("id, check_in, check_out, num_rooms, guest_details, hotel_rooms(name)")
+    .eq("hotel_id", hotelId)
+    .eq("status", "confirmed")
+    .gte("check_out", today)
+    .order("check_in");
+
+  const bookings = data ?? [];
+  return {
+    inHouse: bookings.filter((b) => b.check_in <= today && b.check_out > today),
+    arrivingToday: bookings.filter((b) => b.check_in === today),
+    departingToday: bookings.filter((b) => b.check_out === today),
+  };
+}
+
+export async function getPartnerBookings(hotelIds: string[]) {
   if (hotelIds.length === 0) return [];
+  const supabase = await createClient();
 
   const { data } = await supabase
     .from("hotel_bookings")
     .select(
-      "id, check_in, check_out, num_rooms, num_adults, num_children, status, total_price, currency, created_at, hotels(name), hotel_rooms(name)"
+      "id, hotel_id, check_in, check_out, num_rooms, num_adults, num_children, status, total_price, currency, created_at, hotels(name), hotel_rooms(name)"
     )
     .in("hotel_id", hotelIds)
     .order("created_at", { ascending: false });
@@ -90,15 +140,37 @@ export async function getPartnerBookings(partnerId: string) {
   return data ?? [];
 }
 
-export async function getPartnerStats(partnerId: string) {
+/**
+ * Every hotel_id in scope where the current user can change booking status —
+ * always every owned hotel, and only those managed hotels admin granted
+ * can_manage_bookings on (20260821000002). Drives which rows on the
+ * bookings list get the editable status control vs. a read-only badge.
+ */
+export async function getMyBookingManageableHotelIds(profileId: string, scope: HotelScope): Promise<Set<string>> {
+  if (scope.partnerId !== null) return new Set(scope.hotelIds);
+  if (scope.hotelIds.length === 0) return new Set();
+
   const supabase = await createClient();
-  const [{ count: hotelCount }, hotels] = await Promise.all([
-    supabase.from("hotels").select("*", { count: "exact", head: true }).eq("partner_id", partnerId),
-    supabase.from("hotels").select("id, hotel_rooms(id)").eq("partner_id", partnerId),
-  ]);
+  const { data } = await supabase
+    .from("hotel_managers")
+    .select("hotel_id")
+    .eq("profile_id", profileId)
+    .eq("status", "active")
+    .eq("can_manage_bookings", true)
+    .in("hotel_id", scope.hotelIds);
+
+  return new Set((data ?? []).map((row) => row.hotel_id));
+}
+
+export async function getPartnerStats(hotelIds: string[]) {
+  const supabase = await createClient();
+  const hotelCount = hotelIds.length;
+  const hotels =
+    hotelIds.length > 0
+      ? await supabase.from("hotels").select("id, hotel_rooms(id)").in("id", hotelIds)
+      : { data: [] };
 
   const roomCount = (hotels.data ?? []).reduce((sum, h) => sum + h.hotel_rooms.length, 0);
-  const hotelIds = (hotels.data ?? []).map((h) => h.id);
 
   let bookingCount = 0;
   let pendingCount = 0;
@@ -124,15 +196,13 @@ export async function getPartnerStats(partnerId: string) {
     revenueCurrency = settled.data?.[0]?.currency ?? "USD";
   }
 
-  return { hotelCount: hotelCount ?? 0, roomCount, bookingCount, pendingCount, revenue, revenueCurrency };
+  return { hotelCount, roomCount, bookingCount, pendingCount, revenue, revenueCurrency };
 }
 
-/** Latest bookings across the partner's hotels, for the dashboard. */
-export async function getRecentPartnerBookings(partnerId: string, limit = 5) {
-  const supabase = await createClient();
-  const { data: hotels } = await supabase.from("hotels").select("id").eq("partner_id", partnerId);
-  const hotelIds = (hotels ?? []).map((h) => h.id);
+/** Latest bookings across the user's operable hotels, for the dashboard. */
+export async function getRecentPartnerBookings(hotelIds: string[], limit = 5) {
   if (hotelIds.length === 0) return [];
+  const supabase = await createClient();
 
   const { data } = await supabase
     .from("hotel_bookings")

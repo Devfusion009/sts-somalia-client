@@ -57,9 +57,6 @@ export function CommissionRateForm({
           defaultValue={currentRate}
           required
         />
-        <p className="text-xs text-muted-foreground">
-          Share of the net price credited to this agency on every paid booking.
-        </p>
       </div>
       <FormStatus state={state} />
       <SubmitButton size="sm" pendingText="Saving…">
@@ -91,9 +88,6 @@ export function CreditLimitForm({
           defaultValue={currentLimit}
           required
         />
-        <p className="text-xs text-muted-foreground">
-          How far below zero the wallet may go — &ldquo;book now, settle later&rdquo; headroom.
-        </p>
       </div>
       <FormStatus state={state} />
       <SubmitButton size="sm" pendingText="Saving…">
@@ -110,10 +104,7 @@ export function WalletTransactionForm({ agencyId }: { agencyId: string }) {
       <input type="hidden" name="agencyId" value={agencyId} />
       <div className="space-y-1.5">
         <Label htmlFor="amount">Amount (USD)</Label>
-        <Input id="amount" name="amount" type="number" step="0.01" placeholder="500" required />
-        <p className="text-xs text-muted-foreground">
-          Positive credits the wallet (deposit received); negative corrects it (adjustment).
-        </p>
+        <Input id="amount" name="amount" type="number" step="0.01" placeholder="500 (negative to correct)" required />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="note">Note</Label>
@@ -150,7 +141,6 @@ export function IssueNoteForm({ agencyId }: { agencyId: string }) {
       <div className="space-y-1.5">
         <Label htmlFor="noteAmount">Amount (USD)</Label>
         <Input id="noteAmount" name="amount" type="number" step="0.01" min="0.01" placeholder="25.00" required />
-        <p className="text-xs text-muted-foreground">Enter a plain positive amount — the sign is applied automatically.</p>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="noteReason">Reason</Label>

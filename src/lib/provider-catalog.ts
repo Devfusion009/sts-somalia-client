@@ -1,4 +1,4 @@
-export type ProviderCategory = "flights" | "hotels" | "visa";
+export type ProviderCategory = "flights" | "hotels" | "visa" | "visa_processing";
 
 export type ProviderCredentialField = {
   key: string;

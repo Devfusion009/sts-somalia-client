@@ -35,9 +35,6 @@ export default async function AgentStatementPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold">Account Statement</h1>
-          <p className="text-sm text-muted-foreground">
-            Every deposit, payment, refund, and note against {membership.agency.name}&apos;s wallet, with a running balance.
-          </p>
         </div>
         <Button variant="outline" className="gap-1.5" render={<a href="/agent/statement/export" />}>
           <Download className="size-4" /> Export CSV

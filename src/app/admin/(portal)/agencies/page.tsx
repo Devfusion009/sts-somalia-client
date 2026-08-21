@@ -27,12 +27,9 @@ export default async function AdminAgenciesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex items-center gap-2">
         <h1 className="font-heading text-2xl font-semibold">Agencies</h1>
-        <p className="text-sm text-muted-foreground">
-          {agencies.length} B2B partner {agencies.length === 1 ? "agency" : "agencies"} — wallets,
-          credit limits, and commission rates are managed per agency.
-        </p>
+        <Badge variant="secondary">{agencies.length}</Badge>
       </div>
 
       <Card className="overflow-hidden py-0">

@@ -35,12 +35,9 @@ export default async function AuditLogPage({
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex items-center gap-2">
         <h1 className="font-heading text-2xl font-semibold">Audit Log</h1>
-        <p className="text-sm text-muted-foreground">
-          Every recorded change to bookings, orders, and payments — most recent {entries.length}{" "}
-          shown.
-        </p>
+        <Badge variant="secondary">{entries.length} shown</Badge>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

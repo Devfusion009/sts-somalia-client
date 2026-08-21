@@ -38,7 +38,7 @@ function Heading() {
       lead="Flights, hotels, visa and guidance — one price, one group, zero guesswork."
       action={
         <Link
-          href="/umrah"
+          href="/umrah/group"
           className="flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
         >
           View all packages <ArrowRight className="size-4" aria-hidden />
@@ -67,7 +67,7 @@ export async function FeaturedPackages() {
             : FALLBACK_TEASERS.map((teaser) => (
                 <Link
                   key={teaser.name}
-                  href="/umrah"
+                  href="/umrah/group"
                   className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
                 >
                   <div className="relative h-40 w-full overflow-hidden">

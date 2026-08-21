@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUserForPortal } from "@/lib/auth/session";
+import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { agencyLogoUrl } from "@/modules/agencies/logo";
 import { getMyPartnerAccountId, getPartnerAccount } from "@/modules/admin/partner-accounts";
@@ -89,7 +90,10 @@ export default async function AgentLayout({ children }: { children: React.ReactN
     return <PortalSuspendedNotice portalLabel="Agent Portal" />;
   }
 
-  const accountId = await getMyPartnerAccountId("agency", membership.agency.id);
+  const [accountId, contexts] = await Promise.all([
+    getMyPartnerAccountId("agency", membership.agency.id),
+    getMyPartnerContexts(profile.id, profile.full_name),
+  ]);
   const account = accountId ? await getPartnerAccount(accountId) : null;
 
   return (
@@ -107,6 +111,8 @@ export default async function AgentLayout({ children }: { children: React.ReactN
       navGroups={NAV_GROUPS}
       profileName={profile.full_name}
       profileEmail={profile.email}
+      contexts={contexts}
+      isPlatformAdmin={profile.is_platform_admin}
       accent="agent"
       brandLogoUrl={agencyLogoUrl(membership.agency.logo_path)}
     >

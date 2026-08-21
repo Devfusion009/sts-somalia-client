@@ -39,10 +39,6 @@ export default async function AgentWalletPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Agency Wallet</h1>
-        <p className="text-sm text-muted-foreground">
-          Pay for bookings instantly from your balance — book now, settle with STS on your own
-          schedule up to your credit limit.
-        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

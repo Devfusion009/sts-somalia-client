@@ -30,9 +30,6 @@ export default async function AdminRefundsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Refund Requests</h1>
-        <p className="text-sm text-muted-foreground">
-          Approving credits the agency wallet directly — no separate wallet-adjustment step needed.
-        </p>
       </div>
 
       <Card className="overflow-hidden py-0">

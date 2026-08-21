@@ -33,7 +33,6 @@ export default async function AffiliateLinksPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-semibold">My Links</h1>
-          <p className="text-sm text-muted-foreground">Create and share tracked links to earn commission.</p>
         </div>
         <NewLinkForm />
       </div>

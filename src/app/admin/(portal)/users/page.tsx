@@ -26,9 +26,9 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex items-center gap-2">
         <h1 className="font-heading text-2xl font-semibold">Users</h1>
-        <p className="text-sm text-muted-foreground">{users.length} registered users.</p>
+        <Badge variant="secondary">{users.length}</Badge>
       </div>
 
       <Card className="overflow-hidden py-0">

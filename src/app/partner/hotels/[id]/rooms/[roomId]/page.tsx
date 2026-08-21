@@ -3,14 +3,13 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarDays } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
-  getMyPartnerId,
+  getMyHotelScope,
   getRoomForInventory,
   getRoomInventory,
 } from "@/modules/hotels/partner-queries";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -32,8 +31,8 @@ export default async function RoomInventoryPage({
 }) {
   const { id, roomId } = await params;
   const profile = await requireUser();
-  const partnerId = await getMyPartnerId(profile.id);
-  if (!partnerId) {
+  const scope = await getMyHotelScope(profile.id);
+  if (scope.hotelIds.length === 0) {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -43,7 +42,7 @@ export default async function RoomInventoryPage({
     );
   }
 
-  const room = await getRoomForInventory(roomId, id, partnerId);
+  const room = await getRoomForInventory(roomId, id, scope.hotelIds);
   if (!room) notFound();
 
   const inventory = await getRoomInventory(room.id);
@@ -58,19 +57,11 @@ export default async function RoomInventoryPage({
           <ArrowLeft className="size-3.5" /> {room.hotels.name}
         </Link>
         <h1 className="font-heading text-2xl font-semibold">{room.name} — availability</h1>
-        <p className="text-sm text-muted-foreground">
-          Nights without a cap are open-ended: bookings are accepted without limit. Set a cap to
-          control how many rooms can be sold per night (and optionally a seasonal price).
-        </p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Set availability</CardTitle>
-          <CardDescription>
-            Applies one cap to every night in the range. Re-run with new values to adjust —
-            existing bookings are never lost.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <InventoryRangeForm hotelId={id} roomId={room.id} currency={room.currency} />
@@ -79,16 +70,10 @@ export default async function RoomInventoryPage({
 
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="size-4 text-primary" /> Next 60 days
-            </CardTitle>
-            <CardDescription>
-              {inventory.length === 0
-                ? "No caps set — every night is currently unrestricted."
-                : `${inventory.length} capped night(s) in the next 60 days.`}
-            </CardDescription>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="size-4 text-primary" /> Next 60 days
+          </CardTitle>
+          <Badge variant="secondary">{inventory.length} capped</Badge>
         </CardHeader>
         {inventory.length > 0 ? (
           <CardContent>

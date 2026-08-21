@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
+import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getMyAffiliate } from "@/modules/affiliates/queries";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
@@ -58,6 +59,8 @@ export default async function AffiliateLayout({ children }: { children: React.Re
     return <PortalSuspendedNotice portalLabel="Affiliate Dashboard" />;
   }
 
+  const contexts = await getMyPartnerContexts(profile.id, profile.full_name);
+
   return (
     <PortalShell
       portalName="Affiliate Dashboard"
@@ -65,6 +68,8 @@ export default async function AffiliateLayout({ children }: { children: React.Re
       navGroups={NAV_GROUPS}
       profileName={profile.full_name}
       profileEmail={profile.email}
+      contexts={contexts}
+      isPlatformAdmin={profile.is_platform_admin}
     >
       {children}
     </PortalShell>

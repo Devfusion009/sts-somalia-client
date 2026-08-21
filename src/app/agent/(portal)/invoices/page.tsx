@@ -29,7 +29,6 @@ export default async function AgentInvoicesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">My Invoices</h1>
-        <p className="text-sm text-muted-foreground">Every invoice issued against {membership.agency.name}&apos;s orders.</p>
       </div>
 
       <Card className="overflow-hidden py-0">

@@ -10,6 +10,7 @@ import {
   APPLICANT_TYPES,
   memberSchema,
   parseDocumentSlots,
+  parseApplicationQuestions,
   personalInfoSchema,
   travelInfoSchema,
 } from "./schemas";
@@ -328,6 +329,20 @@ export async function saveTravelInfo(
   const { supabase, application } = await getEditableApplication(applicationId.data, user.id);
   if (!application) return { error: "This application can no longer be edited." };
 
+  // Country-specific extra questions (visa_types.application_questions) are
+  // rendered at the end of this same step — answered here, not a separate
+  // wizard step, so they save in the same request as everything else above.
+  const questions = parseApplicationQuestions(application.visa_type?.application_questions);
+  const customAnswers: Record<string, string> = {};
+  for (const q of questions) {
+    const answer = formData.get(`answer_${q.key}`);
+    const value = typeof answer === "string" ? answer.trim() : "";
+    if (q.required && q.type !== "yesno" && !value) {
+      return { error: `Please answer: ${q.label}`, values: formValues(formData) };
+    }
+    if (value) customAnswers[q.key] = value;
+  }
+
   const d = parsed.data;
   await supabase
     .from("visa_applications")
@@ -346,6 +361,7 @@ export async function saveTravelInfo(
         has_relatives: d.hasRelatives === "yes",
         visited_before: d.visitedBefore === "yes",
       },
+      custom_answers: customAnswers,
       current_step: Math.max(application.current_step, 4),
     })
     .eq("id", application.id);
@@ -581,6 +597,10 @@ export async function submitVisaApplication(
   const visaType = application.visa_type;
   if (!visaType) return { error: "This visa service is no longer available." };
 
+  if (visaType.terms_and_conditions && formData.get("agreeTerms") !== "on") {
+    return { error: "Please agree to the Terms & Conditions to submit." };
+  }
+
   // Completeness re-checks — the wizard enforces these step by step, but the
   // submit action is the gate that matters.
   const traveler = (application.traveler_details ?? {}) as Record<string, string>;
@@ -605,6 +625,12 @@ export async function submitVisaApplication(
   const travel = (application.travel_details ?? {}) as Record<string, unknown>;
   if (Object.keys(travel).length === 0) {
     return { error: "Travel information is incomplete — please review step 3." };
+  }
+  const questions = parseApplicationQuestions(visaType.application_questions);
+  const answers = (application.custom_answers ?? {}) as Record<string, string>;
+  const unanswered = questions.filter((q) => q.required && q.type !== "yesno" && !answers[q.key]?.trim());
+  if (unanswered.length > 0) {
+    return { error: `Please answer: ${unanswered.map((q) => q.label).join(", ")} — review step 3.` };
   }
 
   const slots = parseDocumentSlots(visaType.required_documents);

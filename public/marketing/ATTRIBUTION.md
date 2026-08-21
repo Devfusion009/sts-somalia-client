@@ -64,3 +64,21 @@ First Nairobi generation was discarded before use: it rendered legible (and garb
 These depict generic hospitality settings, not the actual partner properties.
 Swap for real photography of each hotel before launch — a guest seeing a room
 that isn't the one they booked is a trust problem, not just a design one.
+
+### Umrah landing imagery (2026-08-19)
+
+| File | Source | Subject |
+| --- | --- | --- |
+| umrah-private.webp | copy of `supabase/seed-assets/umrah/pilgrims-courtyard.webp` | Two pilgrims in ihram crossing an empty mosque courtyard — the "Individual / Private Umrah" card on /umrah |
+| umrah-private-courtyard.webp | copy of `supabase/seed-assets/umrah/mosque-courtyard-day.webp` | Wide sunlit mosque courtyard, one figure crossing it — the /umrah/private hero (picked over the dusk shots because the copy column needs a bright left third and the subject kept to the right) |
+
+Copied into `public/` rather than referenced from Storage because these have to
+render for anonymous visitors in every environment, including before
+`npm run seed:storage` has ever run — the same reasoning as the note in
+`src/modules/umrah/images.ts`.
+
+Provenance of the `supabase/seed-assets/umrah/*` set was never recorded here;
+it predates this file's AI-batch sections and these two images are already
+shipped as package-gallery photos via `supabase/seed.sql`, so putting one on
+the landing page adds no licensing exposure that the catalog didn't already
+carry. Worth pinning down before launch all the same.

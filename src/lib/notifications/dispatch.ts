@@ -1,7 +1,7 @@
 import "server-only";
 import { sendEmail } from "./email";
 import { sendWhatsAppMessage } from "./whatsapp-send";
-import { getPreferencesForProfile } from "@/modules/preferences/queries";
+import { getPreferencesForProfile } from "@/lib/notifications/preferences";
 
 /**
  * Preference-aware fan-out for customer notifications.

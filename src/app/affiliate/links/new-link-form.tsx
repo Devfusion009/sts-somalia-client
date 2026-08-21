@@ -54,7 +54,6 @@ export function NewLinkForm() {
           <div className="space-y-2">
             <Label htmlFor="targetPath">Destination path</Label>
             <Input id="targetPath" name="targetPath" placeholder="/umrah/14-day-premium-umrah" defaultValue="/" required />
-            <p className="text-xs text-muted-foreground">e.g. /, /hotels, /umrah/some-package-slug</p>
           </div>
           <SubmitButton className="w-full" pendingText="Creating…">
             Create link

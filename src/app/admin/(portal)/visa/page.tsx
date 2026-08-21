@@ -41,9 +41,6 @@ export default async function AdminVisaPage({
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-semibold">Visa Applications</h1>
-        <p className="text-sm text-muted-foreground">
-          Review submissions, request documents, and issue decisions.
-        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">

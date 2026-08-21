@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
-import { BedDouble, PartyPopper, Inbox } from "lucide-react";
+import { BedDouble, PartyPopper, Inbox, Landmark } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBookingQueue } from "@/modules/admin/queue-queries";
@@ -19,12 +19,10 @@ export default async function OrderQueuePage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex items-center gap-2">
         <h1 className="font-heading text-xl font-semibold">Order Queue</h1>
-        <p className="text-sm text-muted-foreground">
-          Booking requests awaiting a decision, oldest first — {queue.length} waiting
-          {waitlisted > 0 ? ` (${waitlisted} waitlisted for full dates)` : ""}.
-        </p>
+        <Badge variant="secondary">{queue.length} waiting</Badge>
+        {waitlisted > 0 ? <Badge variant="outline">{waitlisted} waitlisted</Badge> : null}
       </div>
 
       {queue.length === 0 ? (
@@ -42,7 +40,13 @@ export default async function OrderQueuePage() {
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="font-heading text-lg font-bold text-muted-foreground/60">#{i + 1}</span>
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    {entry.kind === "hotel" ? <BedDouble className="size-5" /> : <PartyPopper className="size-5" />}
+                    {entry.kind === "hotel" ? (
+                      <BedDouble className="size-5" />
+                    ) : entry.kind === "hall" ? (
+                      <PartyPopper className="size-5" />
+                    ) : (
+                      <Landmark className="size-5" />
+                    )}
                   </span>
                   <div className="min-w-0">
                     <p className="flex flex-wrap items-center gap-2 font-medium">

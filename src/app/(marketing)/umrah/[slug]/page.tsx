@@ -69,6 +69,10 @@ export default async function UmrahPackagePage({
           Umrah
         </Link>
         <ChevronRight className="size-3" />
+        <Link href="/umrah/group" className="hover:text-foreground">
+          Group
+        </Link>
+        <ChevronRight className="size-3" />
         <span className="font-medium text-foreground">{pkg.name}</span>
       </nav>
 
@@ -89,6 +93,9 @@ export default async function UmrahPackagePage({
           ) : null}
           <Badge className={cn("border-transparent bg-card font-semibold", tier.className)}>
             {tier.label} Package
+          </Badge>
+          <Badge className="border-transparent bg-card font-semibold text-primary">
+            Group · fixed price
           </Badge>
         </div>
       </div>
@@ -252,7 +259,7 @@ export default async function UmrahPackagePage({
 
         <aside className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-5 shadow-xs lg:sticky lg:top-24">
-            <p className="text-sm text-muted-foreground">Starting from</p>
+            <p className="text-sm text-muted-foreground">Fixed price, from</p>
             <p className="font-heading text-3xl font-bold text-primary">
               {pkg.currency} {pkg.base_price.toFixed(0)}
               <span className="text-sm font-normal text-muted-foreground"> / pilgrim</span>

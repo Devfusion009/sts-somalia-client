@@ -13,9 +13,6 @@ export default async function AdminSecurityPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Security</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage how you sign in to your STS account.
-        </p>
       </div>
       <MfaSettings
         factors={factors.map((f) => ({ id: f.id, friendly_name: f.friendly_name ?? null }))}

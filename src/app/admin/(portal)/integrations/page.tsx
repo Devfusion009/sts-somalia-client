@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BedDouble, CalendarRange, CircleSlash, FileCheck2, Plane, Radio, Settings2 } from "lucide-react";
+import { BedDouble, CalendarRange, CircleSlash, FileCheck2, Plane, Radio, Send, Settings2 } from "lucide-react";
 import { getIntegrationsForAdmin, type IntegrationStatus } from "@/modules/admin/integrations/queries";
 import type { ProviderCategory } from "@/lib/provider-catalog";
 import { holidaysCountryCode } from "@/lib/provider-runtime/holidays";
@@ -18,9 +18,10 @@ const CATEGORY_META: Record<ProviderCategory, { label: string; icon: typeof Plan
   flights: { label: "Flights", icon: Plane, blurb: "Live fares and airline availability in flight search." },
   hotels: { label: "Hotels", icon: BedDouble, blurb: "External room inventory blended into hotel search." },
   visa: { label: "Visa", icon: FileCheck2, blurb: "Passport-nationality visa requirement lookups." },
+  visa_processing: { label: "Visa processing", icon: Send, blurb: "Partners who submit and track visa applications on STS's behalf." },
 };
 
-const CATEGORY_ORDER: ProviderCategory[] = ["flights", "hotels", "visa"];
+const CATEGORY_ORDER: ProviderCategory[] = ["flights", "hotels", "visa", "visa_processing"];
 
 /**
  * The three states a provider can be in, as a count each. This is the thing an

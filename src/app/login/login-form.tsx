@@ -2,15 +2,13 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, Briefcase, Globe2, Headset, PlaneTakeoff, ShieldCheck, Wallet } from "lucide-react";
+import { AlertCircle, ArrowRight, Globe2, Headset, PlaneTakeoff, ShieldCheck, Wallet } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/password-input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { signInAction } from "@/lib/auth/actions";
 import { portalLoginHref } from "@/lib/subdomain";
 
@@ -40,18 +38,22 @@ const VALUE_PROPS = [
 ];
 
 /**
- * Personal (B2C) vs Business (B2B agent) account chooser.
+ * A single plain sign-in — same credentials for every account, personal or
+ * business. Which portals an approved account can reach is discovered AFTER
+ * signing in, via the account switcher (My Account banner, header dropdown,
+ * portal sidebar footer — see getMyPartnerContexts()), not chosen up front
+ * here. Previously this page asked "Personal or Business Account?" before
+ * even taking credentials, which only ever covered agencies (not hotel
+ * partners, affiliates, or venue partners) and didn't match how one account
+ * can hold several partner identities at once.
  *
- * Only the Personal tab takes credentials. The Business tab used to host a
- * second agent sign-in form posting signInToAgentPortalAction from THIS origin,
- * which cannot work now that portal sessions are host-only: the cookie landed
- * on the public host, and the Agent Portal it redirected to couldn't read it,
- * so agents were bounced straight back to the portal's own login — two login
- * pages for one portal. The tab is now a signpost to that single page
- * (portalLoginHref), which is where the credentials belong.
+ * The one exception: /agent/login still exists as its own dedicated,
+ * credentialed entry point, because portal sessions are host-only — once
+ * subdomains are configured, a sign-in here can't hand off to agent.<host>.
+ * That's surfaced as a quiet footnote link instead of a pre-login tab.
  *
- * Admin deliberately has no tab at all: that portal stays reachable only via
- * the dedicated, unlinked /admin/login.
+ * Admin deliberately isn't mentioned anywhere on this page: that portal
+ * stays reachable only via the dedicated, unlinked /admin/login.
  */
 export function LoginForm({ redirectTo, notice }: { redirectTo?: string; notice?: string }) {
   const [personalState, personalAction] = useActionState(signInAction, null);
@@ -119,81 +121,57 @@ export function LoginForm({ redirectTo, notice }: { redirectTo?: string; notice?
       <Card className="rounded-none border-0 shadow-none">
         <CardHeader>
           <CardTitle className="font-heading text-2xl">Log in</CardTitle>
-          <CardDescription>Choose the account you want to sign in to.</CardDescription>
+          <CardDescription>Welcome back to STS Somalia.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="personal">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="personal">Personal Account</TabsTrigger>
-              <TabsTrigger value="business">Business Account</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="personal" className="pt-4">
-              {notice ? (
-                <Alert className="mb-4">
-                  <AlertDescription>{notice}</AlertDescription>
-                </Alert>
-              ) : null}
-              {personalState?.error ? (
-                <Alert variant="destructive" className="mb-4">
-                  <AlertCircle />
-                  <AlertDescription>{personalState.error}</AlertDescription>
-                </Alert>
-              ) : null}
-              <form action={personalAction} className="space-y-4">
-                {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" autoComplete="email" required />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    <Link href="/forgot-password" className="text-xs text-primary hover:underline">
-                      Forgot password?
-                    </Link>
-                  </div>
-                  <PasswordInput id="password" name="password" autoComplete="current-password" required />
-                </div>
-                <SubmitButton className="w-full" pendingText="Logging in…">
-                  Log in
-                </SubmitButton>
-              </form>
-              <p className="mt-4 text-center text-sm text-muted-foreground">
-                Don&apos;t have an account?{" "}
-                <Link href="/signup" className="font-medium text-primary hover:underline">
-                  Sign up
+          {notice ? (
+            <Alert className="mb-4">
+              <AlertDescription>{notice}</AlertDescription>
+            </Alert>
+          ) : null}
+          {personalState?.error ? (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle />
+              <AlertDescription>{personalState.error}</AlertDescription>
+            </Alert>
+          ) : null}
+          <form action={personalAction} className="space-y-4">
+            {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" name="email" type="email" autoComplete="email" required />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+                  Forgot password?
                 </Link>
-              </p>
-            </TabsContent>
-
-            <TabsContent value="business" className="pt-4">
-              <p className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-                <Briefcase className="size-4 shrink-0 text-primary" />
-                For approved travel agencies booking at B2B rates.
-              </p>
-              <div className="rounded-lg border bg-muted/40 p-4">
-                <p className="text-sm font-medium">Agency sign-in has its own page</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  The Agent Portal signs you in on its own secure address. You&apos;ll land
-                  straight on your bookings, wallet balance, and commission.
-                </p>
               </div>
-              {/* A real <a>, not <Link>: the Agent Portal is a separate origin
-                  once subdomains are configured, which a client-side route push
-                  cannot cross. */}
-              <Button className="mt-4 w-full" render={<a href={AGENT_LOGIN_HREF} />}>
-                Continue to Agent Portal
-                <ArrowRight className="size-4" />
-              </Button>
-              <p className="mt-4 text-center text-sm text-muted-foreground">
-                New to STS Somalia Business?{" "}
-                <Link href="/agents" className="font-medium text-primary hover:underline">
-                  Apply to become an agent
-                </Link>
-              </p>
-            </TabsContent>
-          </Tabs>
+              <PasswordInput id="password" name="password" autoComplete="current-password" required />
+            </div>
+            <SubmitButton className="w-full" pendingText="Logging in…">
+              Log in
+            </SubmitButton>
+          </form>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Don&apos;t have an account?{" "}
+            <Link href="/signup" className="font-medium text-primary hover:underline">
+              Sign up
+            </Link>
+          </p>
+          {/* A real <a>, not <Link>: the Agent Portal is a separate origin
+              once subdomains are configured, which a client-side route push
+              cannot cross. Quiet footnote, not a tab — signing in here
+              already reaches an approved agent's dashboard via the account
+              switcher, this is only for people who want to skip straight
+              there. */}
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            Signing in as a travel agent?{" "}
+            <a href={AGENT_LOGIN_HREF} className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">
+              Continue to Agent Portal <ArrowRight className="size-3" />
+            </a>
+          </p>
         </CardContent>
       </Card>
     </div>

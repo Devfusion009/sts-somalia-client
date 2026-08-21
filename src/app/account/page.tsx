@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, ShieldCheck } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { portalForProfile } from "@/lib/auth/roles";
+import { getMyPartnerContexts } from "@/modules/identity/queries";
+import { portalHref } from "@/lib/subdomain";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getSelfTraveler } from "@/modules/travelers/queries";
@@ -36,13 +37,12 @@ export default async function AccountOverviewPage() {
     ]);
 
   const totalBookings = (hotelCount ?? 0) + (flightCount ?? 0) + (visaCount ?? 0) + (umrahCount ?? 0);
-  const portal = portalForProfile(profile);
+  const contexts = await getMyPartnerContexts(profile.id, profile.full_name);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-semibold">Welcome back{profile.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}</h1>
-        <p className="text-sm text-muted-foreground">Manage your profile and see all your STS bookings in one place.</p>
       </div>
 
       {/* Above the fold, before the stat cards. An expiring passport is the
@@ -50,22 +50,46 @@ export default async function AccountOverviewPage() {
           it under the booking counts would be filing it, not warning about it. */}
       <PassportExpiryAlert expiry={selfTraveler?.passport_expiry} subject="Your passport" />
 
-      {portal ? (
+      {profile.is_platform_admin ? (
         <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex flex-col items-start justify-between gap-3 p-4 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3">
+              <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <ShieldCheck className="size-5" />
+              </span>
+              <div>
+                <p className="font-medium">You have access to the Admin Console</p>
+                <p className="text-sm text-muted-foreground">Manage the platform from there.</p>
+              </div>
+            </div>
+            <Button render={<Link href={portalHref("admin")} />}>Open Admin Console</Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {contexts.map((c) => (
+        <Card key={c.type} className="border-primary/30 bg-primary/5">
           <CardContent className="flex flex-col items-start justify-between gap-3 p-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
               <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <LayoutDashboard className="size-5" />
               </span>
               <div>
-                <p className="font-medium">You have access to the {portal.label}</p>
-                <p className="text-sm text-muted-foreground">Manage bookings, listings, or your team from there.</p>
+                <p className="font-medium">
+                  You have access to {c.name}
+                  {c.status && c.status !== "live" ? (
+                    <span className="ml-2 text-xs font-normal text-muted-foreground capitalize">({c.status})</span>
+                  ) : null}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {c.label} — manage bookings, listings, or your team from there.
+                </p>
               </div>
             </div>
-            <Button render={<Link href={portal.href} />}>Open {portal.label}</Button>
+            <Button render={<Link href={c.href} />}>Open {c.label}</Button>
           </CardContent>
         </Card>
-      ) : null}
+      ))}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard label="Hotel bookings" value={hotelCount ?? 0} />

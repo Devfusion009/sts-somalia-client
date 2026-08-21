@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { assertAgencyCanBookProduct, createOrderForBooking, getActiveAgencyId } from "@/modules/orders/helpers";
 import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
+import { notifyPartnerOfBooking } from "@/lib/notifications/partner-booking-notify";
 
 export type ActionState = { error: string | null } | null;
 
@@ -140,6 +141,24 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
 
   if (bookingError || !booking) {
     return { error: bookingError?.message ?? "Could not create booking." };
+  }
+
+  // Org-level email/WhatsApp to the owning partner (the in-app bell already
+  // reaches every partner staff member via the hotel_bookings insert
+  // trigger). Best-effort — never blocks the booking on a send failure, and
+  // skipped entirely for STS-managed hotels (partner_id null).
+  const { data: hotelWithPartner } = await supabase
+    .from("hotels")
+    .select("name, partner:hotel_partners(contact_email, contact_phone)")
+    .eq("id", room.hotel_id)
+    .maybeSingle();
+  if (hotelWithPartner?.partner) {
+    void notifyPartnerOfBooking({
+      partnerEmail: hotelWithPartner.partner.contact_email,
+      partnerPhone: hotelWithPartner.partner.contact_phone,
+      propertyName: hotelWithPartner.name,
+      summary: `${numRooms} room(s), ${checkIn} → ${checkOut}`,
+    }).catch(() => {});
   }
 
   // Holds are an agency-only entry point ("book now, decide later") — the

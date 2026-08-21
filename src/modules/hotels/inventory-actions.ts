@@ -5,33 +5,35 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getMyPartnerId } from "@/modules/hotels/partner-queries";
+import { getMyHotelScope, type HotelScope } from "@/modules/hotels/partner-queries";
 import type { ActionState } from "@/lib/auth/actions";
 
-// Same membership-lookup pattern as partner-actions.ts (see the note there
-// about requireRole and about redirect signals inside try/catch).
-async function requirePartnerId() {
+// Same membership-lookup pattern as partner-actions.ts's requireHotelScope
+// (see the note there about redirect signals inside try/catch, and about
+// why hotelIds — not partnerId — is the scope room/inventory actions check,
+// so a hotel_manager's single assigned hotel works here too).
+async function requireHotelScope(): Promise<HotelScope> {
   const profile = await requireUser();
-  const partnerId = await getMyPartnerId(profile.id);
-  if (!partnerId) {
-    throw new Error("No active hotel partner account found for this user.");
+  const scope = await getMyHotelScope(profile.id);
+  if (scope.hotelIds.length === 0) {
+    throw new Error("No hotel access found for this user.");
   }
-  return partnerId;
+  return scope;
 }
 
-/** Room scoped through its hotel's partner_id, so an id can't be guessed. */
+/** Room scoped through hotelIds, so an id can't be guessed. */
 async function getOwnedRoom(
   supabase: Awaited<ReturnType<typeof createClient>>,
   roomId: string,
   hotelId: string,
-  partnerId: string
+  hotelIds: string[]
 ) {
+  if (!hotelIds.includes(hotelId)) return null;
   const { data } = await supabase
     .from("hotel_rooms")
     .select("id, hotel_id, hotels!inner(id, partner_id)")
     .eq("id", roomId)
     .eq("hotel_id", hotelId)
-    .eq("hotels.partner_id", partnerId)
     .maybeSingle();
   return data;
 }
@@ -70,9 +72,9 @@ export async function setRoomInventory(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  let partnerId: string;
+  let scope: HotelScope;
   try {
-    partnerId = await requirePartnerId();
+    scope = await requireHotelScope();
   } catch (e) {
     unstable_rethrow(e);
     return { error: (e as Error).message };
@@ -102,7 +104,7 @@ export async function setRoomInventory(
   if (!dates) return { error: `Choose a range of at most ${MAX_RANGE_DAYS} days.` };
 
   const supabase = await createClient();
-  const room = await getOwnedRoom(supabase, parsed.data.roomId, parsed.data.hotelId, partnerId);
+  const room = await getOwnedRoom(supabase, parsed.data.roomId, parsed.data.hotelId, scope.hotelIds);
   if (!room) return { error: "Room not found." };
 
   const { error } = await supabase.from("hotel_room_inventory").upsert(
@@ -129,9 +131,9 @@ export async function clearRoomInventory(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  let partnerId: string;
+  let scope: HotelScope;
   try {
-    partnerId = await requirePartnerId();
+    scope = await requireHotelScope();
   } catch (e) {
     unstable_rethrow(e);
     return { error: (e as Error).message };
@@ -146,7 +148,7 @@ export async function clearRoomInventory(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
-  const room = await getOwnedRoom(supabase, parsed.data.roomId, parsed.data.hotelId, partnerId);
+  const room = await getOwnedRoom(supabase, parsed.data.roomId, parsed.data.hotelId, scope.hotelIds);
   if (!room) return { error: "Room not found." };
 
   const { error } = await supabase

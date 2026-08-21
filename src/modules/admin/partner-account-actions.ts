@@ -465,3 +465,77 @@ export async function adminRemovePartnerMember(_prev: ActionState, formData: For
   revalidatePath(consolePath(account.type, account.id));
   return { error: null };
 }
+
+function generateTempPassword(): string {
+  const raw = crypto.randomUUID().replace(/-/g, "");
+  return `Sts-${raw.slice(0, 8)}-${raw.slice(8, 12)}`;
+}
+
+const resetPasswordSchema = z.object({
+  accountId: z.string().min(1),
+  memberId: z.string().uuid(),
+});
+
+/**
+ * Sets a fresh temporary password on a team member's login via the
+ * service-role Auth admin API — the only way to change someone else's
+ * password (there's no "current password" to verify, unlike self-service
+ * reset). Returns the plaintext once, for the admin to relay to the
+ * partner; nothing else in this codebase persists it. Allowed for the
+ * account owner too (unlike role change/removal, this can't orphan the
+ * account) — scoped by account.entity_id the same way those are, so a
+ * memberId can't be used to touch another business's team.
+ */
+export async function adminResetPartnerMemberPassword(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState & { newPassword?: string }> {
+  const adminProfile = await requirePlatformAdmin();
+  const parsed = resetPasswordSchema.safeParse({
+    accountId: formData.get("accountId"),
+    memberId: formData.get("memberId"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const account = await loadAccount(parsed.data.accountId);
+  if (!account || account.type === "affiliate") return { error: "Partner account not found." };
+
+  const supabase = await createClient();
+  const { data: member } =
+    account.type === "agency"
+      ? await supabase
+          .from("agency_members")
+          .select("profile_id")
+          .eq("id", parsed.data.memberId)
+          .eq("agency_id", account.entity_id)
+          .maybeSingle()
+      : account.type === "venue_partner"
+        ? await supabase
+            .from("venue_partner_members")
+            .select("profile_id")
+            .eq("id", parsed.data.memberId)
+            .eq("partner_id", account.entity_id)
+            .maybeSingle()
+        : await supabase
+            .from("hotel_partner_members")
+            .select("profile_id")
+            .eq("id", parsed.data.memberId)
+            .eq("partner_id", account.entity_id)
+            .maybeSingle();
+  if (!member) return { error: "Team member not found." };
+
+  const newPassword = generateTempPassword();
+  const adminClient = createAdminClient();
+  const { error } = await adminClient.auth.admin.updateUserById(member.profile_id, { password: newPassword });
+  if (error) return { error: error.message };
+
+  await supabase.from("partner_account_events").insert({
+    account_id: account.id,
+    actor: adminProfile.id,
+    action: "credentials_reset",
+    reason: null,
+  });
+
+  revalidatePath(consolePath(account.type, account.id));
+  return { error: null, newPassword };
+}

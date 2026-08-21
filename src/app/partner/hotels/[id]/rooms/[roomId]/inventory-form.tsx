@@ -53,15 +53,26 @@ export function InventoryRangeForm({
           <Label htmlFor="totalUnits">
             Rooms available per night <span className="text-destructive">*</span>
           </Label>
-          <Input id="totalUnits" name="totalUnits" type="number" min={0} max={1000} required />
-          <p className="text-xs text-muted-foreground">
-            0 blocks the dates entirely (maintenance, private events…).
-          </p>
+          <Input
+            id="totalUnits"
+            name="totalUnits"
+            type="number"
+            min={0}
+            max={1000}
+            placeholder="0 blocks the dates"
+            required
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="priceOverride">Nightly price override ({currency}, optional)</Label>
-          <Input id="priceOverride" name="priceOverride" type="number" min={0} step="0.01" />
-          <p className="text-xs text-muted-foreground">Leave empty to keep the room&apos;s base price.</p>
+          <Input
+            id="priceOverride"
+            name="priceOverride"
+            type="number"
+            min={0}
+            step="0.01"
+            placeholder="Base price"
+          />
         </div>
       </div>
 
@@ -97,10 +108,6 @@ export function ClearInventoryForm({ hotelId, roomId }: { hotelId: string; roomI
           <Input id="clearEndDate" name="endDate" type="date" min={today} required />
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Removes the caps so those nights become unrestricted again. Nights that already have
-        bookings keep their cap.
-      </p>
       <SubmitButton variant="outline" className="gap-1.5" pendingText="Clearing…">
         <Eraser className="size-4" /> Clear range
       </SubmitButton>

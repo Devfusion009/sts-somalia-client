@@ -9,6 +9,7 @@ import { requireUser, requirePlatformAdmin } from "@/lib/auth/session";
 import { getActiveAgencyId } from "@/modules/orders/helpers";
 import { getPaymentMethod } from "./registry";
 import { initiateWithProvider, type InitiationResult } from "./providers";
+import { MIN_DEPOSIT_FRACTION } from "./constants";
 
 export type ActionState = { error: string | null } | null;
 
@@ -16,9 +17,26 @@ const initiateSchema = z.object({
   orderId: z.string().uuid(),
   methodId: z.string().min(1, "Choose a payment method."),
   payerPhone: z.string().optional(),
+  // Omitted/blank = pay the full remaining balance.
+  amount: z.coerce.number().positive().optional(),
 });
 
 const phonePattern = /^\+?[0-9][0-9\s-]{6,14}$/;
+
+const PAYABLE_ORDER_STATUSES = ["pending_payment", "held", "partially_paid"] as const;
+
+/** Sum of this order's already-succeeded payments — the source of truth for balance due. */
+async function getPaidTotal(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orderId: string
+): Promise<number> {
+  const { data } = await supabase
+    .from("payments")
+    .select("amount")
+    .eq("order_id", orderId)
+    .eq("status", "succeeded");
+  return (data ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+}
 
 export async function initiatePayment(
   _prevState: ActionState,
@@ -28,6 +46,7 @@ export async function initiatePayment(
     orderId: formData.get("orderId"),
     methodId: formData.get("methodId"),
     payerPhone: formData.get("payerPhone")?.toString().trim() || undefined,
+    amount: formData.get("amount")?.toString().trim() || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
@@ -45,12 +64,32 @@ export async function initiatePayment(
     .maybeSingle();
 
   if (!order) return { error: "We could not find this order." };
-  if (order.status !== "pending_payment") {
+  if (!PAYABLE_ORDER_STATUSES.includes(order.status as (typeof PAYABLE_ORDER_STATUSES)[number])) {
     return { error: "This order is not awaiting payment." };
   }
 
+  const paidTotal = await getPaidTotal(supabase, order.id);
+  const remaining = Number(order.total) - paidTotal;
+  if (remaining <= 0) return { error: "This order is already fully paid." };
+
+  // Never trust the client's amount: it must fit in the remaining balance,
+  // and a *first* payment must clear the minimum-deposit floor — a balance
+  // payment made after that (paidTotal > 0) can be any amount up to what's
+  // left, since the floor was already satisfied.
+  let amount = parsed.data.amount ?? remaining;
+  amount = Math.round(amount * 100) / 100;
+  if (amount > remaining + 0.01) {
+    return { error: `That's more than the remaining balance of ${order.currency} ${remaining.toFixed(2)}.` };
+  }
+  const minFirstPayment = Math.round(Number(order.total) * MIN_DEPOSIT_FRACTION * 100) / 100;
+  if (paidTotal === 0 && amount < minFirstPayment - 0.01) {
+    return {
+      error: `The first payment must be at least ${order.currency} ${minFirstPayment.toFixed(2)} (${MIN_DEPOSIT_FRACTION * 100}% deposit).`,
+    };
+  }
+
   if (parsed.data.methodId === "agency_wallet") {
-    return payFromAgencyWallet(supabase, profile.id, order);
+    return payFromAgencyWallet(supabase, profile.id, order, amount);
   }
 
   const method = getPaymentMethod(parsed.data.methodId);
@@ -65,7 +104,7 @@ export async function initiatePayment(
       order_id: order.id,
       provider: method.provider,
       method_label: method.label,
-      amount: order.total,
+      amount,
       currency: order.currency,
       status: "processing",
       payer_phone: method.requiresPhone ? parsed.data.payerPhone : null,
@@ -83,7 +122,7 @@ export async function initiatePayment(
       paymentId: payment.id,
       orderId: order.id,
       orderNumber: order.order_number,
-      amount: Number(order.total),
+      amount,
       currency: order.currency,
       description: `STS Travel order ${order.order_number}`,
       method,
@@ -98,13 +137,19 @@ export async function initiatePayment(
   const admin = createAdminClient();
 
   switch (result.type) {
-    case "success":
+    case "success": {
       await admin
         .from("payments")
         .update({ status: "succeeded", provider_ref: result.providerRef ?? null })
         .eq("id", payment.id);
-      redirect(`/checkout/${order.id}/success`);
+      const { data: settled } = await admin
+        .from("orders")
+        .select("status")
+        .eq("id", order.id)
+        .maybeSingle();
+      redirect(settled?.status === "paid" ? `/checkout/${order.id}/success` : `/checkout/${order.id}`);
       break;
+    }
     case "redirect":
       await admin
         .from("payments")
@@ -140,7 +185,8 @@ export async function initiatePayment(
 async function payFromAgencyWallet(
   supabase: Awaited<ReturnType<typeof createClient>>,
   profileId: string,
-  order: { id: string; order_number: string; total: number; currency: string; agency_id: string | null }
+  order: { id: string; order_number: string; currency: string; agency_id: string | null },
+  amount: number
 ): Promise<ActionState> {
   if (!order.agency_id) {
     return { error: "This order is not an agency booking." };
@@ -156,7 +202,7 @@ async function payFromAgencyWallet(
       order_id: order.id,
       provider: "wallet",
       method_label: "Agency Balance",
-      amount: order.total,
+      amount,
       currency: order.currency,
       status: "processing",
     })
@@ -169,7 +215,7 @@ async function payFromAgencyWallet(
   const admin = createAdminClient();
   const { error: walletError } = await supabase.rpc("apply_agency_wallet_transaction", {
     target_agency_id: order.agency_id,
-    tx_amount: -Number(order.total),
+    tx_amount: -amount,
     tx_type: "booking_payment",
     target_order_id: order.id,
     tx_note: `Order ${order.order_number}`,
@@ -185,7 +231,8 @@ async function payFromAgencyWallet(
   }
 
   await admin.from("payments").update({ status: "succeeded" }).eq("id", payment.id);
-  redirect(`/checkout/${order.id}/success`);
+  const { data: settled } = await admin.from("orders").select("status").eq("id", order.id).maybeSingle();
+  redirect(settled?.status === "paid" ? `/checkout/${order.id}/success` : `/checkout/${order.id}`);
 }
 
 /** Customer abandons a pending manual payment to pick another method. */
@@ -214,4 +261,58 @@ export async function adminConfirmPayment(formData: FormData): Promise<void> {
   const admin = createAdminClient();
   await admin.from("payments").update({ status: "succeeded" }).eq("id", paymentId);
   revalidatePath("/admin/orders");
+}
+
+const recordPaymentSchema = z.object({
+  orderId: z.string().uuid(),
+  amount: z.coerce.number().positive(),
+  methodLabel: z.string().min(2, "Describe how the customer paid, e.g. \"Cash — office\"."),
+});
+
+export type RecordPaymentState = { error: string | null } | null;
+
+/**
+ * Admin logs a payment taken outside the online flow entirely — cash handed
+ * over at the office, a bank transfer that arrived without the customer
+ * going through "Pay at Office" first. Settles through the same trigger as
+ * every other payment, so partial/full rollup stays correct either way.
+ */
+export async function adminRecordPayment(
+  _prev: RecordPaymentState,
+  formData: FormData
+): Promise<RecordPaymentState> {
+  await requirePlatformAdmin();
+  const parsed = recordPaymentSchema.safeParse({
+    orderId: formData.get("orderId"),
+    amount: formData.get("amount"),
+    methodLabel: formData.get("methodLabel"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const admin = createAdminClient();
+  const { data: order } = await admin
+    .from("orders")
+    .select("id, currency, total")
+    .eq("id", parsed.data.orderId)
+    .maybeSingle();
+  if (!order) return { error: "We could not find this order." };
+
+  const paidTotal = await getPaidTotal(admin, order.id);
+  const remaining = Number(order.total) - paidTotal;
+  if (parsed.data.amount > remaining + 0.01) {
+    return { error: `That's more than the remaining balance of ${order.currency} ${remaining.toFixed(2)}.` };
+  }
+
+  const { error } = await admin.from("payments").insert({
+    order_id: order.id,
+    provider: "manual",
+    method_label: parsed.data.methodLabel,
+    amount: parsed.data.amount,
+    currency: order.currency,
+    status: "succeeded",
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/orders");
+  return { error: null };
 }

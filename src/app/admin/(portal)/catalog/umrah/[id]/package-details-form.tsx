@@ -14,7 +14,10 @@ import type { Airport } from "@/modules/flights/queries";
 const selectClass =
   "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
-const TIERS = ["Economy", "Standard", "Premium", "VIP"];
+// Basic / Standard / Premium is the ladder the group product is sold on.
+// Economy and VIP stay listed because live packages already carry them and
+// removing an option would make those rows un-resavable at their own tier.
+const TIERS = ["Basic", "Standard", "Premium", "Economy", "VIP"];
 
 /** Same pattern as flight-search-form.tsx's AirportSelect — this form isn't shared with it, so kept local rather than a premature shared export. */
 function AirportSelect({
@@ -155,9 +158,6 @@ export function PackageDetailsForm({
             defaultValue={originalPrice ?? ""}
             placeholder="Leave blank for no discount"
           />
-          <p className="text-xs text-muted-foreground">
-            Shown struck through next to the live price, with the discount percentage.
-          </p>
         </div>
         <div className="flex items-end pb-2">
           <label className="flex cursor-pointer items-center gap-2 text-sm">

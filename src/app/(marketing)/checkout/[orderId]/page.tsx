@@ -8,6 +8,7 @@ import { convertHoldToCheckout, cancelOrder } from "@/modules/orders/actions";
 import { getOrderForCheckout, describeOrderItem } from "@/modules/payments/queries";
 import { getAvailablePaymentMethods } from "@/modules/payments/registry";
 import { cancelPendingPayment } from "@/modules/payments/actions";
+import { MIN_DEPOSIT_FRACTION } from "@/modules/payments/constants";
 import { CheckoutForm, type CheckoutMethod } from "@/modules/payments/components/checkout-form";
 import { WhatsAppInlineLink } from "@/components/marketing/whatsapp-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,9 +32,16 @@ export default async function CheckoutPage({
 
   const order = await getOrderForCheckout(orderId);
   if (!order) notFound();
-  if (order.status !== "pending_payment" && order.status !== "held") {
+  if (!["pending_payment", "held", "partially_paid"].includes(order.status)) {
     redirect(`/checkout/${orderId}/success`);
   }
+
+  const paidTotal = order.payments
+    .filter((p) => p.status === "succeeded")
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+  const remaining = Number(order.total) - paidTotal;
+  const isFirstPayment = paidTotal === 0;
+  const minDeposit = Math.round(Number(order.total) * MIN_DEPOSIT_FRACTION * 100) / 100;
 
   const isHeld = order.status === "held";
   const holdExpired = isHeld && order.hold_expires_at != null && new Date(order.hold_expires_at) < new Date();
@@ -128,6 +136,18 @@ export default async function CheckoutPage({
                 <span>Total Fee</span>
                 <span className="text-primary">{money(order.total, order.currency)}</span>
               </div>
+              {paidTotal > 0 ? (
+                <>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Paid so far</span>
+                    <span>{money(paidTotal, order.currency)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-base font-semibold">
+                    <span>Balance due</span>
+                    <span className="text-primary">{money(remaining, order.currency)}</span>
+                  </div>
+                </>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -202,7 +222,11 @@ export default async function CheckoutPage({
               <CheckoutForm
                 orderId={order.id}
                 methods={methods}
-                amountLabel={money(order.total, order.currency)}
+                amountLabel={money(remaining, order.currency)}
+                currency={order.currency}
+                remaining={remaining}
+                isFirstPayment={isFirstPayment}
+                minDeposit={minDeposit}
               />
               <div className="flex justify-end">
                 <CancelOrderButton orderId={order.id} redirectTo="/account/bookings" />
@@ -226,9 +250,15 @@ export default async function CheckoutPage({
                 <span className="font-medium">{order.order_items.length}</span>
               </div>
               <Separator className="my-2" />
+              {paidTotal > 0 ? (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Paid so far</span>
+                  <span className="font-medium">{money(paidTotal, order.currency)}</span>
+                </div>
+              ) : null}
               <div className="flex justify-between text-base font-semibold">
-                <span>Total Fee</span>
-                <span className="text-primary">{money(order.total, order.currency)}</span>
+                <span>{paidTotal > 0 ? "Balance due" : "Total Fee"}</span>
+                <span className="text-primary">{money(remaining, order.currency)}</span>
               </div>
               <p className="pt-1 text-xs text-muted-foreground">All fees are non-refundable.</p>
             </CardContent>

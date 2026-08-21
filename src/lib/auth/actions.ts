@@ -4,9 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { portalForProfile } from "@/lib/auth/roles";
 import { portalLoginHref, pathPrefixFor, rootOrigin } from "@/lib/subdomain";
-import { recordLoginEvent } from "@/modules/auth/security-actions";
+import { recordLoginEvent } from "@/lib/auth/login-history";
 
 export type ActionState = { error: string | null; destination?: string } | null;
 
@@ -33,19 +32,15 @@ export async function signInAction(
     return { error: "Incorrect email or password." };
   }
 
-  // Resolve the landing portal from the account's actual role server-side —
-  // this is the default now, not an afterthought. redirect_to still wins
-  // when present (deep-linking, e.g. "log in to view this booking"), but an
-  // agent or admin signing in with no redirect_to param must land in their
-  // own portal, not fall through to /account.
   const {
     data: { user },
   } = await supabase.auth.getUser();
   // A plain customer belongs on the marketing site, not in the account shell:
   // they log in to browse and book, and dropping them on a profile form with
-  // four zeroed stat cards reads as a dead end. Staff and partners still land
-  // in their own portal via portalForProfile below, and redirect_to always
-  // wins when present.
+  // four zeroed stat cards reads as a dead end. Every business role instead
+  // lands on /account (below) — never in a portal directly — so the
+  // switcher is always how a partner identity gets reached, not a silent
+  // login-time swap. redirect_to always wins when present.
   let roleDestination = "/";
   if (user) {
     const { data: profile } = await supabase
@@ -63,11 +58,11 @@ export async function signInAction(
     //
     // Without a custom domain both portals sit on one origin and therefore
     // share one cookie, so the host-only cookie scoping that isolates them
-    // (see cookieDomain) has nothing to separate — and portalForProfile()
-    // hands an admin a same-origin "/admin", dropping them straight into the
-    // console from the public form. Refusing here is the strongest boundary
-    // available in path-based mode, and it mirrors signInToPortalAction, which
-    // already turns non-admins away from /admin/login.
+    // (see cookieDomain) has nothing to separate — a bare admin redirect
+    // would drop them straight into the console from the public form.
+    // Refusing here is the strongest boundary available in path-based mode,
+    // and it mirrors signInToPortalAction, which already turns non-admins
+    // away from /admin/login.
     //
     // Sign back out first: leaving a valid admin session attached to a
     // "rejected" sign-in would defeat the entire point.
@@ -79,30 +74,28 @@ export async function signInAction(
     }
 
     if (profile) {
-      // affiliate, hotel_partner, and venue_partner are deliberately NOT
-      // treated as separate portal citizens here, unlike agent: none of the
-      // three has a dedicated login page (only /agent/login and
-      // /admin/login exist), so this shared customer form is the ONLY door
-      // they ever sign in through. Each is, by design, still first and
-      // foremost the same B2C account that applied — landing on /account
-      // (which already surfaces a "You have access to the X Portal" banner
-      // via portalForProfile, see account/page.tsx) keeps that account
-      // usable as a customer while still surfacing the partner capability,
-      // rather than the login silently swapping their B2C dashboard out for
-      // good. Confirmed for affiliate 2026-08-14; hotel_partner reported the
-      // same "landed in the Partner Portal instead of my B2C account" 2026-08-16.
-      if (profile.role === "affiliate" || profile.role === "hotel_partner" || profile.role === "venue_partner") {
+      // agent, affiliate, hotel_partner, and venue_partner all land on
+      // /account uniformly now: none of the four is a separate portal
+      // citizen on the shared customer form (only /agent/login and
+      // /admin/login are dedicated entry points). Each is, by design, still
+      // first and foremost the same B2C account that applied — landing on
+      // /account (which surfaces every approved partner identity via
+      // getMyPartnerContexts, see account/page.tsx) keeps that account
+      // usable as a customer while still surfacing every partner capability
+      // through the switcher, rather than the login silently swapping the
+      // B2C dashboard out for whichever one role column happened to hold.
+      // Confirmed for affiliate 2026-08-14; hotel_partner reported the same
+      // "landed in the Partner Portal instead of my B2C account" 2026-08-16;
+      // agent was the last inconsistent case, fixed 2026-08-20 alongside the
+      // multi-context account switcher.
+      if (
+        profile.role === "affiliate" ||
+        profile.role === "hotel_partner" ||
+        profile.role === "hotel_manager" ||
+        profile.role === "venue_partner" ||
+        profile.role === "agent"
+      ) {
         roleDestination = "/account";
-      } else {
-        const portal = portalForProfile(profile);
-        // Only follow SAME-ORIGIN portal destinations. When subdomains are
-        // configured, sessions are host-only, so sending an agent from the
-        // customer login straight to agent.<host> would land them on that
-        // portal's sign-in page immediately after signing in — they have to
-        // authenticate on that origin. /partner is a path on this same host
-        // and still works, so that's followed as before.
-        const crossOrigin = portal?.href.startsWith("http") ?? false;
-        roleDestination = portal && !crossOrigin ? portal.href : "/";
       }
     }
   }

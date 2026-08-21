@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil } from "lucide-react";
 import {
@@ -26,7 +26,6 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
 import { createVenue, updateVenue } from "@/modules/admin/actions";
-import type { ActionState } from "@/lib/auth/actions";
 import type { Database } from "@/lib/types/database.types";
 
 type Venue = Database["public"]["Tables"]["event_venues"]["Row"] & {
@@ -52,10 +51,12 @@ export function VenueForm({ venue }: { venue?: Venue }) {
   const action = venue ? updateVenue : createVenue;
   const [state, formAction] = useActionState(action, null);
 
-  const lastState = useRef<ActionState>(null);
-  if (state !== lastState.current) {
-    lastState.current = state;
-    if (state && !state.error && open) setOpen(false);
+  // Derived during render (not an effect) per React's guidance for reacting
+  // to a state change — refs can't be read/written during render.
+  const [lastState, setLastState] = useState(state);
+  if (state !== lastState) {
+    setLastState(state);
+    if (state && !state.error) setOpen(false);
   }
   useEffect(() => {
     if (state && !state.error) router.refresh();
@@ -126,6 +127,10 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                 <Input id="venue-phone" name="phone" type="tel" defaultValue={venue?.phone ?? ""} />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="venue-email">Contact email</Label>
+              <Input id="venue-email" name="contactEmail" type="email" defaultValue={venue?.contact_email ?? ""} />
+            </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="venue-seated">Seated capacity</Label>
@@ -179,6 +184,16 @@ export function VenueForm({ venue }: { venue?: Venue }) {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="venue-policies">Policies (cancellation, deposit, ...)</Label>
+              <Textarea
+                id="venue-policies"
+                name="policies"
+                rows={3}
+                defaultValue={venue?.policies ?? ""}
+                placeholder="50% deposit to confirm. Free cancellation up to 7 days before the event."
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="venue-links">Links (one per line: Label | URL)</Label>
               <Textarea
                 id="venue-links"
@@ -187,9 +202,6 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                 defaultValue={linksList(venue?.property_links)}
                 placeholder={"Website | https://example.so/\nWhatsApp | https://wa.me/252..."}
               />
-              <p className="text-xs text-muted-foreground">
-                Replaces every link on save — leave existing lines in place to keep them.
-              </p>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">

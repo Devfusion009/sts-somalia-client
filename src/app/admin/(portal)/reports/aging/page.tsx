@@ -53,10 +53,6 @@ export default async function AdminAgingReportPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold">Aging Report</h1>
-          <p className="text-sm text-muted-foreground">
-            Agencies currently carrying a negative wallet balance, grouped by how long they&apos;ve
-            been in the red.
-          </p>
         </div>
         <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/admin/reports/aging/export" />}>
           <Download className="size-3.5" /> Export CSV

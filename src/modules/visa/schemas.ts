@@ -104,6 +104,33 @@ export function parseDocumentSlots(raw: unknown): DocumentSlot[] {
   });
 }
 
+/** One country-specific extra question from visa_types.application_questions. */
+export type ApplicationQuestion = {
+  key: string;
+  label: string;
+  type: "text" | "yesno" | "select";
+  options?: string[];
+  required: boolean;
+};
+
+export function parseApplicationQuestions(raw: unknown): ApplicationQuestion[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry): ApplicationQuestion[] => {
+    if (!entry || typeof entry !== "object" || !("key" in entry) || !("label" in entry)) return [];
+    const q = entry as Record<string, unknown>;
+    const type = q.type === "yesno" || q.type === "select" ? q.type : "text";
+    return [
+      {
+        key: String(q.key),
+        label: String(q.label),
+        type,
+        options: Array.isArray(q.options) ? q.options.map(String) : undefined,
+        required: q.required !== false,
+      },
+    ];
+  });
+}
+
 /** Customer-facing labels for application statuses (badges, timeline). */
 export const VISA_STATUS_LABELS: Record<string, string> = {
   draft: "Draft",

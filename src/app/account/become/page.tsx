@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { CheckCircle2, Clock, XCircle, FileEdit, PartyPopper, AlertTriangle, Inbox } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +53,6 @@ function RecentApplicationsSection({ applications }: { applications: RecentAppli
     <Card>
       <CardHeader>
         <CardTitle>Recent Applications</CardTitle>
-        <CardDescription>Every application you&apos;ve submitted, across all programs.</CardDescription>
       </CardHeader>
       <CardContent>
         {applications.length === 0 ? (
@@ -274,7 +273,6 @@ export default async function BecomePartnerPage({
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-semibold">Become a Partner</h1>
-        <p className="text-sm text-muted-foreground">Apply to join STS Somalia as an agent, hotel partner, or affiliate.</p>
       </div>
 
       {submitted ? (
@@ -312,7 +310,6 @@ export default async function BecomePartnerPage({
           <Card>
             <CardHeader>
               <CardTitle>Travel Agent</CardTitle>
-              <CardDescription>Access B2B rates and book on behalf of your customers.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <ProgramPanel kind={TAB_TO_KIND.agent} app={agencyApp} isMember={!!agencyMember.data} isApproved={false} now={now} />
@@ -324,7 +321,6 @@ export default async function BecomePartnerPage({
           <Card>
             <CardHeader>
               <CardTitle>Hotel Partner</CardTitle>
-              <CardDescription>List your property and manage rooms and bookings.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <ProgramPanel kind={TAB_TO_KIND.partner} app={hotelApp} isMember={!!hotelPartnerMember.data} isApproved={false} now={now} />
@@ -336,7 +332,6 @@ export default async function BecomePartnerPage({
           <Card>
             <CardHeader>
               <CardTitle>Event Venue Partner</CardTitle>
-              <CardDescription>List your event hall and manage booking requests.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <ProgramPanel kind={TAB_TO_KIND.venue} app={venueApp} isMember={!!venuePartnerMember.data} isApproved={false} now={now} />
@@ -348,7 +343,6 @@ export default async function BecomePartnerPage({
           <Card>
             <CardHeader>
               <CardTitle>Affiliate</CardTitle>
-              <CardDescription>Earn commission promoting STS Somalia.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <ProgramPanel kind={TAB_TO_KIND.affiliate} app={affiliateApp} isMember={!!affiliate.data} isApproved={false} now={now} />

@@ -10,7 +10,7 @@ import {
   DeleteAccountCard,
   SignOutEverywhereButton,
 } from "@/modules/auth/components/security-panels";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 export const metadata: Metadata = { title: "Security" };
@@ -74,9 +74,6 @@ export default async function AccountSecurityPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Security</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage how you sign in to your STS account.
-        </p>
       </div>
 
       <ChangePasswordCard />
@@ -88,15 +85,9 @@ export default async function AccountSecurityPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Monitor className="size-5 text-muted-foreground" /> Recent sign-ins
-              </CardTitle>
-              <CardDescription>
-                The last 10 times this account was signed into. If you don&apos;t recognise one,
-                change your password and sign out everywhere.
-              </CardDescription>
-            </div>
+            <CardTitle className="flex items-center gap-2">
+              <Monitor className="size-5 text-muted-foreground" /> Recent sign-ins
+            </CardTitle>
             <SignOutEverywhereButton />
           </div>
         </CardHeader>

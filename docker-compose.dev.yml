@@ -1,0 +1,82 @@
+# Development overlay: the same stack, but the app container runs `next dev`
+# against your live source tree instead of a frozen production build.
+#
+#   ./start.sh dev          (or: npm run docker:dev)
+#
+# Layered explicitly on top of docker-compose.yml, NOT named
+# docker-compose.override.yml — Compose auto-loads that filename for every
+# command, which would silently turn plain `docker compose up` into a dev
+# server. Production parity is what the base file is for, and it should stay
+# the thing you get when you don't ask for anything else.
+#
+# WHY THIS FILE EXISTS AT ALL: the base image does `COPY . .` + `npm run
+# build` (see Dockerfile), so the source is baked into an image layer. The
+# container has no view of your working tree, which is exactly right for a
+# production artifact and means edits never appear on :3000 until the next
+# `docker compose build`. This overlay swaps that COPY for a bind mount.
+
+services:
+  app:
+    build:
+      # Stops before the `builder` stage — no `npm run build` runs at all,
+      # so bringing this up is seconds rather than a full production compile.
+      target: dev
+
+    volumes:
+      # The working tree, live. A save on the host is a save in the container.
+      - .:/app
+
+      # Two anonymous volumes masking paths INSIDE the bind mount above.
+      #
+      # node_modules: the host's tree is compiled for the host's libc and
+      # CPU; this container is alpine (musl). Letting the bind mount shadow
+      # /app/node_modules would hand musl a glibc build of every native
+      # dependency — sharp, the Tailwind oxide binary, Turbopack's native
+      # addon — and the dev server would die on its first require. An
+      # anonymous volume here re-exposes the copy `npm ci` installed in the
+      # image, so each side keeps the tree built for it.
+      #
+      # .next: build output, not source. Sharing one directory between a
+      # host `npm run dev` and this container means two dev servers writing
+      # the same manifests and chunk files, which produces corrupt-looking
+      # 404s for chunks that exist. Keeping the container's build artifacts
+      # in their own volume lets both run at once without a fight.
+      - /app/node_modules
+      - /app/.next
+
+    environment:
+      NODE_ENV: development
+
+      # env_file (.env.local, from the base file) is still loaded, and its
+      # NEXT_PUBLIC_SUPABASE_URL is http://127.0.0.1:54321 — correct on the
+      # host, and a dead end inside a container, where 127.0.0.1 is the
+      # container itself. Compose `environment:` wins over `env_file:`, so
+      # this is the override that makes Supabase reachable. It is the same
+      # value the base file passes as a build ARG; the difference is that a
+      # production build inlines it at build time while `next dev` reads it
+      # from the process environment at run time, so it has to be here too.
+      #
+      # NEXT_PUBLIC_APP_HOST is deliberately NOT overridden — it flows
+      # through from .env.local exactly as in production, so portal
+      # isolation behaves identically in both modes (admin.stssomalia.test
+      # :3000, not localhost:3000/admin).
+      NEXT_PUBLIC_SUPABASE_URL: http://host.docker.internal:54321
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+
+      # Uncomment ONLY if edits don't trigger a rebuild. Native inotify works
+      # over a Linux bind mount and costs nothing; polling wakes the watcher
+      # on a timer and will sit at meaningful CPU forever, so it is opt-in
+      # rather than a default that quietly heats the machine.
+      # WATCHPACK_POLLING: "true"
+      # CHOKIDAR_USEPOLLING: "true"
+
+    # A cold `next dev` compiles the first route on demand, which can take
+    # well over the base file's 10s start_period on a fresh container — the
+    # container would be flagged unhealthy while it is merely busy. Nothing
+    # depends on this healthcheck (only redis has dependents), so the effect
+    # is cosmetic, but a red "unhealthy" next to a working dev server is the
+    # kind of noise that sends people debugging the wrong thing.
+    healthcheck:
+      start_period: 90s
+      interval: 15s
+      retries: 5

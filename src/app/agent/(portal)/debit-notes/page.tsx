@@ -17,7 +17,6 @@ export default async function AgentDebitNotesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Debit Notes</h1>
-        <p className="text-sm text-muted-foreground">Charges applied to {membership.agency.name}&apos;s wallet by STS Somalia.</p>
       </div>
       <WalletNotesTable
         notes={notes}

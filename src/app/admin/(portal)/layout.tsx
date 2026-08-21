@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireAdminPortalAccess } from "@/lib/auth/session";
 import { listVerifiedFactors } from "@/lib/auth/mfa";
+import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { createClient } from "@/lib/supabase/server";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { MfaSettings } from "@/modules/auth/components/mfa-settings";
@@ -9,21 +10,27 @@ import { fireDueEventReminders } from "@/modules/admin/calendar-reminders";
 import { AdminNotificationBell } from "./admin-notification-bell";
 import { ShieldAlert } from "lucide-react";
 
-// Reorganized (2026-08-09, per user request) from 5 groups/16 flat items
-// into topic-based groups that match how the work actually breaks down —
-// the old split ("Admin" vs "Operations" vs "People") mixed unrelated
-// things in the same bucket and, worse, had "Applications" (partner
-// sign-up approvals) sitting right next to "Visa Applications" (customer
-// document review) — two different features with near-identical names in
-// different groups. Renamed the former to "Partner Applications" to remove
-// that collision outright, not just relocate it.
+// Reorganized (2026-08-20, per user request) from 7 groups into 6 grouped
+// strictly by JOB rather than loose topic — the previous split had "Hotels"
+// and "Events & Halls" (managing what's listed for sale) sitting in
+// "Operations" while "Visa Catalog"/"Umrah Packages"/"Umrah Services" (the
+// exact same kind of task — manage inventory) sat in a separate "Catalog"
+// group. That inconsistency, not raw group count, was what read as fuzzy:
+// two items of the same TYPE living in different buckets for no reason a
+// user could infer. Fixed by moving every listing/inventory item into one
+// "Catalog & Inventory" group and renaming the leftover queue-processing
+// group to "Bookings & Orders" (every item in it is "a customer submitted
+// something, I need to act on it" — a genuinely different job from
+// managing what's for sale). Settings + Developer also merged: four
+// platform-configuration items split into two groups of two had no
+// defensible boundary either.
 const NAV_GROUPS: PortalNavGroup[] = [
   {
     label: "Overview",
     items: [{ href: "/admin", label: "Dashboard", icon: "overview" }],
   },
   {
-    label: "Operations",
+    label: "Bookings & Orders",
     items: [
       // First in the group: the queue is the "what needs my hands right now"
       // surface for the manual-booking workflow — FIFO booking requests.
@@ -32,14 +39,17 @@ const NAV_GROUPS: PortalNavGroup[] = [
       { href: "/admin/orders", label: "Orders & Payments", icon: "orders" },
       { href: "/admin/refunds", label: "Refund Requests", icon: "refund" },
       { href: "/admin/visa", label: "Visa Applications", icon: "visa" },
-      { href: "/admin/events", label: "Events & Halls", icon: "events" },
+      { href: "/admin/umrah/requests", label: "Private Umrah", icon: "bookings" },
     ],
   },
   {
-    label: "Catalog",
+    label: "Catalog & Inventory",
     items: [
+      { href: "/admin/hotels", label: "Hotels", icon: "hotels" },
+      { href: "/admin/events", label: "Events & Halls", icon: "events" },
       { href: "/admin/catalog/visa", label: "Visa Catalog", icon: "catalog" },
-      { href: "/admin/catalog/umrah", label: "Umrah Catalog", icon: "catalog" },
+      { href: "/admin/catalog/umrah", label: "Umrah Packages", icon: "catalog" },
+      { href: "/admin/catalog/umrah/services", label: "Umrah Services", icon: "catalog" },
     ],
   },
   {
@@ -61,11 +71,6 @@ const NAV_GROUPS: PortalNavGroup[] = [
     items: [
       { href: "/admin/users", label: "Users", icon: "team" },
       { href: "/admin/security", label: "Security", icon: "security" },
-    ],
-  },
-  {
-    label: "Developer",
-    items: [
       { href: "/admin/integrations", label: "Integrations", icon: "integrations" },
       { href: "/admin/audit-log", label: "Audit Log", icon: "audit" },
     ],
@@ -114,7 +119,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // configured at all.
   const supabase = await createClient();
   await fireDueEventReminders(supabase);
-  const notifications = await getUnreadNotifications(profile.id, { limit: 10 });
+  const [notifications, contexts] = await Promise.all([
+    getUnreadNotifications(profile.id, { limit: 10 }),
+    getMyPartnerContexts(profile.id, profile.full_name),
+  ]);
 
   return (
     <PortalShell
@@ -123,6 +131,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       navGroups={NAV_GROUPS}
       profileName={profile.full_name}
       profileEmail={profile.email}
+      contexts={contexts}
+      isPlatformAdmin={profile.is_platform_admin}
       accent="admin"
       headerExtra={<AdminNotificationBell notifications={notifications} />}
     >

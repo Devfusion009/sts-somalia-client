@@ -60,9 +60,11 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { signOutAction } from "@/lib/auth/actions";
-import { rootOrigin, stripPortalPrefix } from "@/lib/subdomain";
+import { rootOrigin, stripPortalPrefix, portalHref } from "@/lib/subdomain";
 import { cn } from "@/lib/utils";
+import type { PartnerContext } from "@/modules/identity/queries";
 
 // Icons are resolved from a string key (not passed as component references)
 // because PortalShell is a Client Component: Server Component layouts can
@@ -281,6 +283,8 @@ export function PortalShell({
   navGroups,
   profileName,
   profileEmail,
+  contexts = [],
+  isPlatformAdmin = false,
   accent = "customer",
   brandLogoUrl,
   headerExtra,
@@ -291,6 +295,10 @@ export function PortalShell({
   navGroups: PortalNavGroup[];
   profileName: string | null;
   profileEmail: string | null;
+  /** Every other partner identity (and "Personal Account") this profile can switch into — same list everywhere, see getMyPartnerContexts(). */
+  contexts?: PartnerContext[];
+  /** Adds an "Admin Console" switch item — is_platform_admin is a separate flag from `contexts`, which only covers business/partner kinds. */
+  isPlatformAdmin?: boolean;
   accent?: PortalAccent;
   /** Agency's own uploaded logo (agent portal only) — replaces the STS icon in the sidebar header so the portal reads as the agency's own, not just a reskinned STS shell. Falls back to /logo-icon.png when unset. */
   brandLogoUrl?: string | null;
@@ -379,34 +387,61 @@ export function PortalShell({
         <SidebarFooter>
           <Separator className="mb-2" />
           <SidebarMenu>
-            <SidebarMenuItem className="flex items-center gap-2.5 rounded-lg bg-sidebar-accent/50 px-2.5 py-2 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:px-0">
-              <Avatar className={`size-9 shrink-0 ring-2 ${styles.ring}`}>
-                <AvatarFallback className="text-xs font-semibold">{initials(profileName, profileEmail)}</AvatarFallback>
-              </Avatar>
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5 group-data-[collapsible=icon]:hidden">
-                <span className="truncate text-sm leading-none font-medium">{profileName || "Account"}</span>
-                <Badge variant="outline" className={`w-fit text-[10px] ${styles.badge}`}>
-                  {roleLabel}
-                </Badge>
-              </div>
-            </SidebarMenuItem>
-            <SidebarMenuItem className="mt-1">
-              <form action={signOutAction}>
-                {/* A real account action, not just another nav link — a
-                    destructive-tinted hover signals "this ends your session"
-                    the way sign-out affordances read in most B2B consoles. */}
-                <SidebarMenuButton
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger
                   render={
-                    <button
-                      type="submit"
-                      className="w-full text-sidebar-foreground/80 hover:bg-destructive/10 hover:text-destructive [&_svg]:hover:text-destructive"
+                    <SidebarMenuButton
+                      size="lg"
+                      className="flex items-center gap-2.5 rounded-lg bg-sidebar-accent/50 px-2.5 py-2 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:px-0"
                     />
                   }
                 >
-                  <LogOut />
-                  <span>Sign out</span>
-                </SidebarMenuButton>
-              </form>
+                  <Avatar className={`size-9 shrink-0 ring-2 ${styles.ring}`}>
+                    <AvatarFallback className="text-xs font-semibold">{initials(profileName, profileEmail)}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5 group-data-[collapsible=icon]:hidden">
+                    <span className="truncate text-sm leading-none font-medium">{profileName || "Account"}</span>
+                    <Badge variant="outline" className={`w-fit text-[10px] ${styles.badge}`}>
+                      {roleLabel}
+                    </Badge>
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" side="top" className="w-64">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Switch account</DropdownMenuLabel>
+                  </DropdownMenuGroup>
+                  <DropdownMenuItem render={<Link href={rootOrigin() ? `${rootOrigin()}/account` : "/account"} />}>
+                    <User /> Personal Account
+                  </DropdownMenuItem>
+                  {isPlatformAdmin ? (
+                    <DropdownMenuItem render={<Link href={portalHref("admin")} />}>
+                      <ShieldCheck /> Admin Console
+                    </DropdownMenuItem>
+                  ) : null}
+                  {contexts.map((c) => (
+                    <DropdownMenuItem key={c.type} render={<Link href={c.href} />}>
+                      <LayoutDashboard />
+                      <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                        <span className="truncate">
+                          {c.name} <span className="text-muted-foreground">· {c.label}</span>
+                        </span>
+                        {c.status && c.status !== "live" ? (
+                          <Badge variant="outline" className="shrink-0 text-[10px] capitalize">
+                            {c.status}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <form action={signOutAction}>
+                    <DropdownMenuItem variant="destructive" render={<button type="submit" className="w-full" />}>
+                      <LogOut /> Sign out
+                    </DropdownMenuItem>
+                  </form>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>

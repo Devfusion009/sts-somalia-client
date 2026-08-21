@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { assertAgencyCanBookProduct, createOrderForBooking, getActiveAgencyId } from "@/modules/orders/helpers";
 import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
+import { notifyPartnerOfBooking } from "@/lib/notifications/partner-booking-notify";
 
 export type ActionState = { error: string | null } | null;
 
@@ -117,6 +118,26 @@ export async function createHallBooking(
     .single();
   if (bookingError || !booking) {
     return { error: bookingError?.message ?? "Could not create the booking. Please try again." };
+  }
+
+  // Org-level email/WhatsApp to the owning partner (the in-app bell already
+  // reaches every partner staff member via the hall_bookings insert
+  // trigger). Best-effort — skipped entirely for STS-managed venues
+  // (partner_id null).
+  if (venue.partner_id) {
+    const { data: venuePartner } = await supabase
+      .from("venue_partners")
+      .select("contact_email, contact_phone")
+      .eq("id", venue.partner_id)
+      .maybeSingle();
+    if (venuePartner) {
+      void notifyPartnerOfBooking({
+        partnerEmail: venuePartner.contact_email,
+        partnerPhone: venuePartner.contact_phone,
+        propertyName: venue.name,
+        summary: `${d.eventType}, ${d.expectedGuests} guests, ${d.startDate}${d.endDate !== d.startDate ? ` → ${d.endDate}` : ""}`,
+      }).catch(() => {});
+    }
   }
 
   const order = await createOrderForBooking(supabase, {

@@ -27,7 +27,6 @@ export default async function VenueDashboardPage() {
         <h1 className="font-heading text-2xl font-semibold">
           Welcome back{profile.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}
         </h1>
-        <p className="text-sm text-muted-foreground">Manage your event venues and booking requests.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

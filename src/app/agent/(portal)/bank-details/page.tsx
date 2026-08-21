@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Info, Landmark } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency } from "@/modules/agencies/queries";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BankDetailsForm } from "./bank-details-form";
 
@@ -20,9 +20,6 @@ export default async function AgentBankDetailsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Bank Details</h1>
-        <p className="text-sm text-muted-foreground">
-          Where refunds and payouts to {agency.name} are sent.
-        </p>
       </div>
 
       {!canManage ? (
@@ -37,7 +34,6 @@ export default async function AgentBankDetailsPage() {
           <CardTitle className="flex items-center gap-2">
             <Landmark className="size-4 text-primary" /> Payout account
           </CardTitle>
-          <CardDescription>Used for commission payouts and approved refunds sent outside the wallet.</CardDescription>
         </CardHeader>
         <CardContent>
           {canManage ? (

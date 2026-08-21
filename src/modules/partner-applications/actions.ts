@@ -412,17 +412,28 @@ function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
 }
 
+/** `<input type="date">` permits extended-year values (e.g. a stray keystroke producing "12028-08-20") that are valid per spec but nonsense for a document expiry. */
+function isValidExpiry(value: string | null): boolean {
+  if (value === null) return true;
+  const match = /^(\d{4})-\d{2}-\d{2}$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  return year >= 1900 && year <= 2100;
+}
+
 export async function uploadApplicationDocument(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const kind = kindOf(formData);
   const id = String(formData.get("applicationId"));
   const docKey = String(formData.get("docKey") || "");
   const docLabel = String(formData.get("docLabel") || docKey);
   const file = formData.get("file");
+  const expiry = String(formData.get("expiry") || "") || null;
 
   if (!docKey) return { error: "Unknown document type." };
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to upload." };
   if (!ALLOWED_TYPES.includes(file.type)) return { error: "Only JPG, PNG, or PDF files are accepted." };
   if (file.size > MAX_UPLOAD_BYTES) return { error: "File must be 5MB or smaller." };
+  if (!isValidExpiry(expiry)) return { error: "Enter a valid expiry date." };
 
   const user = await requireUser();
   const { supabase, application } = await getEditableApplication(kind, id, user.id);
@@ -445,7 +456,7 @@ export async function uploadApplicationDocument(_prev: ActionState, formData: Fo
   }
   const next = [
     ...existing.filter((d) => d.key !== docKey),
-    { key: docKey, label: docLabel, storage_path: storagePath, file_name: file.name, uploaded_at: new Date().toISOString() },
+    { key: docKey, label: docLabel, storage_path: storagePath, file_name: file.name, file_size: file.size, expiry, uploaded_at: new Date().toISOString() },
   ];
 
   const { error } = await supabase.from(APP_CONFIG[kind].table).update({ document_refs: next } as never).eq("id", id);
@@ -474,12 +485,58 @@ export async function removeApplicationDocument(formData: FormData): Promise<voi
   revalidatePath(wizardPath(kind, id, 5));
 }
 
-export async function advanceToReview(formData: FormData): Promise<void> {
+/** Separate from the upload itself so an applicant can correct/renew the expiry on an already-uploaded license without re-uploading the file. */
+export async function updateDocumentExpiry(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const kind = kindOf(formData);
+  const id = String(formData.get("applicationId"));
+  const docKey = String(formData.get("docKey") || "");
+  const expiry = String(formData.get("expiry") || "") || null;
+  if (!isValidExpiry(expiry)) return { error: "Enter a valid expiry date." };
+
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(kind, id, user.id);
+  if (!application) return { error: "This application can no longer be edited." };
+
+  const existing: DocumentRef[] = Array.isArray(application.document_refs) ? (application.document_refs as DocumentRef[]) : [];
+  if (!existing.some((d) => d.key === docKey)) return { error: "Upload the document before setting an expiry date." };
+  const next = existing.map((d) => (d.key === docKey ? { ...d, expiry } : d));
+
+  const { error } = await supabase.from(APP_CONFIG[kind].table).update({ document_refs: next } as never).eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath(wizardPath(kind, id, 5));
+  return { error: null };
+}
+
+/** Signed URL is generated on demand (not stored) so a stale/expired link is never rendered — callers open the returned URL directly. */
+export async function getDocumentViewUrl(kind: ApplicationKind, id: string, docKey: string): Promise<{ url: string } | { error: string }> {
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(kind, id, user.id);
+  if (!application) return { error: "This application can no longer be edited." };
+
+  const refs: DocumentRef[] = Array.isArray(application.document_refs) ? (application.document_refs as DocumentRef[]) : [];
+  const ref = refs.find((d) => d.key === docKey);
+  if (!ref) return { error: "Document not found." };
+
+  const { data, error } = await supabase.storage.from("kyc-documents").createSignedUrl(ref.storage_path, 3600);
+  if (error || !data) return { error: "Could not generate a link." };
+  return { url: data.signedUrl };
+}
+
+export async function advanceToReview(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const kind = kindOf(formData);
   const id = String(formData.get("applicationId"));
   const user = await requireUser();
   const { supabase, application } = await getEditableApplication(kind, id, user.id);
   if (!application) redirect("/account/become");
+
+  const uploaded = new Set(
+    (Array.isArray(application!.document_refs) ? (application!.document_refs as DocumentRef[]) : []).map((d) => d.key)
+  );
+  const missing = docSlotsFor(kind).filter((slot) => !slot.optional && !uploaded.has(slot.key));
+  if (missing.length > 0) {
+    return { error: `Please upload: ${missing.map((s) => s.label).join(", ")}.` };
+  }
 
   const currentStep = Number((application!.business_details as Record<string, unknown> | null)?._wizard_step) || 1;
   const details = mergeDetails(application!.business_details, { _wizard_step: Math.max(6, currentStep) });

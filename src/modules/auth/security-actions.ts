@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
@@ -77,29 +76,6 @@ export async function signOutEverywhereAction(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut({ scope: "global" });
   redirect("/login");
-}
-
-/** Records a sign-in for the login-history list. Best-effort; never blocks login. */
-export async function recordLoginEvent(profileId: string, portal?: string): Promise<void> {
-  try {
-    const supabase = await createClient();
-    const headerList = await headers();
-
-    // x-forwarded-for is a comma-separated chain; the first entry is the
-    // client. Behind a proxy that doesn't set it, this is simply null — an
-    // unknown IP is better than recording the load balancer's.
-    const forwarded = headerList.get("x-forwarded-for");
-    const ip = forwarded?.split(",")[0]?.trim() || null;
-
-    await supabase.from("login_events").insert({
-      profile_id: profileId,
-      portal: portal ?? null,
-      ip_address: ip,
-      user_agent: headerList.get("user-agent")?.slice(0, 500) ?? null,
-    });
-  } catch {
-    // A failed audit write must never stop someone signing in.
-  }
 }
 
 const deletionSchema = z.object({

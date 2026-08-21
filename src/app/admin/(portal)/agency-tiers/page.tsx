@@ -20,10 +20,6 @@ export default async function AgencyTiersPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold">Agency Tiers</h1>
-          <p className="text-sm text-muted-foreground">
-            Labeled presets (e.g. Silver/Gold) for commission rate and credit limit — assign one
-            to an agency from its detail page, then apply the defaults with one click.
-          </p>
         </div>
         <CreateTierForm />
       </div>

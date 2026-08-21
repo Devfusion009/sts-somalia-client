@@ -359,7 +359,6 @@ export default async function AdminApplicationsPage({
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-semibold">Partner Applications</h1>
-        <p className="text-sm text-muted-foreground">Review and manage partner applications by category.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">

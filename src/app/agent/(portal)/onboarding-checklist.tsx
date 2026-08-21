@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Circle, CheckCircle2 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import type { AgencyOnboardingStatus } from "@/modules/agencies/queries";
 
 const ITEMS: Array<{ key: keyof AgencyOnboardingStatus; label: string; description: string; href: string }> = [
@@ -32,7 +32,6 @@ export function OnboardingChecklist({ status }: { status: AgencyOnboardingStatus
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Getting started</CardTitle>
-        <CardDescription>A few things to set up before you&apos;re fully up and running.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         {ITEMS.map((item) => {

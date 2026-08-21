@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Plus, Building2, BedDouble, MapPin, Star } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import { getMyPartnerId, getMyHotels } from "@/modules/hotels/partner-queries";
+import { getMyHotelScope, getMyHotels } from "@/modules/hotels/partner-queries";
 import { hotelImageUrls } from "@/modules/hotels/images";
 import { MediaPlaceholder } from "@/components/media-placeholder";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,9 +19,9 @@ const STATUS_BADGE: Record<string, string> = {
 
 export default async function PartnerHotelsPage() {
   const profile = await requireUser();
-  const partnerId = await getMyPartnerId(profile.id);
+  const scope = await getMyHotelScope(profile.id);
 
-  if (!partnerId) {
+  if (scope.hotelIds.length === 0) {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -30,18 +31,30 @@ export default async function PartnerHotelsPage() {
     );
   }
 
-  const hotels = await getMyHotels(partnerId);
+  // A pure manager with exactly one hotel has nothing to pick between here —
+  // the sidebar already links straight to it (see navGroupsFor in the
+  // layout), but redirect this URL too in case it's reached directly.
+  if (scope.partnerId === null && scope.hotelIds.length === 1) {
+    redirect(`/partner/hotels/${scope.hotelIds[0]}`);
+  }
+
+  const hotels = await getMyHotels(scope.hotelIds);
+  // Creating a brand-new hotel requires an actual hotel_partner business to
+  // attach it to — a hotel_manager (scope.partnerId null) only ever operates
+  // hotels admin already assigned them, never adds one of their own.
+  const canCreateHotel = scope.partnerId !== null;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold">My Hotels</h1>
-          <p className="text-sm text-muted-foreground">Manage your properties and rooms.</p>
         </div>
-        <Button render={<Link href="/partner/hotels/new" />} className="gap-1.5">
-          <Plus className="size-4" /> Add hotel
-        </Button>
+        {canCreateHotel ? (
+          <Button render={<Link href="/partner/hotels/new" />} className="gap-1.5">
+            <Plus className="size-4" /> Add hotel
+          </Button>
+        ) : null}
       </div>
 
       {hotels.length === 0 ? (
@@ -52,11 +65,15 @@ export default async function PartnerHotelsPage() {
             </span>
             <p className="font-medium">No hotels yet</p>
             <p className="text-sm text-muted-foreground">
-              Add your first property to start taking bookings.
+              {canCreateHotel
+                ? "Add your first property to start taking bookings."
+                : "Ask an admin to assign you as a manager on a hotel."}
             </p>
-            <Button render={<Link href="/partner/hotels/new" />} className="gap-1.5">
-              <Plus className="size-4" /> Add hotel
-            </Button>
+            {canCreateHotel ? (
+              <Button render={<Link href="/partner/hotels/new" />} className="gap-1.5">
+                <Plus className="size-4" /> Add hotel
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : (

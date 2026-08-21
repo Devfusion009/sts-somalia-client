@@ -49,9 +49,6 @@ export default async function AgentCalendarPage({
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Event Calendar</h1>
-        <p className="text-sm text-muted-foreground">
-          Every upcoming event {membership.agency.name} has booked — who, what, and any date conflicts.
-        </p>
       </div>
       <EventCalendar
         month={month}

@@ -1199,6 +1199,7 @@ export type Database = {
           capacity_seated: number | null
           capacity_standing: number | null
           city: string
+          contact_email: string | null
           country_code: string
           created_at: string
           currency: string
@@ -1210,6 +1211,7 @@ export type Database = {
           name: string
           partner_id: string | null
           phone: string | null
+          policies: string | null
           price_unit: string
           size_sqm: number | null
           slug: string
@@ -1224,6 +1226,7 @@ export type Database = {
           capacity_seated?: number | null
           capacity_standing?: number | null
           city: string
+          contact_email?: string | null
           country_code?: string
           created_at?: string
           currency?: string
@@ -1235,6 +1238,7 @@ export type Database = {
           name: string
           partner_id?: string | null
           phone?: string | null
+          policies?: string | null
           price_unit?: string
           size_sqm?: number | null
           slug: string
@@ -1249,6 +1253,7 @@ export type Database = {
           capacity_seated?: number | null
           capacity_standing?: number | null
           city?: string
+          contact_email?: string | null
           country_code?: string
           created_at?: string
           currency?: string
@@ -1260,6 +1265,7 @@ export type Database = {
           name?: string
           partner_id?: string | null
           phone?: string | null
+          policies?: string | null
           price_unit?: string
           size_sqm?: number | null
           slug?: string
@@ -1726,6 +1732,61 @@ export type Database = {
           },
         ]
       }
+      hotel_managers: {
+        Row: {
+          can_manage_bookings: boolean
+          can_manage_photos: boolean
+          created_at: string
+          created_by: string | null
+          hotel_id: string
+          id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["member_status"]
+        }
+        Insert: {
+          can_manage_bookings?: boolean
+          can_manage_photos?: boolean
+          created_at?: string
+          created_by?: string | null
+          hotel_id: string
+          id?: string
+          profile_id: string
+          status?: Database["public"]["Enums"]["member_status"]
+        }
+        Update: {
+          can_manage_bookings?: boolean
+          can_manage_photos?: boolean
+          created_at?: string
+          created_by?: string | null
+          hotel_id?: string
+          id?: string
+          profile_id?: string
+          status?: Database["public"]["Enums"]["member_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_managers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_managers_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_managers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_partner_applications: {
         Row: {
           applicant_id: string
@@ -1926,6 +1987,24 @@ export type Database = {
           },
         ]
       }
+      hotel_room_types: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       hotel_rooms: {
         Row: {
           amenities: Json
@@ -1934,6 +2013,7 @@ export type Database = {
           created_at: string
           currency: string
           description: string | null
+          floor: string | null
           hotel_id: string
           id: string
           images: Json
@@ -1950,6 +2030,7 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          floor?: string | null
           hotel_id: string
           id?: string
           images?: Json
@@ -1966,6 +2047,7 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          floor?: string | null
           hotel_id?: string
           id?: string
           images?: Json
@@ -1990,7 +2072,10 @@ export type Database = {
           address_line: string | null
           amenities: Json
           booking_mode: string
+          check_in_time: string | null
+          check_out_time: string | null
           city: string
+          contact_email: string | null
           country_code: string
           created_at: string
           description: string | null
@@ -2001,6 +2086,7 @@ export type Database = {
           name: string
           partner_id: string | null
           phone: string | null
+          policies: string | null
           slug: string
           star_rating: number | null
           status: Database["public"]["Enums"]["listing_status"]
@@ -2010,7 +2096,10 @@ export type Database = {
           address_line?: string | null
           amenities?: Json
           booking_mode?: string
+          check_in_time?: string | null
+          check_out_time?: string | null
           city: string
+          contact_email?: string | null
           country_code: string
           created_at?: string
           description?: string | null
@@ -2021,6 +2110,7 @@ export type Database = {
           name: string
           partner_id?: string | null
           phone?: string | null
+          policies?: string | null
           slug: string
           star_rating?: number | null
           status?: Database["public"]["Enums"]["listing_status"]
@@ -2030,7 +2120,10 @@ export type Database = {
           address_line?: string | null
           amenities?: Json
           booking_mode?: string
+          check_in_time?: string | null
+          check_out_time?: string | null
           city?: string
+          contact_email?: string | null
           country_code?: string
           created_at?: string
           description?: string | null
@@ -2041,6 +2134,7 @@ export type Database = {
           name?: string
           partner_id?: string | null
           phone?: string | null
+          policies?: string | null
           slug?: string
           star_rating?: number | null
           status?: Database["public"]["Enums"]["listing_status"]
@@ -3032,13 +3126,15 @@ export type Database = {
         Row: {
           agency_id: string | null
           booked_by: string
+          booking_kind: string
           created_at: string
           currency: string
+          custom_request_id: string | null
           customer_id: string
-          departure_id: string
+          departure_id: string | null
           id: string
           num_pilgrims: number
-          package_id: string
+          package_id: string | null
           special_requests: string | null
           status: Database["public"]["Enums"]["booking_status"]
           total_price: number
@@ -3047,13 +3143,15 @@ export type Database = {
         Insert: {
           agency_id?: string | null
           booked_by: string
+          booking_kind?: string
           created_at?: string
           currency?: string
+          custom_request_id?: string | null
           customer_id: string
-          departure_id: string
+          departure_id?: string | null
           id?: string
           num_pilgrims: number
-          package_id: string
+          package_id?: string | null
           special_requests?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
           total_price: number
@@ -3062,13 +3160,15 @@ export type Database = {
         Update: {
           agency_id?: string | null
           booked_by?: string
+          booking_kind?: string
           created_at?: string
           currency?: string
+          custom_request_id?: string | null
           customer_id?: string
-          departure_id?: string
+          departure_id?: string | null
           id?: string
           num_pilgrims?: number
-          package_id?: string
+          package_id?: string | null
           special_requests?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
           total_price?: number
@@ -3090,6 +3190,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "umrah_bookings_custom_request_id_fkey"
+            columns: ["custom_request_id"]
+            isOneToOne: false
+            referencedRelation: "umrah_custom_requests"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "umrah_bookings_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -3108,6 +3215,145 @@ export type Database = {
             columns: ["package_id"]
             isOneToOne: false
             referencedRelation: "umrah_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      umrah_custom_request_services: {
+        Row: {
+          category: Database["public"]["Enums"]["umrah_service_category"]
+          created_at: string
+          id: string
+          line_total: number
+          name: string
+          price_unit: Database["public"]["Enums"]["umrah_price_unit"]
+          quantity: number
+          request_id: string
+          service_id: string | null
+          unit_price: number
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["umrah_service_category"]
+          created_at?: string
+          id?: string
+          line_total: number
+          name: string
+          price_unit: Database["public"]["Enums"]["umrah_price_unit"]
+          quantity: number
+          request_id: string
+          service_id?: string | null
+          unit_price: number
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["umrah_service_category"]
+          created_at?: string
+          id?: string
+          line_total?: number
+          name?: string
+          price_unit?: Database["public"]["Enums"]["umrah_price_unit"]
+          quantity?: number
+          request_id?: string
+          service_id?: string | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "umrah_custom_request_services_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "umrah_custom_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "umrah_custom_request_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "umrah_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      umrah_custom_requests: {
+        Row: {
+          agency_id: string | null
+          booked_by: string
+          created_at: string
+          currency: string
+          current_step: number
+          customer_id: string
+          departure_date: string | null
+          id: string
+          nights_madinah: number
+          nights_makkah: number
+          notes: string | null
+          num_pilgrims: number
+          pilgrims: Json
+          reference: string
+          status: string
+          subtotal: number
+          tier: Database["public"]["Enums"]["umrah_tier"]
+          updated_at: string
+        }
+        Insert: {
+          agency_id?: string | null
+          booked_by: string
+          created_at?: string
+          currency?: string
+          current_step?: number
+          customer_id: string
+          departure_date?: string | null
+          id?: string
+          nights_madinah?: number
+          nights_makkah?: number
+          notes?: string | null
+          num_pilgrims?: number
+          pilgrims?: Json
+          reference?: string
+          status?: string
+          subtotal?: number
+          tier?: Database["public"]["Enums"]["umrah_tier"]
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string | null
+          booked_by?: string
+          created_at?: string
+          currency?: string
+          current_step?: number
+          customer_id?: string
+          departure_date?: string | null
+          id?: string
+          nights_madinah?: number
+          nights_makkah?: number
+          notes?: string | null
+          num_pilgrims?: number
+          pilgrims?: Json
+          reference?: string
+          status?: string
+          subtotal?: number
+          tier?: Database["public"]["Enums"]["umrah_tier"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "umrah_custom_requests_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "umrah_custom_requests_booked_by_fkey"
+            columns: ["booked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "umrah_custom_requests_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3441,6 +3687,60 @@ export type Database = {
           },
         ]
       }
+      umrah_services: {
+        Row: {
+          category: Database["public"]["Enums"]["umrah_service_category"]
+          created_at: string
+          currency: string
+          description: string | null
+          distance_to_haram_m: number | null
+          id: string
+          is_default: boolean
+          name: string
+          price: number
+          price_unit: Database["public"]["Enums"]["umrah_price_unit"]
+          sort_order: number
+          star_rating: number | null
+          status: Database["public"]["Enums"]["listing_status"]
+          tier: Database["public"]["Enums"]["umrah_tier"] | null
+          updated_at: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["umrah_service_category"]
+          created_at?: string
+          currency?: string
+          description?: string | null
+          distance_to_haram_m?: number | null
+          id?: string
+          is_default?: boolean
+          name: string
+          price: number
+          price_unit: Database["public"]["Enums"]["umrah_price_unit"]
+          sort_order?: number
+          star_rating?: number | null
+          status?: Database["public"]["Enums"]["listing_status"]
+          tier?: Database["public"]["Enums"]["umrah_tier"] | null
+          updated_at?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["umrah_service_category"]
+          created_at?: string
+          currency?: string
+          description?: string | null
+          distance_to_haram_m?: number | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          price?: number
+          price_unit?: Database["public"]["Enums"]["umrah_price_unit"]
+          sort_order?: number
+          star_rating?: number | null
+          status?: Database["public"]["Enums"]["listing_status"]
+          tier?: Database["public"]["Enums"]["umrah_tier"] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       venue_partner_applications: {
         Row: {
           applicant_id: string
@@ -3660,9 +3960,15 @@ export type Database = {
           created_at: string
           currency: string
           current_step: number
+          custom_answers: Json
           decided_at: string | null
           decided_by: string | null
           id: string
+          partner_last_synced_at: string | null
+          partner_provider_key: string | null
+          partner_raw_payload: Json | null
+          partner_ref: string | null
+          partner_status: string | null
           price: number
           status: Database["public"]["Enums"]["visa_status"]
           submitted_by: string
@@ -3682,9 +3988,15 @@ export type Database = {
           created_at?: string
           currency?: string
           current_step?: number
+          custom_answers?: Json
           decided_at?: string | null
           decided_by?: string | null
           id?: string
+          partner_last_synced_at?: string | null
+          partner_provider_key?: string | null
+          partner_raw_payload?: Json | null
+          partner_ref?: string | null
+          partner_status?: string | null
           price: number
           status?: Database["public"]["Enums"]["visa_status"]
           submitted_by: string
@@ -3704,9 +4016,15 @@ export type Database = {
           created_at?: string
           currency?: string
           current_step?: number
+          custom_answers?: Json
           decided_at?: string | null
           decided_by?: string | null
           id?: string
+          partner_last_synced_at?: string | null
+          partner_provider_key?: string | null
+          partner_raw_payload?: Json | null
+          partner_ref?: string | null
+          partner_status?: string | null
           price?: number
           status?: Database["public"]["Enums"]["visa_status"]
           submitted_by?: string
@@ -3923,61 +4241,79 @@ export type Database = {
       }
       visa_types: {
         Row: {
+          application_questions: Json
           created_at: string
           currency: string
           description: string | null
           destination_country_code: string
+          eligibility_requirements: string | null
           entry_type: string
           id: string
           is_featured: boolean
           name: string
           overview: string | null
+          partner_provider_key: string | null
           price: number
           processing_days_max: number | null
           processing_days_min: number | null
+          processing_fee: number | null
+          processing_mode: Database["public"]["Enums"]["visa_processing_mode"]
           required_documents: Json
           status: Database["public"]["Enums"]["listing_status"]
           stay_days: number | null
+          terms_and_conditions: string | null
           updated_at: string
           validity_days: number | null
           visa_category: string
         }
         Insert: {
+          application_questions?: Json
           created_at?: string
           currency?: string
           description?: string | null
           destination_country_code: string
+          eligibility_requirements?: string | null
           entry_type?: string
           id?: string
           is_featured?: boolean
           name: string
           overview?: string | null
+          partner_provider_key?: string | null
           price: number
           processing_days_max?: number | null
           processing_days_min?: number | null
+          processing_fee?: number | null
+          processing_mode?: Database["public"]["Enums"]["visa_processing_mode"]
           required_documents?: Json
           status?: Database["public"]["Enums"]["listing_status"]
           stay_days?: number | null
+          terms_and_conditions?: string | null
           updated_at?: string
           validity_days?: number | null
           visa_category?: string
         }
         Update: {
+          application_questions?: Json
           created_at?: string
           currency?: string
           description?: string | null
           destination_country_code?: string
+          eligibility_requirements?: string | null
           entry_type?: string
           id?: string
           is_featured?: boolean
           name?: string
           overview?: string | null
+          partner_provider_key?: string | null
           price?: number
           processing_days_max?: number | null
           processing_days_min?: number | null
+          processing_fee?: number | null
+          processing_mode?: Database["public"]["Enums"]["visa_processing_mode"]
           required_documents?: Json
           status?: Database["public"]["Enums"]["listing_status"]
           stay_days?: number | null
+          terms_and_conditions?: string | null
           updated_at?: string
           validity_days?: number | null
           visa_category?: string
@@ -3992,6 +4328,77 @@ export type Database = {
       _apply_order_cancellation: {
         Args: { reason?: string; target_order_id: string }
         Returns: undefined
+      }
+      admin_add_hotel_manager:
+        | {
+            Args: { p_email: string; p_hotel_id: string }
+            Returns: {
+              can_manage_bookings: boolean
+              can_manage_photos: boolean
+              created_at: string
+              created_by: string | null
+              hotel_id: string
+              id: string
+              profile_id: string
+              status: Database["public"]["Enums"]["member_status"]
+            }
+            SetofOptions: {
+              from: "*"
+              to: "hotel_managers"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: {
+              p_can_manage_bookings?: boolean
+              p_can_manage_photos?: boolean
+              p_email: string
+              p_hotel_id: string
+            }
+            Returns: {
+              can_manage_bookings: boolean
+              can_manage_photos: boolean
+              created_at: string
+              created_by: string | null
+              hotel_id: string
+              id: string
+              profile_id: string
+              status: Database["public"]["Enums"]["member_status"]
+            }
+            SetofOptions: {
+              from: "*"
+              to: "hotel_managers"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      admin_remove_hotel_manager: {
+        Args: { p_manager_id: string }
+        Returns: undefined
+      }
+      admin_update_hotel_manager_permissions: {
+        Args: {
+          p_can_manage_bookings: boolean
+          p_can_manage_photos: boolean
+          p_manager_id: string
+        }
+        Returns: {
+          can_manage_bookings: boolean
+          can_manage_photos: boolean
+          created_at: string
+          created_by: string | null
+          hotel_id: string
+          id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["member_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "hotel_managers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       apply_agency_wallet_transaction: {
         Args: {
@@ -4048,6 +4455,7 @@ export type Database = {
       generate_hotel_partner_application_ref: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
       generate_order_number: { Args: never; Returns: string }
+      generate_umrah_request_ref: { Args: never; Returns: string }
       generate_venue_partner_application_ref: { Args: never; Returns: string }
       generate_visa_application_ref: { Args: never; Returns: string }
       get_venue_occupied_ranges: {
@@ -4062,6 +4470,14 @@ export type Database = {
         Args: { check_role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
       }
+      hotel_manager_can_manage_bookings: {
+        Args: { target_hotel_id: string }
+        Returns: boolean
+      }
+      hotel_manager_can_manage_photos: {
+        Args: { target_hotel_id: string }
+        Returns: boolean
+      }
       is_admin: { Args: never; Returns: boolean }
       is_affiliate_owner: {
         Args: { target_affiliate_id: string }
@@ -4074,6 +4490,7 @@ export type Database = {
         Args: { target_agency_id: string }
         Returns: boolean
       }
+      is_hotel_manager: { Args: { target_hotel_id: string }; Returns: boolean }
       is_hotel_partner_member: {
         Args: { target_partner_id: string }
         Returns: boolean
@@ -4090,6 +4507,7 @@ export type Database = {
         Args: { target_partner_id: string }
         Returns: boolean
       }
+      my_operable_hotel_ids: { Args: never; Returns: string[] }
       promote_user_role: {
         Args: {
           new_role: Database["public"]["Enums"]["app_role"]
@@ -4176,6 +4594,7 @@ export type Database = {
         | "affiliate"
         | "admin"
         | "venue_partner"
+        | "hotel_manager"
       application_status:
         | "pending"
         | "approved"
@@ -4221,6 +4640,7 @@ export type Database = {
         | "cancelled"
         | "refunded"
         | "held"
+        | "partially_paid"
       partner_account_status: "onboarding" | "live" | "suspended" | "offboarded"
       passenger_type: "adult" | "child" | "infant"
       payment_status:
@@ -4245,6 +4665,21 @@ export type Database = {
         | "travel_insurance"
         | "other"
       trip_type: "one_way" | "round_trip" | "multi_city"
+      umrah_price_unit:
+        | "per_person"
+        | "per_person_per_night"
+        | "per_night"
+        | "per_booking"
+      umrah_service_category:
+        | "hotel_makkah"
+        | "hotel_madinah"
+        | "flight"
+        | "visa"
+        | "transport"
+        | "intercity"
+        | "extra"
+      umrah_tier: "basic" | "standard" | "premium"
+      visa_processing_mode: "in_house" | "partner"
       visa_status:
         | "draft"
         | "submitted"
@@ -4404,6 +4839,7 @@ export const Constants = {
         "affiliate",
         "admin",
         "venue_partner",
+        "hotel_manager",
       ],
       application_status: [
         "pending",
@@ -4454,6 +4890,7 @@ export const Constants = {
         "cancelled",
         "refunded",
         "held",
+        "partially_paid",
       ],
       partner_account_status: ["onboarding", "live", "suspended", "offboarded"],
       passenger_type: ["adult", "child", "infant"],
@@ -4481,6 +4918,23 @@ export const Constants = {
         "other",
       ],
       trip_type: ["one_way", "round_trip", "multi_city"],
+      umrah_price_unit: [
+        "per_person",
+        "per_person_per_night",
+        "per_night",
+        "per_booking",
+      ],
+      umrah_service_category: [
+        "hotel_makkah",
+        "hotel_madinah",
+        "flight",
+        "visa",
+        "transport",
+        "intercity",
+        "extra",
+      ],
+      umrah_tier: ["basic", "standard", "premium"],
+      visa_processing_mode: ["in_house", "partner"],
       visa_status: [
         "draft",
         "submitted",

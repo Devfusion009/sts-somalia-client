@@ -22,7 +22,6 @@ import {
   Card,
   CardAction,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -61,6 +60,7 @@ const ROLE_CHART_LABELS: Record<AppRole, string> = {
   customer: "Customers",
   agent: "Agents",
   hotel_partner: "Hotel Partners",
+  hotel_manager: "Hotel Managers",
   affiliate: "Affiliates",
   venue_partner: "Venue Partners",
   admin: "Admins",
@@ -155,10 +155,7 @@ export default async function AdminDashboardPage({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-0.5">
-          <h1 className="font-heading text-2xl font-bold tracking-tight">Admin Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Platform-wide overview &middot; {range.label.toLowerCase()}.</p>
-        </div>
+        <h1 className="font-heading text-2xl font-bold tracking-tight">Admin Dashboard</h1>
         <DateRangePicker currentKey={range.key} />
       </div>
 
@@ -225,7 +222,6 @@ export default async function AdminDashboardPage({
         <Card className={cn(CARD, "lg:col-span-3")}>
           <CardHeader>
             <CardTitle>Revenue trend</CardTitle>
-            <CardDescription>Paid revenue and order volume, {range.label.toLowerCase()}.</CardDescription>
           </CardHeader>
           <CardContent>
             <RevenueTrendChart data={revenueTrend} />
@@ -235,7 +231,6 @@ export default async function AdminDashboardPage({
         <Card className={cn(CARD, "lg:col-span-2")}>
           <CardHeader>
             <CardTitle>Bookings by type</CardTitle>
-            <CardDescription>Paid order items, {range.label.toLowerCase()}.</CardDescription>
           </CardHeader>
           <CardContent>
             <BookingsByTypeChart data={bookingsByType} />
@@ -247,7 +242,6 @@ export default async function AdminDashboardPage({
         <Card className={cn(CARD, "lg:col-span-3")}>
           <CardHeader>
             <CardTitle>User growth</CardTitle>
-            <CardDescription>Cumulative registered users, {range.label.toLowerCase()}.</CardDescription>
             <CardAction>
               <ExportLink href={`/admin/reports/user-growth/export?${rangeQuery}`} />
             </CardAction>
@@ -260,7 +254,6 @@ export default async function AdminDashboardPage({
         <Card className={cn(CARD, "lg:col-span-2")}>
           <CardHeader>
             <CardTitle>B2B vs B2C</CardTitle>
-            <CardDescription>Agency-booked vs direct-customer orders.</CardDescription>
             <CardAction>
               <ExportLink href={`/admin/reports/b2b-b2c/export?${rangeQuery}`} />
             </CardAction>
@@ -275,7 +268,6 @@ export default async function AdminDashboardPage({
         <Card className={cn(CARD, "lg:col-span-3")}>
           <CardHeader>
             <CardTitle>Recent orders</CardTitle>
-            <CardDescription>The latest orders placed across the platform.</CardDescription>
             <CardAction>
               <Button size="sm" variant="outline" render={<Link href="/admin/orders" />}>
                 View all
@@ -322,7 +314,6 @@ export default async function AdminDashboardPage({
         <Card className={cn(CARD, "lg:col-span-2")}>
           <CardHeader>
             <CardTitle>Top hotels</CardTitle>
-            <CardDescription>By confirmed booking revenue.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-0.5">
             {topHotels.length === 0 ? (
@@ -355,7 +346,6 @@ export default async function AdminDashboardPage({
           <CardTitle className="flex items-center gap-2">
             <Trophy className="size-4 text-brand-gold" /> Agent leaderboard
           </CardTitle>
-          <CardDescription>Top agencies by revenue, {range.label.toLowerCase()}.</CardDescription>
           <CardAction>
             <ExportLink href={`/admin/reports/agent-leaderboard/export?${rangeQuery}`} />
           </CardAction>
@@ -399,10 +389,12 @@ export default async function AdminDashboardPage({
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className={cn(CARD, "lg:col-span-3")}>
           <CardHeader>
-            <CardTitle>Visa pipeline</CardTitle>
-            <CardDescription>
-              {visaActive} application{visaActive === 1 ? "" : "s"} in progress · {visaStats.total} total
-            </CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              Visa pipeline
+              <Badge variant="secondary">
+                {visaActive} active · {visaStats.total} total
+              </Badge>
+            </CardTitle>
             <CardAction>
               <Button size="sm" variant="outline" render={<Link href="/admin/visa" />}>
                 Review
@@ -429,7 +421,6 @@ export default async function AdminDashboardPage({
         <Card className={cn(CARD, "lg:col-span-2")}>
           <CardHeader>
             <CardTitle>Upcoming events</CardTitle>
-            <CardDescription>Next hall bookings on the calendar.</CardDescription>
             <CardAction>
               <Button size="sm" variant="outline" render={<Link href="/admin/events" />}>
                 Manage
@@ -470,7 +461,6 @@ export default async function AdminDashboardPage({
       <Card className={CARD}>
         <CardHeader>
           <CardTitle>Users by role</CardTitle>
-          <CardDescription>How the {stats.totalUsers} registered accounts break down.</CardDescription>
         </CardHeader>
         <CardContent>
           <UsersByRoleChart data={usersByRoleData} />

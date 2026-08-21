@@ -239,6 +239,13 @@ function bookingHref(booking: UnifiedBooking) {
       ? `/visa/apply/${booking.id}`
       : `/account/visa/${booking.id}`;
   }
+  // The private-Umrah builder resumes to whatever step the draft is actually
+  // on (see startUmrahCustomRequest / the landing page's own draft lookup),
+  // so linking straight to the landing page — rather than guessing a step
+  // number here — is what stays correct if that resume logic ever changes.
+  if (booking.type === "umrah" && booking.status === "draft") {
+    return "/umrah/private";
+  }
   return "/account/bookings";
 }
 

@@ -29,7 +29,7 @@ import {
 } from "@/modules/partner-applications/components/detail-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -211,16 +211,9 @@ export default async function PartnerAccountConsolePage({
           <Card>
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <CardTitle className="text-base">
-                    Onboarding — {doneCount}/{checklist.length} complete
-                  </CardTitle>
-                  <CardDescription>
-                    {account.status === "onboarding"
-                      ? "The account goes live automatically the moment every item is complete."
-                      : "Completed items are computed live from real data."}
-                  </CardDescription>
-                </div>
+                <CardTitle className="text-base">
+                  Onboarding — {doneCount}/{checklist.length} complete
+                </CardTitle>
                 {account.status === "onboarding" ? <SendReminderButton accountId={account.id} /> : null}
               </div>
               <Progress value={progressPct} className="mt-2" />
@@ -387,10 +380,6 @@ export default async function PartnerAccountConsolePage({
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Link2 className="size-4" /> Affiliate program
                 </CardTitle>
-                <CardDescription>
-                  Referral performance lives in the affiliate&apos;s own dashboard — this view will grow as the
-                  program does.
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
@@ -421,9 +410,6 @@ export default async function PartnerAccountConsolePage({
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Commercial terms</CardTitle>
-              <CardDescription>
-                Commission is the platform&apos;s cut{type === "hotel_partner" ? " of each completed stay" : ""}.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <CommercialTermsForm
@@ -438,10 +424,6 @@ export default async function PartnerAccountConsolePage({
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Record Commission Payout</CardTitle>
-                <CardDescription>
-                  Total earned {money(detail.affiliateSnapshot.totalEarned)} · total paid out{" "}
-                  {money(detail.affiliateSnapshot.totalPaid)}.
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <AffiliateCommissionPayoutForm accountId={account.id} affiliateId={detail.affiliateSnapshot.id} />
@@ -599,7 +581,6 @@ export default async function PartnerAccountConsolePage({
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Add a team member</CardTitle>
-                  <CardDescription>They need an existing STS account — ask them to sign up first.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <AddMemberForm accountId={account.id} type={type} />
@@ -614,7 +595,6 @@ export default async function PartnerAccountConsolePage({
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Activity log</CardTitle>
-              <CardDescription>Every status change and admin action on this account, newest first.</CardDescription>
             </CardHeader>
             <CardContent>
               {events.length === 0 ? (
@@ -653,8 +633,10 @@ export default async function PartnerAccountConsolePage({
         <TabsContent value="notes" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Internal notes</CardTitle>
-              <CardDescription>Admin-only — never visible to the partner.</CardDescription>
+              <CardTitle className="flex items-center gap-2 text-base">
+                Internal notes
+                <Badge variant="outline">Admin-only</Badge>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <AccountNotesForm accountId={account.id} initialNotes={account.internal_notes} />

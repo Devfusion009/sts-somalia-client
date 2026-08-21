@@ -7,6 +7,8 @@ export type DocumentRef = {
   label: string;
   storage_path: string;
   file_name: string;
+  file_size?: number;
+  expiry?: string | null;
   uploaded_at: string;
 };
 

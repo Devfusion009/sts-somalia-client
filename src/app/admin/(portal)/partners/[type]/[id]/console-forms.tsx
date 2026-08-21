@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BellRing, UserPlus, Trash2 } from "lucide-react";
+import { BellRing, KeyRound, UserPlus, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import {
   adminAddPartnerMember,
   adminUpdatePartnerMemberRole,
   adminRemovePartnerMember,
+  adminResetPartnerMemberPassword,
 } from "@/modules/admin/partner-account-actions";
 import { recordAffiliateCommissionPayout } from "@/modules/affiliates/admin-actions";
 import type { AccountMember, PartnerAccountType } from "@/modules/admin/partner-account-shared";
@@ -233,6 +234,66 @@ export function AddMemberForm({ accountId, type }: { accountId: string; type: Ex
   );
 }
 
+/**
+ * Sets a fresh temp password on this login and shows it once — the admin
+ * relays it to the partner out of band. No "current password" to verify
+ * (this is admin resetting someone else's), so it's a plain confirm dialog,
+ * and it's offered for the owner too, unlike role-change/remove below (a
+ * password reset can't orphan the account).
+ */
+function ResetPasswordButton({ accountId, member }: { accountId: string; member: AccountMember }) {
+  const [state, formAction] = useActionState(adminResetPartnerMemberPassword, null);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button size="icon" variant="outline" className="size-8" onClick={() => setOpen(true)} aria-label="Reset password">
+        <KeyRound className="size-3.5" />
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          {state?.newPassword ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>New password set</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Shown once — copy it now and share it with {member.profile?.full_name ?? member.profile?.email}{" "}
+                  out of band. It won&apos;t be shown again.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <p className="my-2 rounded-md border border-border bg-muted px-3 py-2 font-mono text-sm select-all">
+                {state.newPassword}
+              </p>
+              <AlertDialogFooter>
+                <Button onClick={() => setOpen(false)}>Done</Button>
+              </AlertDialogFooter>
+            </>
+          ) : (
+            <form action={formAction}>
+              <input type="hidden" name="accountId" value={accountId} />
+              <input type="hidden" name="memberId" value={member.id} />
+              <AlertDialogHeader>
+                <AlertDialogTitle>Reset {member.profile?.full_name ?? member.profile?.email}&apos;s password?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Their current password stops working immediately. A new one is generated and shown once for you
+                  to relay to them.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              {state?.error ? <p className="my-2 text-xs text-destructive">{state.error}</p> : null}
+              <AlertDialogFooter>
+                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <SubmitButton pendingText="Resetting…">Reset password</SubmitButton>
+              </AlertDialogFooter>
+            </form>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 export function MemberRowControls({
   accountId,
   type,
@@ -252,8 +313,17 @@ export function MemberRowControls({
     if (removeState && !removeState.error) setConfirmRemove(false);
   }
 
-  if (member.role === "owner" || member.status !== "active") {
-    return <span className="text-xs text-muted-foreground">{member.role === "owner" ? "Account owner" : "—"}</span>;
+  if (member.status !== "active") {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+
+  if (member.role === "owner") {
+    return (
+      <div className="flex items-center justify-end gap-2">
+        <span className="text-xs text-muted-foreground">Account owner</span>
+        <ResetPasswordButton accountId={accountId} member={member} />
+      </div>
+    );
   }
 
   return (
@@ -274,6 +344,7 @@ export function MemberRowControls({
           ))}
         </select>
       </form>
+      <ResetPasswordButton accountId={accountId} member={member} />
       <Button
         size="icon"
         variant="outline"

@@ -35,7 +35,7 @@ export async function getMyBookings(): Promise<MyBookingsResult> {
   const supabase = await createClient();
   const orFilter = `customer_id.eq.${profile.id},booked_by.eq.${profile.id}`;
 
-  const [hotelRes, flightRes, visaRes, umrahRes, hallRes, orderItemsRes] = await Promise.all([
+  const [hotelRes, flightRes, visaRes, umrahRes, umrahDraftRes, hallRes, orderItemsRes] = await Promise.all([
     supabase
       .from("hotel_bookings")
       .select("id, check_in, check_out, status, total_price, currency, created_at, hotels(name)")
@@ -53,8 +53,19 @@ export async function getMyBookings(): Promise<MyBookingsResult> {
     supabase
       .from("umrah_bookings")
       .select(
-        "id, status, total_price, currency, created_at, num_pilgrims, umrah_packages(name), umrah_package_departures(departure_date, return_date)"
+        "id, status, total_price, currency, created_at, num_pilgrims, booking_kind, umrah_packages(name), umrah_package_departures(departure_date, return_date), umrah_custom_requests(reference, departure_date)"
       )
+      .or(orFilter),
+    // A private-Umrah draft has no umrah_bookings row at all — that's only
+    // created on final submit (see submitUmrahCustomRequest) — so without
+    // this second query, a build abandoned mid-wizard is invisible here even
+    // though it's exactly the kind of unfinished work this page exists to
+    // surface. Mirrors how visa_applications above is queried with no status
+    // filter, so its own drafts already flow through the same way.
+    supabase
+      .from("umrah_custom_requests")
+      .select("id, reference, status, current_step, num_pilgrims, departure_date, subtotal, currency, created_at")
+      .eq("status", "draft")
       .or(orFilter),
     supabase
       .from("hall_bookings")
@@ -137,17 +148,46 @@ export async function getMyBookings(): Promise<MyBookingsResult> {
       travelDate: visaArrivalDate(v.travel_details),
       ...link("visa", v.id),
     })),
+    // Both Umrah flows land in umrah_bookings. A group booking names its
+    // package and travels on a scheduled departure; a private one names its
+    // request reference and travels on the customer's own date.
     ...(umrahRes.data ?? []).map((u) => ({
       id: u.id,
       type: "umrah" as const,
-      title: u.umrah_packages?.name ?? "Umrah booking",
-      subtitle: `${u.num_pilgrims} pilgrim${u.num_pilgrims > 1 ? "s" : ""}`,
+      title:
+        u.booking_kind === "private"
+          ? "Private Umrah"
+          : (u.umrah_packages?.name ?? "Umrah booking"),
+      subtitle:
+        u.booking_kind === "private" && u.umrah_custom_requests
+          ? `${u.umrah_custom_requests.reference} · ${u.num_pilgrims} pilgrim${u.num_pilgrims > 1 ? "s" : ""}`
+          : `${u.num_pilgrims} pilgrim${u.num_pilgrims > 1 ? "s" : ""}`,
       status: u.status,
       price: u.total_price,
       currency: u.currency,
       createdAt: u.created_at,
-      travelDate: u.umrah_package_departures?.departure_date ?? null,
+      travelDate:
+        u.umrah_package_departures?.departure_date ??
+        u.umrah_custom_requests?.departure_date ??
+        null,
       ...link("umrah", u.id),
+    })),
+    // Drafts never had an order (that happens at submit), so `link()` is
+    // skipped rather than looked up — an id from a different table would
+    // never match anything in orderByBooking anyway, but this makes the
+    // "no order" reason explicit instead of relying on a lookup miss.
+    ...(umrahDraftRes.data ?? []).map((r) => ({
+      id: r.id,
+      type: "umrah" as const,
+      title: "Private Umrah",
+      subtitle: `${r.reference} · ${r.num_pilgrims} traveller${r.num_pilgrims > 1 ? "s" : ""} · step ${r.current_step} of 4`,
+      status: "draft",
+      price: Number(r.subtotal),
+      currency: r.currency,
+      createdAt: r.created_at,
+      travelDate: r.departure_date,
+      orderId: null,
+      orderStatus: null,
     })),
     ...(hallRes.data ?? []).map((h) => ({
       id: h.id,

@@ -3,7 +3,7 @@ import { Info } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { agencyLogoUrl } from "@/modules/agencies/logo";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AgencyLogoUploader } from "./agency-logo-uploader";
 import { AgencyProfileForm } from "./agency-profile-form";
@@ -22,9 +22,6 @@ export default async function AgentSettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Agency Profile</h1>
-        <p className="text-sm text-muted-foreground">
-          How {agency.name} appears across STS Somalia — logo, contact details, and business info.
-        </p>
       </div>
 
       {!canManage ? (
@@ -39,7 +36,6 @@ export default async function AgentSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Logo</CardTitle>
-          <CardDescription>Shown on your invoices and across the agent portal.</CardDescription>
         </CardHeader>
         <CardContent>
           {canManage ? (
@@ -58,7 +54,6 @@ export default async function AgentSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Agency details</CardTitle>
-          <CardDescription>Legal and contact information for {agency.name}.</CardDescription>
         </CardHeader>
         <CardContent>
           {canManage ? (

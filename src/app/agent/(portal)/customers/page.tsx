@@ -27,10 +27,6 @@ export default async function AgentCustomersPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold">Customers</h1>
-          <p className="text-sm text-muted-foreground">
-            {membership.agency.name}&apos;s client book — pick any of them in the &ldquo;Booking
-            for&rdquo; field when you book.
-          </p>
         </div>
         <AddCustomerForm />
       </div>

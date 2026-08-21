@@ -42,6 +42,9 @@ supabase/.env
 # vercel
 .vercel
 
+# repowise — local codebase-intelligence cache (db/lance/pickle state, regenerated)
+/.repowise
+
 # local business docs — not app code
 /docs
 
@@ -54,4 +57,5 @@ next-env.d.ts
 # Never committed: these are convenience notes for a machine-local database,
 # and a leaked admin password in git history is not something you can take back.
 *CREDENTIALS.local.md
+*CREDENTIALS.local.txt
 *.credentials.local

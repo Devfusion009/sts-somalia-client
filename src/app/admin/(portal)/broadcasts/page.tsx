@@ -20,10 +20,6 @@ export default async function AdminBroadcastsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Broadcasts</h1>
-        <p className="text-sm text-muted-foreground">
-          Push an announcement to every agency at once — fare deals, policy changes, or general
-          notices. Shows as a dismissible banner on their dashboard.
-        </p>
       </div>
 
       <Card>

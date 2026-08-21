@@ -15,7 +15,7 @@ export async function getOrderForCheckout(orderId: string) {
          hotel_booking:hotel_booking_id (id, status, check_in, check_out, num_rooms, guest_details, hotel:hotel_id (name)),
          flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at),
          visa_application:visa_application_id (id, application_ref, applicant_type, visa_type:visa_type_id (name, destination_country_code)),
-         umrah_booking:umrah_booking_id (id, num_pilgrims, package:package_id (name)),
+         umrah_booking:umrah_booking_id (id, num_pilgrims, booking_kind, status, package:package_id (name), custom_request:custom_request_id (reference, departure_date)),
          hall_booking:hall_booking_id (id, status, start_date, end_date, event_type, venue:venue_id (name))
        ),
        payments (*)`
@@ -66,11 +66,20 @@ export function describeOrderItem(item: CheckoutOrderItem): {
     }
     case "umrah": {
       const booking = item.umrah_booking;
+      // A private trip has no package to name — it IS the customer's own
+      // build, identified by its request reference.
+      const isPrivate = booking?.booking_kind === "private";
+      const pilgrims = booking
+        ? `${booking.num_pilgrims} pilgrim${booking.num_pilgrims > 1 ? "s" : ""}`
+        : "";
       return {
-        title: booking?.package?.name ?? "Umrah package",
-        subtitle: booking
-          ? `${booking.num_pilgrims} pilgrim${booking.num_pilgrims > 1 ? "s" : ""}`
-          : "",
+        title: isPrivate
+          ? "Private Umrah"
+          : (booking?.package?.name ?? "Umrah package"),
+        subtitle:
+          isPrivate && booking?.custom_request
+            ? `${booking.custom_request.reference} · ${pilgrims}`
+            : pilgrims,
         href: "/account/bookings",
       };
     }

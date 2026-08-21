@@ -104,15 +104,24 @@ export const MEGA_SECTIONS: MegaSection[] = [
     label: "Umrah",
     href: "/umrah",
     icon: "umrah",
-    blurb: "Guided packages with flights, hotels, visa and transport included.",
+    blurb: "Join a fixed-price group package, or build a private trip on your own dates.",
+    // The two flows are the top-level split everywhere Umrah appears, the
+    // menu included. This column used to be four "By tier" entries that all
+    // pointed at the same /umrah URL — four ways to arrive in the same place,
+    // and no way to reach either product directly.
     columns: [
       {
-        heading: "By tier",
+        heading: "Group Umrah",
         links: [
-          { label: "Economy packages", href: "/umrah" },
-          { label: "Standard packages", href: "/umrah" },
-          { label: "VIP packages", href: "/umrah" },
-          { label: "All Umrah packages", href: "/umrah" },
+          { label: "All group packages", href: "/umrah/group" },
+          { label: "Fixed price per person", href: "/umrah/group" },
+        ],
+      },
+      {
+        heading: "Private Umrah",
+        links: [
+          { label: "Build your own trip", href: "/umrah/private" },
+          { label: "Compare both options", href: "/umrah" },
         ],
       },
     ],
@@ -149,6 +158,8 @@ export const FOOTER_GROUPS: Array<{ heading: string; links: MegaLink[] }> = [
       { label: "Hotels", href: "/hotels" },
       { label: "Visa Services", href: "/visa" },
       { label: "Umrah Packages", href: "/umrah" },
+      { label: "Group Umrah", href: "/umrah/group" },
+      { label: "Private Umrah", href: "/umrah/private" },
       { label: "Events & Halls", href: "/events" },
       { label: "Become a Travel Agent", href: "/agents" },
       { label: "List Your Hotel", href: "/partners" },

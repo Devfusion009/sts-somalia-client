@@ -10,6 +10,24 @@ import {
   updateHotelBookingPrice,
   updateHallBookingPrice,
 } from "@/modules/admin/actions";
+import {
+  updateUmrahBookingStatus,
+  updateUmrahRequestPrice,
+} from "@/modules/umrah/service-admin-actions";
+
+export type QueueKind = "hotel" | "hall" | "umrah";
+
+const STATUS_ACTIONS = {
+  hotel: updateHotelBookingStatus,
+  hall: updateHallBookingStatus,
+  umrah: updateUmrahBookingStatus,
+} as const;
+
+const PRICE_ACTIONS = {
+  hotel: updateHotelBookingPrice,
+  hall: updateHallBookingPrice,
+  umrah: updateUmrahRequestPrice,
+} as const;
 
 /**
  * Confirm / Decline for one queue entry. Confirming a waitlisted hotel
@@ -17,8 +35,8 @@ import {
  * the error ("still not enough rooms available on <date>") surfaces inline,
  * so a stale waitlist entry can't silently double-book.
  */
-export function QueueEntryActions({ kind, bookingId }: { kind: "hotel" | "hall"; bookingId: string }) {
-  const action = kind === "hotel" ? updateHotelBookingStatus : updateHallBookingStatus;
+export function QueueEntryActions({ kind, bookingId }: { kind: QueueKind; bookingId: string }) {
+  const action = STATUS_ACTIONS[kind];
   const [confirmState, confirmAction] = useActionState(action, null);
   const [declineState, declineAction] = useActionState(action, null);
   const error = confirmState?.error ?? declineState?.error;
@@ -58,12 +76,12 @@ export function PriceQuoteForm({
   currentPrice,
   currency,
 }: {
-  kind: "hotel" | "hall";
+  kind: QueueKind;
   bookingId: string;
   currentPrice: number;
   currency: string;
 }) {
-  const action = kind === "hotel" ? updateHotelBookingPrice : updateHallBookingPrice;
+  const action = PRICE_ACTIONS[kind];
   const [state, formAction] = useActionState(action, null);
 
   return (

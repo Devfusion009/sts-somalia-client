@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -39,9 +41,6 @@ export default async function AdminEventsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-semibold">Events &amp; Halls</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage the venue catalog and incoming hall booking requests.
-          </p>
         </div>
         <VenueForm />
       </div>
@@ -103,7 +102,12 @@ export default async function AdminEventsPage() {
                       ) : null}
                     </TableCell>
                     <TableCell className="text-right">
-                      <VenueForm venue={venue} />
+                      <div className="flex justify-end gap-1.5">
+                        <Button size="sm" variant="outline" className="gap-1.5" render={<Link href={`/admin/events/${venue.id}`} />}>
+                          Photos &amp; reviews
+                        </Button>
+                        <VenueForm venue={venue} />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

@@ -62,7 +62,7 @@ import {
   submitVisaApplication,
   type ActionState,
 } from "@/modules/visa/actions";
-import { RELATIONSHIPS, parseDocumentSlots, type DocumentSlot } from "@/modules/visa/schemas";
+import { RELATIONSHIPS, parseDocumentSlots, parseApplicationQuestions, type DocumentSlot } from "@/modules/visa/schemas";
 import type { WizardApplication } from "@/modules/visa/queries";
 
 /* ------------------------------------------------------------------------- */
@@ -670,6 +670,8 @@ export function StepTravelInfo({
   const t = (application.travel_details ?? {}) as Record<string, string | boolean | null>;
   const v = state?.values ?? {};
   const str = (key: string) => (typeof t[key] === "string" ? (t[key] as string) : "");
+  const questions = parseApplicationQuestions(application.visa_type?.application_questions);
+  const answers = (application.custom_answers ?? {}) as Record<string, string>;
 
   return (
     <form action={formAction} className="space-y-6">
@@ -755,6 +757,45 @@ export function StepTravelInfo({
           defaultValue={t.visited_before === true ? "yes" : "no"}
         />
       </div>
+
+      {questions.length > 0 ? (
+        <div className="space-y-5 border-t border-border pt-5">
+          <p className="text-sm font-semibold">Additional questions for {destination}</p>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+            {questions.map((q) => {
+              const fieldName = `answer_${q.key}`;
+              const existing = v[fieldName] ?? answers[q.key] ?? "";
+              if (q.type === "yesno") {
+                return (
+                  <YesNo
+                    key={q.key}
+                    name={fieldName}
+                    label={q.label}
+                    defaultValue={existing === "yes" ? "yes" : "no"}
+                  />
+                );
+              }
+              if (q.type === "select") {
+                return (
+                  <Field key={q.key} label={q.label} required={q.required}>
+                    <LabeledSelect
+                      name={fieldName}
+                      defaultValue={existing}
+                      placeholder="Select an option"
+                      options={(q.options ?? []).map((o) => ({ value: o, label: o }))}
+                    />
+                  </Field>
+                );
+              }
+              return (
+                <Field key={q.key} label={q.label} htmlFor={fieldName} required={q.required}>
+                  <Input id={fieldName} name={fieldName} defaultValue={existing} required={q.required} />
+                </Field>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <ErrorAlert state={state} />
 
@@ -1021,6 +1062,9 @@ export function StepReview({ application }: { application: WizardApplication }) 
   const travel = (application.travel_details ?? {}) as Record<string, string | boolean | null>;
   const slots = parseDocumentSlots(application.visa_type?.required_documents);
   const byKey = new Map(application.documents.map((d) => [d.document_type, d]));
+  const questions = parseApplicationQuestions(application.visa_type?.application_questions);
+  const answers = (application.custom_answers ?? {}) as Record<string, string>;
+  const termsAndConditions = application.visa_type?.terms_and_conditions;
   const editBase = `/visa/apply/${application.id}?step=`;
 
   const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -1085,6 +1129,12 @@ export function StepReview({ application }: { application: WizardApplication }) 
         />
       </ReviewSection>
 
+      {questions.length > 0 ? (
+        <ReviewSection icon={Info} title="Additional Questions" editHref={`${editBase}3`}>
+          <ReviewGrid rows={questions.map((q) => [q.label, answers[q.key] ?? ""])} />
+        </ReviewSection>
+      ) : null}
+
       <ReviewSection icon={FileText} title="Document Summary" editHref={`${editBase}4`}>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {slots.map((slot) => {
@@ -1108,6 +1158,18 @@ export function StepReview({ application }: { application: WizardApplication }) 
 
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="applicationId" value={application.id} />
+        {termsAndConditions ? (
+          <div className="space-y-2 rounded-lg border border-border p-4">
+            <p className="text-sm font-semibold">Terms &amp; Conditions</p>
+            <div className="max-h-40 overflow-y-auto rounded-md bg-secondary/40 p-3 text-xs whitespace-pre-wrap text-muted-foreground">
+              {termsAndConditions}
+            </div>
+            <label className="flex items-start gap-2.5 text-sm">
+              <input type="checkbox" name="agreeTerms" className="mt-0.5 size-4 accent-primary" required />
+              <span>I agree to the Terms &amp; Conditions.</span>
+            </label>
+          </div>
+        ) : null}
         <label className="flex items-start gap-2.5 rounded-lg border border-border p-4 text-sm">
           <input type="checkbox" name="confirmAccuracy" className="mt-0.5 size-4 accent-primary" required />
           <span>

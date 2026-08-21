@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 import { getCurrentProfile } from "@/lib/auth/session";
+import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { SiteHeaderClient, HeaderSearch } from "@/components/marketing/site-header-client";
 import { HeaderShell } from "@/components/marketing/header-shell";
 import { ScrollProgressBar } from "@/components/ui/aceternity/motion-primitives";
@@ -20,6 +21,7 @@ import { InfoOutlinedIcon, PhoneInTalkIcon, StorefrontIcon, SupportAgentIcon } f
  */
 export async function SiteHeader() {
   const profile = await getCurrentProfile();
+  const contexts = profile ? await getMyPartnerContexts(profile.id, profile.full_name) : [];
 
   return (
     <HeaderShell>
@@ -71,7 +73,7 @@ export async function SiteHeader() {
           >
             <Image src="/logo.png" alt="STS Somalia" width={714} height={312} priority className="h-11 w-auto transition-[height] duration-300 ease-out group-data-[condensed]/header:h-9" />
           </Link>
-          <SiteHeaderClient profile={profile} />
+          <SiteHeaderClient profile={profile} contexts={contexts} />
         </div>
       </div>
 

@@ -75,10 +75,6 @@ export default async function AgentBookingsPage({
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Agency Bookings</h1>
-        <p className="text-sm text-muted-foreground">
-          Every booking made through {membership.agency.name} — across flights, hotels, visas,
-          Umrah, and event halls.
-        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">

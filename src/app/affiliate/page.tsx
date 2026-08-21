@@ -56,7 +56,6 @@ export default async function AffiliateDashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-semibold">Welcome back{profile.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}</h1>
-        <p className="text-sm text-muted-foreground">Track your referral links and commissions.</p>
       </div>
 
       <Card>

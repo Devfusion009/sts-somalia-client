@@ -1,0 +1,12 @@
+-- ============================================================================
+-- New enum value only — see 20260815000001 for why this must be its own
+-- migration (a value added by ALTER TYPE ... ADD VALUE can't be USED in the
+-- same transaction it was added in). Everything that references
+-- 'hotel_manager' lives in the next migration file.
+--
+-- Fifth portal role: a person admin assigns to run ONE specific hotel's
+-- rooms/inventory/bookings, distinct from 'hotel_partner' (owns/staffs a
+-- whole hotel_partners business, every property it has). See
+-- 20260820000003_hotel_managers.sql for the scoping table + RLS.
+-- ============================================================================
+alter type public.app_role add value if not exists 'hotel_manager';

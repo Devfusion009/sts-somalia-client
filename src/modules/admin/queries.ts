@@ -289,6 +289,13 @@ export async function getVisaTypesAdmin() {
   return data ?? [];
 }
 
+/** Single visa type for the full-page editor at /admin/catalog/visa/[id]/edit. */
+export async function getVisaTypeAdmin(id: string) {
+  const supabase = await createClient();
+  const { data } = await supabase.from("visa_types").select("*").eq("id", id).maybeSingle();
+  return data;
+}
+
 export async function getUmrahPackagesAdmin() {
   const supabase = await createClient();
   const { data } = await supabase
@@ -498,6 +505,16 @@ export async function getVenuesAdmin() {
   return data ?? [];
 }
 
+export async function getVenueByIdAdmin(venueId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("event_venues")
+    .select(`*, property_links(label, url, sort_order), property_reviews(*)`)
+    .eq("id", venueId)
+    .maybeSingle();
+  return data;
+}
+
 export async function getHallBookingsAdmin() {
   const supabase = await createClient();
   const { data } = await supabase
@@ -507,6 +524,108 @@ export async function getHallBookingsAdmin() {
     )
     .order("start_date", { ascending: true })
     .limit(300);
+  return data ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Hotel management (admin)
+// ---------------------------------------------------------------------------
+export async function getHotelsAdmin() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("hotels")
+    .select("*, hotel_rooms(id), partner:hotel_partners(name)")
+    .order("created_at", { ascending: false });
+  return data ?? [];
+}
+
+export async function getHotelByIdAdmin(hotelId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("hotels")
+    .select(
+      `*,
+       partner:hotel_partners(name, contact_email, contact_phone),
+       hotel_rooms(*),
+       property_links(label, url, sort_order),
+       property_reviews(*)`
+    )
+    .eq("id", hotelId)
+    .maybeSingle();
+  if (!data) return null;
+
+  // partner_accounts.id (the STS-HP-... reference) is what the console page
+  // is keyed by — resolved separately since partner_accounts can't be a
+  // real FK (it fans out across three different entity tables).
+  let partnerAccountId: string | null = null;
+  if (data.partner_id) {
+    const { data: account } = await supabase
+      .from("partner_accounts")
+      .select("id")
+      .eq("type", "hotel_partner")
+      .eq("entity_id", data.partner_id)
+      .maybeSingle();
+    partnerAccountId = account?.id ?? null;
+  }
+
+  return { ...data, partnerAccountId };
+}
+
+/** Active managers assigned to one hotel — see hotel_manager-form.tsx. */
+export async function getHotelManagers(hotelId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("hotel_managers")
+    .select(
+      "id, created_at, can_manage_bookings, can_manage_photos, profile:profiles!hotel_managers_profile_id_fkey(id, full_name, email)"
+    )
+    .eq("hotel_id", hotelId)
+    .eq("status", "active")
+    .order("created_at");
+  return data ?? [];
+}
+
+/** Active hotel partners, for the "Owner" picker on the hotel create/edit form. */
+export async function getHotelPartnersForSelect() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("hotel_partners")
+    .select("id, name")
+    .eq("status", "active")
+    .order("name");
+  return data ?? [];
+}
+
+export async function getHotelRoomAdmin(roomId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase.from("hotel_rooms").select("*, hotel:hotel_id(id, name)").eq("id", roomId).maybeSingle();
+  return data;
+}
+
+export async function getRoomInventoryAdmin(roomId: string, fromDate: string, toDate: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("hotel_room_inventory")
+    .select("*")
+    .eq("room_id", roomId)
+    .gte("date", fromDate)
+    .lte("date", toDate)
+    .order("date", { ascending: true });
+  return data ?? [];
+}
+
+export async function getHotelBookingsForHotel(hotelId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("hotel_bookings")
+    .select(
+      `*,
+       room:room_id(name),
+       customer:profiles!hotel_bookings_customer_id_fkey(full_name, email),
+       order_item:order_items(order:order_id(status))`
+    )
+    .eq("hotel_id", hotelId)
+    .order("created_at", { ascending: false });
   return data ?? [];
 }
 

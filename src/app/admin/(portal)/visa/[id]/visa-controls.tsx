@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { FilePlus2, Upload } from "lucide-react";
+import { FilePlus2, RefreshCw, Send, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +28,8 @@ import {
   adminSetVisaStatus,
   adminRequestDocument,
   adminUploadResultDocument,
-  type ActionState,
+  adminSubmitToPartner,
+  adminSyncPartnerStatus,
 } from "@/modules/visa/admin-actions";
 import { VISA_STATUS_LABELS } from "@/modules/visa/schemas";
 
@@ -97,10 +98,13 @@ export function StatusControl({
 export function RequestDocumentDialog({ applicationId }: { applicationId: string }) {
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(adminRequestDocument, null);
-  const lastState = useRef<ActionState>(null);
-  if (state !== lastState.current) {
-    lastState.current = state;
-    if (state && !state.error && open) setOpen(false);
+
+  // Derived during render (not an effect) per React's guidance for reacting
+  // to a state change — refs can't be read/written during render.
+  const [lastState, setLastState] = useState(state);
+  if (state !== lastState) {
+    setLastState(state);
+    if (state && !state.error) setOpen(false);
   }
 
   return (
@@ -186,5 +190,72 @@ export function ResultUpload({ applicationId }: { applicationId: string }) {
       </Button>
       {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
     </form>
+  );
+}
+
+/** Hand the application to the visa type's configured processing partner, and re-sync its status. */
+export function PartnerControl({
+  applicationId,
+  partnerName,
+  partnerRef,
+  partnerStatus,
+  partnerLastSyncedAt,
+}: {
+  applicationId: string;
+  partnerName: string;
+  partnerRef: string | null;
+  partnerStatus: string | null;
+  partnerLastSyncedAt: string | null;
+}) {
+  const [state, submitAction] = useActionState(adminSubmitToPartner, null);
+
+  return (
+    <div className="space-y-3 text-sm">
+      <dl className="space-y-3">
+        <div>
+          <dt className="text-xs text-muted-foreground">Partner</dt>
+          <dd className="font-medium">{partnerName}</dd>
+        </div>
+        {partnerRef ? (
+          <>
+            <div>
+              <dt className="text-xs text-muted-foreground">Partner reference</dt>
+              <dd className="font-mono text-xs">{partnerRef}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Partner status</dt>
+              <dd className="font-medium capitalize">{partnerStatus?.replace(/_/g, " ") ?? "—"}</dd>
+            </div>
+          </>
+        ) : null}
+      </dl>
+      {partnerRef ? (
+        <>
+          <p className="text-xs text-muted-foreground">
+            {partnerLastSyncedAt
+              ? `Last synced ${new Date(partnerLastSyncedAt).toLocaleString()}`
+              : "Not yet synced."}
+          </p>
+          <form action={adminSyncPartnerStatus}>
+            <input type="hidden" name="applicationId" value={applicationId} />
+            <Button type="submit" variant="outline" size="sm" className="w-full gap-1.5">
+              <RefreshCw className="size-3.5" /> Sync status
+            </Button>
+          </form>
+        </>
+      ) : (
+        <form action={submitAction}>
+          <input type="hidden" name="applicationId" value={applicationId} />
+          {state?.error ? (
+            <Alert variant="destructive" className="mb-2">
+              <AlertDescription>{state.error}</AlertDescription>
+            </Alert>
+          ) : null}
+          <SubmitButton pendingText="Submitting…" className="w-full gap-1.5">
+            <Send className="size-3.5" /> Submit to partner
+          </SubmitButton>
+        </form>
+      )}
+    </div>
   );
 }

@@ -116,10 +116,6 @@ export default async function AgentReportsPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold">Earnings &amp; Reports</h1>
-          <p className="text-sm text-muted-foreground">
-            Your commission ({membership.agency.commission_rate}% of net) plus your own markup,
-            credited automatically the moment each order is paid.
-          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/agent/reports/export" />}>

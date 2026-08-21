@@ -165,9 +165,6 @@ export default async function VisaTrackingPage({
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Application Tracking</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Track the progress of your visa application in real-time.
-              </p>
             </CardHeader>
             <CardContent>
               <ol className="flex items-start">
@@ -297,9 +294,6 @@ export default async function VisaTrackingPage({
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Need to Add or Update Documents?</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  If requested by immigration, upload the additional documents below.
-                </p>
               </CardHeader>
               <CardContent>
                 <Table>

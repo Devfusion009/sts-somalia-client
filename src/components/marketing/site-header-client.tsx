@@ -26,7 +26,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { signOutAction } from "@/lib/auth/actions";
-import { portalForProfile } from "@/lib/auth/roles";
+import { portalHref } from "@/lib/subdomain";
+import type { PartnerContext } from "@/modules/identity/queries";
 import { MEGA_SECTIONS, SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL, type MegaSection } from "@/lib/marketing-nav";
 import { cn } from "@/lib/utils";
 import { createScrollFlagStore } from "@/lib/scroll-flag-store";
@@ -60,9 +61,8 @@ function initials(name: string | null, email: string | null) {
  * in the footer) — the one exception is the portal switch, which only appears
  * for an account that already holds that identity.
  */
-export function SiteHeaderClient({ profile }: { profile: Profile | null }) {
+export function SiteHeaderClient({ profile, contexts }: { profile: Profile | null; contexts: PartnerContext[] }) {
   const pathname = usePathname();
-  const portal = profile ? portalForProfile(profile) : null;
   const [openKey, setOpenKey] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -194,10 +194,29 @@ export function SiteHeaderClient({ profile }: { profile: Profile | null }) {
               <DropdownMenuItem render={<Link href="/account" />}>
                 <PersonIcon sx={{ fontSize: 18 }} /> My Account
               </DropdownMenuItem>
-              {portal ? (
-                <DropdownMenuItem render={<Link href={portal.href} />}>
-                  <DashboardIcon sx={{ fontSize: 18 }} /> Switch to {portal.label}
+              {profile?.is_platform_admin ? (
+                <DropdownMenuItem render={<Link href={portalHref("admin")} />}>
+                  <DashboardIcon sx={{ fontSize: 18 }} /> Admin Console
                 </DropdownMenuItem>
+              ) : null}
+              {contexts.length > 0 ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Switch account</DropdownMenuLabel>
+                  </DropdownMenuGroup>
+                  {contexts.map((c) => (
+                    <DropdownMenuItem key={c.type} render={<Link href={c.href} />}>
+                      <DashboardIcon sx={{ fontSize: 18 }} />
+                      <span className="min-w-0 flex-1 truncate">
+                        {c.name} <span className="text-muted-foreground">· {c.label}</span>
+                      </span>
+                      {c.status && c.status !== "live" ? (
+                        <span className="shrink-0 text-xs text-muted-foreground capitalize">{c.status}</span>
+                      ) : null}
+                    </DropdownMenuItem>
+                  ))}
+                </>
               ) : null}
               <DropdownMenuSeparator />
               <form action={signOutAction}>
@@ -285,10 +304,26 @@ export function SiteHeaderClient({ profile }: { profile: Profile | null }) {
                   <SheetClose render={<Link href="/account" className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent" />}>
                     My Account
                   </SheetClose>
-                  {portal ? (
-                    <SheetClose render={<Link href={portal.href} className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent" />}>
-                      Switch to {portal.label}
+                  {profile?.is_platform_admin ? (
+                    <SheetClose render={<Link href={portalHref("admin")} className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent" />}>
+                      Admin Console
                     </SheetClose>
+                  ) : null}
+                  {contexts.length > 0 ? (
+                    <>
+                      <p className="px-3 pt-2 pb-1 text-xs font-medium text-muted-foreground">Switch account</p>
+                      {contexts.map((c) => (
+                        <SheetClose
+                          key={c.type}
+                          render={<Link href={c.href} className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent" />}
+                        >
+                          {c.name} · {c.label}
+                          {c.status && c.status !== "live" ? (
+                            <span className="ml-1 text-xs text-muted-foreground capitalize">({c.status})</span>
+                          ) : null}
+                        </SheetClose>
+                      ))}
+                    </>
                   ) : null}
                   <form action={signOutAction}>
                     <button type="submit" className="w-full rounded-md px-3 py-2.5 text-left text-sm font-medium text-destructive hover:bg-accent">

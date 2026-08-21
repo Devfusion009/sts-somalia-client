@@ -7,6 +7,9 @@
 #
 #   deps    -> install dependencies only (cached independently of source
 #              changes: editing a .tsx file doesn't invalidate this layer)
+#   dev     -> deps + `next dev`, with the source arriving as a BIND MOUNT
+#              at run time rather than a COPY (docker-compose.dev.yml).
+#              Never built by `docker compose up`; only by the dev override.
 #   builder -> compile the production build (needs deps + full source)
 #   runner  -> the actual image that ships: just the traced output + a
 #              Node runtime to execute it
@@ -15,6 +18,32 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
+
+# ---------------------------------------------------------------------------
+# Development image. Deliberately contains NO application source: the source
+# is bind-mounted over /app at run time by docker-compose.dev.yml, so a save
+# on the host is a save inside the container and `next dev` recompiles it.
+#
+# This is the whole difference between the two ways of running the app. The
+# production path below does `COPY . .` + `npm run build`, which FREEZES the
+# source into an image layer — that image keeps serving whatever the tree
+# looked like at build time, no matter what you edit afterwards, until you
+# rebuild. That is correct for shipping and useless for iterating.
+#
+# node_modules is installed here (via deps) and NOT taken from the host: the
+# host's copy is built for the host's libc and CPU, and this is alpine/musl.
+# Reusing it would break every native dependency. docker-compose.dev.yml
+# keeps them apart with an anonymous volume — see the note there.
+FROM node:22-alpine AS dev
+WORKDIR /app
+ENV NODE_ENV=development
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json ./
+EXPOSE 3000
+# -H 0.0.0.0 is not optional: `next dev` otherwise listens on the container's
+# own loopback, where the published port mapping cannot reach it, and
+# localhost:3000 on the host just refuses the connection.
+CMD ["npm", "run", "dev", "--", "-H", "0.0.0.0", "-p", "3000"]
 
 FROM node:22-alpine AS builder
 WORKDIR /app

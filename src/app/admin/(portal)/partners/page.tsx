@@ -31,9 +31,6 @@ export default async function PartnerAccountsIndexPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-semibold">Partner Accounts</h1>
-        <p className="text-sm text-muted-foreground">
-          The ongoing relationships created by approving applications — one account per approved application.
-        </p>
       </div>
 
       <Card className="overflow-hidden py-0">

@@ -2,14 +2,16 @@
 
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, ArrowLeft, Check, CloudUpload, FileCheck2, Loader2, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowRight, ArrowLeft, Check, CloudUpload, FileCheck2, FileText, Loader2, MoreVertical, Paperclip, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { SubmitButton } from "@/components/submit-button";
+import { cn } from "@/lib/utils";
 import { OptionPicker, RepeatableRows, BucketPicker } from "./field-helpers";
 import { PhoneField } from "./phone-field";
 import { AnalogTimeField } from "./analog-time-field";
@@ -23,6 +25,8 @@ import {
   saveStep4,
   uploadApplicationDocument,
   removeApplicationDocument,
+  updateDocumentExpiry,
+  getDocumentViewUrl,
   advanceToReview,
   submitApplication,
   type ActionState,
@@ -157,11 +161,13 @@ function StepNav({
   nextLabel = "Continue",
   saving,
   saved,
+  note,
 }: {
   backHref?: string;
   nextLabel?: string;
   saving?: boolean;
   saved?: boolean;
+  note?: string;
 }) {
   return (
     <div className="flex items-center justify-between pt-2">
@@ -180,6 +186,10 @@ function StepNav({
         ) : saved ? (
           <span className="flex items-center gap-1 text-xs text-primary">
             <Check className="size-3" /> All changes saved
+          </span>
+        ) : note ? (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <ShieldCheck className="size-3.5 text-primary" /> {note}
           </span>
         ) : null}
       </div>
@@ -810,6 +820,25 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
 /* -------------------------------------------------------------------------- */
 /* Step 5 — documents                                                         */
 /* -------------------------------------------------------------------------- */
+/** Cycled by slot position purely for visual variety — not tied to file type. */
+const DOC_ICON_STYLES = [
+  "bg-emerald-100 text-emerald-600",
+  "bg-blue-100 text-blue-600",
+  "bg-amber-100 text-amber-600",
+  "bg-violet-100 text-violet-600",
+  "bg-rose-100 text-rose-600",
+];
+
+function formatFileSize(bytes?: number) {
+  if (!bytes) return null;
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatUploadDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+}
+
 /**
  * Uploads the instant a file is chosen — no separate "Upload" click. The
  * previous two-step pattern (choose file, then click a distinct Upload
@@ -824,54 +853,124 @@ function DocUploadRow({
   applicationId,
   slot,
   existing,
+  iconIndex,
 }: {
   kind: ApplicationKind;
   applicationId: string;
   slot: DocSlot;
   existing?: DocumentRef;
+  iconIndex: number;
 }) {
   const [state, formAction, pending] = useActionState(uploadApplicationDocument, null);
-  const [expiry, setExpiry] = useState("");
+  const [expiryState, expiryAction, expiryPending] = useActionState(updateDocumentExpiry, null);
+  const [expiry, setExpiry] = useState(existing?.expiry ?? "");
+  const removeFormRef = useRef<HTMLFormElement>(null);
+  const [viewLoading, setViewLoading] = useState(false);
   const isExpired = slot.expiryField && expiry && new Date(expiry) < new Date(new Date().toDateString());
+
+  async function handleView() {
+    setViewLoading(true);
+    const result = await getDocumentViewUrl(kind, applicationId, slot.key);
+    setViewLoading(false);
+    if ("url" in result) window.open(result.url, "_blank", "noopener,noreferrer");
+  }
 
   return (
     <div className="rounded-xl border border-border p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium">
-          {slot.label} {slot.optional ? <span className="text-xs text-muted-foreground">(optional)</span> : <span className="text-destructive">*</span>}
-        </p>
-        {existing ? (
-          <form action={removeApplicationDocument}>
-            <input type="hidden" name="kind" value={kind} />
-            <input type="hidden" name="applicationId" value={applicationId} />
-            <input type="hidden" name="docKey" value={slot.key} />
-            <Button type="submit" variant="outline" size="sm" className="gap-1 text-destructive hover:text-destructive">
-              <Trash2 className="size-3.5" /> Remove
-            </Button>
-          </form>
-        ) : null}
-      </div>
-
-      {slot.expiryField ? (
-        <div className="mt-2 max-w-xs space-y-1">
-          <Label className="text-xs">Expiry date</Label>
-          <Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
-          {isExpired ? (
-            <p className="text-xs text-destructive">This license has expired — you&apos;ll need a current one to submit.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", DOC_ICON_STYLES[iconIndex % DOC_ICON_STYLES.length])}>
+            <FileText className="size-5" />
+          </span>
+          <div>
+            <p className="text-sm font-medium">
+              {slot.label} {slot.optional ? <span className="text-xs text-muted-foreground">(optional)</span> : <span className="text-destructive">*</span>}
+            </p>
+            {existing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleView}
+                  disabled={viewLoading}
+                  className="mt-1 flex items-center gap-1 text-sm text-primary hover:underline disabled:opacity-60"
+                >
+                  <Paperclip className="size-3.5" /> {existing.file_name}
+                </button>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Uploaded on {formatUploadDate(existing.uploaded_at)}
+                  {formatFileSize(existing.file_size) ? ` • ${formatFileSize(existing.file_size)}` : ""}
+                </p>
+              </>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {existing ? (
+            <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+              <Check className="size-3" /> Uploaded
+            </span>
+          ) : null}
+          {existing ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon" className="size-8" />}>
+                <MoreVertical className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem render={<button type="button" className="w-full" onClick={handleView} />}>View document</DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  render={<button type="button" className="w-full" onClick={() => removeFormRef.current?.requestSubmit()} />}
+                >
+                  Remove
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null}
         </div>
+      </div>
+
+      <form ref={removeFormRef} action={removeApplicationDocument} className="hidden">
+        <input type="hidden" name="kind" value={kind} />
+        <input type="hidden" name="applicationId" value={applicationId} />
+        <input type="hidden" name="docKey" value={slot.key} />
+      </form>
+
+      {slot.expiryField ? (
+        <form action={expiryAction} className="mt-3 max-w-xs space-y-1">
+          <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="applicationId" value={applicationId} />
+          <input type="hidden" name="docKey" value={slot.key} />
+          <Label className="text-xs">Expiry date</Label>
+          <Input
+            type="date"
+            name="expiry"
+            min="1900-01-01"
+            max="2100-12-31"
+            value={expiry}
+            disabled={!existing}
+            onChange={(e) => {
+              setExpiry(e.target.value);
+              if (existing) e.currentTarget.form?.requestSubmit();
+            }}
+          />
+          {!existing ? (
+            <p className="text-xs text-muted-foreground">Upload the file first, then set its expiry date.</p>
+          ) : expiryPending ? (
+            <p className="text-xs text-muted-foreground">Saving…</p>
+          ) : isExpired ? (
+            <p className="text-xs text-destructive">This license has expired — you&apos;ll need a current one to submit.</p>
+          ) : null}
+          {expiryState?.error ? <p className="text-xs text-destructive">{expiryState.error}</p> : null}
+        </form>
       ) : null}
 
-      {existing ? (
-        <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-primary">
-          <FileCheck2 className="size-4" /> {existing.file_name} uploaded
-        </p>
-      ) : (
-        <form action={formAction} className="mt-2">
+      {!existing ? (
+        <form action={formAction} className="mt-3">
           <input type="hidden" name="kind" value={kind} />
           <input type="hidden" name="applicationId" value={applicationId} />
           <input type="hidden" name="docKey" value={slot.key} />
           <input type="hidden" name="docLabel" value={slot.label} />
+          <input type="hidden" name="expiry" value={expiry} />
           <label
             className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed p-4 text-sm transition-colors ${
               pending ? "border-primary/40 bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:bg-accent"
@@ -892,7 +991,7 @@ function DocUploadRow({
             {pending ? "Uploading…" : "Click to choose a file — uploads automatically"}
           </label>
         </form>
-      )}
+      ) : null}
       {state?.error ? (
         <Alert variant="destructive" className="mt-2">
           <AlertCircle />
@@ -904,20 +1003,51 @@ function DocUploadRow({
 }
 
 export function StepDocuments({ kind, application }: { kind: ApplicationKind; application: AppRow }) {
+  const [state, formAction] = useActionState(advanceToReview, null);
   const refs = Array.isArray(application.document_refs) ? (application.document_refs as DocumentRef[]) : [];
   const slots = docSlotsFor(kind);
   const backStep = kind === "affiliate" ? 3 : 4;
+  const uploadedKeys = new Set(refs.map((r) => r.key));
+  const missingRequiredDocs = slots.filter((slot) => !slot.optional && !uploadedKeys.has(slot.key));
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">Upload the documents below. JPG, PNG, or PDF, up to 5MB each.</p>
-      {slots.map((slot) => (
-        <DocUploadRow key={slot.key} kind={kind} applicationId={application.id} slot={slot} existing={refs.find((r) => r.key === slot.key)} />
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <FileText className="size-4.5" />
+        </span>
+        <div>
+          <p className="text-sm font-semibold">Upload Documents</p>
+          <p className="text-sm text-muted-foreground">Upload the documents below. JPG, PNG, or PDF, up to 5MB each.</p>
+        </div>
+      </div>
+      {slots.map((slot, i) => (
+        <DocUploadRow
+          key={slot.key}
+          kind={kind}
+          applicationId={application.id}
+          slot={slot}
+          existing={refs.find((r) => r.key === slot.key)}
+          iconIndex={i}
+        />
       ))}
-      <form action={advanceToReview}>
+      {missingRequiredDocs.length > 0 ? (
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertDescription>
+            Still needed before you can continue: {missingRequiredDocs.map((s) => s.label).join(", ")}.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <form action={formAction}>
         <input type="hidden" name="kind" value={kind} />
         <input type="hidden" name="applicationId" value={application.id} />
-        <StepNav backHref={`/account/become/${kind}/${application.id}?step=${backStep}`} nextLabel="Continue to Review" />
+        <ErrorAlert state={state} />
+        <StepNav
+          backHref={`/account/become/${kind}/${application.id}?step=${backStep}`}
+          nextLabel="Continue to Review"
+          note="Your documents are secure and encrypted"
+        />
       </form>
     </div>
   );

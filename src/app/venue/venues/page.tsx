@@ -24,9 +24,6 @@ export default async function MyVenuesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold">My Venues</h1>
-          <p className="text-sm text-muted-foreground">
-            Draft your listing, submit it for review, and STS staff publish it to the public catalog.
-          </p>
         </div>
         <VenuePartnerForm />
       </div>

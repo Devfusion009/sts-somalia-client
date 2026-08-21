@@ -5,6 +5,9 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformAdmin } from "@/lib/auth/session";
+import { getApplicationDetail } from "./queries";
+import { submitToPartner, syncPartnerStatus } from "./partner/registry";
+import type { Json } from "@/lib/types/database.types";
 
 export type ActionState = { error: string | null } | null;
 
@@ -193,4 +196,69 @@ export async function adminUploadResultDocument(
 
   revalidateVisaViews(applicationId.data);
   return { error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Partner processing — hand an application off to whichever partner the
+// application's visa type is configured for (visa_types.partner_provider_key).
+// ---------------------------------------------------------------------------
+export async function adminSubmitToPartner(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const applicationId = z.string().uuid().safeParse(formData.get("applicationId"));
+  if (!applicationId.success) return { error: "Invalid application." };
+
+  await requirePlatformAdmin();
+  const application = await getApplicationDetail(applicationId.data);
+  if (!application) return { error: "Application not found." };
+  if (application.visa_type?.processing_mode !== "partner" || !application.visa_type.partner_provider_key) {
+    return { error: "This visa type isn't configured for partner processing." };
+  }
+
+  const result = await submitToPartner(application.visa_type.partner_provider_key, { application });
+  if (result.type === "error") return { error: result.message };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("visa_applications")
+    .update({
+      partner_provider_key: application.visa_type.partner_provider_key,
+      partner_ref: result.partnerRef,
+      partner_status: result.status ?? null,
+      partner_last_synced_at: new Date().toISOString(),
+    })
+    .eq("id", applicationId.data);
+  if (error) return { error: error.message };
+
+  revalidateVisaViews(applicationId.data);
+  return { error: null };
+}
+
+/** Pulls the latest status from the partner, when the adapter supports it. */
+export async function adminSyncPartnerStatus(formData: FormData): Promise<void> {
+  await requirePlatformAdmin();
+  const applicationId = z.string().uuid().parse(formData.get("applicationId"));
+
+  const supabase = await createClient();
+  const { data: application } = await supabase
+    .from("visa_applications")
+    .select("partner_provider_key, partner_ref")
+    .eq("id", applicationId)
+    .maybeSingle();
+  if (!application?.partner_provider_key || !application.partner_ref) return;
+
+  const result = await syncPartnerStatus(application.partner_provider_key, application.partner_ref);
+  if (result.type === "status") {
+    await supabase
+      .from("visa_applications")
+      .update({
+        partner_status: result.status,
+        partner_raw_payload: result.raw ? (JSON.parse(JSON.stringify(result.raw)) as Json) : null,
+        partner_last_synced_at: new Date().toISOString(),
+      })
+      .eq("id", applicationId);
+  }
+
+  revalidateVisaViews(applicationId);
 }

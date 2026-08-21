@@ -79,9 +79,6 @@ export function AssignTierForm({
       {currentTierId ? (
         <form action={applyAction} className="space-y-2 border-t border-border pt-3">
           <input type="hidden" name="agencyId" value={agencyId} />
-          <p className="text-xs text-muted-foreground">
-            Copy this tier&apos;s default commission rate and credit limit onto the agency.
-          </p>
           <FormStatus state={applyState} />
           <Button type="submit" variant="outline" size="sm">
             Apply tier defaults
@@ -114,10 +111,6 @@ export function LowBalanceThresholdForm({
           defaultValue={currentThreshold}
           required
         />
-        <p className="text-xs text-muted-foreground">
-          The agency&apos;s owner/admin are notified when available balance (wallet + credit
-          limit) drops below this.
-        </p>
       </div>
       <FormStatus state={state} />
       <SubmitButton size="sm" pendingText="Saving…">

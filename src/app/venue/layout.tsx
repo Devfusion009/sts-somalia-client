@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
+import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getMyVenuePartnerId, getMyVenuePartner } from "@/modules/events/venue-partner-queries";
 import { getMyPartnerAccountId, getPartnerAccount } from "@/modules/admin/partner-accounts";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
@@ -61,7 +62,10 @@ export default async function VenuePartnerLayout({ children }: { children: React
     return <PortalSuspendedNotice portalLabel="Venue Portal" />;
   }
 
-  const accountId = await getMyPartnerAccountId("venue_partner", partnerId);
+  const [accountId, contexts] = await Promise.all([
+    getMyPartnerAccountId("venue_partner", partnerId),
+    getMyPartnerContexts(profile.id, profile.full_name),
+  ]);
   const account = accountId ? await getPartnerAccount(accountId) : null;
 
   return (
@@ -71,6 +75,8 @@ export default async function VenuePartnerLayout({ children }: { children: React
       navGroups={NAV_GROUPS}
       profileName={profile.full_name}
       profileEmail={profile.email}
+      contexts={contexts}
+      isPlatformAdmin={profile.is_platform_admin}
     >
       {account ? <OnboardingStatusBanner checklist={account.checklist} portalLabel="the Venue Portal" /> : null}
       {children}

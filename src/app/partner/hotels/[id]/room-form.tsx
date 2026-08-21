@@ -24,6 +24,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
 import { createRoom, updateRoom } from "@/modules/hotels/partner-actions";
+import { RoomTypeCombobox } from "@/modules/hotels/components/room-type-combobox";
+import { RoomAmenitiesField } from "@/modules/hotels/components/room-amenities-field";
+import { ROOM_BED_TYPES } from "@/modules/hotels/constants";
 
 type Room = {
   id: string;
@@ -31,13 +34,20 @@ type Room = {
   description: string | null;
   max_occupancy: number;
   bed_type: string | null;
+  floor: string | null;
+  size_sqm: number | null;
+  amenities: unknown;
   base_price: number;
   currency: string;
   status: string;
 };
 
-export function RoomDialog({ hotelId, room }: { hotelId: string; room?: Room }) {
+export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room?: Room; roomTypes: string[] }) {
   const [open, setOpen] = useState(false);
+  const [name, setName] = useState(room?.name ?? "");
+  const [amenities, setAmenities] = useState<string[]>(
+    Array.isArray(room?.amenities) ? (room.amenities as string[]) : []
+  );
   const action = room ? updateRoom : createRoom;
   const [state, formAction] = useActionState(action, null);
 
@@ -74,8 +84,9 @@ export function RoomDialog({ hotelId, room }: { hotelId: string; room?: Room }) 
           ) : null}
 
           <div className="space-y-2">
-            <Label htmlFor="room-name">Room name</Label>
-            <Input id="room-name" name="name" defaultValue={room?.name} required />
+            <Label htmlFor="room-name">Room type</Label>
+            <input type="hidden" name="name" value={name} />
+            <RoomTypeCombobox id="room-name" value={name} onValueChange={setName} types={roomTypes} />
           </div>
 
           <div className="space-y-2">
@@ -97,7 +108,29 @@ export function RoomDialog({ hotelId, room }: { hotelId: string; room?: Room }) 
             </div>
             <div className="space-y-2">
               <Label htmlFor="bedType">Bed type</Label>
-              <Input id="bedType" name="bedType" defaultValue={room?.bed_type ?? ""} />
+              <Select name="bedType" defaultValue={room?.bed_type ?? ""}>
+                <SelectTrigger id="bedType" className="w-full">
+                  <SelectValue placeholder="Not specified" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROOM_BED_TYPES.map((bedType) => (
+                    <SelectItem key={bedType} value={bedType}>
+                      {bedType}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="floor">Floor</Label>
+              <Input id="floor" name="floor" placeholder="e.g. 2nd floor" defaultValue={room?.floor ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sizeSqm">Room size (m²)</Label>
+              <Input id="sizeSqm" name="sizeSqm" type="number" min={0} step="0.1" defaultValue={room?.size_sqm ?? ""} />
             </div>
           </div>
 
@@ -118,6 +151,12 @@ export function RoomDialog({ hotelId, room }: { hotelId: string; room?: Room }) 
               <Label htmlFor="currency">Currency</Label>
               <Input id="currency" name="currency" maxLength={3} defaultValue={room?.currency ?? "USD"} required />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="room-amenities">Room features</Label>
+            <input type="hidden" name="amenities" value={JSON.stringify(amenities)} />
+            <RoomAmenitiesField id="room-amenities" value={amenities} onValueChange={setAmenities} />
           </div>
 
           <div className="space-y-2">

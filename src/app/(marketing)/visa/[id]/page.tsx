@@ -120,6 +120,15 @@ export default async function VisaDetailPage({
             </dl>
           </section>
 
+          {visa.eligibility_requirements ? (
+            <section>
+              <h2 className="font-heading text-xl font-bold">Eligibility requirements</h2>
+              <p className="mt-2 leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                {visa.eligibility_requirements}
+              </p>
+            </section>
+          ) : null}
+
           <section>
             <h2 className="font-heading text-xl font-bold">Required documents</h2>
             <ul className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">

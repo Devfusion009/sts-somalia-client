@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getUmrahPackageById, getActiveAgenciesForPicker } from "@/modules/admin/queries";
 import { getAirports } from "@/modules/flights/queries";
@@ -74,7 +74,6 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Photo gallery</CardTitle>
-          <CardDescription>The first image is the cover shown on cards and the package hero.</CardDescription>
         </CardHeader>
         <CardContent>
           <GalleryManager packageId={pkg.id} paths={umrahImagePaths(pkg.images)} />
@@ -84,7 +83,6 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Package details</CardTitle>
-          <CardDescription>Badge, route, discount, meals, and who&apos;s responsible for this package.</CardDescription>
         </CardHeader>
         <CardContent>
           <PackageDetailsForm
@@ -111,7 +109,6 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Hotels</CardTitle>
-            <CardDescription>Makkah and Madinah properties, with star rating and distance to the Haram.</CardDescription>
           </CardHeader>
           <CardContent>
             <HotelsManager packageId={pkg.id} hotels={hotels} />
@@ -121,7 +118,6 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Rate card</CardTitle>
-            <CardDescription>Per-pilgrim price by room sharing.</CardDescription>
           </CardHeader>
           <CardContent>
             <PricingManager packageId={pkg.id} rows={pricing.map((p) => ({ ...p, price: Number(p.price) }))} currency={pkg.currency} />
@@ -132,7 +128,6 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Day-by-day plan</CardTitle>
-          <CardDescription>What pilgrims do each day — shown as the itinerary on the package page.</CardDescription>
         </CardHeader>
         <CardContent>
           <ItineraryManager packageId={pkg.id} days={itinerary} durationDays={pkg.duration_days} />
@@ -142,7 +137,6 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Local agencies</CardTitle>
-          <CardDescription>Which partner agencies handle this package on the ground.</CardDescription>
         </CardHeader>
         <CardContent>
           <AgenciesPicker packageId={pkg.id} agencies={agencies} selectedIds={linkedAgencyIds} />
@@ -152,7 +146,6 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Departures</CardTitle>
-          <CardDescription>Scheduled dates and seat inventory.</CardDescription>
         </CardHeader>
         <CardContent>
           <DeparturesForm packageId={pkg.id} />

@@ -20,7 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { StatusControl, RequestDocumentDialog, ResultUpload } from "./visa-controls";
+import { StatusControl, RequestDocumentDialog, ResultUpload, PartnerControl } from "./visa-controls";
+import { getProvider } from "@/lib/provider-catalog";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Review Visa Application" };
@@ -353,6 +354,28 @@ export default async function AdminVisaDetailPage({
               <StatusControl applicationId={application.id} currentStatus={application.status} />
             </CardContent>
           </Card>
+
+          {application.visa_type.processing_mode === "partner" ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Partner processing</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PartnerControl
+                  applicationId={application.id}
+                  partnerName={
+                    application.visa_type.partner_provider_key === "manual" || !application.visa_type.partner_provider_key
+                      ? "Manual hand-off"
+                      : (getProvider(application.visa_type.partner_provider_key)?.name ??
+                        application.visa_type.partner_provider_key)
+                  }
+                  partnerRef={application.partner_ref}
+                  partnerStatus={application.partner_status}
+                  partnerLastSyncedAt={application.partner_last_synced_at}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
 
           {decided ? (
             <Card>

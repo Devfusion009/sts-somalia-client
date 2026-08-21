@@ -148,18 +148,25 @@ export default async function BookingDetailPage({
   const voucherAvailable = isPaid;
 
   const umrahItem = order.order_items.find((i) => i.item_type === "umrah");
-  const umrahBookingStatus = umrahItem?.umrah_booking
-    ? // umrah_booking on the checkout query doesn't carry status, so fall back
-      // to the order's — accurate enough for the timeline, and it avoids a
-      // second round trip for a card that may not even render.
-      order.status === "completed"
-      ? "completed"
-      : order.status === "cancelled"
-        ? "cancelled"
-        : isPaid
-          ? "confirmed"
-          : "pending"
+  const umrahBooking = umrahItem?.umrah_booking as
+    | { status?: string; booking_kind?: string; custom_request?: { reference: string } | null }
+    | null;
+  // The booking's own status now comes back on the checkout query, and for a
+  // private trip it is the ONLY accurate source: that booking sits at
+  // 'pending' until staff confirm availability, which is exactly the state
+  // the customer needs to see. Group bookings keep the old order-derived
+  // reading as a fallback for rows written before booking_kind existed.
+  const umrahBookingStatus = umrahBooking
+    ? (umrahBooking.status ??
+      (order.status === "completed"
+        ? "completed"
+        : order.status === "cancelled"
+          ? "cancelled"
+          : isPaid
+            ? "confirmed"
+            : "pending"))
     : null;
+  const umrahIsPrivate = umrahBooking?.booking_kind === "private";
 
   const openRequests = requests.filter((r) => r.status === "requested" || r.status === "in_review");
 
@@ -367,13 +374,40 @@ export default async function BookingDetailPage({
       {umrahBookingStatus ? (
         <Card>
           <CardHeader className="pb-4">
-            <CardTitle className="text-base">Umrah progress</CardTitle>
+            <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+              {umrahIsPrivate ? "Private Umrah progress" : "Umrah progress"}
+              {umrahIsPrivate && umrahBookingStatus === "pending" && awaitingPayment ? (
+                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">
+                  Requested
+                </Badge>
+              ) : null}
+              {umrahBooking?.custom_request ? (
+                <span className="font-mono text-xs font-normal text-muted-foreground">
+                  {umrahBooking.custom_request.reference}
+                </span>
+              ) : null}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {umrahIsPrivate && umrahBookingStatus === "pending" && awaitingPayment ? (
+              <Alert>
+                <AlertDescription>
+                  Your trip is with our Umrah team — we&apos;re confirming your hotels, seats and
+                  visa slots for these dates. You won&apos;t pay anything until it&apos;s confirmed,
+                  and the price you agreed is what you&apos;ll be charged unless we tell you first.
+                </AlertDescription>
+              </Alert>
+            ) : null}
             <StatusTimeline
               stages={UMRAH_STAGES}
               currentIndex={umrahStageIndex(umrahBookingStatus).index}
               outcome={umrahStageIndex(umrahBookingStatus).outcome}
+            />
+            <PayAfterConfirmation
+              show={umrahBookingStatus === "confirmed" && awaitingPayment}
+              orderId={orderId}
+              total={order.total}
+              currency={order.currency}
             />
           </CardContent>
         </Card>

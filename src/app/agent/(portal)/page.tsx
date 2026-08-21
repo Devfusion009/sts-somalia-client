@@ -220,9 +220,6 @@ export default async function AgentDashboardPage({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-heading text-lg font-bold">Book for your clients</h2>
-            <p className="text-sm text-muted-foreground">
-              Bookings made while signed in are automatically attributed to {membership.agency.name} with your B2B commission.
-            </p>
           </div>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
