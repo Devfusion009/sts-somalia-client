@@ -35,7 +35,25 @@ export default async function AffiliateLayout({ children }: { children: React.Re
   // of programs they still belong to.
   const profile = await requireUser();
   const trpc = await getServerTrpc();
-  const affiliate = await trpc.affiliates.me.query();
+  // Distinguished from "no affiliate account" below: apps/api being
+  // unreachable is not the same fact as this profile never having applied,
+  // and telling a real affiliate the latter when it's actually the former
+  // is actively misleading, not just an unhandled edge case.
+  let affiliate;
+  try {
+    affiliate = await trpc.affiliates.me.query();
+  } catch {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
+        <Card>
+          <CardContent className="space-y-3 p-6 text-center">
+            <p className="font-medium">Affiliate Dashboard is temporarily unavailable</p>
+            <p className="text-sm text-muted-foreground">Try again in a moment.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!affiliate) {
     return (

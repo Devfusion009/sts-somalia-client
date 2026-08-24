@@ -121,7 +121,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   await fireDueEventReminders(supabase);
   const trpc = await getServerTrpc();
   const [notifications, contexts, { data: navCountsRaw }] = await Promise.all([
-    trpc.notifications.unread.query({ limit: 10 }),
+    // apps/api is a separate deployment (not yet reachable from every
+    // environment) — the rest of the admin portal has nothing to do with
+    // notifications, so it shouldn't 500 just because that one dependency
+    // is down.
+    trpc.notifications.unread.query({ limit: 10 }).catch(() => []),
     getMyPartnerContexts(profile.id, profile.full_name),
     supabase.rpc("admin_nav_counts"),
   ]);
