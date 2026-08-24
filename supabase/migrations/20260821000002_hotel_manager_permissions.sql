@@ -75,7 +75,7 @@ create policy "hotels: manager updates photos when permitted"
 -- permissions is the new entry point for changing them afterwards.
 create or replace function public.admin_add_hotel_manager(
   p_hotel_id uuid,
-  p_email citext,
+  p_email extensions.citext,
   p_can_manage_bookings boolean default false,
   p_can_manage_photos boolean default false
 )

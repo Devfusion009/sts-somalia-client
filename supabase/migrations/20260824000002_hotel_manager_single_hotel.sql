@@ -15,7 +15,7 @@ create unique index hotel_managers_one_active_hotel_per_profile
 
 create or replace function public.add_hotel_manager(
   p_hotel_id uuid,
-  p_email citext,
+  p_email extensions.citext,
   p_permissions text[] default '{}'
 )
 returns public.hotel_managers

@@ -3,14 +3,14 @@
 -- this is a suggestion list, not a foreign key: the admin room form offers
 -- it via a combobox (pick a listed type, or type a new one), and saving a
 -- room with a name not yet in the list adds it here so it's offered on every
--- other hotel from then on. citext gives case-insensitive uniqueness
+-- other hotel from then on. extensions.citext gives case-insensitive uniqueness
 -- ("Deluxe Room" and "deluxe room" are the same type) — same pattern this
 -- codebase already uses for email columns.
 -- ============================================================================
 
 create table public.hotel_room_types (
   id uuid primary key default gen_random_uuid(),
-  name citext not null unique,
+  name extensions.citext not null unique,
   created_at timestamptz not null default now()
 );
 

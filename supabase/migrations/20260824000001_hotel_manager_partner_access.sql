@@ -28,7 +28,7 @@ as $$
   );
 $$;
 
-drop function public.admin_add_hotel_manager(uuid, citext, text[]);
+drop function public.admin_add_hotel_manager(uuid, extensions.citext, text[]);
 drop function public.admin_update_hotel_manager_permissions(uuid, text[]);
 drop function public.admin_remove_hotel_manager(uuid);
 
@@ -44,7 +44,7 @@ drop function public.admin_remove_hotel_manager(uuid);
 -- doing the column update directly is the narrower — not the looser — choice.
 create function public.add_hotel_manager(
   p_hotel_id uuid,
-  p_email citext,
+  p_email extensions.citext,
   p_permissions text[] default '{}'
 )
 returns public.hotel_managers

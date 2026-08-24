@@ -74,7 +74,7 @@ $$;
 -- is_hotel_manager()/hotel_managers directly, so leaving an existing role
 -- alone costs the manager nothing and avoids demoting them out of a role
 -- they still hold in truth.
-create or replace function public.admin_add_hotel_manager(p_hotel_id uuid, p_email citext)
+create or replace function public.admin_add_hotel_manager(p_hotel_id uuid, p_email extensions.citext)
 returns public.hotel_managers
 language plpgsql
 security definer

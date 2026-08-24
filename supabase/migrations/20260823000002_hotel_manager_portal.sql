@@ -131,13 +131,13 @@ create policy "property_reviews: manager reads assigned hotel"
 -- 3) Admin RPCs over the array (both old overloads dropped — the pair was
 --    already an overload trap for PostgREST)
 -- ----------------------------------------------------------------------------
-drop function public.admin_add_hotel_manager(uuid, citext);
-drop function public.admin_add_hotel_manager(uuid, citext, boolean, boolean);
+drop function public.admin_add_hotel_manager(uuid, extensions.citext);
+drop function public.admin_add_hotel_manager(uuid, extensions.citext, boolean, boolean);
 drop function public.admin_update_hotel_manager_permissions(uuid, boolean, boolean);
 
 create function public.admin_add_hotel_manager(
   p_hotel_id uuid,
-  p_email citext,
+  p_email extensions.citext,
   p_permissions text[] default '{}'
 )
 returns public.hotel_managers
