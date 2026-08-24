@@ -6,7 +6,7 @@ import { hotelGuestNames } from "@/modules/payments/queries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BookingStatusControl } from "@/app/partner/bookings/booking-status-control";
+import { BookingStatusControl } from "@/app/partner/(portal)/bookings/booking-status-control";
 
 export const metadata = { title: "Bookings" };
 

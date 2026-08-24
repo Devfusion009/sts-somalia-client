@@ -1,0 +1,25 @@
+import type { Metadata } from "next";
+import { PortalLoginShell } from "@/components/auth/portal-login-shell";
+import { PortalLoginForm } from "@/components/auth/portal-login-form";
+import { signInToVenuePortalAction } from "@/lib/auth/actions";
+
+export const metadata: Metadata = { title: "Venue Portal — Log in" };
+
+export default async function VenueLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect_to?: string }>;
+}) {
+  const { redirect_to } = await searchParams;
+
+  return (
+    <PortalLoginShell portalLabel="Venue Portal" accent="venue">
+      <PortalLoginForm
+        title="Venue partner sign-in"
+        description="Log in to manage your venues and booking requests."
+        action={signInToVenuePortalAction}
+        redirectTo={redirect_to}
+      />
+    </PortalLoginShell>
+  );
+}

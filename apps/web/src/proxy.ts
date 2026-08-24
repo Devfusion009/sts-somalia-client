@@ -1,21 +1,30 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { portalSubdomainFor, pathPrefixFor, rootOrigin, portalsAreIsolated } from "@/lib/subdomain";
+import {
+  portalSubdomainFor,
+  pathPrefixFor,
+  rootOrigin,
+  portalsAreIsolated,
+  type PortalSubdomain,
+} from "@/lib/subdomain";
 import { readEdgeSession } from "@/lib/auth/edge-session";
+
+const ALL_PORTALS: readonly PortalSubdomain[] = ["admin", "agent", "manager", "affiliate", "partner", "venue"];
+const ALL_PORTAL_PATHS = ALL_PORTALS.map(pathPrefixFor);
 
 /**
  * Phase 2 portal-subdomain routing (docs/B2B-PORTAL-SEPARATION-BUILD-PROMPT.md).
  * A no-op — every request just passes through — until NEXT_PUBLIC_APP_HOST
  * is set (see lib/subdomain.ts). That's the safe default: Phase 1's
- * path-based /admin and /agent keep working exactly as before on every
- * environment that hasn't configured subdomains yet.
+ * path-based /admin, /agent, /manager, /affiliate, /partner, /venue keep
+ * working exactly as before on every environment that hasn't configured
+ * subdomains yet.
  *
- * Once configured:
- *   - admin.<APP_HOST>/*  is rewritten to /admin/*  internally
- *   - agent.<APP_HOST>/*  is rewritten to /agent/*  internally
- *   - the root host can no longer reach /admin or /agent directly at all
- *     (404, not a redirect — this is the actual security boundary the
- *     rest of the portal-separation work assumes, not just obscurity)
+ * Once configured, for each portal:
+ *   - <portal>.<APP_HOST>/*  is rewritten to /<portal>/*  internally
+ *   - the root host can no longer reach /<portal> directly at all (404, not
+ *     a redirect — this is the actual security boundary the rest of the
+ *     portal-separation work assumes, not just obscurity)
  *
  * NOTE (this Next.js version, 16.2.12): the file-convention here is
  * `proxy.ts`/`export function proxy`, NOT `middleware.ts`/`middleware` —
@@ -89,14 +98,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // Root host: block direct access to the portal path trees entirely.
+  // Root host: block direct access to every portal's path tree entirely.
   // rootOrigin() is only non-empty once subdomains are actually
   // configured, so this block is unreachable (and Phase 1 access to
-  // /admin, /agent on the single host stays intact) until then.
-  if (
-    portalsAreIsolated() &&
-    (pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/agent" || pathname.startsWith("/agent/"))
-  ) {
+  // /admin, /agent, /manager, /affiliate, /partner, /venue on the single
+  // host stays intact) until then.
+  if (portalsAreIsolated() && ALL_PORTAL_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
     return new NextResponse("Not Found", { status: 404, headers: { "content-type": "text/plain" } });
   }
 

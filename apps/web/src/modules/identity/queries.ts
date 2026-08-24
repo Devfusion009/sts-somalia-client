@@ -15,16 +15,12 @@ export type PartnerContext = {
   href: string;
 };
 
-/**
- * hotel_partner/affiliate/venue_partner stay path-based forever (see
- * roles.ts); agency is the one kind that goes cross-origin once portal
- * subdomains are configured, so it alone runs through portalHref().
- */
+/** Every partner kind now has a subdomain lane (see roles.ts) — each runs through portalHref(). */
 const PORTAL_HREF_FOR_TYPE: Record<PartnerAccountType, string> = {
   agency: portalHref("agent"),
-  hotel_partner: "/partner",
-  affiliate: "/affiliate",
-  venue_partner: "/venue",
+  hotel_partner: portalHref("partner"),
+  affiliate: portalHref("affiliate"),
+  venue_partner: portalHref("venue"),
 };
 
 async function statusFor(type: PartnerAccountType, entityId: string): Promise<PartnerAccountStatus | null> {

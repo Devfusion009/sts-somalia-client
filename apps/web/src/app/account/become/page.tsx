@@ -15,15 +15,21 @@ import { getLatestApplication, getRecentApplications, getRejectedDocumentKeys, t
 import { startApplication } from "@/modules/partner-applications/actions";
 import { portalHref } from "@/lib/subdomain";
 
+const APPLICATION_KIND_PORTAL: Record<ApplicationKind, Parameters<typeof portalHref>[0]> = {
+  agency: "agent",
+  hotel_partner: "partner",
+  affiliate: "affiliate",
+  venue_partner: "venue",
+};
+
 /**
  * Where "Open <portal>" should point from this page, which is served on the
- * root host. The Agent Portal lives on its own origin once subdomains are
- * configured, and proxy.ts 404s /agent/* on the root host — so the config's
- * relative "/agent" is wrong exactly when subdomains are on. Hotel Partner and
- * Affiliate have no subdomain of their own and stay relative.
+ * root host. Every portal now lives on its own origin once subdomains are
+ * configured, and proxy.ts 404s each portal's path tree on the root host —
+ * so the config's relative path is wrong exactly when subdomains are on.
  */
 function openPortalHref(kind: ApplicationKind): string {
-  return kind === "agency" ? portalHref("agent") : APP_CONFIG[kind].portalHref;
+  return portalHref(APPLICATION_KIND_PORTAL[kind]);
 }
 
 type Status = "none" | "draft" | "pending" | "under_review" | "more_info_requested" | "rejected" | "approved";

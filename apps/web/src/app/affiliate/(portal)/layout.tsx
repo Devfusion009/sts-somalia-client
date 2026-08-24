@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireUser } from "@/lib/auth/session";
+import { requireUserForPortal } from "@/lib/auth/session";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getServerTrpc } from "@/lib/trpc/server";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
@@ -33,7 +33,7 @@ export default async function AffiliateLayout({ children }: { children: React.Re
   // (whichever was approved last), but keeps every membership row they were
   // actually granted — gating on role alone would incorrectly lock them out
   // of programs they still belong to.
-  const profile = await requireUser();
+  const profile = await requireUserForPortal("affiliate");
   const trpc = await getServerTrpc();
   // Distinguished from "no affiliate account" below: apps/api being
   // unreachable is not the same fact as this profile never having applied,

@@ -7,8 +7,9 @@
  *
  * Everything here is a no-op — every helper returns "" / relative paths —
  * until NEXT_PUBLIC_APP_HOST is set. That keeps Phase 1 (path-based
- * /admin, /agent) fully working as the default, and turns subdomain
- * enforcement on only once the client's DNS is actually live.
+ * /admin, /agent, /manager, /affiliate, /partner, /venue) fully working as
+ * the default, and turns subdomain enforcement on only once the client's
+ * DNS is actually live.
  *
  * Client-safe: NEXT_PUBLIC_* so both proxy.ts (server) and components that
  * render cross-origin links (PortalShell, PortalLoginShell, portalForProfile)
@@ -34,19 +35,27 @@ export const APP_HOST = process.env.NEXT_PUBLIC_APP_HOST || null;
  * path-based mode everything shares one origin and one cookie, and the
  * isolation is nominal.
  *
- * Set the SAME values on every deployment — each one needs to recognise all
- * three hosts to route and to link across them correctly.
+ * Set the SAME values on every deployment — each one needs to recognise
+ * every configured host to route and to link across them correctly.
  */
 const ADMIN_HOST = process.env.NEXT_PUBLIC_ADMIN_HOST || null;
 const AGENT_HOST = process.env.NEXT_PUBLIC_AGENT_HOST || null;
+const MANAGER_HOST = process.env.NEXT_PUBLIC_MANAGER_HOST || null;
+const AFFILIATE_HOST = process.env.NEXT_PUBLIC_AFFILIATE_HOST || null;
+const PARTNER_HOST = process.env.NEXT_PUBLIC_PARTNER_HOST || null;
+const VENUE_HOST = process.env.NEXT_PUBLIC_VENUE_HOST || null;
 /** The public/B2C origin, when portals are split across explicit hosts. */
 const PUBLIC_HOST = process.env.NEXT_PUBLIC_PUBLIC_HOST || null;
 
-export type PortalSubdomain = "admin" | "agent";
+export type PortalSubdomain = "admin" | "agent" | "manager" | "affiliate" | "partner" | "venue";
 
 const EXPLICIT_HOST: Record<PortalSubdomain, string | null> = {
   admin: ADMIN_HOST,
   agent: AGENT_HOST,
+  manager: MANAGER_HOST,
+  affiliate: AFFILIATE_HOST,
+  partner: PARTNER_HOST,
+  venue: VENUE_HOST,
 };
 
 const bareHost = (h: string) => h.split(":")[0].toLowerCase();
@@ -57,12 +66,16 @@ const bareHost = (h: string) => h.split(":")[0].toLowerCase();
  * really different origins" keys off this rather than testing APP_HOST alone.
  */
 export function portalsAreIsolated(): boolean {
-  return Boolean(APP_HOST || ADMIN_HOST || AGENT_HOST);
+  return Boolean(APP_HOST || Object.values(EXPLICIT_HOST).some(Boolean));
 }
 
 const PORTAL_PATH: Record<PortalSubdomain, string> = {
   admin: "/admin",
   agent: "/agent",
+  manager: "/manager",
+  affiliate: "/affiliate",
+  partner: "/partner",
+  venue: "/venue",
 };
 
 // RFC 2606 / RFC 6761 reserved TLDs used for local/testing setups — any of
@@ -170,15 +183,17 @@ export function cookieDomain(): string {
 
 /**
  * Given an incoming request's `host` header, returns which portal
- * subdomain it is ("admin" | "agent"), or null if it's the root host (or
+ * subdomain it is (a PortalSubdomain), or null if it's the root host (or
  * subdomains aren't configured at all). Used by proxy.ts.
  */
+const ALL_PORTALS: readonly PortalSubdomain[] = ["admin", "agent", "manager", "affiliate", "partner", "venue"];
+
 export function portalSubdomainFor(host: string): PortalSubdomain | null {
   const incoming = bareHost(host);
 
   // Explicitly named portal hosts win: they are unrelated names (separate
   // Vercel projects), so no prefix arithmetic can recognise them.
-  for (const portal of ["admin", "agent"] as const) {
+  for (const portal of ALL_PORTALS) {
     const explicit = EXPLICIT_HOST[portal];
     if (explicit && incoming === bareHost(explicit)) return portal;
   }
@@ -189,7 +204,7 @@ export function portalSubdomainFor(host: string): PortalSubdomain | null {
   const prefix = incoming.slice(0, incoming.length - appHost.length);
   if (!prefix.endsWith(".")) return null;
   const label = prefix.slice(0, -1);
-  return label === "admin" || label === "agent" ? label : null;
+  return (ALL_PORTALS as readonly string[]).includes(label) ? (label as PortalSubdomain) : null;
 }
 
 export function pathPrefixFor(portal: PortalSubdomain): string {

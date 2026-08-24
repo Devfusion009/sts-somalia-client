@@ -8,7 +8,7 @@ import { getRoomTypes } from "@/modules/hotels/room-types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RoomDialog } from "@/app/partner/hotels/[id]/room-form";
+import { RoomDialog } from "@/app/partner/(portal)/hotels/[id]/room-form";
 
 export const metadata = { title: "Rooms & Availability" };
 

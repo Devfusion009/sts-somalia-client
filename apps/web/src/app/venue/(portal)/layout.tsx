@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireUser } from "@/lib/auth/session";
+import { requireUserForPortal } from "@/lib/auth/session";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getMyVenuePartnerId, getMyVenuePartner } from "@/modules/events/venue-partner-queries";
 import { getMyPartnerAccountId, getPartnerAccount } from "@/modules/admin/partner-accounts";
@@ -35,7 +35,7 @@ export default async function VenuePartnerLayout({ children }: { children: React
   // (whichever was approved last), but keeps every membership row they were
   // actually granted — gating on role alone would incorrectly lock them out
   // of programs they still belong to.
-  const profile = await requireUser();
+  const profile = await requireUserForPortal("venue");
   const partnerId = await getMyVenuePartnerId(profile.id);
 
   if (!partnerId) {

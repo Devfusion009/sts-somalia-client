@@ -90,24 +90,25 @@ export function accountRoleBadges(account: {
   return badges;
 }
 
-// Only admin/agent are on subdomains in the Phase 2 plan (see
-// docs/B2B-PORTAL-SEPARATION-BUILD-PROMPT.md) — hotel_partner/affiliate
-// stay path-based regardless, so their hrefs are always relative.
+// Every non-customer role now has a subdomain lane (see
+// docs/B2B-PORTAL-SEPARATION-BUILD-PROMPT.md) — hrefs go through
+// portalHref() like admin/agent, so they're relative paths until subdomains
+// are configured and absolute cross-origin URLs once they are.
 export const PORTAL_BY_ROLE: Partial<Record<AppRole, { href: string; label: string }>> = {
-  hotel_partner: { href: "/partner", label: "Partner Portal" },
-  hotel_manager: { href: "/manager", label: "Manager Portal" },
-  affiliate: { href: "/affiliate", label: "Affiliate Dashboard" },
-  venue_partner: { href: "/venue", label: "Venue Portal" },
+  hotel_partner: { href: portalHref("partner"), label: "Partner Portal" },
+  hotel_manager: { href: portalHref("manager"), label: "Manager Portal" },
+  affiliate: { href: portalHref("affiliate"), label: "Affiliate Dashboard" },
+  venue_partner: { href: portalHref("venue"), label: "Venue Portal" },
 };
 
 /**
  * Resolves which portal an account lands in, as an href a plain <Link>/
- * redirect() can use directly. Once subdomains are configured
- * (NEXT_PUBLIC_APP_HOST set), admin/agent hrefs are absolute cross-origin
- * URLs (e.g. "https://admin.stssomalia.com/"); until then they're the
- * Phase 1 relative paths ("/admin", "/agent") — same shape either way, so
- * every caller (signInAction, the avatar-dropdown portal switch, etc.)
- * works unchanged.
+ * redirect() can use directly. Once subdomains are configured (per-portal
+ * NEXT_PUBLIC_*_HOST or NEXT_PUBLIC_APP_HOST set), every portal's href is
+ * an absolute cross-origin URL (e.g. "https://admin.stssomalia.com/");
+ * until then they're the Phase 1 relative paths ("/admin", "/partner", …)
+ * — same shape either way, so every caller (signInAction, the
+ * avatar-dropdown portal switch, etc.) works unchanged.
  *
  * Admin is decided by is_platform_admin, not role='admin' — role is a
  * business identity that approval flows can overwrite, is_platform_admin

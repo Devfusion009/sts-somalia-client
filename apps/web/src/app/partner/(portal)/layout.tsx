@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth/session";
+import { requireUserForPortal } from "@/lib/auth/session";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getMyHotelScope, getMyPartner } from "@/modules/hotels/partner-queries";
 import { getMyPartnerAccountId, getPartnerAccount } from "@/modules/admin/partner-accounts";
@@ -53,7 +53,7 @@ export default async function PartnerLayout({ children }: { children: React.Reac
   // actually granted — gating on role alone would incorrectly lock them out
   // of programs they still belong to. scope.hotelIds also covers a plain
   // hotel_manager, who has no partnerId at all — see getMyHotelScope.
-  const profile = await requireUser();
+  const profile = await requireUserForPortal("partner");
   const scope = await getMyHotelScope(profile.id);
   const { partnerId } = scope;
 

@@ -2,17 +2,23 @@ import Link from "next/link";
 import Image from "next/image";
 import { rootOrigin } from "@/lib/subdomain";
 
-const ACCENT_ICON_BG: Record<"agent" | "admin" | "manager", string> = {
+type PortalLoginAccent = "agent" | "admin" | "manager" | "affiliate" | "partner" | "venue";
+
+const ACCENT_ICON_BG: Record<PortalLoginAccent, string> = {
   agent: "bg-amber-500",
   admin: "bg-blue-500",
   manager: "bg-teal-600",
+  affiliate: "bg-purple-500",
+  partner: "bg-orange-500",
+  venue: "bg-rose-500",
 };
 
 /**
- * Visual wrapper for the dedicated /agent/login, /admin/login, and
- * /manager/login pages. Deliberately distinct from the plain-consumer
- * (auth) layout — a dark, operator-grade backdrop instead of the light
- * marketing chrome — so entering a portal login reads as a different, more
+ * Visual wrapper for every dedicated portal login page (/agent/login,
+ * /admin/login, /manager/login, /affiliate/login, /partner/login,
+ * /venue/login). Deliberately distinct from the plain-consumer (auth)
+ * layout — a dark, operator-grade backdrop instead of the light marketing
+ * chrome — so entering a portal login reads as a different, more
  * professional product, not a reskinned customer form. Reuses the same
  * --sidebar tokens the portal shells already use elsewhere, so this isn't a
  * new palette.
@@ -23,13 +29,13 @@ export function PortalLoginShell({
   children,
 }: {
   portalLabel: string;
-  accent: "agent" | "admin" | "manager";
+  accent: PortalLoginAccent;
   children: React.ReactNode;
 }) {
-  // From admin.<host>/login or agent.<host>/login, "/" and "/login" need to
-  // point back to the root marketing site, not re-resolve within this same
-  // subdomain (see homeHref in PortalShell for the identical reasoning).
-  // /manager has no dedicated subdomain, so this is always "/login" there.
+  // From e.g. admin.<host>/login, "/" and "/login" need to point back to
+  // the root marketing site, not re-resolve within this same subdomain (see
+  // homeHref in PortalShell for the identical reasoning). A portal with no
+  // subdomain configured yet resolves this to "/login" either way.
   const root = rootOrigin();
 
   return (

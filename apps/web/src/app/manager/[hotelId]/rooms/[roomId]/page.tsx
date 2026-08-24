@@ -7,7 +7,7 @@ import { getRoomForInventory, getRoomInventory } from "@/modules/hotels/partner-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { InventoryRangeForm, ClearInventoryForm } from "@/app/partner/hotels/[id]/rooms/[roomId]/inventory-form";
+import { InventoryRangeForm, ClearInventoryForm } from "@/app/partner/(portal)/hotels/[id]/rooms/[roomId]/inventory-form";
 
 export const metadata = { title: "Room Availability" };
 

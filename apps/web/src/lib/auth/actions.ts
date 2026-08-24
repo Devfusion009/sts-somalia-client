@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { pathPrefixFor, rootOrigin } from "@/lib/subdomain";
+import { pathPrefixFor, rootOrigin, type PortalSubdomain } from "@/lib/subdomain";
 import { recordLoginEvent } from "@/lib/auth/login-history";
 
 export type ActionState = { error: string | null; destination?: string } | null;
@@ -128,11 +128,15 @@ export async function signInAction(
   redirect(finalDestination);
 }
 
-type PortalKind = "agent" | "admin";
+type PortalKind = PortalSubdomain;
 
 const PORTAL_LOGIN_META: Record<PortalKind, { audienceError: string }> = {
   agent: { audienceError: "This account doesn't have agent access." },
   admin: { audienceError: "This account doesn't have admin access." },
+  manager: { audienceError: "This account doesn't have hotel manager access." },
+  affiliate: { audienceError: "This account doesn't have affiliate access." },
+  partner: { audienceError: "This account doesn't have hotel partner access." },
+  venue: { audienceError: "This account doesn't have venue partner access." },
 };
 
 /**
@@ -171,15 +175,113 @@ async function hasActiveAgencyMembership(
   return !!data;
 }
 
+async function hasActiveHotelManagerRow(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("hotel_managers")
+    .select("hotel_id")
+    .eq("profile_id", userId)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+  return !!data;
+}
+
+async function hasAffiliateRow(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<boolean> {
+  // Existence only, not status — a suspended affiliate still has account
+  // audience; affiliate/layout.tsx shows the suspension notice from there,
+  // same as agency/hotel-partner suspension does in their own layouts.
+  const { data } = await supabase.from("affiliates").select("id").eq("profile_id", userId).maybeSingle();
+  return !!data;
+}
+
 /**
- * Shared sign-in logic for the dedicated /agent/login and /admin/login
- * routes. Unlike the plain /login form, this validates the authenticated
- * account actually holds the matching audience BEFORE establishing a
- * "successful login" state for that portal — a customer submitting
- * /admin/login sees a clear "doesn't have admin access" error instead of
- * landing on a broken or empty dashboard. is_platform_admin (not
- * role='admin') is the admin check, for the same reason requirePlatformAdmin
- * uses it — see session.ts.
+ * Mirrors modules/hotels/partner-queries.ts::getMyHotelScope, inlined
+ * rather than imported: lib never depends on modules (see
+ * modules/README.md) — a plain hotel_manager with no hotel_partner_members
+ * row of their own still holds this audience via my_operable_hotel_ids.
+ */
+async function hasHotelPartnerScope(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<boolean> {
+  const [{ data: member }, { data: hotelIds }] = await Promise.all([
+    supabase
+      .from("hotel_partner_members")
+      .select("partner_id")
+      .eq("profile_id", userId)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle(),
+    supabase.rpc("my_operable_hotel_ids"),
+  ]);
+  return !!member || (hotelIds?.length ?? 0) > 0;
+}
+
+/** Mirrors modules/events/venue-partner-queries.ts::getMyVenuePartnerId, inlined for the same reason as hasHotelPartnerScope above. */
+async function hasVenuePartnerMembership(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("venue_partner_members")
+    .select("partner_id")
+    .eq("profile_id", userId)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+  return !!data;
+}
+
+/**
+ * Per-portal "does this authenticated account actually belong here" check,
+ * run before a portal login is allowed to succeed. Admin is the one case
+ * read directly off `profiles` (a single boolean flag); every other portal
+ * is a membership-table lookup, since one flat `profiles.role` column can't
+ * represent "which programs is this account actually a member of" (an
+ * account can hold more than one).
+ */
+async function holdsPortalAudience(
+  portal: PortalKind,
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<boolean> {
+  switch (portal) {
+    case "admin": {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_platform_admin")
+        .eq("id", userId)
+        .single();
+      return !!profile?.is_platform_admin;
+    }
+    case "agent":
+      return hasActiveAgencyMembership(supabase, userId);
+    case "manager":
+      return hasActiveHotelManagerRow(supabase, userId);
+    case "affiliate":
+      return hasAffiliateRow(supabase, userId);
+    case "partner":
+      return hasHotelPartnerScope(supabase, userId);
+    case "venue":
+      return hasVenuePartnerMembership(supabase, userId);
+  }
+}
+
+/**
+ * Shared sign-in logic for every dedicated portal login route (/agent/login,
+ * /admin/login, /manager/login, /affiliate/login, /partner/login,
+ * /venue/login). Unlike the plain /login form, this validates the
+ * authenticated account actually holds the matching audience BEFORE
+ * establishing a "successful login" state for that portal — a customer
+ * submitting /admin/login sees a clear "doesn't have admin access" error
+ * instead of landing on a broken or empty dashboard. See
+ * holdsPortalAudience() for what "holds the audience" means per portal.
  */
 async function signInToPortalAction(
   portal: PortalKind,
@@ -207,18 +309,7 @@ async function signInToPortalAction(
     return { error: "Incorrect email or password." };
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_platform_admin")
-    .eq("id", user.id)
-    .single();
-
-  const holdsAudience =
-    portal === "admin"
-      ? !!profile?.is_platform_admin
-      : await hasActiveAgencyMembership(supabase, user.id);
-
-  if (!holdsAudience) {
+  if (!(await holdsPortalAudience(portal, supabase, user.id))) {
     // Leaving a valid session sitting on the wrong portal's login page reads
     // as a silent failure — sign back out before surfacing the error so the
     // account isn't left half-authenticated into a portal it can't use.
@@ -257,72 +348,10 @@ async function signInToPortalAction(
 
 export const signInToAgentPortalAction = signInToPortalAction.bind(null, "agent");
 export const signInToAdminPortalAction = signInToPortalAction.bind(null, "admin");
-
-async function hasActiveHotelManagerRow(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string
-): Promise<boolean> {
-  const { data } = await supabase
-    .from("hotel_managers")
-    .select("hotel_id")
-    .eq("profile_id", userId)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
-  return !!data;
-}
-
-/**
- * Sign-in for the dedicated /manager/login route. Not built on
- * signInToPortalAction/PortalKind: that machinery's destination and audience
- * checks are subdomain-shaped (see pathPrefixFor), and /manager has no
- * dedicated subdomain — it's a path-based portal like /partner, gated by its
- * own layout. Same credential + audience-before-redirect + AAL2 shape as the
- * agent/admin actions, just self-contained.
- */
-export async function signInToManagerPortalAction(
-  _prevState: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const parsed = credentialsSchema.safeParse({
-    email: formData.get("email"),
-    password: formData.get("password"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) {
-    return { error: "Incorrect email or password." };
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Incorrect email or password." };
-  }
-
-  if (!(await hasActiveHotelManagerRow(supabase, user.id))) {
-    await supabase.auth.signOut();
-    return { error: "This account doesn't have hotel manager access." };
-  }
-
-  const redirectTo = formData.get("redirect_to");
-  const finalDestination = typeof redirectTo === "string" && redirectTo ? redirectTo : "/manager";
-
-  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (aal?.currentLevel === "aal1" && aal.nextLevel === "aal2") {
-    return {
-      error: null,
-      destination: `/login/verify-2fa?redirect_to=${encodeURIComponent(finalDestination)}`,
-    };
-  }
-
-  return { error: null, destination: finalDestination };
-}
+export const signInToManagerPortalAction = signInToPortalAction.bind(null, "manager");
+export const signInToAffiliatePortalAction = signInToPortalAction.bind(null, "affiliate");
+export const signInToPartnerPortalAction = signInToPortalAction.bind(null, "partner");
+export const signInToVenuePortalAction = signInToPortalAction.bind(null, "venue");
 
 const signUpSchema = credentialsSchema.extend({
   fullName: z.string().min(2, "Enter your full name."),

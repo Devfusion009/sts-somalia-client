@@ -15,7 +15,6 @@ export const APP_CONFIG: Record<
       | "generate_affiliate_application_ref"
       | "generate_venue_partner_application_ref";
     hasSettlementStep: boolean;
-    portalHref: string;
     portalLabel: string;
     label: string;
     totalSteps: number;
@@ -26,7 +25,6 @@ export const APP_CONFIG: Record<
     nameField: "agency_name",
     refRpc: "generate_agency_application_ref",
     hasSettlementStep: true,
-    portalHref: "/agent",
     portalLabel: "Agent Portal",
     label: "Travel Agent",
     totalSteps: 6,
@@ -36,7 +34,6 @@ export const APP_CONFIG: Record<
     nameField: "business_name",
     refRpc: "generate_hotel_partner_application_ref",
     hasSettlementStep: true,
-    portalHref: "/partner",
     portalLabel: "Partner Portal",
     label: "Hotel Partner",
     totalSteps: 6,
@@ -46,7 +43,6 @@ export const APP_CONFIG: Record<
     nameField: null,
     refRpc: "generate_affiliate_application_ref",
     hasSettlementStep: false,
-    portalHref: "/affiliate",
     portalLabel: "Affiliate Dashboard",
     label: "Affiliate",
     totalSteps: 5,
@@ -59,7 +55,6 @@ export const APP_CONFIG: Record<
     nameField: "business_name",
     refRpc: "generate_venue_partner_application_ref",
     hasSettlementStep: true,
-    portalHref: "/venue",
     portalLabel: "Venue Portal",
     label: "Event Venue Partner",
     totalSteps: 6,
