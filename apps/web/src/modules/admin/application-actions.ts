@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { notifyApplicant } from "@/lib/notifications/application-notify";
+import { docSlotsFor } from "@/modules/partner-applications/config";
 import type { ActionState } from "@/lib/auth/actions";
 import type { ApplicationType } from "@/modules/admin/queries";
 
@@ -447,6 +448,40 @@ export async function setDocumentReviewStatus(type: ApplicationType, _prev: Acti
     }
   }
 
+  // Verifying the last outstanding document is what actually opens the
+  // partner's portal (see the gate in app/partner/layout.tsx) — without this
+  // they'd have no way to know it happened short of retrying the URL.
+  if (parsed.data.status === "verified") {
+    const requiredKeys = docSlotsFor(type).filter((s) => !s.optional).map((s) => s.key);
+    const { data: reviewRows } = await supabase
+      .from("partner_document_reviews")
+      .select("doc_key, status")
+      .eq("application_type", type)
+      .eq("application_id", parsed.data.applicationId);
+    const verified = new Set((reviewRows ?? []).filter((r) => r.status === "verified").map((r) => r.doc_key));
+
+    if (requiredKeys.every((key) => verified.has(key))) {
+      const { data: appRow } = await supabase
+        .from(TABLE[type])
+        .select("applicant_id, reference_number")
+        .eq("id", parsed.data.applicationId)
+        .maybeSingle();
+      if (appRow) {
+        await supabase.from("notifications").insert({
+          profile_id: appRow.applicant_id,
+          type: "application_documents_verified",
+          title: "Your documents are verified",
+          body: `All documents on your ${TYPE_LABEL_FOR_NOTIFY[type]} application (${appRow.reference_number}) are verified. Your portal is now open.`,
+          data: { applicationType: type, applicationId: parsed.data.applicationId },
+        });
+      }
+    }
+  }
+
   revalidatePath(`/admin/applications/${type.replace("_", "-")}/${parsed.data.applicationId}`);
+  // Also reviewable from the Partner Account console's Documents tab, whose
+  // URL is keyed by account id rather than application id — revalidate the
+  // whole route pattern since the account id isn't available here.
+  revalidatePath("/admin/partners/[type]/[id]", "page");
   return { error: null };
 }

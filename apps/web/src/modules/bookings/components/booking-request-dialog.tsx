@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CalendarCog, Ban, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -15,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SubmitButton } from "@/components/submit-button";
-import { openBookingRequestAction } from "../actions";
+import { trpc } from "@/lib/trpc/react";
 
 type Kind = "cancellation" | "refund" | "modification";
 
@@ -75,18 +76,29 @@ export function BookingRequestDialog({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useActionState(openBookingRequestAction, null);
+  const router = useRouter();
   const copy = COPY[kind];
   const Icon = ICON[kind];
 
-  // Close once the action succeeds. Derived during render rather than in an
-  // effect, per this codebase's established pattern (see
-  // src/app/affiliate/links/new-link-form.tsx): comparing against the
-  // last-seen state avoids the cascading re-render an effect would cause.
-  const [lastState, setLastState] = useState(state);
-  if (state !== lastState) {
-    setLastState(state);
-    if (state && !state.error) setOpen(false);
+  const openRequest = trpc.bookings.openRequest.useMutation({
+    onSuccess: () => {
+      setOpen(false);
+      router.refresh();
+    },
+  });
+
+  async function handleSubmit(formData: FormData) {
+    try {
+      const rawAmount = formData.get("requestedAmount") as string;
+      await openRequest.mutateAsync({
+        orderId,
+        kind,
+        reason: formData.get("reason") as string,
+        requestedAmount: rawAmount ? Number(rawAmount) : undefined,
+      });
+    } catch {
+      // handled via openRequest.error
+    }
   }
 
   return (
@@ -108,13 +120,10 @@ export function BookingRequestDialog({
             <DialogDescription>{copy.description}</DialogDescription>
           </DialogHeader>
 
-          <form action={formAction} className="space-y-4">
-            <input type="hidden" name="orderId" value={orderId} />
-            <input type="hidden" name="kind" value={kind} />
-
-            {state?.error ? (
+          <form action={handleSubmit} className="space-y-4">
+            {openRequest.error ? (
               <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
+                <AlertDescription>{openRequest.error.message}</AlertDescription>
               </Alert>
             ) : null}
 

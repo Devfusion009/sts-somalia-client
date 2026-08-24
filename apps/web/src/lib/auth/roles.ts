@@ -95,7 +95,7 @@ export function accountRoleBadges(account: {
 // stay path-based regardless, so their hrefs are always relative.
 export const PORTAL_BY_ROLE: Partial<Record<AppRole, { href: string; label: string }>> = {
   hotel_partner: { href: "/partner", label: "Partner Portal" },
-  hotel_manager: { href: "/partner", label: "Partner Portal" },
+  hotel_manager: { href: "/manager", label: "Manager Portal" },
   affiliate: { href: "/affiliate", label: "Affiliate Dashboard" },
   venue_partner: { href: "/venue", label: "Venue Portal" },
 };

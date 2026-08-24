@@ -6,7 +6,6 @@ import { Plus, Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -26,44 +25,19 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
 import { createHotel, updateHotel } from "@/modules/admin/actions";
-import { AMENITIES, AMENITY_LABELS } from "@/modules/partner-applications/config";
+import { uploadHotelLogoAdmin, removeHotelLogoAdmin } from "@/modules/admin/hotel-logo-actions";
+import { AmenitiesField, amenitiesList } from "@/modules/hotels/components/amenities-field";
+import { PhoneField } from "@/modules/partner-applications/components/phone-field";
+import { LocationField } from "@/components/location-field";
+import { hotelLogoUrl } from "@/modules/hotels/images";
+import { HotelLogoUploader } from "@/components/admin/hotel-logo-uploader";
 import type { Database } from "@/lib/types/database.types";
 
 type Hotel = Database["public"]["Tables"]["hotels"]["Row"] & {
   property_links?: Array<{ label: string; url: string; sort_order: number }>;
 };
 
-/** Same fixed vocabulary + checkbox-pill UI as the hotel partner application wizard's AmenitiesField (steps.tsx) — picking from a known list instead of free-typing keeps values consistent with AMENITY_LABELS lookups everywhere else (PillList on the partner console, public property pages). */
-function AmenitiesField({ initial }: { initial: string[] }) {
-  const [checked, setChecked] = useState<string[]>(initial);
-  return (
-    <div className="space-y-2">
-      <Label>Facilities</Label>
-      <div className="flex flex-wrap gap-2">
-        {AMENITIES.map((a) => (
-          <label
-            key={a}
-            className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm has-checked:border-primary has-checked:bg-primary/5"
-          >
-            <input
-              type="checkbox"
-              checked={checked.includes(a)}
-              onChange={(e) => setChecked((prev) => (e.target.checked ? [...prev, a] : prev.filter((v) => v !== a)))}
-            />
-            {AMENITY_LABELS[a]}
-          </label>
-        ))}
-      </div>
-      <input type="hidden" name="amenities" value={checked.join(",")} />
-    </div>
-  );
-}
-
-function amenitiesList(raw: unknown): string[] {
-  return Array.isArray(raw) ? raw.map((v) => String(v)) : [];
-}
-
-/** Inverse of parseLinks() in admin/actions.ts — prefills the textarea so re-saving without touching it doesn't wipe existing links. */
+/** Inverse of parseLinks() in listing-fields.ts — prefills the textarea so re-saving without touching it doesn't wipe existing links. */
 function linksList(links: Hotel["property_links"]): string {
   if (!links || links.length === 0) return "";
   return [...links]
@@ -105,14 +79,24 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
         )}
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{hotel ? "Edit hotel" : "Add hotel"}</DialogTitle>
+        </DialogHeader>
+
+        {hotel ? (
+          <div className="border-b border-border pb-4">
+            <Label className="mb-2 block">Logo</Label>
+            <HotelLogoUploader
+              hotelId={hotel.id}
+              logoUrl={hotelLogoUrl(hotel.logo_path)}
+              uploadAction={uploadHotelLogoAdmin}
+              removeAction={removeHotelLogoAdmin}
+            />
+          </div>
+        ) : null}
+
         <form action={formAction}>
           {hotel ? <input type="hidden" name="id" value={hotel.id} /> : null}
-          <DialogHeader>
-            <DialogTitle>{hotel ? "Edit hotel" : "Add hotel"}</DialogTitle>
-            <DialogDescription>
-              Shown on the public Hotels pages once published.
-            </DialogDescription>
-          </DialogHeader>
 
           <div className="grid gap-4 py-4">
             {state?.error ? (
@@ -128,7 +112,7 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
               </div>
               <div className="space-y-2">
                 <Label htmlFor="hotel-city">City</Label>
-                <Input id="hotel-city" name="city" defaultValue={hotel?.city} required />
+                <LocationField id="hotel-city" name="city" defaultValue={hotel?.city} required />
               </div>
             </div>
             <div className="space-y-2">
@@ -156,7 +140,7 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
                 />
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="hotel-star">Star rating</Label>
                 <Input
@@ -169,13 +153,13 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="hotel-phone">Phone</Label>
-                <Input id="hotel-phone" name="phone" type="tel" defaultValue={hotel?.phone ?? ""} />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="hotel-email">Contact email</Label>
                 <Input id="hotel-email" name="contactEmail" type="email" defaultValue={hotel?.contact_email ?? ""} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="hotel-phone">Phone</Label>
+              <PhoneField name="phone" defaultValue={hotel?.phone ?? ""} />
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -190,23 +174,11 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
             <AmenitiesField initial={amenitiesList(hotel?.amenities)} />
             <div className="space-y-2">
               <Label htmlFor="hotel-policies">Policies (cancellation, house rules, ...)</Label>
-              <Textarea
-                id="hotel-policies"
-                name="policies"
-                rows={3}
-                defaultValue={hotel?.policies ?? ""}
-                placeholder="Free cancellation up to 48 hours before check-in. No smoking. Pets not allowed."
-              />
+              <Textarea id="hotel-policies" name="policies" rows={3} defaultValue={hotel?.policies ?? ""} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="hotel-links">Links (one per line: Label | URL)</Label>
-              <Textarea
-                id="hotel-links"
-                name="links"
-                rows={3}
-                defaultValue={linksList(hotel?.property_links)}
-                placeholder={"Website | https://example.so/\nWhatsApp | https://wa.me/252..."}
-              />
+              <Textarea id="hotel-links" name="links" rows={3} defaultValue={linksList(hotel?.property_links)} />
             </div>
             <div className="space-y-2">
               <Label>Owner</Label>

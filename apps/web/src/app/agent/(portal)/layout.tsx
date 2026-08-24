@@ -116,7 +116,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
       accent="agent"
       brandLogoUrl={agencyLogoUrl(membership.agency.logo_path)}
     >
-      {account ? <OnboardingStatusBanner checklist={account.checklist} portalLabel="the Agent Portal" /> : null}
+      {account ? <OnboardingStatusBanner checklist={account.checklist} /> : null}
       {children}
     </PortalShell>
   );

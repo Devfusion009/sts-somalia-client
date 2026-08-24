@@ -16,6 +16,14 @@ import {
   ArrowDownRight,
   ArrowRight,
   BellRing,
+  Send,
+  Eye,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  BadgeCheck,
+  XCircle,
+  Ban,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -77,6 +85,7 @@ const TONES = {
   blue: "bg-chart-3/10 text-chart-3",
   violet: "bg-chart-4/10 text-chart-4",
   gold: "bg-brand-gold/10 text-brand-gold",
+  red: "bg-destructive/10 text-destructive",
 } as const;
 
 type Tone = keyof typeof TONES;
@@ -100,6 +109,40 @@ const ITEM_TYPE_TONE: Record<string, Tone> = {
   visa: "blue",
   umrah: "gold",
   hall: "orange",
+};
+
+/** Pipeline order — where a visa application sits in its lifecycle, not object key order. */
+const VISA_PIPELINE_STAGES = [
+  "submitted",
+  "in_review",
+  "additional_info_required",
+  "processing",
+  "approved",
+  "issued",
+  "rejected",
+  "cancelled",
+] as const;
+
+const VISA_STAGE_ICON: Record<string, LucideIcon> = {
+  submitted: Send,
+  in_review: Eye,
+  additional_info_required: AlertCircle,
+  processing: Clock,
+  approved: CheckCircle2,
+  issued: BadgeCheck,
+  rejected: XCircle,
+  cancelled: Ban,
+};
+
+const VISA_STAGE_TONE: Record<string, Tone> = {
+  submitted: "blue",
+  in_review: "violet",
+  additional_info_required: "orange",
+  processing: "gold",
+  approved: "teal",
+  issued: "teal",
+  rejected: "red",
+  cancelled: "red",
 };
 
 /** Soft lift so white cards separate from the tinted page background. */
@@ -401,19 +444,20 @@ export default async function AdminDashboardPage({
               </Button>
             </CardAction>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {Object.keys(VISA_STATUS_LABELS)
-              .filter((s) => s !== "draft" && (visaStats.byStatus[s] ?? 0) > 0)
-              .map((status) => (
-                <Link
-                  key={status}
-                  href={`/admin/visa?status=${status}`}
-                  className="flex items-center gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-                >
-                  <span className="font-semibold tabular-nums">{visaStats.byStatus[status]}</span>
-                  <span className="text-muted-foreground">{VISA_STATUS_LABELS[status]}</span>
-                </Link>
-              ))}
+          <CardContent className="space-y-0.5">
+            {VISA_PIPELINE_STAGES.filter((status) => (visaStats.byStatus[status] ?? 0) > 0).map((status) => (
+              <Link
+                key={status}
+                href={`/admin/visa?status=${status}`}
+                className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <IconChip icon={VISA_STAGE_ICON[status]} tone={VISA_STAGE_TONE[status]} />
+                  <p className="truncate text-sm font-medium">{VISA_STATUS_LABELS[status]}</p>
+                </div>
+                <span className="shrink-0 text-sm font-semibold tabular-nums">{visaStats.byStatus[status]}</span>
+              </Link>
+            ))}
             {visaStats.total === 0 ? <EmptyRow>No visa applications yet.</EmptyRow> : null}
           </CardContent>
         </Card>
@@ -436,19 +480,22 @@ export default async function AdminDashboardPage({
                   key={booking.id}
                   className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium capitalize">
-                      {booking.event_type.replace("_", " ")} · {booking.venue?.name ?? "—"}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {new Date(booking.start_date).toLocaleDateString()}
-                      {booking.end_date !== booking.start_date
-                        ? ` → ${new Date(booking.end_date).toLocaleDateString()}`
-                        : ""}
-                      {booking.expected_guests ? ` · ${booking.expected_guests} guests` : ""}
-                    </p>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <IconChip icon={PartyPopper} tone="orange" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium capitalize">
+                        {booking.event_type.replace("_", " ")} · {booking.venue?.name ?? "—"}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {new Date(booking.start_date).toLocaleDateString()}
+                        {booking.end_date !== booking.start_date
+                          ? ` → ${new Date(booking.end_date).toLocaleDateString()}`
+                          : ""}
+                        {booking.expected_guests ? ` · ${booking.expected_guests} guests` : ""}
+                      </p>
+                    </div>
                   </div>
-                  <Badge variant="secondary" className="capitalize">
+                  <Badge variant="secondary" className="shrink-0 capitalize">
                     {booking.status}
                   </Badge>
                 </div>

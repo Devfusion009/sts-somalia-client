@@ -200,6 +200,36 @@ export const PAYOUT_FREQUENCY_LABELS: Record<string, string> = {
 
 export const REJECT_COOLDOWN_DAYS = 30;
 
+/** Bounds for "Year established". Read once at module load rather than
+ * hardcoded, so the upper bound doesn't silently go stale each January. */
+export const EARLIEST_BUSINESS_YEAR = 1900;
+export const CURRENT_YEAR = new Date().getFullYear();
+
+/**
+ * How long after submitting an applicant may still change their own
+ * application. Long enough to fix something spotted right after hitting
+ * submit, short enough that a reviewer isn't verifying a moving target.
+ * 'draft' and 'more_info_requested' ignore the window entirely — both mean
+ * the application is explicitly back in the applicant's hands.
+ *
+ * Enforced for real by the applicant_can_edit() SQL function behind each
+ * application table's UPDATE policy; this copy drives the UI and the server
+ * actions' pre-checks. Keep the two in step.
+ */
+export const EDIT_WINDOW_HOURS = 2;
+
+export function canApplicantEdit(status: string, submittedAt: string | null): boolean {
+  if (status === "draft" || status === "more_info_requested") return true;
+  if (status !== "pending" && status !== "under_review") return false;
+  if (!submittedAt) return false;
+  return Date.now() - new Date(submittedAt).getTime() < EDIT_WINDOW_HOURS * 3_600_000;
+}
+
+export function editWindowEndsAt(submittedAt: string | null): Date | null {
+  if (!submittedAt) return null;
+  return new Date(new Date(submittedAt).getTime() + EDIT_WINDOW_HOURS * 3_600_000);
+}
+
 export type DocSlot = { key: string; label: string; optional?: boolean; expiryField?: boolean };
 
 /**
@@ -225,4 +255,30 @@ export function docSlotsFor(kind: ApplicationKind): DocSlot[] {
   if (kind === "hotel_partner") base.push({ key: "property_ownership", label: "Proof of property ownership or lease agreement" });
   if (kind === "venue_partner") base.push({ key: "property_ownership", label: "Proof of venue ownership or lease agreement" });
   return base;
+}
+
+/**
+ * Splits required-but-missing slots into two reasons: never uploaded, vs.
+ * uploaded but (for a slot with `expiryField`) still missing its expiry
+ * date — trade_license is the only current case, and an expired/undated
+ * license is exactly the thing a KYC gate exists to catch, so it blocks
+ * the same way a missing file does rather than being a soft nudge.
+ */
+export function missingRequiredDocSlots(
+  kind: ApplicationKind,
+  refs: ReadonlyArray<{ key: string; expiry?: string | null }>
+): { missingUpload: DocSlot[]; missingExpiry: DocSlot[] } {
+  const byKey = new Map(refs.map((r) => [r.key, r]));
+  const missingUpload: DocSlot[] = [];
+  const missingExpiry: DocSlot[] = [];
+  for (const slot of docSlotsFor(kind)) {
+    if (slot.optional) continue;
+    const ref = byKey.get(slot.key);
+    if (!ref) {
+      missingUpload.push(slot);
+    } else if (slot.expiryField && !ref.expiry) {
+      missingExpiry.push(slot);
+    }
+  }
+  return { missingUpload, missingExpiry };
 }

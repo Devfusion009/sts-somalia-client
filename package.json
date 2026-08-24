@@ -18,7 +18,7 @@
     "db:status": "supabase status",
     "db:reset": "supabase db reset",
     "db:diff": "supabase db diff -f",
-    "db:types": "supabase gen types typescript --local > apps/web/src/lib/types/database.types.ts",
+    "db:types": "supabase gen types typescript --local > packages/shared-types/src/database.types.ts",
     "seed:storage": "node scripts/seed-storage.mjs",
     "create:admin": "node scripts/create-admin.mjs",
     "docker:build": "docker compose build",

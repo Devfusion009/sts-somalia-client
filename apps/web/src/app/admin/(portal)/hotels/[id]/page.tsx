@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { getHotelByIdAdmin, getHotelBookingsForHotel, getHotelPartnersForSelect, getHotelManagers } from "@/modules/admin/queries";
+import { getHotelByIdAdmin, getHotelBookingsForHotel, getHotelPartnersForSelect } from "@/modules/admin/queries";
 import { getRoomTypes } from "@/modules/hotels/room-types";
+import { getHotelManagers } from "@/modules/hotels/manager-queries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import { PropertyReviews } from "@/components/admin/property-reviews";
 import { uploadHotelImages, removeHotelImage, setHotelCoverImage } from "@/modules/admin/property-gallery-actions";
 import { HotelForm } from "../hotel-form";
 import { RoomDialog } from "./room-form";
-import { AddHotelManagerForm, HotelManagerRow } from "./hotel-manager-form";
+import { HotelManagersSection } from "@/modules/hotels/components/manager-form";
 import { HotelBookingStatusSelect, HotelBookingPriceForm } from "../hotel-booking-controls";
 import { pipelineStatus, PIPELINE_STATUS_STYLES } from "@/modules/bookings/pipeline-status";
 import { cn } from "@/lib/utils";
@@ -144,20 +145,8 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
         ) : null}
 
         <Card>
-          <CardContent className="space-y-3">
-            <h2 className="font-heading text-sm font-semibold">Managers</h2>
-            {managers.length > 0 ? (
-              <ul className="divide-y divide-border">
-                {managers.map((manager) => (
-                  <li key={manager.id} className="py-2.5 first:pt-0 last:pb-0">
-                    <HotelManagerRow hotelId={hotel.id} manager={manager} />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">No managers assigned yet.</p>
-            )}
-            <AddHotelManagerForm hotelId={hotel.id} />
+          <CardContent>
+            <HotelManagersSection hotelId={hotel.id} managers={managers} />
           </CardContent>
         </Card>
       </div>

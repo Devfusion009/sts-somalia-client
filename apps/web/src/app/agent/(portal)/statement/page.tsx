@@ -46,9 +46,6 @@ export default async function AgentStatementPage() {
           <CardContent className="flex flex-col items-center gap-2 py-14 text-center">
             <FileClock className="size-8 text-muted-foreground" />
             <p className="font-medium">No activity yet</p>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Deposits, booking payments, refunds, and notes will appear here as they happen.
-            </p>
           </CardContent>
         ) : (
           <div className="overflow-x-auto">

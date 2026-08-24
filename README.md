@@ -19,14 +19,24 @@ later once the backend is solid.
 
 ```bash
 npm install
-npm run db:start     # boots local Postgres/Auth/Storage/Studio via Docker
-cp .env.example .env.local   # already pre-filled for this repo's local stack
-npm run dev
+cp apps/web/.env.example apps/web/.env.local   # pre-filled for this repo's local stack
+cp apps/api/.env.example apps/api/.env.local
+./start.sh                                     # Supabase + redis + api + web, hot reload
 ```
 
+`./start.sh prod` runs the same stack against a production build instead of
+`next dev`; `./start.sh --stop` shuts everything down. `./start.sh --help`
+covers the rest.
+
 - App: http://localhost:3000
+- Admin portal: http://admin.stssomalia.test:3000
+- Agent portal: http://agent.stssomalia.test:3000
+- API (NestJS): http://localhost:4000
 - Supabase Studio (DB/Auth/Storage GUI): http://127.0.0.1:54323
 - Mailpit (captures auth emails locally): http://127.0.0.1:54324
+
+To run the apps on the host instead of in containers, start the database on
+its own with `npm run db:start`, then `npm run dev:web` and `npm run dev:api`.
 
 Run `npm run db:status` any time to see the local API URL and keys — if you
 ever reset your Docker volumes, the keys in `.env.local` may need updating

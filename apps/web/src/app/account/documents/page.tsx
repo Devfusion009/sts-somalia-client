@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
-import { getMyDocuments, getMyTravelers } from "@/modules/travelers/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { DocumentVault } from "@/modules/travelers/components/document-vault";
 
 export const metadata: Metadata = { title: "Document Vault" };
 
 export default async function AccountDocumentsPage() {
-  const [documents, travelers] = await Promise.all([getMyDocuments(), getMyTravelers()]);
+  const trpc = await getServerTrpc();
+  const [documents, travelers] = await Promise.all([
+    trpc.travelers.myDocuments.query(),
+    trpc.travelers.myTravelers.query(),
+  ]);
 
   return (
     <div className="space-y-6">

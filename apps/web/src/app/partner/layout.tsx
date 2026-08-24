@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getMyHotelScope, getMyPartner } from "@/modules/hotels/partner-queries";
 import { getMyPartnerAccountId, getPartnerAccount } from "@/modules/admin/partner-accounts";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
+import { PartnerVerificationGate } from "@/components/portal/partner-verification-gate";
 import { OnboardingStatusBanner } from "@/components/portal/onboarding-status-banner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,6 +57,12 @@ export default async function PartnerLayout({ children }: { children: React.Reac
   const scope = await getMyHotelScope(profile.id);
   const { partnerId } = scope;
 
+  // A pure manager (no hotel_partners business of their own) now has a
+  // dedicated portal — /partner is the business owner's console.
+  if (!partnerId && scope.hotelIds.length > 0) {
+    redirect("/manager");
+  }
+
   if (!partnerId && scope.hotelIds.length === 0) {
     return (
       <div className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
@@ -87,6 +95,25 @@ export default async function PartnerLayout({ children }: { children: React.Reac
   ]);
   const account = accountId ? await getPartnerAccount(accountId) : null;
 
+  // Nothing in the portal opens until STS has verified every required KYC
+  // document. Deliberately gated on that one checklist item rather than the
+  // whole checklist: "first property listed" and "rooms configured" are done
+  // *inside* the portal, so gating on them would lock the partner out of the
+  // only place they could satisfy them. A hotel_manager has no account of
+  // their own (admin grants their access directly) and is never gated here.
+  if (account && account.account.status === "onboarding" && !account.checklist.find((i) => i.key === "docs_verified")?.done) {
+    return (
+      <PartnerVerificationGate
+        kind="hotel_partner"
+        portalLabel="Hotel Partner Portal"
+        applicationId={account.application.id}
+        referenceNumber={account.account.id}
+        documentRefs={account.application.document_refs}
+        docReviews={account.docReviews}
+      />
+    );
+  }
+
   return (
     <PortalShell
       portalName="Hotel Partner Portal"
@@ -97,7 +124,7 @@ export default async function PartnerLayout({ children }: { children: React.Reac
       contexts={contexts}
       isPlatformAdmin={profile.is_platform_admin}
     >
-      {account ? <OnboardingStatusBanner checklist={account.checklist} portalLabel="the Hotel Partner Portal" /> : null}
+      {account ? <OnboardingStatusBanner checklist={account.checklist} /> : null}
       {children}
     </PortalShell>
   );

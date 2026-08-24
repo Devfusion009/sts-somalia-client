@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Headset, ArrowRight } from "lucide-react";
+import { ArrowLeft, Headset, ArrowRight, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { requireUser } from "@/lib/auth/session";
 import { APP_CONFIG, stepsFor, type ApplicationKind } from "@/modules/partner-applications/config";
-import { getEditableApplication, wizardStep } from "@/modules/partner-applications/queries";
+import { getDocumentReviews, getEditableApplication, wizardStep } from "@/modules/partner-applications/queries";
 import { WizardStepper } from "@/modules/partner-applications/components/wizard-stepper";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,8 +34,11 @@ export default async function PartnerApplicationWizardPage({
   if (!isKind(type)) notFound();
 
   const user = await requireUser();
+  // Covers both "not yours" and "past the edit window" — the read-only view
+  // resolves the first as a 404 of its own, and is the right destination for
+  // the second rather than a dead end on a bookmarked wizard URL.
   const { application } = await getEditableApplication(type, id, user.id);
-  if (!application) notFound();
+  if (!application) redirect(`/account/become/${type}/${id}/view`);
 
   const validSteps = stepsFor(type);
   const maxStep = Math.min(Math.max(wizardStep(application.business_details), 1), 6);
@@ -49,6 +53,11 @@ export default async function PartnerApplicationWizardPage({
 
   const cfg = APP_CONFIG[type];
 
+  // Only step 5 renders review state, and an applicant who never had a
+  // document rejected has no rows to read — so this stays off the other five
+  // steps rather than being fetched alongside the application every time.
+  const documentReviews = step === 5 ? await getDocumentReviews(type, id) : {};
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
       <div className="mb-6">
@@ -57,6 +66,14 @@ export default async function PartnerApplicationWizardPage({
         </Link>
         <h1 className="font-heading text-2xl font-semibold">{cfg.label} Application</h1>
       </div>
+
+      {application.status === "more_info_requested" && application.review_notes ? (
+        <Alert variant="destructive" className="mb-6">
+          <AlertTriangle />
+          <AlertTitle>Action needed from STS</AlertTitle>
+          <AlertDescription>{application.review_notes}</AlertDescription>
+        </Alert>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[270px_1fr]">
         <div className="space-y-6">
@@ -82,7 +99,7 @@ export default async function PartnerApplicationWizardPage({
           ) : step === 4 ? (
             <StepSettlement kind={type} application={application} />
           ) : step === 5 ? (
-            <StepDocuments kind={type} application={application} />
+            <StepDocuments kind={type} application={application} reviews={documentReviews} />
           ) : (
             <StepReview kind={type} application={application} />
           )}

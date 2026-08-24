@@ -1,0 +1,10 @@
+import { Module } from "@nestjs/common";
+import { TravelersService } from "./travelers.service";
+import { TravelersController } from "./travelers.controller";
+
+@Module({
+  controllers: [TravelersController],
+  providers: [TravelersService],
+  exports: [TravelersService],
+})
+export class TravelersModule {}

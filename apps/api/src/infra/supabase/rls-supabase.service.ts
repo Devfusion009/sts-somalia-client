@@ -16,6 +16,18 @@ export class RlsSupabaseService {
 
   constructor(@Inject(REQUEST) private readonly request: Request) {}
 
+  /**
+   * Returns a plain (untyped) SupabaseClient — kept that way deliberately.
+   * Typing this globally with SupabaseClient<Database> was tried in phase
+   * 4b and reverted: it flowed the full generated Database type's
+   * complexity into every module's inferred tRPC output (via
+   * ctx.resolve()), not just the ones doing real joins, and tripped
+   * "Type instantiation is excessively deep" (TS2589) at apps/web call
+   * sites for routers that never needed the extra typing. Modules that
+   * genuinely need join-aware typing (travelers, bookings) cast locally:
+   * `this.rls.get() as SupabaseClient<Database>`. Scope the complexity to
+   * where it's earned, not globally.
+   */
   get(): SupabaseClient {
     if (this.client) return this.client;
     const header = this.request.headers.authorization;

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -42,9 +43,38 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
-import { uploadVaultDocumentAction, deleteVaultDocumentAction } from "../actions";
+import { trpc } from "@/lib/trpc/react";
+import { apiUrl } from "@/lib/trpc/shared";
+import { createClient as createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { TRAVELER_DOCUMENT_TYPES } from "../schemas";
 import type { TravelerProfile, VaultDocument } from "../queries";
+
+/**
+ * Plain REST multipart POST, not a tRPC mutation — tRPC doesn't carry
+ * binary well (same reasoning as every prior phase's real file upload).
+ * Still goes through @tanstack/react-query's useMutation below so it gets
+ * the same pending/error/success shape as the tRPC mutations elsewhere on
+ * this page, and can still invalidate the tRPC-cached documents query on
+ * success.
+ */
+async function uploadDocument(formData: FormData) {
+  const supabase = createSupabaseBrowserClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const res = await fetch(`${apiUrl()}/travelers/documents`, {
+    method: "POST",
+    headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message ?? "Upload failed.");
+  }
+  return res.json();
+}
 
 const TYPE_LABELS = new Map(TRAVELER_DOCUMENT_TYPES.map((t) => [t.value, t.label]));
 
@@ -69,23 +99,35 @@ export function DocumentVault({
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<VaultDocument | null>(null);
-  const [state, formAction] = useActionState(uploadVaultDocumentAction, null);
+  const utils = trpc.useUtils();
+
+  const upload = useMutation({
+    mutationFn: uploadDocument,
+    onSuccess: () => {
+      utils.travelers.myDocuments.invalidate();
+      setUploadOpen(false);
+      setFormKey((k) => k + 1);
+    },
+  });
+
+  const remove = trpc.travelers.deleteDocument.useMutation({
+    onSuccess: () => {
+      utils.travelers.myDocuments.invalidate();
+      setConfirmDelete(null);
+    },
+  });
+
   // Bumped on every successful upload to remount the form. A file input cannot
   // be cleared by re-rendering — its value is owned by the browser — and
   // calling formRef.current.reset() here would be reading a ref during render.
   // Remounting is the one approach that is both correct and legal.
   const [formKey, setFormKey] = useState(0);
 
-  // Close once the action succeeds. Derived during render rather than in an
-  // effect, per this codebase's established pattern (see
-  // src/app/affiliate/links/new-link-form.tsx): comparing against the
-  // last-seen state avoids the cascading re-render an effect would cause.
-  const [lastState, setLastState] = useState(state);
-  if (state !== lastState) {
-    setLastState(state);
-    if (state && !state.error) {
-      setUploadOpen(false);
-      setFormKey((k) => k + 1);
+  async function handleUpload(formData: FormData) {
+    try {
+      await upload.mutateAsync(formData);
+    } catch {
+      // handled via upload.error below
     }
   }
 
@@ -216,10 +258,10 @@ export function DocumentVault({
             </DialogDescription>
           </DialogHeader>
 
-          <form key={formKey} action={formAction} className="space-y-4">
-            {state?.error ? (
+          <form key={formKey} action={handleUpload} className="space-y-4">
+            {upload.error ? (
               <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
+                <AlertDescription>{upload.error.message}</AlertDescription>
               </Alert>
             ) : null}
 
@@ -301,20 +343,17 @@ export function DocumentVault({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep</AlertDialogCancel>
-            <form action={deleteVaultDocumentAction}>
-              <input type="hidden" name="documentId" value={confirmDelete?.id ?? ""} />
-              <AlertDialogAction
-                type="submit"
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Delete
-              </AlertDialogAction>
-            </form>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => confirmDelete && remove.mutate({ documentId: confirmDelete.id })}
+            >
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {state && !state.error ? (
+      {upload.isSuccess ? (
         <Alert>
           <CheckCircle2 />
           <AlertDescription>Document uploaded to your vault.</AlertDescription>

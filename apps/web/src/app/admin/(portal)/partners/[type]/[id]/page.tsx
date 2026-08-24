@@ -8,6 +8,7 @@ import {
   FileText,
   CheckCircle2,
   Circle,
+  ChevronRight,
   BedDouble,
   Landmark,
   Link2,
@@ -36,6 +37,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { StatusActions } from "./status-actions";
 import { ListingStatusControl } from "./listing-status-control";
+import { DocumentReviewControls } from "../../../applications/[type]/document-review-controls";
 import {
   CommercialTermsForm,
   AccountNotesForm,
@@ -54,12 +56,6 @@ const ACCOUNT_STATUS_STYLES: Record<PartnerAccountStatus, string> = {
   offboarded: "bg-muted text-muted-foreground",
 };
 
-const DOC_REVIEW_STYLES: Record<string, string> = {
-  verified: "bg-primary/10 text-primary",
-  rejected: "bg-destructive/10 text-destructive",
-  pending: "bg-brand-gold/15 text-brand-gold",
-};
-
 function money(amount: number, currency = "USD") {
   return `${currency} ${amount.toFixed(2)}`;
 }
@@ -73,13 +69,19 @@ function KeyDate({ label, value }: { label: string; value: string | null }) {
   );
 }
 
+const CONSOLE_TABS = ["overview", "onboarding", "portfolio", "commercial", "documents", "users", "activity", "notes"];
+
 export default async function PartnerAccountConsolePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ type: string; id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   await requirePlatformAdmin();
   const { type: slug, id } = await params;
+  const { tab: requestedTab } = await searchParams;
+  const initialTab = requestedTab && CONSOLE_TABS.includes(requestedTab) ? requestedTab : "overview";
   const type = ACCOUNT_TYPE_FROM_SLUG[slug];
   if (!type) notFound();
 
@@ -139,7 +141,7 @@ export default async function PartnerAccountConsolePage({
         <StatusActions accountId={account.id} status={account.status} />
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs key={initialTab} defaultValue={initialTab}>
         <TabsList className="flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
@@ -219,21 +221,37 @@ export default async function PartnerAccountConsolePage({
               <Progress value={progressPct} className="mt-2" />
             </CardHeader>
             <CardContent className="space-y-2">
-              {checklist.map((item) => (
-                <div key={item.key} className="flex items-start gap-3 rounded-lg border border-border p-3">
-                  {item.done ? (
-                    <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
-                  ) : (
-                    <Circle className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-                  )}
-                  <div>
-                    <p className={cn("text-sm font-medium", item.done && "text-muted-foreground line-through")}>
-                      {item.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{item.description}</p>
+              {checklist.map((item) => {
+                const body = (
+                  <>
+                    {item.done ? (
+                      <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
+                    ) : (
+                      <Circle className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className={cn("text-sm font-medium", item.done && "text-muted-foreground line-through")}>
+                        {item.label}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{item.description}</p>
+                    </div>
+                    {item.tab ? <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" /> : null}
+                  </>
+                );
+                return item.tab ? (
+                  <Link
+                    key={item.key}
+                    href={`?tab=${item.tab}`}
+                    className="flex items-start gap-3 rounded-lg border border-border p-3 hover:bg-muted/50"
+                  >
+                    {body}
+                  </Link>
+                ) : (
+                  <div key={item.key} className="flex items-start gap-3 rounded-lg border border-border p-3">
+                    {body}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
         </TabsContent>
@@ -470,67 +488,61 @@ export default async function PartnerAccountConsolePage({
 
         {/* ------------------------------ Documents ------------------------------ */}
         <TabsContent value="documents" className="mt-4">
-          <Card className="overflow-hidden py-0">
-            <CardHeader className="border-b border-border !py-4">
+          <Card>
+            <CardHeader>
               <CardTitle className="text-base">
                 KYC documents ({signedDocs.length})
                 <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  {signedDocs.filter((d) => d.review?.status === "verified").length} verified — review them on the
-                  original application
+                  {signedDocs.filter((d) => d.review?.status === "verified").length} verified
+                  {" · "}
+                  {signedDocs.filter((d) => d.review?.status === "rejected").length} rejected
+                  {" · "}
+                  {signedDocs.filter((d) => (d.review?.status ?? "pending") === "pending").length} awaiting review
                 </span>
               </CardTitle>
             </CardHeader>
-            {signedDocs.length === 0 ? (
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                No documents on file.
-              </CardContent>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Document</TableHead>
-                    <TableHead>Uploaded</TableHead>
-                    <TableHead>Review</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            <CardContent>
+              {signedDocs.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">No documents on file.</p>
+              ) : (
+                <div className="space-y-3">
                   {signedDocs.map((doc) => (
-                    <TableRow key={doc.key}>
-                      <TableCell>
-                        <p className="text-sm font-medium">{doc.label}</p>
-                        <p className="text-xs text-muted-foreground">{doc.file_name}</p>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(doc.uploaded_at), "d MMM yyyy")}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={cn(
-                            "border-transparent capitalize",
-                            DOC_REVIEW_STYLES[doc.review?.status ?? "pending"]
-                          )}
-                        >
-                          {doc.review?.status ?? "pending"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
+                    <div key={doc.key} className="rounded-lg border border-border p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <FileText className="size-4 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{doc.label}</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {doc.file_name} · uploaded {format(new Date(doc.uploaded_at), "d MMM yyyy")}
+                            </p>
+                          </div>
+                        </div>
                         {doc.url ? (
                           <Button
                             size="sm"
                             variant="ghost"
                             render={<a href={doc.url} target="_blank" rel="noreferrer" />}
-                            className="gap-1 text-primary"
+                            className="shrink-0 gap-1 text-primary"
                           >
                             View <ExternalLink className="size-3.5" />
                           </Button>
                         ) : null}
-                      </TableCell>
-                    </TableRow>
+                      </div>
+                      <DocumentReviewControls
+                        applicationId={application.id}
+                        type={type}
+                        docKey={doc.key}
+                        status={(doc.review?.status as "pending" | "verified" | "rejected" | undefined) ?? "pending"}
+                        note={doc.review?.note ?? null}
+                        reviewedAt={doc.review?.reviewed_at ?? null}
+                        reviewerName={doc.review?.reviewer?.full_name ?? doc.review?.reviewer?.email ?? null}
+                      />
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
-            )}
+                </div>
+              )}
+            </CardContent>
           </Card>
         </TabsContent>
 

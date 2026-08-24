@@ -114,8 +114,8 @@ export default async function AgentDashboardPage({
 
   return (
     <div className="space-y-6">
-      <LowBalanceBanner profileId={profile.id} />
-      <BroadcastBanner profileId={profile.id} />
+      <LowBalanceBanner />
+      <BroadcastBanner />
 
       {/* Welcome header */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">

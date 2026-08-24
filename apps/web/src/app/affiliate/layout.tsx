@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
-import { getMyAffiliate } from "@/modules/affiliates/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,7 +34,8 @@ export default async function AffiliateLayout({ children }: { children: React.Re
   // actually granted — gating on role alone would incorrectly lock them out
   // of programs they still belong to.
   const profile = await requireUser();
-  const affiliate = await getMyAffiliate(profile.id);
+  const trpc = await getServerTrpc();
+  const affiliate = await trpc.affiliates.me.query();
 
   if (!affiliate) {
     return (

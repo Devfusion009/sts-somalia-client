@@ -1,25 +1,12 @@
 /**
- * The customer-facing pipeline the client asked for — Pending → Payment
- * Received → Confirmed → Completed/Cancelled — computed from the existing
- * order_status + booking_status pair rather than stored as a new column, so
- * it can never drift out of sync with the two statuses that already govern
- * money and fulfillment (same "compute, don't duplicate" approach used for
- * order partial-payment rollup).
+ * PipelineStatus + pipelineStatus() moved to packages/shared-types (phase
+ * 4b) — re-exported here, not redefined, so existing imports need no
+ * changes. PIPELINE_STATUS_STYLES stays local: it's Tailwind class
+ * strings, presentation, not data a backend module has any use for.
  */
-export type PipelineStatus = "Pending" | "Payment Received" | "Confirmed" | "Completed" | "Cancelled";
-
-const TERMINAL_CANCELLED = new Set(["cancelled", "refunded", "failed", "no_show"]);
-
-export function pipelineStatus(
-  orderStatus: string | null | undefined,
-  bookingStatus: string
-): PipelineStatus {
-  if (TERMINAL_CANCELLED.has(bookingStatus)) return "Cancelled";
-  if (bookingStatus === "completed") return "Completed";
-  if (bookingStatus === "confirmed") return "Confirmed";
-  if (orderStatus === "paid" || orderStatus === "partially_paid") return "Payment Received";
-  return "Pending";
-}
+export type { PipelineStatus } from "@sts/shared-types";
+export { pipelineStatus } from "@sts/shared-types";
+import type { PipelineStatus } from "@sts/shared-types";
 
 export const PIPELINE_STATUS_STYLES: Record<PipelineStatus, string> = {
   Pending: "bg-brand-gold/15 text-brand-gold",

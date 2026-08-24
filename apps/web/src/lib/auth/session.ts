@@ -50,7 +50,7 @@ export async function requireUser(): Promise<Profile> {
  * rendered on the admin origin. rootOrigin() is "" until subdomains are set
  * up, where a bare "/" is already correct.
  */
-function deniedDestination(): string {
+export function deniedDestination(): string {
   return rootOrigin() || "/";
 }
 

@@ -1044,11 +1044,11 @@ function ReviewSection({
 
 function ReviewGrid({ rows }: { rows: Array<[string, string]> }) {
   return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+    <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
       {rows.map(([label, value]) => (
         <div key={label}>
-          <dt className="text-xs text-muted-foreground">{label}</dt>
-          <dd className="text-sm font-medium">{value || "—"}</dd>
+          <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
+          <dd className={cn("text-sm break-words", value ? "font-semibold text-foreground" : "text-muted-foreground/50")}>{value || "—"}</dd>
         </div>
       ))}
     </dl>

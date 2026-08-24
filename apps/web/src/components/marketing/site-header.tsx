@@ -20,7 +20,12 @@ import { InfoOutlinedIcon, PhoneInTalkIcon, StorefrontIcon, SupportAgentIcon } f
  * off HeaderShell's `data-condensed` attribute.
  */
 export async function SiteHeader() {
-  const profile = await getCurrentProfile();
+  const rawProfile = await getCurrentProfile();
+  // A hotel manager has no B2C identity of their own — see the rejection in
+  // signInAction. Treated as signed-out here so the public site never shows
+  // them a "My Account" customer identity that isn't really theirs, even
+  // though the /manager session cookie is still valid.
+  const profile = rawProfile?.role === "hotel_manager" ? null : rawProfile;
   const contexts = profile ? await getMyPartnerContexts(profile.id, profile.full_name) : [];
 
   return (

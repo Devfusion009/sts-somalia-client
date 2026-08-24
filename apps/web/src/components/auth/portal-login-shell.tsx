@@ -2,18 +2,20 @@ import Link from "next/link";
 import Image from "next/image";
 import { rootOrigin } from "@/lib/subdomain";
 
-const ACCENT_ICON_BG: Record<"agent" | "admin", string> = {
+const ACCENT_ICON_BG: Record<"agent" | "admin" | "manager", string> = {
   agent: "bg-amber-500",
   admin: "bg-blue-500",
+  manager: "bg-teal-600",
 };
 
 /**
- * Visual wrapper for the dedicated /agent/login and /admin/login pages.
- * Deliberately distinct from the plain-consumer (auth) layout — a dark,
- * operator-grade backdrop instead of the light marketing chrome — so
- * entering a portal login reads as a different, more professional product,
- * not a reskinned customer form. Reuses the same --sidebar tokens the
- * portal shells already use elsewhere, so this isn't a new palette.
+ * Visual wrapper for the dedicated /agent/login, /admin/login, and
+ * /manager/login pages. Deliberately distinct from the plain-consumer
+ * (auth) layout — a dark, operator-grade backdrop instead of the light
+ * marketing chrome — so entering a portal login reads as a different, more
+ * professional product, not a reskinned customer form. Reuses the same
+ * --sidebar tokens the portal shells already use elsewhere, so this isn't a
+ * new palette.
  */
 export function PortalLoginShell({
   portalLabel,
@@ -21,12 +23,13 @@ export function PortalLoginShell({
   children,
 }: {
   portalLabel: string;
-  accent: "agent" | "admin";
+  accent: "agent" | "admin" | "manager";
   children: React.ReactNode;
 }) {
   // From admin.<host>/login or agent.<host>/login, "/" and "/login" need to
   // point back to the root marketing site, not re-resolve within this same
   // subdomain (see homeHref in PortalShell for the identical reasoning).
+  // /manager has no dedicated subdomain, so this is always "/login" there.
   const root = rootOrigin();
 
   return (

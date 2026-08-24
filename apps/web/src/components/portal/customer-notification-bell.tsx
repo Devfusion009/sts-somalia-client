@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Bell, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { dismissNotification } from "@/modules/notifications/actions";
+import { trpc } from "@/lib/trpc/react";
 import { cn } from "@/lib/utils";
+import { ACTIONABLE_TYPES } from "@/lib/notifications/actionable-types";
 
 type NotificationRow = {
   id: string;
@@ -26,11 +27,11 @@ const POLL_MS = 30_000;
 // way to find out short of manually revisiting /account/become, since real
 // email/WhatsApp sending is still a placeholder pending Resend/Twilio
 // credentials. This works today regardless of that.
-const ACTIONABLE_TYPES = new Set(["application_more_info_requested", "application_document_rejected"]);
-
 export function CustomerNotificationBell({ notifications }: { notifications: NotificationRow[] }) {
-  const pathname = usePathname();
   const router = useRouter();
+  const dismiss = trpc.notifications.dismiss.useMutation({
+    onSuccess: () => router.refresh(),
+  });
 
   useEffect(() => {
     const tick = () => {
@@ -92,13 +93,15 @@ export function CustomerNotificationBell({ notifications }: { notifications: Not
                     {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                   </p>
                 </div>
-                <form action={dismissNotification}>
-                  <input type="hidden" name="notificationId" value={n.id} />
-                  <input type="hidden" name="path" value={pathname} />
-                  <Button type="submit" size="icon" variant="ghost" className="size-6 shrink-0">
-                    <X className="size-3.5" />
-                  </Button>
-                </form>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-6 shrink-0"
+                  onClick={() => dismiss.mutate({ notificationId: n.id })}
+                >
+                  <X className="size-3.5" />
+                </Button>
               </div>
             ))}
           </div>

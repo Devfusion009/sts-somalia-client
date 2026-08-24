@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, ArrowLeft, Check, CloudUpload, FileCheck2, FileText, Loader2, MoreVertical, Paperclip, ShieldCheck } from "lucide-react";
+import { AlertCircle, ArrowRight, ArrowLeft, Check, CloudUpload, FileCheck2, FileText, Loader2, MoreVertical, Paperclip, ShieldCheck, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -31,9 +31,12 @@ import {
   submitApplication,
   type ActionState,
 } from "../actions";
+import { checkUploadFile } from "../schemas";
 import {
   APP_CONFIG,
   BUSINESS_TYPES,
+  EARLIEST_BUSINESS_YEAR,
+  CURRENT_YEAR,
   VOLUME_RANGES,
   PRODUCTS,
   TRAFFIC_SOURCES,
@@ -51,11 +54,12 @@ import {
   PAYOUT_FREQUENCIES,
   PAYOUT_FREQUENCY_LABELS,
   docSlotsFor,
+  missingRequiredDocSlots,
   stepLabel,
   type ApplicationKind,
   type DocSlot,
 } from "../config";
-import type { ApplicationRow, DocumentRef } from "../queries";
+import type { ApplicationRow, DocumentRef, DocumentReview } from "../queries";
 
 type AppRow = ApplicationRow;
 
@@ -85,7 +89,9 @@ function useAutosave(formRef: React.RefObject<HTMLFormElement | null>, formActio
   return useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      if (formRef.current) formAction(new FormData(formRef.current));
+      if (!formRef.current) return;
+      const payload = new FormData(formRef.current);
+      startTransition(() => formAction(payload));
     }, 900);
   }, [formRef, formAction]);
 }
@@ -282,8 +288,15 @@ export function StepBusiness({ kind, application, backHref }: { kind: Applicatio
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Year established</Label>
-          <Input name="yearEstablished" type="number" min="1900" max="2026" defaultValue={s(d.yearEstablished)} />
+          <Label>Year established *</Label>
+          <Input
+            name="yearEstablished"
+            type="number"
+            min={EARLIEST_BUSINESS_YEAR}
+            max={CURRENT_YEAR}
+            defaultValue={s(d.yearEstablished)}
+            required
+          />
         </div>
         <div className="space-y-1.5">
           <Label>Business registration number</Label>
@@ -367,9 +380,6 @@ export function StepContact({ kind, application }: { kind: ApplicationKind; appl
           <Label>National ID or passport number *</Label>
           <Input name="idNumber" defaultValue={s(d.idNumber)} required />
         </div>
-        <p className="text-xs text-muted-foreground">
-          For payout verification only — you&apos;ll upload a copy in the Documents step.
-        </p>
         <StepNav backHref={`/account/become/${kind}/${application.id}?step=1`} saving={pending} saved={saved} />
       </form>
     );
@@ -403,9 +413,6 @@ export function StepContact({ kind, application }: { kind: ApplicationKind; appl
           <Input name="contactEmail" type="email" defaultValue={s(d.contactEmail)} required />
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        You&apos;ll upload their ID/passport document in the Documents step.
-      </p>
 
       <StepNav backHref={`/account/become/${kind}/${application.id}?step=1`} saving={pending} saved={saved} />
     </form>
@@ -568,10 +575,6 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
         <Separator />
         <AmenitiesField initial={initialAmenities} />
 
-        <p className="text-xs text-muted-foreground">
-          Photos and live rates/availability are set up in the partner portal once you&apos;re approved.
-        </p>
-
         <StepNav backHref={backHref} saving={pending} saved={saved} />
       </form>
     );
@@ -607,9 +610,6 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
           </div>
         </div>
         <VenueEventTypesField initial={initialEventTypes} />
-        <p className="text-xs text-muted-foreground">
-          Photos and live availability are set up in the Venue Portal once you&apos;re approved.
-        </p>
         <StepNav backHref={backHref} saving={pending} saved={saved} />
       </form>
     );
@@ -853,20 +853,25 @@ function DocUploadRow({
   applicationId,
   slot,
   existing,
+  review,
   iconIndex,
 }: {
   kind: ApplicationKind;
   applicationId: string;
   slot: DocSlot;
   existing?: DocumentRef;
+  review?: DocumentReview;
   iconIndex: number;
 }) {
   const [state, formAction, pending] = useActionState(uploadApplicationDocument, null);
   const [expiryState, expiryAction, expiryPending] = useActionState(updateDocumentExpiry, null);
   const [expiry, setExpiry] = useState(existing?.expiry ?? "");
+  const [fileError, setFileError] = useState<string | null>(null);
   const removeFormRef = useRef<HTMLFormElement>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const isExpired = slot.expiryField && expiry && new Date(expiry) < new Date(new Date().toDateString());
+  const isRejected = review?.status === "rejected";
+  const isVerified = review?.status === "verified";
 
   async function handleView() {
     setViewLoading(true);
@@ -876,7 +881,7 @@ function DocUploadRow({
   }
 
   return (
-    <div className="rounded-xl border border-border p-4">
+    <div className={cn("rounded-xl border p-4", isRejected ? "border-destructive/50 bg-destructive/5" : "border-border")}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", DOC_ICON_STYLES[iconIndex % DOC_ICON_STYLES.length])}>
@@ -905,7 +910,15 @@ function DocUploadRow({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {existing ? (
+          {isRejected ? (
+            <span className="flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
+              <XCircle className="size-3" /> Rejected
+            </span>
+          ) : isVerified ? (
+            <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+              <ShieldCheck className="size-3" /> Verified
+            </span>
+          ) : existing ? (
             <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
               <Check className="size-3" /> Uploaded
             </span>
@@ -929,6 +942,13 @@ function DocUploadRow({
         </div>
       </div>
 
+      {isRejected && review?.note ? (
+        <p className="mt-3 flex items-start gap-1.5 text-xs text-destructive">
+          <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+          {review.note}
+        </p>
+      ) : null}
+
       <form ref={removeFormRef} action={removeApplicationDocument} className="hidden">
         <input type="hidden" name="kind" value={kind} />
         <input type="hidden" name="applicationId" value={applicationId} />
@@ -940,7 +960,9 @@ function DocUploadRow({
           <input type="hidden" name="kind" value={kind} />
           <input type="hidden" name="applicationId" value={applicationId} />
           <input type="hidden" name="docKey" value={slot.key} />
-          <Label className="text-xs">Expiry date</Label>
+          <Label className="text-xs">
+            Expiry date {slot.optional ? null : <span className="text-destructive">*</span>}
+          </Label>
           <Input
             type="date"
             name="expiry"
@@ -953,9 +975,7 @@ function DocUploadRow({
               if (existing) e.currentTarget.form?.requestSubmit();
             }}
           />
-          {!existing ? (
-            <p className="text-xs text-muted-foreground">Upload the file first, then set its expiry date.</p>
-          ) : expiryPending ? (
+          {!existing ? null : expiryPending ? (
             <p className="text-xs text-muted-foreground">Saving…</p>
           ) : isExpired ? (
             <p className="text-xs text-destructive">This license has expired — you&apos;ll need a current one to submit.</p>
@@ -964,7 +984,7 @@ function DocUploadRow({
         </form>
       ) : null}
 
-      {!existing ? (
+      {!existing || isRejected ? (
         <form action={formAction} className="mt-3">
           <input type="hidden" name="kind" value={kind} />
           <input type="hidden" name="applicationId" value={applicationId} />
@@ -984,31 +1004,48 @@ function DocUploadRow({
               className="sr-only"
               disabled={pending}
               onChange={(e) => {
-                if (e.target.files?.length) e.currentTarget.form?.requestSubmit();
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const problem = checkUploadFile(file);
+                if (problem) {
+                  setFileError(problem);
+                  e.target.value = "";
+                  return;
+                }
+                setFileError(null);
+                e.currentTarget.form?.requestSubmit();
               }}
             />
             <CloudUpload className="size-4 shrink-0" />
-            {pending ? "Uploading…" : "Click to choose a file — uploads automatically"}
+            {pending ? "Uploading…" : isRejected ? "Choose a replacement file" : "Click to choose a file — uploads automatically"}
           </label>
         </form>
       ) : null}
-      {state?.error ? (
+      {fileError ?? state?.error ? (
         <Alert variant="destructive" className="mt-2">
           <AlertCircle />
-          <AlertDescription>{state.error}</AlertDescription>
+          <AlertDescription>{fileError ?? state?.error}</AlertDescription>
         </Alert>
       ) : null}
     </div>
   );
 }
 
-export function StepDocuments({ kind, application }: { kind: ApplicationKind; application: AppRow }) {
+export function StepDocuments({
+  kind,
+  application,
+  reviews = {},
+}: {
+  kind: ApplicationKind;
+  application: AppRow;
+  reviews?: Record<string, DocumentReview>;
+}) {
   const [state, formAction] = useActionState(advanceToReview, null);
   const refs = Array.isArray(application.document_refs) ? (application.document_refs as DocumentRef[]) : [];
   const slots = docSlotsFor(kind);
   const backStep = kind === "affiliate" ? 3 : 4;
-  const uploadedKeys = new Set(refs.map((r) => r.key));
-  const missingRequiredDocs = slots.filter((slot) => !slot.optional && !uploadedKeys.has(slot.key));
+  const { missingUpload, missingExpiry } = missingRequiredDocSlots(kind, refs);
+  const rejectedDocs = slots.filter((slot) => reviews[slot.key]?.status === "rejected");
 
   return (
     <div className="space-y-4">
@@ -1018,7 +1055,6 @@ export function StepDocuments({ kind, application }: { kind: ApplicationKind; ap
         </span>
         <div>
           <p className="text-sm font-semibold">Upload Documents</p>
-          <p className="text-sm text-muted-foreground">Upload the documents below. JPG, PNG, or PDF, up to 5MB each.</p>
         </div>
       </div>
       {slots.map((slot, i) => (
@@ -1028,14 +1064,31 @@ export function StepDocuments({ kind, application }: { kind: ApplicationKind; ap
           applicationId={application.id}
           slot={slot}
           existing={refs.find((r) => r.key === slot.key)}
+          review={reviews[slot.key]}
           iconIndex={i}
         />
       ))}
-      {missingRequiredDocs.length > 0 ? (
+      {rejectedDocs.length > 0 ? (
+        <Alert variant="destructive">
+          <XCircle />
+          <AlertDescription>
+            Re-upload before you continue: {rejectedDocs.map((s) => s.label).join(", ")}.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {missingUpload.length > 0 ? (
         <Alert variant="destructive">
           <AlertCircle />
           <AlertDescription>
-            Still needed before you can continue: {missingRequiredDocs.map((s) => s.label).join(", ")}.
+            Still needed before you can continue: {missingUpload.map((s) => s.label).join(", ")}.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {missingExpiry.length > 0 ? (
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertDescription>
+            Set an expiry date before you can continue: {missingExpiry.map((s) => s.label).join(", ")}.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -1073,8 +1126,7 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
   useRestoreOnError(formRef, state);
   const d = application.business_details;
   const refs = Array.isArray(application.document_refs) ? (application.document_refs as DocumentRef[]) : [];
-  const uploadedKeys = new Set(refs.map((r) => r.key));
-  const missingRequiredDocs = docSlotsFor(kind).filter((slot) => !slot.optional && !uploadedKeys.has(slot.key));
+  const { missingUpload, missingExpiry } = missingRequiredDocSlots(kind, refs);
 
   return (
     <div className="space-y-6">
@@ -1218,11 +1270,19 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
             ))}
           </ul>
         )}
-        {missingRequiredDocs.length > 0 ? (
+        {missingUpload.length > 0 ? (
           <Alert variant="destructive" className="mt-3">
             <AlertCircle />
             <AlertDescription>
-              Still needed before you can submit: {missingRequiredDocs.map((s) => s.label).join(", ")}.
+              Still needed before you can submit: {missingUpload.map((s) => s.label).join(", ")}.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {missingExpiry.length > 0 ? (
+          <Alert variant="destructive" className="mt-3">
+            <AlertCircle />
+            <AlertDescription>
+              Set an expiry date before you can submit: {missingExpiry.map((s) => s.label).join(", ")}.
             </AlertDescription>
           </Alert>
         ) : null}

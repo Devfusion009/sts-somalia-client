@@ -4,7 +4,6 @@ import { ShieldCheck, Headset, Hourglass, CalendarClock, X } from "lucide-react"
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveAgencyId, HOLD_DURATION_HOURS } from "@/modules/orders/helpers";
-import { convertHoldToCheckout, cancelOrder } from "@/modules/orders/actions";
 import { getOrderForCheckout, describeOrderItem } from "@/modules/payments/queries";
 import { getAvailablePaymentMethods } from "@/modules/payments/registry";
 import { cancelPendingPayment } from "@/modules/payments/actions";
@@ -15,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { CancelOrderButton } from "@/modules/orders/components/cancel-order-button";
+import { ConvertHoldButton } from "@/modules/orders/components/convert-hold-button";
 
 export const metadata: Metadata = { title: "Checkout" };
 
@@ -185,12 +185,7 @@ export default async function CheckoutPage({
                   . Pay now to confirm it, or cancel to release the hold.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <form action={convertHoldToCheckout}>
-                    <input type="hidden" name="orderId" value={order.id} />
-                    <Button type="submit" size="sm" className="gap-1.5">
-                      Pay Now
-                    </Button>
-                  </form>
+                  <ConvertHoldButton orderId={order.id} />
                   <CancelOrderButton orderId={order.id} label="Release Hold" redirectTo="/account/bookings" />
                 </div>
               </CardContent>

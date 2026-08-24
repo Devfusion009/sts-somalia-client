@@ -129,18 +129,18 @@ export default async function VisaTrackingPage({
             </div>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Application Reference</p>
-            <p className="font-mono text-sm font-semibold">{application.application_ref}</p>
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Application Reference</p>
+            <p className="font-mono text-sm font-semibold text-foreground">{application.application_ref}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Submitted On</p>
-            <p className="text-sm font-semibold">
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Submitted On</p>
+            <p className="text-sm font-semibold text-foreground">
               {format(new Date(application.created_at), "dd MMM yyyy, hh:mm a")}
             </p>
           </div>
           <div className="ml-auto flex items-center gap-3">
             <div className="text-right">
-              <p className="text-xs text-muted-foreground">Current Status</p>
+              <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Current Status</p>
               <VisaStatusBadge status={application.status} className="mt-0.5" />
             </div>
           </div>
@@ -269,8 +269,8 @@ export default async function VisaTrackingPage({
                     ["Passport Number", traveler.passport_number ?? "—"],
                   ].map(([label, value]) => (
                     <div key={label}>
-                      <p className="text-xs text-muted-foreground">{label}</p>
-                      <p className="mt-0.5 text-sm font-semibold">{value}</p>
+                      <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
+                      <p className={cn("mt-0.5 text-sm", value === "—" ? "text-muted-foreground/50" : "font-semibold text-foreground")}>{value}</p>
                     </div>
                   ))}
                   <div className="col-span-full">
@@ -278,11 +278,7 @@ export default async function VisaTrackingPage({
                       <Button className="gap-2" render={<a href={resultUrl} download />}>
                         <Download className="size-4" /> Download Visa
                       </Button>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Your visa document will appear here shortly.
-                      </p>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               ) : null}

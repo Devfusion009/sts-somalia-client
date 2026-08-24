@@ -21,16 +21,6 @@ export default async function PartnerHotelsPage() {
   const profile = await requireUser();
   const scope = await getMyHotelScope(profile.id);
 
-  if (scope.hotelIds.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          No active hotel partner account was found for your login. Please contact support.
-        </CardContent>
-      </Card>
-    );
-  }
-
   // A pure manager with exactly one hotel has nothing to pick between here —
   // the sidebar already links straight to it (see navGroupsFor in the
   // layout), but redirect this URL too in case it's reached directly.

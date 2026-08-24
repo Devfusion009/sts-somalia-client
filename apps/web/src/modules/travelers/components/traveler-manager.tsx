@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import { CheckCircle2, Pencil, Plus, Trash2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { SubmitButton } from "@/components/submit-button";
 import { countryFlag, countryName } from "@/lib/countries";
-import { saveTravelerAction, deleteTravelerAction } from "../actions";
+import { trpc } from "@/lib/trpc/react";
 import { TravelerFields } from "./traveler-fields";
 import { PassportExpiryBadge } from "./passport-alert";
 import type { TravelerProfile } from "../queries";
@@ -38,17 +38,42 @@ import type { TravelerProfile } from "../queries";
 export function TravelerManager({ travelers }: { travelers: TravelerProfile[] }) {
   const [editing, setEditing] = useState<TravelerProfile | null | "new">(null);
   const [confirmDelete, setConfirmDelete] = useState<TravelerProfile | null>(null);
-  const [state, formAction] = useActionState(saveTravelerAction, null);
+  const utils = trpc.useUtils();
 
-  // Close once the action succeeds. Derived during render rather than in an
-  // effect, per this codebase's established pattern (see
-  // src/app/affiliate/links/new-link-form.tsx): comparing against the
-  // last-seen state avoids the cascading re-render an effect would cause.
-  // A validation failure leaves the dialog open with its message visible.
-  const [lastState, setLastState] = useState(state);
-  if (state !== lastState) {
-    setLastState(state);
-    if (state && !state.error) setEditing(null);
+  const save = trpc.travelers.save.useMutation({
+    onSuccess: () => {
+      utils.travelers.myTravelers.invalidate();
+      setEditing(null);
+    },
+  });
+
+  const remove = trpc.travelers.delete.useMutation({
+    onSuccess: () => {
+      utils.travelers.myTravelers.invalidate();
+      setConfirmDelete(null);
+    },
+  });
+
+  // async + awaited mutateAsync so SubmitButton's useFormStatus()-based
+  // pending state tracks the mutation's actual duration — same pattern as
+  // every prior phase's converted form.
+  async function handleSubmit(formData: FormData) {
+    try {
+      await save.mutateAsync({
+        travelerId: editing !== "new" ? editing?.id : undefined,
+        fullName: formData.get("fullName") as string,
+        relationship: formData.get("relationship") as never,
+        dateOfBirth: (formData.get("dateOfBirth") as string) || undefined,
+        gender: (formData.get("gender") as string) || undefined,
+        nationality: (formData.get("nationality") as string) || undefined,
+        passportNumber: (formData.get("passportNumber") as string) || undefined,
+        passportIssueDate: (formData.get("passportIssueDate") as string) || undefined,
+        passportExpiry: (formData.get("passportExpiry") as string) || undefined,
+        notes: (formData.get("notes") as string) || undefined,
+      });
+    } catch {
+      // handled via save.error below
+    }
   }
 
   const companions = travelers.filter((t) => !t.is_self);
@@ -147,16 +172,12 @@ export function TravelerManager({ travelers }: { travelers: TravelerProfile[] })
               values stay on screen. */}
           <form
             key={editing === "new" ? "new" : (editing?.id ?? "none")}
-            action={formAction}
+            action={handleSubmit}
             className="space-y-4"
           >
-            {editing && editing !== "new" ? (
-              <input type="hidden" name="travelerId" value={editing.id} />
-            ) : null}
-
-            {state?.error ? (
+            {save.error ? (
               <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
+                <AlertDescription>{save.error.message}</AlertDescription>
               </Alert>
             ) : null}
 
@@ -192,20 +213,17 @@ export function TravelerManager({ travelers }: { travelers: TravelerProfile[] })
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep</AlertDialogCancel>
-            <form action={deleteTravelerAction}>
-              <input type="hidden" name="travelerId" value={confirmDelete?.id ?? ""} />
-              <AlertDialogAction
-                type="submit"
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Remove traveler
-              </AlertDialogAction>
-            </form>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => confirmDelete && remove.mutate({ travelerId: confirmDelete.id })}
+            >
+              Remove traveler
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {state && !state.error ? (
+      {save.isSuccess ? (
         <Alert>
           <CheckCircle2 />
           <AlertDescription>Traveler saved.</AlertDescription>

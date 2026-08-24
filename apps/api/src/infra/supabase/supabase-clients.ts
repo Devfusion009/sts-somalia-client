@@ -30,6 +30,22 @@ export function createRlsClient(accessToken: string): SupabaseClient {
 }
 
 /**
+ * Anon-key client, no user session — for genuinely public reads (flight
+ * search, airport lookups) where the original apps/web code used the
+ * cookie-bound client without requiring a logged-in visitor. RLS still
+ * applies (via Postgres's `anon` role policies), it's just not scoped to
+ * any particular user. Added phase 4c: everything migrated before this
+ * point required a bearer token, so there was no anonymous-access path yet.
+ */
+export function createAnonClient(): SupabaseClient {
+  const url = requireEnv("SUPABASE_URL");
+  const anonKey = requireEnv("SUPABASE_ANON_KEY");
+  return createClient(url, anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+/**
  * Service-role client. BYPASSES ROW LEVEL SECURITY ENTIRELY — mirrors
  * apps/web's createAdminClient() restriction. Only inject
  * AdminSupabaseService into modules that genuinely need it.

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RELATIONSHIPS } from "@sts/shared-types";
 
 /**
  * Wizard step payloads. traveler_details / contact_details / travel_details
@@ -9,19 +10,14 @@ import { z } from "zod";
 export const APPLICANT_TYPES = ["single", "family", "group"] as const;
 export type ApplicantType = (typeof APPLICANT_TYPES)[number];
 
-export const RELATIONSHIPS = [
-  "self",
-  "spouse",
-  "son",
-  "daughter",
-  "father",
-  "mother",
-  "brother",
-  "sister",
-  "grandfather",
-  "grandmother",
-  "other",
-] as const;
+/**
+ * Re-exported, not defined here — moved to packages/shared-types (phase
+ * 4b) since modules/travelers/schemas.ts needs this same vocabulary (a
+ * saved traveler prefills a visa member row, so the two lists must stay
+ * identical). This file keeps re-exporting it under its original name so
+ * visa's still-unmigrated code (phase 6) needs zero changes.
+ */
+export { RELATIONSHIPS };
 
 export const personalInfoSchema = z.object({
   fullName: z.string().min(2, "Enter the full name as shown in the passport."),

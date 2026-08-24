@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getMyPartnerId, getMyHotelScope, type HotelScope } from "@/modules/hotels/partner-queries";
 import { rememberRoomType } from "@/modules/hotels/room-types";
+import { commaList, parseLinks, replacePropertyLinks } from "@/modules/hotels/listing-fields";
+import { phoneSchema } from "@/modules/partner-applications/schemas";
 import type { ActionState } from "@/lib/auth/actions";
 
 // Partner-facing forms deliberately exclude 'published': a partner could
@@ -66,8 +68,51 @@ const hotelSchema = z.object({
   addressLine: z.string().optional(),
   city: z.string().min(1, "Enter a city."),
   countryCode: z.string().min(2, "Enter a country code.").max(2),
+  phone: phoneSchema.optional(),
+  contactEmail: z.string().email().optional().or(z.literal("")),
+  checkInTime: z.string().optional(),
+  checkOutTime: z.string().optional(),
+  policies: z.string().optional(),
+  amenities: z.string().optional(),
+  links: z.string().optional(),
   status: z.enum(PARTNER_LISTING_STATUSES),
 });
+
+function hotelInput(formData: FormData) {
+  return {
+    name: formData.get("name"),
+    description: formData.get("description") || undefined,
+    starRating: formData.get("starRating") || undefined,
+    addressLine: formData.get("addressLine") || undefined,
+    city: formData.get("city"),
+    countryCode: formData.get("countryCode"),
+    phone: formData.get("phone") || undefined,
+    contactEmail: formData.get("contactEmail") || undefined,
+    checkInTime: formData.get("checkInTime") || undefined,
+    checkOutTime: formData.get("checkOutTime") || undefined,
+    policies: formData.get("policies") || undefined,
+    amenities: formData.get("amenities") || undefined,
+    links: formData.get("links") || undefined,
+    status: formData.get("status"),
+  };
+}
+
+function hotelRow(data: z.infer<typeof hotelSchema>) {
+  return {
+    name: data.name,
+    description: data.description ?? null,
+    star_rating: data.starRating ?? null,
+    address_line: data.addressLine ?? null,
+    city: data.city,
+    country_code: data.countryCode.toUpperCase(),
+    phone: data.phone ?? null,
+    contact_email: data.contactEmail || null,
+    check_in_time: data.checkInTime || null,
+    check_out_time: data.checkOutTime || null,
+    policies: data.policies ?? null,
+    amenities: commaList(data.amenities),
+  };
+}
 
 export async function createHotel(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   let partnerId: string;
@@ -81,15 +126,7 @@ export async function createHotel(_prevState: ActionState, formData: FormData): 
     return { error: (e as Error).message };
   }
 
-  const parsed = hotelSchema.safeParse({
-    name: formData.get("name"),
-    description: formData.get("description") || undefined,
-    starRating: formData.get("starRating") || undefined,
-    addressLine: formData.get("addressLine") || undefined,
-    city: formData.get("city"),
-    countryCode: formData.get("countryCode"),
-    status: formData.get("status"),
-  });
+  const parsed = hotelSchema.safeParse(hotelInput(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
@@ -97,19 +134,15 @@ export async function createHotel(_prevState: ActionState, formData: FormData): 
     .from("hotels")
     .insert({
       partner_id: partnerId,
-      name: parsed.data.name,
       slug: slugify(parsed.data.name),
-      description: parsed.data.description ?? null,
-      star_rating: parsed.data.starRating ?? null,
-      address_line: parsed.data.addressLine ?? null,
-      city: parsed.data.city,
-      country_code: parsed.data.countryCode.toUpperCase(),
       status: parsed.data.status,
+      ...hotelRow(parsed.data),
     })
     .select("id")
     .single();
 
   if (error || !data) return { error: error?.message ?? "Failed to create hotel." };
+  await replacePropertyLinks(supabase, { hotelId: data.id }, parseLinks(parsed.data.links));
 
   revalidatePath("/partner/hotels");
   redirect(`/partner/hotels/${data.id}`);
@@ -130,15 +163,7 @@ export async function updateHotel(_prevState: ActionState, formData: FormData): 
   const hotelId = formData.get("hotelId");
   if (typeof hotelId !== "string") return { error: "Missing hotel id." };
 
-  const parsed = hotelSchema.safeParse({
-    name: formData.get("name"),
-    description: formData.get("description") || undefined,
-    starRating: formData.get("starRating") || undefined,
-    addressLine: formData.get("addressLine") || undefined,
-    city: formData.get("city"),
-    countryCode: formData.get("countryCode"),
-    status: formData.get("status"),
-  });
+  const parsed = hotelSchema.safeParse(hotelInput(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
@@ -152,19 +177,12 @@ export async function updateHotel(_prevState: ActionState, formData: FormData): 
 
   const { error } = await supabase
     .from("hotels")
-    .update({
-      name: parsed.data.name,
-      description: parsed.data.description ?? null,
-      star_rating: parsed.data.starRating ?? null,
-      address_line: parsed.data.addressLine ?? null,
-      city: parsed.data.city,
-      country_code: parsed.data.countryCode.toUpperCase(),
-      ...statusUpdate,
-    })
+    .update({ ...hotelRow(parsed.data), ...statusUpdate })
     .eq("id", hotelId)
     .eq("partner_id", partnerId);
 
   if (error) return { error: error.message };
+  await replacePropertyLinks(supabase, { hotelId }, parseLinks(parsed.data.links));
 
   revalidatePath(`/partner/hotels/${hotelId}`);
   return { error: null };
@@ -342,18 +360,18 @@ export async function updateBookingStatus(_prevState: ActionState, formData: For
   }
 
   // Business owners can always work their own booking queue; a hotel_manager
-  // (scope.partnerId null) needs the can_manage_bookings flag admin grants
+  // (scope.partnerId null) needs the 'bookings' permission admin grants
   // per hotel (20260821000002) — RLS enforces this for real, this is just a
   // clean error instead of a raw policy violation.
   if (scope.partnerId === null) {
     const { data: manager } = await supabase
       .from("hotel_managers")
-      .select("can_manage_bookings")
+      .select("permissions")
       .eq("hotel_id", booking.hotel_id)
       .eq("profile_id", (await requireUser()).id)
       .eq("status", "active")
       .maybeSingle();
-    if (!manager?.can_manage_bookings) {
+    if (!manager?.permissions.includes("bookings")) {
       return { error: "You don't have permission to manage bookings for this hotel." };
     }
   }

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { portalLoginHref, pathPrefixFor, rootOrigin } from "@/lib/subdomain";
+import { pathPrefixFor, rootOrigin } from "@/lib/subdomain";
 import { recordLoginEvent } from "@/lib/auth/login-history";
 
 export type ActionState = { error: string | null; destination?: string } | null;
@@ -65,12 +65,28 @@ export async function signInAction(
     // away from /admin/login.
     //
     // Sign back out first: leaving a valid admin session attached to a
-    // "rejected" sign-in would defeat the entire point.
+    // "rejected" sign-in would defeat the entire point. The error is
+    // deliberately the same generic line as a wrong password below — naming
+    // the account's real type here would let this form be used to test
+    // whether a given email is staff/a manager, which is exactly the kind
+    // of account-enumeration leak a login form must not offer.
     if (profile?.is_platform_admin) {
       await supabase.auth.signOut();
-      return {
-        error: `This is a staff account — it can't be used on the customer sign-in. Use the Admin Console sign-in at ${portalLoginHref("admin")}.`,
-      };
+      return { error: "Incorrect email or password." };
+    }
+
+    // hotel_manager is deliberately NOT one of the unified-identity roles
+    // below — unlike agent/affiliate/hotel_partner/venue_partner (each its
+    // own B2C account that also applied for a program), a manager is an
+    // admin-assigned staff seat on a specific hotel with no B2C account of
+    // its own behind it. Rejected here the same way is_platform_admin is,
+    // rather than folded into /account: 2026-08-23, after a manager account
+    // reached the customer site via the account switcher and could switch
+    // back into a "My Account" view that isn't really theirs. Same generic
+    // error as above, for the same reason.
+    if (profile?.role === "hotel_manager") {
+      await supabase.auth.signOut();
+      return { error: "Incorrect email or password." };
     }
 
     if (profile) {
@@ -91,7 +107,6 @@ export async function signInAction(
       if (
         profile.role === "affiliate" ||
         profile.role === "hotel_partner" ||
-        profile.role === "hotel_manager" ||
         profile.role === "venue_partner" ||
         profile.role === "agent"
       ) {
@@ -242,6 +257,72 @@ async function signInToPortalAction(
 
 export const signInToAgentPortalAction = signInToPortalAction.bind(null, "agent");
 export const signInToAdminPortalAction = signInToPortalAction.bind(null, "admin");
+
+async function hasActiveHotelManagerRow(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("hotel_managers")
+    .select("hotel_id")
+    .eq("profile_id", userId)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+  return !!data;
+}
+
+/**
+ * Sign-in for the dedicated /manager/login route. Not built on
+ * signInToPortalAction/PortalKind: that machinery's destination and audience
+ * checks are subdomain-shaped (see pathPrefixFor), and /manager has no
+ * dedicated subdomain — it's a path-based portal like /partner, gated by its
+ * own layout. Same credential + audience-before-redirect + AAL2 shape as the
+ * agent/admin actions, just self-contained.
+ */
+export async function signInToManagerPortalAction(
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = credentialsSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  if (error) {
+    return { error: "Incorrect email or password." };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Incorrect email or password." };
+  }
+
+  if (!(await hasActiveHotelManagerRow(supabase, user.id))) {
+    await supabase.auth.signOut();
+    return { error: "This account doesn't have hotel manager access." };
+  }
+
+  const redirectTo = formData.get("redirect_to");
+  const finalDestination = typeof redirectTo === "string" && redirectTo ? redirectTo : "/manager";
+
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aal?.currentLevel === "aal1" && aal.nextLevel === "aal2") {
+    return {
+      error: null,
+      destination: `/login/verify-2fa?redirect_to=${encodeURIComponent(finalDestination)}`,
+    };
+  }
+
+  return { error: null, destination: finalDestination };
+}
 
 const signUpSchema = credentialsSchema.extend({
   fullName: z.string().min(2, "Enter your full name."),

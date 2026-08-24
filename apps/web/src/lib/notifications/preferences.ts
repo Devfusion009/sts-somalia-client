@@ -1,36 +1,17 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Database } from "@/lib/types/database.types";
+import { DEFAULT_PREFERENCES, type PreferenceValues, type AccountLanguage } from "@sts/shared-types";
 
-export type AccountLanguage = Database["public"]["Enums"]["account_language"];
+export { DEFAULT_PREFERENCES };
+export type { PreferenceValues, AccountLanguage };
 
-export type PreferenceValues = {
-  email_enabled: boolean;
-  sms_enabled: boolean;
-  whatsapp_enabled: boolean;
-  language: AccountLanguage;
-  display_currency: string;
-};
-
-/**
- * Defaults for a customer who has never opened the preferences page.
- *
- * Email and WhatsApp on, SMS off — matching what the platform can actually
- * deliver today (Resend and Twilio WhatsApp are wired; SMS is not). Defaulting
- * SMS on would promise a channel that silently drops every message.
- *
- * Lives in lib, not modules/preferences (where this was originally written),
- * because dispatch.ts — every customer notification sender — depends on it,
- * and lib never depends on modules (modules/README.md). modules/preferences
- * imports it back from here for its own settings-page defaults.
- */
-export const DEFAULT_PREFERENCES: PreferenceValues = {
-  email_enabled: true,
-  sms_enabled: false,
-  whatsapp_enabled: true,
-  language: "en",
-  display_currency: "USD",
-};
+// DEFAULT_PREFERENCES/PreferenceValues/AccountLanguage used to be defined
+// here (dispatch.ts — every customer notification sender — depends on
+// them, and lib never depends on modules, modules/README.md, so they
+// couldn't live in modules/preferences). Phase 2 moved the modules/preferences
+// side of this to apps/api, which needed the same values, so the single
+// source of truth is now @sts/shared-types and this file re-exports them —
+// dispatch.ts's import of { DEFAULT_PREFERENCES } from here is unaffected.
 
 /**
  * Preferences for an arbitrary profile, for the notification senders.

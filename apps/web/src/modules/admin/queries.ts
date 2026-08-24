@@ -571,20 +571,6 @@ export async function getHotelByIdAdmin(hotelId: string) {
   return { ...data, partnerAccountId };
 }
 
-/** Active managers assigned to one hotel — see hotel_manager-form.tsx. */
-export async function getHotelManagers(hotelId: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("hotel_managers")
-    .select(
-      "id, created_at, can_manage_bookings, can_manage_photos, profile:profiles!hotel_managers_profile_id_fkey(id, full_name, email)"
-    )
-    .eq("hotel_id", hotelId)
-    .eq("status", "active")
-    .order("created_at");
-  return data ?? [];
-}
-
 /** Active hotel partners, for the "Owner" picker on the hotel create/edit form. */
 export async function getHotelPartnersForSelect() {
   const supabase = await createClient();

@@ -295,7 +295,7 @@ export function AgenciesPicker({
   if (agencies.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-muted-foreground">
-        No active agencies yet — approved agencies will appear here.
+        No active agencies yet.
       </p>
     );
   }

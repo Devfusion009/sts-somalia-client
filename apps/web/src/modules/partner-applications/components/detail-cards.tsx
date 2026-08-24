@@ -1,5 +1,5 @@
-import type { LucideIcon } from "lucide-react";
-import { Building2, User, ShieldCheck, MapPin } from "lucide-react";
+import { FileText, FileImage, File as FileIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { humanizeKey } from "@/lib/format-detail";
 import {
   AUDIENCE_LOCATION_LABELS,
@@ -16,16 +16,14 @@ import { Separator } from "@/components/ui/separator";
 
 export type Details = Record<string, unknown>;
 
-/** Every card header sharing this component gets the same icon-chip treatment, matching this app's existing IconChip convention (admin dashboard, hero deal cards) rather than inventing a one-off style. */
-export function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: React.ReactNode }) {
-  return (
-    <CardTitle className="flex items-center gap-2.5 text-base">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <Icon className="size-4.5" />
-      </span>
-      {children}
-    </CardTitle>
-  );
+/**
+ * One heading idiom for every card on an application/partner detail page:
+ * plain text, no icon chip. The repeated icon-in-a-title treatment this
+ * replaced made each section look like an unrelated widget rather than part
+ * of one record.
+ */
+export function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <CardTitle className="text-base">{children}</CardTitle>;
 }
 
 function s(v: unknown): string {
@@ -39,15 +37,82 @@ function titleCase(v: unknown): string {
   return str.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function DetailGrid({ rows }: { rows: Array<[string, string]> }) {
+/**
+ * The 2-3 facts that identify this specific application at a glance — the
+ * same fields BusinessDetailsCard renders in full, condensed for a page
+ * header's meta line ("Hotel · 1 star · Kolkata" rather than a generic
+ * "Hotel Partner application").
+ */
+export function headerFacts(kind: ApplicationType, d: Details): string[] {
+  const facts: Array<string | null> =
+    kind === "hotel_partner"
+      ? [
+          d.propertyType ? (PROPERTY_TYPE_LABELS[String(d.propertyType)] ?? titleCase(d.propertyType)) : null,
+          d.location ? String(d.location) : null,
+        ]
+      : kind === "venue_partner"
+        ? [d.location ? String(d.location) : null, d.seatedCapacity ? `${d.seatedCapacity} seated` : null]
+        : kind === "agency"
+          ? [d.businessType ? titleCase(d.businessType) : null, d.officeCity ? String(d.officeCity) : null]
+          : [
+              d.city ? String(d.city) : null,
+              d.audienceLocation
+                ? ((AUDIENCE_LOCATION_LABELS as Record<string, string>)[String(d.audienceLocation)] ?? String(d.audienceLocation))
+                : null,
+            ];
+  return facts.filter((v): v is string => Boolean(v));
+}
+
+/** Hotel/venue star classification as a number for rendering actual star icons, rather than the "★ 1 star" text treatment. */
+export function starRatingValue(d: Details): number | null {
+  const n = Number(d.starRating);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "heic"]);
+
+/** A quiet plain-text row read as a wall of filenames — a colored file-type chip (PDF red, image blue) makes each document scannable at a glance. */
+export function DocFileIcon({ fileName }: { fileName: string }) {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "pdf") {
+    return (
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+        <FileText className="size-5" />
+      </span>
+    );
+  }
+  if (IMAGE_EXTENSIONS.has(ext)) {
+    return (
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-chart-3/10 text-chart-3">
+        <FileImage className="size-5" />
+      </span>
+    );
+  }
+  return (
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+      <FileIcon className="size-5" />
+    </span>
+  );
+}
+
+/**
+ * `compact` drops to two columns, for grids rendered inside a half-width card.
+ *
+ * Labels are tracked micro-caps rather than sentence case — the data-panel
+ * convention (Stripe, Linear) that reads as a real product rather than a raw
+ * key dump. An unfilled field renders its "—" at reduced weight instead of
+ * the same bold black as real data: at a glance, a page half full of bold
+ * em-dashes reads as broken, not as "nothing here yet."
+ */
+export function DetailGrid({ rows, compact }: { rows: Array<[string, string]>; compact?: boolean }) {
   const visible = rows.filter(([, v]) => v !== "");
   if (visible.length === 0) return <p className="text-sm text-muted-foreground">No details submitted yet.</p>;
   return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+    <dl className={cn("grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2", !compact && "lg:grid-cols-3")}>
       {visible.map(([label, value]) => (
         <div key={label} className="min-w-0">
-          <dt className="text-xs text-muted-foreground">{label}</dt>
-          <dd className="text-sm font-medium break-words">{value}</dd>
+          <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
+          <dd className={cn("text-sm break-words", value === "—" ? "text-muted-foreground/50" : "font-semibold text-foreground")}>{value}</dd>
         </div>
       ))}
     </dl>
@@ -99,7 +164,7 @@ export function RoomTypesList({ roomTypes }: { roomTypes: unknown }) {
 export function FullWidthField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="sm:col-span-2 lg:col-span-3">
-      <p className="mb-1.5 text-xs text-muted-foreground">{label}</p>
+      <p className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
       {children}
     </div>
   );
@@ -122,13 +187,14 @@ function BusinessIdentityFields(d: Details): Array<[string, string]> {
   ];
 }
 
+/** Unprefixed — these render inside a card already titled "Authorized Contact". */
 function ContactFields(d: Details): Array<[string, string]> {
   return [
-    ["Contact Name", s(d.contactFullName)],
-    ["Contact Role", s(d.contactRole)],
-    ["Contact ID Number", s(d.contactIdNumber)],
-    ["Contact Mobile", s(d.contactMobile)],
-    ["Contact Email", s(d.contactEmail)],
+    ["Name", s(d.contactFullName)],
+    ["Role", s(d.contactRole)],
+    ["ID Number", s(d.contactIdNumber)],
+    ["Mobile", s(d.contactMobile)],
+    ["Email", s(d.contactEmail)],
   ];
 }
 
@@ -163,38 +229,77 @@ function SettlementFields(kind: ApplicationType, d: Details): Array<[string, str
 
 type Branch = { name?: string; location?: string };
 
-export function BusinessDetailsCard({ kind, details }: { kind: ApplicationType; details: Details }) {
+/**
+ * One card per step the applicant actually filled in, in the same order the
+ * wizard asked for them. Previously all of this was a single "Business
+ * Details" card with six Separator-delimited blocks, which buried the
+ * authorized contact in the middle of the business record — an admin
+ * comparing this page against the wizard couldn't line the two up.
+ */
+export function BusinessDetailsCard({
+  kind,
+  details,
+  elevated,
+}: {
+  kind: ApplicationType;
+  details: Details;
+  /** Soft shadow instead of the plain flat card — opt-in for the customer-facing
+   * view page, which wants more visual weight than the admin console's
+   * intentionally flat treatment. Undefined everywhere else keeps every
+   * existing admin usage pixel-identical. */
+  elevated?: boolean;
+}) {
   const d = details;
   const branches = Array.isArray(d.branches) ? (d.branches as Branch[]).filter((b) => b?.name || b?.location) : [];
+  const cardClass = elevated ? "shadow-sm" : undefined;
 
   return (
-    <Card>
-      <CardHeader>
-        <SectionTitle icon={Building2}>Business Details</SectionTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <DetailGrid rows={BusinessIdentityFields(d)} />
-
-        {kind === "agency" ? (
-          <>
-            <Separator />
-            <DetailGrid
-              rows={[
-                ["Years of Experience", s(d.yearsExperience)],
-                ["Staff Count", s(d.staffCount)],
-                ["Monthly Volume", s(d.monthlyVolume)],
-                ["IATA Number", s(d.iataNumber)],
-              ]}
-            />
-            <FullWidthField label="Products">
-              <PillList items={Array.isArray(d.products) ? (d.products as string[]).map(titleCase) : []} />
+    <>
+      <Card className={cardClass}>
+        <CardHeader>
+          <SectionTitle>Business</SectionTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <DetailGrid rows={BusinessIdentityFields(d)} />
+          <Separator />
+          <DetailGrid rows={AddressFields(d)} />
+          {branches.length > 0 ? (
+            <FullWidthField label="Branch Offices">
+              <ul className="space-y-1 text-sm">
+                {branches.map((b, i) => (
+                  <li key={i}>
+                    {b.name || "Branch"}
+                    {b.location ? ` — ${b.location}` : ""}
+                  </li>
+                ))}
+              </ul>
             </FullWidthField>
-          </>
-        ) : null}
+          ) : null}
+          {kind === "agency" ? (
+            <>
+              <Separator />
+              <DetailGrid
+                rows={[
+                  ["Years of Experience", s(d.yearsExperience)],
+                  ["Staff Count", s(d.staffCount)],
+                  ["Monthly Volume", s(d.monthlyVolume)],
+                  ["IATA Number", s(d.iataNumber)],
+                ]}
+              />
+              <FullWidthField label="Products">
+                <PillList items={Array.isArray(d.products) ? (d.products as string[]).map(titleCase) : []} />
+              </FullWidthField>
+            </>
+          ) : null}
+        </CardContent>
+      </Card>
 
-        {kind === "hotel_partner" ? (
-          <>
-            <Separator />
+      {kind === "hotel_partner" ? (
+        <Card className={cardClass}>
+          <CardHeader>
+            <SectionTitle>Property</SectionTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <DetailGrid
               rows={[
                 ["Property Name", s(d.propertyName)],
@@ -217,12 +322,16 @@ export function BusinessDetailsCard({ kind, details }: { kind: ApplicationType; 
             <FullWidthField label="Amenities">
               <PillList items={Array.isArray(d.amenities) ? (d.amenities as string[]).map((a) => AMENITY_LABELS[a] ?? titleCase(a)) : []} />
             </FullWidthField>
-          </>
-        ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
-        {kind === "venue_partner" ? (
-          <>
-            <Separator />
+      {kind === "venue_partner" ? (
+        <Card className={cardClass}>
+          <CardHeader>
+            <SectionTitle>Venue</SectionTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <DetailGrid
               rows={[
                 ["Venue Name", s(d.venueName)],
@@ -235,31 +344,29 @@ export function BusinessDetailsCard({ kind, details }: { kind: ApplicationType; 
             <FullWidthField label="Event Types">
               <PillList items={Array.isArray(d.eventTypes) ? (d.eventTypes as string[]).map(titleCase) : []} />
             </FullWidthField>
-          </>
-        ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
-        <Separator />
-        <DetailGrid rows={ContactFields(d)} />
-
-        <Separator />
-        <DetailGrid rows={AddressFields(d)} />
-        {branches.length > 0 ? (
-          <FullWidthField label="Branch Offices">
-            <ul className="space-y-1 text-sm">
-              {branches.map((b, i) => (
-                <li key={i}>
-                  {b.name || "Branch"}
-                  {b.location ? ` — ${b.location}` : ""}
-                </li>
-              ))}
-            </ul>
-          </FullWidthField>
-        ) : null}
-
-        <Separator />
-        <DetailGrid rows={SettlementFields(kind, d)} />
-      </CardContent>
-    </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className={cardClass}>
+          <CardHeader>
+            <SectionTitle>Authorized Contact</SectionTitle>
+          </CardHeader>
+          <CardContent>
+            <DetailGrid rows={ContactFields(d)} compact />
+          </CardContent>
+        </Card>
+        <Card className={cardClass}>
+          <CardHeader>
+            <SectionTitle>Settlement</SectionTitle>
+          </CardHeader>
+          <CardContent>
+            <DetailGrid rows={SettlementFields(kind, d)} compact />
+          </CardContent>
+        </Card>
+      </div>
+    </>
   );
 }
 
@@ -278,13 +385,14 @@ function formatHandles(handles: unknown): string {
  * etc.) — kept as its own grouped rendering, mirroring the applicant's own
  * 3-step review (About You / Verification / Audience & Reach).
  */
-export function AffiliateDetailCards({ details }: { details: Details }) {
+export function AffiliateDetailCards({ details, elevated }: { details: Details; elevated?: boolean }) {
   const d = details;
+  const cardClass = elevated ? "shadow-sm" : undefined;
   return (
     <>
-      <Card>
+      <Card className={cardClass}>
         <CardHeader>
-          <SectionTitle icon={User}>About You</SectionTitle>
+          <SectionTitle>About You</SectionTitle>
         </CardHeader>
         <CardContent>
           <DetailGrid
@@ -299,18 +407,18 @@ export function AffiliateDetailCards({ details }: { details: Details }) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={cardClass}>
         <CardHeader>
-          <SectionTitle icon={ShieldCheck}>Verification</SectionTitle>
+          <SectionTitle>Verification</SectionTitle>
         </CardHeader>
         <CardContent>
           <DetailGrid rows={[["ID Number", s(d.idNumber)]]} />
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={cardClass}>
         <CardHeader>
-          <SectionTitle icon={MapPin}>Audience &amp; Reach</SectionTitle>
+          <SectionTitle>Audience &amp; Reach</SectionTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <DetailGrid
@@ -321,8 +429,10 @@ export function AffiliateDetailCards({ details }: { details: Details }) {
             ]}
           />
           <div>
-            <p className="text-xs text-muted-foreground">Promotion Plan</p>
-            <p className="text-sm font-medium break-words">{s(d.promotionPlan)}</p>
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Promotion Plan</p>
+            <p className={cn("text-sm break-words", s(d.promotionPlan) === "—" ? "text-muted-foreground/50" : "font-semibold text-foreground")}>
+              {s(d.promotionPlan)}
+            </p>
           </div>
         </CardContent>
       </Card>

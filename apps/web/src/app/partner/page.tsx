@@ -33,16 +33,6 @@ export default async function PartnerDashboardPage() {
   const profile = await requireUser();
   const scope = await getMyHotelScope(profile.id);
 
-  if (scope.hotelIds.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          No active hotel partner account was found for your login. Please contact support.
-        </CardContent>
-      </Card>
-    );
-  }
-
   const [partner, stats, recent] = await Promise.all([
     scope.partnerId ? getMyPartner(scope.partnerId) : null,
     getPartnerStats(scope.hotelIds),

@@ -32,11 +32,37 @@ register is a hard no on this project, not a style preference.
     nights are cleared."
   - "Nights without a cap are open-ended: bookings are accepted without
     limit..."
-  If a sentence *explains how a feature behaves* or *reassures about a
-  consequence*, it is this pattern regardless of how short or how true it
-  is — cut it. A user learns behavior by using the control, from its
-  label, or from an inline validation error when they hit the edge case —
-  not from standing prose above it.
+  - "2 managers — hidden until viewed." (narrating a collapsed section's
+    own state, when the count badge and the View/Hide toggle sitting right
+    next to it already say exactly that)
+  - "Add at least one photo so customers can see what they're booking."
+    (GalleryManager's empty state — "No photos yet" alone was already
+    enough; the dropzone right above it is the call to action)
+  - "Shown on the public Hotels/Events & Halls/Umrah pages once
+    published." (a `DialogDescription` under "Add hotel"/"Add venue"/"Add
+    Umrah package" — shipped identically in three separate admin forms)
+  - "No active agencies yet — approved agencies will appear here."
+  - "Deposits, booking payments, refunds, and notes will appear here as
+    they happen." (agent statement empty state)
+  - "This booking hasn't been paid yet, so you can cancel it yourself at
+    no cost." (sitting directly above a Cancel button that already is
+    that affordance)
+  These five shipped together, discovered in one sweep of files sitting
+  near unrelated work rather than newly written — self-checking only the
+  text you just typed is not enough; see [[sts-somalia-iso-copy-standard]]
+  for the mandatory grep-the-touched-directory step this requires now.
+  If a sentence *explains how a feature behaves*, *reassures about a
+  consequence*, or *narrates a UI state the controls on screen already
+  show* (a badge, a toggle's own label, a loading spinner, a disabled
+  state), it is this pattern regardless of how short or how true it is —
+  cut it. This applies to dynamically-rendered strings exactly as much as
+  static JSX — "is this still true" is not the test, "does something
+  already visible say it" is. A user learns behavior by using the control,
+  from its label, or from an inline validation error when they hit the
+  edge case — not from standing prose above or beside it. Before shipping
+  any new UI text, read every other element already on screen and ask
+  whether it already says this; if yes, the text is dead weight, not
+  redundant confirmation.
 - A heading stands alone: `<h2>`/`CardTitle` text and nothing under it.
   If you catch yourself writing a second sentence under any heading in
   this codebase, stop and delete it before finishing the edit — do not

@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ChevronRight, Home } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getApplicationForWizard } from "@/modules/visa/queries";
-import { getMyDocuments } from "@/modules/travelers/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { TRAVELER_DOCUMENT_TYPES } from "@/modules/travelers/schemas";
 import { countryName } from "@/lib/countries";
 import { VisaTypeBanner } from "@/modules/visa/components/visa-shared";
@@ -31,6 +31,7 @@ export default async function VisaWizardPage({
 }) {
   const [{ applicationId }, { step: stepParam }] = await Promise.all([params, searchParams]);
   await requireUser();
+  const trpc = await getServerTrpc();
 
   const application = await getApplicationForWizard(applicationId);
   if (!application || !application.visa_type) notFound();
@@ -47,7 +48,7 @@ export default async function VisaWizardPage({
   // query. Every other step would be loading a list nothing renders.
   const vaultOptions =
     step === 4
-      ? (await getMyDocuments()).map((doc) => ({
+      ? (await trpc.travelers.myDocuments.query()).map((doc) => ({
           id: doc.id,
           label:
             doc.label ??

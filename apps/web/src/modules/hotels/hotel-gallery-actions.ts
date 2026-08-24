@@ -16,12 +16,12 @@ const TARGET: GalleryTarget = {
 
 /**
  * A hotel_partner owner can always manage their own hotel's photos; a
- * hotel_manager only when admin granted can_manage_photos (20260821000002)
+ * hotel_manager only when admin granted the 'photos' permission (20260821000002)
  * — checked here for a clean error message, and enforced for real by RLS
  * ("hotels: manager updates photos when permitted" / "hotels: partner
  * manages own"), which is what actually stops a manager without the flag.
  */
-async function requireHotelPhotoAccess(hotelId: string): Promise<void> {
+export async function requireHotelPhotoAccess(hotelId: string): Promise<void> {
   const profile = await requireUser();
   const scope = await getMyHotelScope(profile.id);
   if (!scope.hotelIds.includes(hotelId)) throw new Error("Hotel not found.");
@@ -34,12 +34,12 @@ async function requireHotelPhotoAccess(hotelId: string): Promise<void> {
 
   const { data: manager } = await supabase
     .from("hotel_managers")
-    .select("can_manage_photos")
+    .select("permissions")
     .eq("hotel_id", hotelId)
     .eq("profile_id", profile.id)
     .eq("status", "active")
     .maybeSingle();
-  if (!manager?.can_manage_photos) throw new Error("You don't have permission to manage this hotel's photos.");
+  if (!manager?.permissions.includes("photos")) throw new Error("You don't have permission to manage this hotel's photos.");
 }
 
 export async function uploadHotelImagesPartner(_prev: ActionState, formData: FormData): Promise<ActionState> {

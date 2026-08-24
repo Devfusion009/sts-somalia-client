@@ -15,6 +15,17 @@ export function hotelImageUrls(images: unknown): string[] {
   return images.map(hotelImageUrl).filter((url): url is string => url !== null);
 }
 
+/**
+ * A hotel's own brand mark — distinct from the property photo gallery
+ * above. Stored in the public `hotel-logos` bucket as `<hotel_id>/<filename>`,
+ * same shape as agencyLogoUrl (modules/agencies/logo.ts).
+ */
+export function hotelLogoUrl(path: string | null): string | null {
+  if (!path) return null;
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  return base ? `${base}/storage/v1/object/public/hotel-logos/${path}` : null;
+}
+
 export function amenityLabel(amenity: string) {
   return amenity.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }

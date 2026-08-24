@@ -1,19 +1,31 @@
+"use client";
+
 import Link from "next/link";
 import { AlertTriangle, X } from "lucide-react";
-import { getUnreadNotifications } from "@/modules/notifications/queries";
-import { dismissNotification } from "@/modules/notifications/actions";
+import { trpc } from "@/lib/trpc/react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 /**
  * Surfaces unread `low_balance` notifications (written by the
  * notify_low_agency_balance DB trigger — see 20260807000001_b2b_phase1.sql)
- * at the top of the agent dashboard. Server component: dismiss posts back
- * through a plain form action, no client JS needed.
+ * at the top of the agent dashboard.
+ *
+ * Was a zero-client-JS server component (dismiss posted through a plain
+ * form action) — moving the read+dismiss behind apps/api's tRPC procedures
+ * means both now need to happen client-side, so this is a real, deliberate
+ * tradeoff of this migration phase, not an oversight. The caller always
+ * scopes to its own token-derived identity server-side regardless of what
+ * this component is told, so no `profileId` prop is needed anymore.
  */
-export async function LowBalanceBanner({ profileId }: { profileId: string }) {
-  const notifications = await getUnreadNotifications(profileId, { type: "low_balance", limit: 3 });
-  if (notifications.length === 0) return null;
+export function LowBalanceBanner() {
+  const utils = trpc.useUtils();
+  const { data: notifications } = trpc.notifications.unread.useQuery({ type: "low_balance", limit: 3 });
+  const dismiss = trpc.notifications.dismiss.useMutation({
+    onSuccess: () => utils.notifications.unread.invalidate(),
+  });
+
+  if (!notifications || notifications.length === 0) return null;
 
   return (
     <div className="space-y-2">
@@ -27,13 +39,14 @@ export async function LowBalanceBanner({ profileId }: { profileId: string }) {
               Go to Wallet
             </Button>
           </AlertDescription>
-          <form action={dismissNotification} className="absolute top-3 right-3">
-            <input type="hidden" name="notificationId" value={n.id} />
-            <input type="hidden" name="path" value="/agent" />
-            <button type="submit" aria-label="Dismiss" className="text-muted-foreground hover:text-foreground">
-              <X className="size-4" />
-            </button>
-          </form>
+          <button
+            type="button"
+            onClick={() => dismiss.mutate({ notificationId: n.id })}
+            aria-label="Dismiss"
+            className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
         </Alert>
       ))}
     </div>

@@ -4,7 +4,7 @@ import { CheckCircle2, ArrowRight, CalendarRange, Layers, List } from "lucide-re
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getMyBookings } from "@/modules/bookings/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import {
   bookingTimeframe,
   groupIntoTrips,
@@ -53,7 +53,8 @@ export default async function AccountBookingsPage({
     | "all";
   const view: View = viewParam === "list" ? "list" : "trips";
 
-  const { bookings, orderMeta } = await getMyBookings();
+  const trpc = await getServerTrpc();
+  const { bookings, orderMeta } = await trpc.bookings.myBookings.query();
 
   const counts: Record<BookingTimeframe, number> = { upcoming: 0, past: 0, cancelled: 0 };
   for (const booking of bookings) counts[bookingTimeframe(booking)] += 1;

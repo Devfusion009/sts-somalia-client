@@ -26,7 +26,7 @@ import {
   adminRemovePartnerMember,
   adminResetPartnerMemberPassword,
 } from "@/modules/admin/partner-account-actions";
-import { recordAffiliateCommissionPayout } from "@/modules/affiliates/admin-actions";
+import { trpc } from "@/lib/trpc/react";
 import type { AccountMember, PartnerAccountType } from "@/modules/admin/partner-account-shared";
 
 const selectClass =
@@ -124,12 +124,37 @@ export function AccountNotesForm({ accountId, initialNotes }: { accountId: strin
  * (and revalidatePath) is keyed on.
  */
 export function AffiliateCommissionPayoutForm({ accountId, affiliateId }: { accountId: string; affiliateId: string }) {
-  const [state, formAction] = useActionState(recordAffiliateCommissionPayout, null);
+  const utils = trpc.useUtils();
+  const recordPayout = trpc.affiliates.admin.recordPayout.useMutation({
+    onSuccess: () => {
+      utils.affiliates.myPayouts.invalidate();
+      utils.affiliates.dashboard.invalidate();
+    },
+  });
+
+  async function handleSubmit(formData: FormData) {
+    try {
+      await recordPayout.mutateAsync({
+        accountId,
+        affiliateId,
+        amount: Number(formData.get("amount")),
+        method: (formData.get("method") as string) || undefined,
+        reference: (formData.get("reference") as string) || undefined,
+        periodStart: (formData.get("periodStart") as string) || undefined,
+        periodEnd: (formData.get("periodEnd") as string) || undefined,
+      });
+    } catch {
+      // handled via recordPayout.error below
+    }
+  }
+
   return (
-    <form action={formAction} className="space-y-3">
-      <input type="hidden" name="accountId" value={accountId} />
-      <input type="hidden" name="affiliateId" value={affiliateId} />
-      <ErrorAlert state={state} />
+    <form action={handleSubmit} className="space-y-3">
+      {recordPayout.error ? (
+        <Alert variant="destructive">
+          <AlertDescription>{recordPayout.error.message}</AlertDescription>
+        </Alert>
+      ) : null}
       <div className="space-y-1.5">
         <Label htmlFor="payoutAmount">Amount (USD)</Label>
         <Input id="payoutAmount" name="amount" type="number" step="0.01" min="0.01" placeholder="250" required />
@@ -159,7 +184,7 @@ export function AffiliateCommissionPayoutForm({ accountId, affiliateId }: { acco
       </p>
       <div className="flex items-center gap-3">
         <SubmitButton pendingText="Recording…">Record payout</SubmitButton>
-        <SavedHint state={state} />
+        {recordPayout.isSuccess ? <p className="text-xs text-primary">Saved.</p> : null}
       </div>
     </form>
   );

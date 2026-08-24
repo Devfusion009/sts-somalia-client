@@ -6,7 +6,7 @@ import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { portalHref } from "@/lib/subdomain";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getSelfTraveler } from "@/modules/travelers/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { TravelerProfileCard } from "@/modules/travelers/components/traveler-profile-card";
 import { PassportExpiryAlert } from "@/modules/travelers/components/passport-alert";
 import { ProfileForm } from "./profile-form";
@@ -14,7 +14,8 @@ import { ProfileForm } from "./profile-form";
 export default async function AccountOverviewPage() {
   const profile = await requireUser();
   const supabase = await createClient();
-  const selfTraveler = await getSelfTraveler();
+  const trpc = await getServerTrpc();
+  const selfTraveler = await trpc.travelers.selfTraveler.query();
 
   const [{ count: hotelCount }, { count: flightCount }, { count: visaCount }, { count: umrahCount }] =
     await Promise.all([

@@ -1,17 +1,24 @@
+"use client";
+
 import { Megaphone, X } from "lucide-react";
-import { getUnreadNotifications } from "@/modules/notifications/queries";
-import { dismissNotification } from "@/modules/notifications/actions";
+import { trpc } from "@/lib/trpc/react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 /**
- * Surfaces unread `broadcast` notifications (admin → all-agencies push,
- * see src/modules/notifications/broadcast-actions.ts) at the top of the
- * agent dashboard. Same server-only dismiss-via-form pattern as
- * low-balance-banner.tsx — no client JS needed.
+ * Surfaces unread `broadcast` notifications (admin → all-agencies push, see
+ * apps/api's modules/notifications/notifications.service.ts::sendBroadcast)
+ * at the top of the agent dashboard. Same client-side read+dismiss pattern
+ * as low-balance-banner.tsx, and the same reasoning for why — see that
+ * file's comment.
  */
-export async function BroadcastBanner({ profileId }: { profileId: string }) {
-  const notifications = await getUnreadNotifications(profileId, { type: "broadcast", limit: 3 });
-  if (notifications.length === 0) return null;
+export function BroadcastBanner() {
+  const utils = trpc.useUtils();
+  const { data: notifications } = trpc.notifications.unread.useQuery({ type: "broadcast", limit: 3 });
+  const dismiss = trpc.notifications.dismiss.useMutation({
+    onSuccess: () => utils.notifications.unread.invalidate(),
+  });
+
+  if (!notifications || notifications.length === 0) return null;
 
   return (
     <div className="space-y-2">
@@ -20,13 +27,14 @@ export async function BroadcastBanner({ profileId }: { profileId: string }) {
           <Megaphone className="text-primary" />
           <AlertTitle>{n.title}</AlertTitle>
           {n.body ? <AlertDescription>{n.body}</AlertDescription> : null}
-          <form action={dismissNotification} className="absolute top-3 right-3">
-            <input type="hidden" name="notificationId" value={n.id} />
-            <input type="hidden" name="path" value="/agent" />
-            <button type="submit" aria-label="Dismiss" className="text-muted-foreground hover:text-foreground">
-              <X className="size-4" />
-            </button>
-          </form>
+          <button
+            type="button"
+            onClick={() => dismiss.mutate({ notificationId: n.id })}
+            aria-label="Dismiss"
+            className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
         </Alert>
       ))}
     </div>

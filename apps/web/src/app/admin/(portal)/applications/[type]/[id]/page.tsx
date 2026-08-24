@@ -2,22 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import type { LucideIcon } from "lucide-react";
-import {
-  ArrowLeft,
-  ExternalLink,
-  History,
-  User,
-  Building2,
-  BedDouble,
-  PartyPopper,
-  Gavel,
-  UserCog,
-  StickyNote,
-  Folder,
-  FileText,
-  FileImage,
-  File as FileIcon,
-} from "lucide-react";
+import { ArrowLeft, ExternalLink, User, UserCheck, Mail, FileCheck2, Building2, BedDouble, PartyPopper } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   getApplicationDetail,
@@ -28,7 +13,7 @@ import {
 } from "@/modules/admin/queries";
 import { startReview } from "@/modules/admin/application-actions";
 import { getAccountIdsByApplication } from "@/modules/admin/partner-accounts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -39,9 +24,9 @@ import { InternalNotesForm } from "../internal-notes-form";
 import { DocumentReviewControls } from "../document-review-controls";
 import {
   SectionTitle,
-  DetailGrid,
   BusinessDetailsCard,
   AffiliateDetailCards,
+  DocFileIcon,
   type Details,
 } from "@/modules/partner-applications/components/detail-cards";
 
@@ -83,32 +68,6 @@ function StatusBadge({ status }: { status: string }) {
     <Badge className={`border-transparent capitalize ${STATUS_STYLES[status] ?? "bg-muted text-muted-foreground"}`}>
       {status.replace(/_/g, " ")}
     </Badge>
-  );
-}
-
-const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "heic"]);
-
-/** A quiet plain-text row read as a wall of filenames — a colored file-type chip (PDF red, image blue) makes each document scannable at a glance. */
-function DocFileIcon({ fileName }: { fileName: string }) {
-  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-  if (ext === "pdf") {
-    return (
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-        <FileText className="size-5" />
-      </span>
-    );
-  }
-  if (IMAGE_EXTENSIONS.has(ext)) {
-    return (
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-chart-3/10 text-chart-3">
-        <FileImage className="size-5" />
-      </span>
-    );
-  }
-  return (
-    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-      <FileIcon className="size-5" />
-    </span>
   );
 }
 
@@ -154,6 +113,21 @@ export default async function ApplicationDetailPage({
   const reviewer = application.reviewer as unknown as { full_name: string | null; email: string } | null;
   const isActionable = application.status === "pending" || application.status === "under_review";
   const TypeIcon = TYPE_ICON[type];
+  const details = ((application as { business_details?: unknown }).business_details ?? {}) as Details;
+
+  // The account that signed in and submitted is routinely a different person
+  // from the business's authorized contact — showing only the former under a
+  // bare "Applicant" heading made admins think the contact they'd entered had
+  // been lost. Both sit side by side here.
+  const verifiedDocs = signedDocs.filter((d) => documentReviews.get(d.key)?.status === "verified").length;
+  const railItems: Array<{ icon: LucideIcon; label: string; value: string }> = [
+    { icon: User, label: "Submitted by", value: applicant?.full_name ?? applicant?.email ?? "—" },
+    { icon: Mail, label: "Account email", value: applicant?.email ?? "—" },
+    ...(type === "affiliate"
+      ? []
+      : [{ icon: UserCheck, label: "Authorized contact", value: String(details.contactFullName ?? "—") || "—" }]),
+    { icon: FileCheck2, label: "Documents", value: signedDocs.length === 0 ? "None" : `${verifiedDocs}/${signedDocs.length} verified` },
+  ];
 
   return (
     <div className="space-y-6">
@@ -202,34 +176,30 @@ export default async function ApplicationDetailPage({
         </Alert>
       ) : null}
 
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl bg-secondary/40 px-4 py-4 lg:grid-cols-4">
+        {railItems.map(({ icon: Icon, label, value }) => (
+          <div key={label} className="flex min-w-0 items-start gap-2.5">
+            <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
+            <div className="min-w-0">
+              <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
+              <dd className="truncate text-sm font-semibold text-foreground">{value}</dd>
+            </div>
+          </div>
+        ))}
+      </dl>
+
       <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <SectionTitle icon={User}>Applicant</SectionTitle>
-            </CardHeader>
-            <CardContent>
-              <DetailGrid
-                rows={[
-                  ["Full Name", applicant?.full_name ?? "—"],
-                  ["Email", applicant?.email ?? "—"],
-                  ["Phone", applicant?.phone ?? "—"],
-                ]}
-              />
-            </CardContent>
-          </Card>
-
-          {(() => {
-            const details = ((application as { business_details?: unknown }).business_details ?? {}) as Details;
-            if (Object.keys(details).length === 0) return null;
-            if (type === "affiliate") return <AffiliateDetailCards details={details} />;
-            return <BusinessDetailsCard kind={type} details={details} />;
-          })()}
+          {Object.keys(details).length === 0 ? null : type === "affiliate" ? (
+            <AffiliateDetailCards details={details} elevated />
+          ) : (
+            <BusinessDetailsCard kind={type} details={details} elevated />
+          )}
 
           {type === "affiliate" && (application as { notes?: string }).notes ? (
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader>
-                <SectionTitle icon={StickyNote}>Notes from applicant</SectionTitle>
+                <SectionTitle>Notes from applicant</SectionTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm">{(application as { notes: string }).notes}</p>
@@ -237,9 +207,9 @@ export default async function ApplicationDetailPage({
             </Card>
           ) : null}
 
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
-              <SectionTitle icon={Folder}>
+              <SectionTitle>
                 <span>
                   Documents ({signedDocs.length})
                   {signedDocs.length > 0 ? (
@@ -295,9 +265,9 @@ export default async function ApplicationDetailPage({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
-              <SectionTitle icon={History}>Audit trail</SectionTitle>
+              <SectionTitle>Audit trail</SectionTitle>
             </CardHeader>
             <CardContent>
               {auditTrail.length === 0 ? (
@@ -329,9 +299,9 @@ export default async function ApplicationDetailPage({
 
         <div className="space-y-4">
           {isActionable ? (
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader>
-                <SectionTitle icon={Gavel}>Decision</SectionTitle>
+                <SectionTitle>Decision</SectionTitle>
               </CardHeader>
               <CardContent>
                 <ApplicationActions applicationId={application.id} type={type} />
@@ -339,9 +309,9 @@ export default async function ApplicationDetailPage({
             </Card>
           ) : null}
 
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
-              <SectionTitle icon={UserCog}>Assigned reviewer</SectionTitle>
+              <SectionTitle>Assigned reviewer</SectionTitle>
             </CardHeader>
             <CardContent>
               <ReviewerPicker
@@ -356,9 +326,9 @@ export default async function ApplicationDetailPage({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
-              <SectionTitle icon={StickyNote}>Internal notes</SectionTitle>
+              <SectionTitle>Internal notes</SectionTitle>
             </CardHeader>
             <CardContent>
               <InternalNotesForm applicationId={application.id} type={type} initialNotes={application.internal_notes} />

@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/session";
-import { getMyAffiliate, getMyLinks, getMyConversions, getMyPayouts } from "@/modules/affiliates/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -17,7 +17,8 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 
 export default async function AffiliateDashboardPage() {
   const profile = await requireUser();
-  const affiliate = await getMyAffiliate(profile.id);
+  const trpc = await getServerTrpc();
+  const { affiliate, links, conversions, payouts } = await trpc.affiliates.dashboard.query();
 
   if (!affiliate) {
     return (
@@ -28,12 +29,6 @@ export default async function AffiliateDashboardPage() {
       </Alert>
     );
   }
-
-  const [links, conversions, payouts] = await Promise.all([
-    getMyLinks(affiliate.id),
-    getMyConversions(affiliate.id),
-    getMyPayouts(affiliate.id),
-  ]);
 
   const totalClicks = links.reduce((sum, l) => sum + l.clicks_count, 0);
   const pendingConversions = conversions.filter((c) => c.status === "pending").length;

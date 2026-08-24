@@ -5,13 +5,25 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { APP_CONFIG, REJECT_COOLDOWN_DAYS, docSlotsFor, type ApplicationKind } from "./config";
-import { getEditableApplication, getLatestApplication, type DocumentRef } from "./queries";
+import {
+  APP_CONFIG,
+  REJECT_COOLDOWN_DAYS,
+  EARLIEST_BUSINESS_YEAR,
+  CURRENT_YEAR,
+  docSlotsFor,
+  missingRequiredDocSlots,
+  type ApplicationKind,
+} from "./config";
+import { getEditableApplication, getLatestApplication, getOwnedApplication, type DocumentRef } from "./queries";
+import {
+  phoneSchema,
+  MAX_UPLOAD_BYTES,
+  ALLOWED_UPLOAD_TYPES,
+  UPLOAD_SIZE_ERROR,
+  UPLOAD_TYPE_ERROR,
+} from "./schemas";
 
 export type ActionState = { error: string | null } | null;
-
-/** "+<dial code><6-10 digit local number>", produced by PhoneField. */
-const phoneSchema = z.string().regex(/^\+\d{1,4}\d{6,10}$/, "Enter a valid phone number.");
 
 function wizardPath(kind: ApplicationKind, id: string, step: number) {
   return `/account/become/${kind}/${id}?step=${step}`;
@@ -72,7 +84,13 @@ const step1BusinessSchema = z.object({
   legalBusinessName: z.string().min(2, "Enter your legal business name."),
   tradingName: z.string().optional(),
   businessType: z.string().min(1, "Select a business type."),
-  yearEstablished: z.string().optional(),
+  yearEstablished: z
+    .string()
+    .min(1, "Enter the year your business was established.")
+    .refine((v) => {
+      const year = Number(v);
+      return Number.isInteger(year) && year >= EARLIEST_BUSINESS_YEAR && year <= CURRENT_YEAR;
+    }, `Enter a year between ${EARLIEST_BUSINESS_YEAR} and ${CURRENT_YEAR}.`),
   registrationNumber: z.string().optional(),
   taxId: z.string().optional(),
   officeStreet: z.string().optional(),
@@ -131,7 +149,7 @@ export async function saveStep1(_prev: ActionState, formData: FormData): Promise
       legalBusinessName: parsed.data.legalBusinessName,
       tradingName: parsed.data.tradingName || null,
       businessType: parsed.data.businessType,
-      yearEstablished: parsed.data.yearEstablished || null,
+      yearEstablished: parsed.data.yearEstablished,
       registrationNumber: parsed.data.registrationNumber || null,
       taxId: parsed.data.taxId || null,
       officeStreet: parsed.data.officeStreet || null,
@@ -405,9 +423,6 @@ export async function saveStep4(_prev: ActionState, formData: FormData): Promise
 // ---------------------------------------------------------------------------
 // Step 5 — documents
 // ---------------------------------------------------------------------------
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "application/pdf"];
-
 function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
 }
@@ -431,8 +446,8 @@ export async function uploadApplicationDocument(_prev: ActionState, formData: Fo
 
   if (!docKey) return { error: "Unknown document type." };
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to upload." };
-  if (!ALLOWED_TYPES.includes(file.type)) return { error: "Only JPG, PNG, or PDF files are accepted." };
-  if (file.size > MAX_UPLOAD_BYTES) return { error: "File must be 5MB or smaller." };
+  if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) return { error: UPLOAD_TYPE_ERROR };
+  if (file.size > MAX_UPLOAD_BYTES) return { error: UPLOAD_SIZE_ERROR };
   if (!isValidExpiry(expiry)) return { error: "Enter a valid expiry date." };
 
   const user = await requireUser();
@@ -461,6 +476,13 @@ export async function uploadApplicationDocument(_prev: ActionState, formData: Fo
 
   const { error } = await supabase.from(APP_CONFIG[kind].table).update({ document_refs: next } as never).eq("id", id);
   if (error) return { error: error.message };
+
+  // The applicant owns document_refs, but partner_document_reviews is
+  // admin-write — so replacing a rejected file here would otherwise leave the
+  // admin looking at "Rejected: image is blurry" against a file that no
+  // longer exists. The RPC is a no-op unless this document is currently
+  // rejected, and it also alerts the admins that a replacement is waiting.
+  await supabase.rpc("clear_document_rejection", { p_kind: kind, p_application_id: id, p_doc_key: docKey });
 
   revalidatePath(wizardPath(kind, id, 5));
   return { error: null };
@@ -523,6 +545,76 @@ export async function getDocumentViewUrl(kind: ApplicationKind, id: string, docK
   return { url: data.signedUrl };
 }
 
+/**
+ * Replaces one document an admin marked 'rejected' — the only edit an
+ * applicant can make once an application is already decided. Everything
+ * else on a decided application is locked (see
+ * applicant_edit_pending_applications.sql); the DB write here goes through
+ * resubmit_kyc_document(), a security-definer function that itself
+ * re-checks the doc is currently rejected before touching anything, so this
+ * can't be used to swap out an already-verified document.
+ */
+export async function resubmitRejectedDocument(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const kind = kindOf(formData);
+  const id = String(formData.get("applicationId"));
+  const docKey = String(formData.get("docKey") || "");
+  const file = formData.get("file");
+
+  if (!docKey) return { error: "Unknown document type." };
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to upload." };
+  if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) return { error: UPLOAD_TYPE_ERROR };
+  if (file.size > MAX_UPLOAD_BYTES) return { error: UPLOAD_SIZE_ERROR };
+
+  const user = await requireUser();
+  const application = await getOwnedApplication(kind, id, user.id);
+  if (!application) return { error: "Application not found." };
+
+  const supabase = await createClient();
+  const { data: review } = await supabase
+    .from("partner_document_reviews")
+    .select("status")
+    .eq("application_type", kind)
+    .eq("application_id", id)
+    .eq("doc_key", docKey)
+    .maybeSingle();
+  if (review?.status !== "rejected") return { error: "Only a rejected document can be resubmitted." };
+
+  const existing: DocumentRef[] = Array.isArray(application.document_refs) ? (application.document_refs as DocumentRef[]) : [];
+  const previous = existing.filter((d) => d.key === docKey);
+  const docLabel = docSlotsFor(kind).find((s) => s.key === docKey)?.label ?? docKey;
+
+  const storagePath = `${kind}/${id}/${docKey}/${Date.now()}-${sanitizeFilename(file.name)}`;
+  const { error: uploadError } = await supabase.storage
+    .from("kyc-documents")
+    .upload(storagePath, file, { contentType: file.type });
+  if (uploadError) return { error: uploadError.message };
+
+  const { error } = await supabase.rpc("resubmit_kyc_document", {
+    p_kind: kind,
+    p_application_id: id,
+    p_doc_key: docKey,
+    p_label: docLabel,
+    p_storage_path: storagePath,
+    p_file_name: file.name,
+    p_file_size: file.size,
+  });
+  if (error) {
+    await supabase.storage.from("kyc-documents").remove([storagePath]);
+    return { error: error.message };
+  }
+
+  if (previous.length > 0) {
+    await supabase.storage.from("kyc-documents").remove(previous.map((p) => p.storage_path));
+  }
+
+  revalidatePath(`/account/become/${kind}/${id}/view`);
+  // ResubmitDocumentForm also renders inside PartnerVerificationGate, shown
+  // to an applicant who is already inside /partner waiting on the last
+  // rejected document — that layout needs the same refresh.
+  revalidatePath("/partner", "layout");
+  return { error: null };
+}
+
 export async function advanceToReview(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const kind = kindOf(formData);
   const id = String(formData.get("applicationId"));
@@ -530,12 +622,28 @@ export async function advanceToReview(_prev: ActionState, formData: FormData): P
   const { supabase, application } = await getEditableApplication(kind, id, user.id);
   if (!application) redirect("/account/become");
 
-  const uploaded = new Set(
-    (Array.isArray(application!.document_refs) ? (application!.document_refs as DocumentRef[]) : []).map((d) => d.key)
-  );
-  const missing = docSlotsFor(kind).filter((slot) => !slot.optional && !uploaded.has(slot.key));
-  if (missing.length > 0) {
-    return { error: `Please upload: ${missing.map((s) => s.label).join(", ")}.` };
+  const refs: DocumentRef[] = Array.isArray(application!.document_refs) ? (application!.document_refs as DocumentRef[]) : [];
+  const { missingUpload, missingExpiry } = missingRequiredDocSlots(kind, refs);
+  if (missingUpload.length > 0) {
+    return { error: `Please upload: ${missingUpload.map((s) => s.label).join(", ")}.` };
+  }
+  if (missingExpiry.length > 0) {
+    return { error: `Please set an expiry date for: ${missingExpiry.map((s) => s.label).join(", ")}.` };
+  }
+
+  // Server-side twin of the rejected-document alert on step 5: an admin who
+  // rejected a document is waiting on a replacement, and letting the
+  // application walk back to review without one just returns it to the queue
+  // unchanged.
+  const { data: rejectedRows } = await supabase
+    .from("partner_document_reviews")
+    .select("doc_key")
+    .eq("application_type", kind)
+    .eq("application_id", id)
+    .eq("status", "rejected");
+  if (rejectedRows && rejectedRows.length > 0) {
+    const labels = new Map(docSlotsFor(kind).map((slot) => [slot.key, slot.label]));
+    return { error: `Please re-upload: ${rejectedRows.map((r) => labels.get(r.doc_key) ?? r.doc_key).join(", ")}.` };
   }
 
   const currentStep = Number((application!.business_details as Record<string, unknown> | null)?._wizard_step) || 1;
@@ -566,12 +674,13 @@ export async function submitApplication(_prev: ActionState, formData: FormData):
     return { error: "Please complete the earlier steps before submitting." };
   }
 
-  const uploaded = new Set(
-    (Array.isArray(application.document_refs) ? (application.document_refs as DocumentRef[]) : []).map((d) => d.key)
-  );
-  const missing = docSlotsFor(kind).filter((slot) => !slot.optional && !uploaded.has(slot.key));
-  if (missing.length > 0) {
-    return { error: `Please upload: ${missing.map((s) => s.label).join(", ")}.` };
+  const refs: DocumentRef[] = Array.isArray(application.document_refs) ? (application.document_refs as DocumentRef[]) : [];
+  const { missingUpload, missingExpiry } = missingRequiredDocSlots(kind, refs);
+  if (missingUpload.length > 0) {
+    return { error: `Please upload: ${missingUpload.map((s) => s.label).join(", ")}.` };
+  }
+  if (missingExpiry.length > 0) {
+    return { error: `Please set an expiry date for: ${missingExpiry.map((s) => s.label).join(", ")}.` };
   }
 
   const cfg = APP_CONFIG[kind];

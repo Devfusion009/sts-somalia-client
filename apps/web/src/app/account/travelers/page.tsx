@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getMyTravelers } from "@/modules/travelers/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { TravelerManager } from "@/modules/travelers/components/traveler-manager";
 import { PassportExpiryAlert } from "@/modules/travelers/components/passport-alert";
 
 export const metadata: Metadata = { title: "Saved Travelers" };
 
 export default async function AccountTravelersPage() {
-  const travelers = await getMyTravelers();
+  const trpc = await getServerTrpc();
+  const travelers = await trpc.travelers.myTravelers.query();
   const companions = travelers.filter((t) => !t.is_self);
 
   return (

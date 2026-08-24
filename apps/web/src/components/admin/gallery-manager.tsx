@@ -38,7 +38,6 @@ export function GalleryManager({
   uploadAction,
   removeAction,
   setCoverAction,
-  emptyHint,
 }: {
   id: string;
   paths: string[];
@@ -46,7 +45,6 @@ export function GalleryManager({
   uploadAction: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   removeAction: (formData: FormData) => Promise<void>;
   setCoverAction: (formData: FormData) => Promise<void>;
-  emptyHint?: string;
 }) {
   const [state, formAction, pending] = useActionState(uploadAction, null);
 
@@ -88,9 +86,6 @@ export function GalleryManager({
         <div className="flex flex-col items-center gap-1.5 rounded-lg border border-border py-10 text-center">
           <ImageIcon className="size-7 text-muted-foreground" />
           <p className="text-sm font-medium">No photos yet</p>
-          <p className="text-xs text-muted-foreground">
-            {emptyHint ?? "Add at least one photo so customers can see what they're booking."}
-          </p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

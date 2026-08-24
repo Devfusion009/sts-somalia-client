@@ -39,6 +39,8 @@ import {
   RotateCcw,
   ChevronDown,
   CalendarRange,
+  Images,
+  Star,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -102,12 +104,14 @@ export const PORTAL_ICONS = {
   statement: FileClock,
   refund: RotateCcw,
   calendar: CalendarRange,
+  photos: Images,
+  reviews: Star,
 } satisfies Record<string, LucideIcon>;
 
 export type PortalIconName = keyof typeof PORTAL_ICONS;
-export type PortalNavItem = { href: string; label: string; icon: PortalIconName };
+export type PortalNavItem = { href: string; label: string; icon: PortalIconName; badge?: number };
 export type PortalNavGroup = { label: string; items: PortalNavItem[] };
-export type PortalAccent = "customer" | "agent" | "admin";
+export type PortalAccent = "customer" | "agent" | "admin" | "manager";
 
 // Per-portal identity marker — a refinement of the shared shell, not a
 // redesign. Same rounded-card/icon-in-a-circle visual language throughout;
@@ -134,6 +138,13 @@ const ACCENT_STYLES: Record<PortalAccent, { bar: string; badge: string; iconBg: 
     iconBg: "bg-blue-500",
     activeText: "text-blue-600 dark:text-blue-400",
     ring: "ring-blue-500/20",
+  },
+  manager: {
+    bar: "bg-teal-500",
+    badge: "border-teal-500/25 bg-teal-500/10 text-teal-700 dark:text-teal-400",
+    iconBg: "bg-teal-600",
+    activeText: "text-teal-600 dark:text-teal-400",
+    ring: "ring-teal-500/20",
   },
 };
 
@@ -253,6 +264,11 @@ function NavGroups({
                         >
                           <Icon />
                           <span>{item.label}</span>
+                          {item.badge ? (
+                            <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:top-0.5 group-data-[collapsible=icon]:right-0.5">
+                              {item.badge > 99 ? "99+" : item.badge}
+                            </span>
+                          ) : null}
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );
@@ -365,24 +381,29 @@ export function PortalShell({
         <SidebarContent>
           <NavGroups navGroups={navGroups} activeHref={activeHref} accent={accent} />
           {/* An exit hatch, not a destination — separated from real nav items
-              and deliberately muted so it doesn't compete with them. */}
-          <SidebarGroup className="mt-auto">
-            <Separator className="mb-2 group-data-[collapsible=icon]:hidden" />
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    tooltip="Back to website"
-                    className="text-sidebar-foreground/60 hover:text-sidebar-foreground [&_svg]:size-3.5"
-                    render={<Link href={homeHref} />}
-                  >
-                    <ExternalLink />
-                    <span className="text-xs">Back to website</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+              and deliberately muted so it doesn't compete with them. A hotel
+              manager's portal isn't a reskinned view of the public site the
+              way the other portals are, so there's no "back to website" to
+              offer here. */}
+          {accent !== "manager" ? (
+            <SidebarGroup className="mt-auto">
+              <Separator className="mb-2 group-data-[collapsible=icon]:hidden" />
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      tooltip="Back to website"
+                      className="text-sidebar-foreground/60 hover:text-sidebar-foreground [&_svg]:size-3.5"
+                      render={<Link href={homeHref} />}
+                    >
+                      <ExternalLink />
+                      <span className="text-xs">Back to website</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ) : null}
         </SidebarContent>
         <SidebarFooter>
           <Separator className="mb-2" />
@@ -411,9 +432,14 @@ export function PortalShell({
                   <DropdownMenuGroup>
                     <DropdownMenuLabel>Switch account</DropdownMenuLabel>
                   </DropdownMenuGroup>
-                  <DropdownMenuItem render={<Link href={rootOrigin() ? `${rootOrigin()}/account` : "/account"} />}>
-                    <User /> Personal Account
-                  </DropdownMenuItem>
+                  {/* A hotel manager has no B2C account behind it — see the
+                      rejection in signInAction — so there's nothing to
+                      switch to here, unlike every other portal. */}
+                  {accent !== "manager" ? (
+                    <DropdownMenuItem render={<Link href={rootOrigin() ? `${rootOrigin()}/account` : "/account"} />}>
+                      <User /> Personal Account
+                    </DropdownMenuItem>
+                  ) : null}
                   {isPlatformAdmin ? (
                     <DropdownMenuItem render={<Link href={portalHref("admin")} />}>
                       <ShieldCheck /> Admin Console
@@ -456,7 +482,7 @@ export function PortalShell({
             {headerExtra}
             {accent !== "customer" ? (
               <Badge variant="outline" className={`hidden text-[10px] tracking-wide uppercase sm:inline-flex ${styles.badge}`}>
-                {accent === "admin" ? "Operator console" : "Agent workspace"}
+                {accent === "admin" ? "Operator console" : accent === "manager" ? "Hotel console" : "Agent workspace"}
               </Badge>
             ) : null}
           </div>

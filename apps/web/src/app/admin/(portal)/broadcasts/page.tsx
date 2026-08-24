@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { format } from "date-fns";
 import { Megaphone } from "lucide-react";
-import { getBroadcastHistory } from "@/modules/notifications/broadcast-actions";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BroadcastForm } from "./broadcast-form";
@@ -14,7 +14,8 @@ const AUDIENCE_LABELS: Record<string, string> = {
 };
 
 export default async function AdminBroadcastsPage() {
-  const history = await getBroadcastHistory();
+  const trpc = await getServerTrpc();
+  const history = await trpc.notifications.admin.broadcastHistory.query();
 
   return (
     <div className="space-y-6">

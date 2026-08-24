@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/session";
-import { getMyAffiliate, getMyLinks } from "@/modules/affiliates/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -14,8 +14,9 @@ import { NewLinkForm } from "./new-link-form";
 import { CopyLinkButton } from "./copy-link-button";
 
 export default async function AffiliateLinksPage() {
-  const profile = await requireUser();
-  const affiliate = await getMyAffiliate(profile.id);
+  await requireUser();
+  const trpc = await getServerTrpc();
+  const affiliate = await trpc.affiliates.me.query();
 
   if (!affiliate) {
     return (
@@ -25,7 +26,7 @@ export default async function AffiliateLinksPage() {
     );
   }
 
-  const links = await getMyLinks(affiliate.id);
+  const links = await trpc.affiliates.myLinks.query();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
   return (

@@ -1,29 +1,46 @@
 "use client";
 
-import { useActionState } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
-import { sendBroadcast } from "@/modules/notifications/broadcast-actions";
+import { trpc } from "@/lib/trpc/react";
 
 const selectClass =
   "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 export function BroadcastForm() {
-  const [state, formAction] = useActionState(sendBroadcast, null);
+  const utils = trpc.useUtils();
+  const sendBroadcast = trpc.notifications.admin.sendBroadcast.useMutation({
+    onSuccess: () => utils.notifications.admin.broadcastHistory.invalidate(),
+  });
+
+  // async + awaited mutateAsync, not fire-and-forget .mutate() — same
+  // reasoning as new-link-form.tsx: SubmitButton's useFormStatus()-based
+  // pending state needs an awaited async action to track real duration.
+  async function handleSubmit(formData: FormData) {
+    try {
+      await sendBroadcast.mutateAsync({
+        title: formData.get("title") as string,
+        body: (formData.get("body") as string) || undefined,
+        audience: formData.get("audience") as "all_agency_owners" | "all_agency_members",
+      });
+    } catch {
+      // handled via sendBroadcast.error
+    }
+  }
 
   return (
-    <form action={formAction} className="space-y-4">
-      {state?.error ? (
+    <form action={handleSubmit} className="space-y-4">
+      {sendBroadcast.error ? (
         <Alert variant="destructive">
           <AlertCircle />
-          <AlertDescription>{state.error}</AlertDescription>
+          <AlertDescription>{sendBroadcast.error.message}</AlertDescription>
         </Alert>
       ) : null}
-      {state && !state.error ? (
+      {sendBroadcast.isSuccess ? (
         <Alert>
           <CheckCircle2 />
           <AlertDescription>Broadcast sent.</AlertDescription>

@@ -1,6 +1,5 @@
 "use client";
 
-import { useActionState } from "react";
 import { CheckCircle2, Mail, MessageCircle, Smartphone } from "lucide-react";
 import {
   Card,
@@ -20,8 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
-import { savePreferencesAction } from "../actions";
-import { SUPPORTED_LANGUAGES, DISPLAY_CURRENCIES } from "../constants";
+import { trpc } from "@/lib/trpc/react";
+import { SUPPORTED_LANGUAGES, DISPLAY_CURRENCIES, type AccountLanguage } from "@sts/shared-types";
 
 type Preferences = {
   email_enabled: boolean;
@@ -73,16 +72,38 @@ export function PreferencesForm({
   /** Currencies that actually have an FX rate on file. */
   convertibleCurrencies: string[];
 }) {
-  const [state, formAction] = useActionState(savePreferencesAction, null);
+  const utils = trpc.useUtils();
+  const save = trpc.preferences.save.useMutation({
+    onSuccess: () => {
+      utils.preferences.me.invalidate();
+    },
+  });
+
+  // async + awaited mutateAsync (not the fire-and-forget .mutate()) so that
+  // SubmitButton's useFormStatus()-based pending state tracks the
+  // mutation's actual duration — same reasoning as affiliate/links/new-link-form.tsx.
+  async function handleSubmit(formData: FormData) {
+    try {
+      await save.mutateAsync({
+        emailEnabled: formData.get("emailEnabled") === "on",
+        smsEnabled: formData.get("smsEnabled") === "on",
+        whatsappEnabled: formData.get("whatsappEnabled") === "on",
+        language: formData.get("language") as AccountLanguage,
+        displayCurrency: formData.get("displayCurrency") as string,
+      });
+    } catch {
+      // handled via save.error below
+    }
+  }
 
   return (
-    <form action={formAction} className="space-y-6">
-      {state?.error ? (
+    <form action={handleSubmit} className="space-y-6">
+      {save.error ? (
         <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
+          <AlertDescription>{save.error.message}</AlertDescription>
         </Alert>
       ) : null}
-      {state && !state.error ? (
+      {save.isSuccess ? (
         <Alert>
           <CheckCircle2 />
           <AlertDescription>Preferences saved.</AlertDescription>

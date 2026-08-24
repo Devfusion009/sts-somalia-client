@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { getMyPreferences, getFxRates } from "@/modules/preferences/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { PreferencesForm } from "@/modules/preferences/components/preferences-form";
 import { getIntegrations } from "@/lib/integrations";
 
 export const metadata: Metadata = { title: "Preferences" };
 
 export default async function AccountPreferencesPage() {
-  const [preferences, rates] = await Promise.all([getMyPreferences(), getFxRates("USD")]);
+  const trpc = await getServerTrpc();
+  const [preferences, rates] = await Promise.all([trpc.preferences.me.query(), trpc.preferences.fxRates.query()]);
 
   // There is no SMS provider wired yet (Twilio is configured for WhatsApp
   // only). The form says so rather than offering a toggle that quietly does
@@ -26,7 +27,7 @@ export default async function AccountPreferencesPage() {
       <PreferencesForm
         preferences={preferences}
         smsAvailable={smsAvailable}
-        convertibleCurrencies={[...rates.keys()]}
+        convertibleCurrencies={Object.keys(rates)}
       />
 
       {!whatsappApi ? (

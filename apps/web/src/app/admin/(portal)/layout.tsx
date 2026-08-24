@@ -5,7 +5,7 @@ import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { createClient } from "@/lib/supabase/server";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { MfaSettings } from "@/modules/auth/components/mfa-settings";
-import { getUnreadNotifications } from "@/modules/notifications/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { fireDueEventReminders } from "@/modules/admin/calendar-reminders";
 import { AdminNotificationBell } from "./admin-notification-bell";
 import { ShieldAlert } from "lucide-react";
@@ -119,16 +119,35 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // configured at all.
   const supabase = await createClient();
   await fireDueEventReminders(supabase);
-  const [notifications, contexts] = await Promise.all([
-    getUnreadNotifications(profile.id, { limit: 10 }),
+  const trpc = await getServerTrpc();
+  const [notifications, contexts, { data: navCountsRaw }] = await Promise.all([
+    trpc.notifications.unread.query({ limit: 10 }),
     getMyPartnerContexts(profile.id, profile.full_name),
+    supabase.rpc("admin_nav_counts"),
   ]);
+
+  // Red count badges on the queue-shaped nav items — everything a customer
+  // or partner submitted that is waiting on staff. One RPC round trip; the
+  // bell's 30s router.refresh() re-runs this layout, so the numbers track
+  // new arrivals on the same tick that surfaces their notifications.
+  const navCounts = (navCountsRaw ?? {}) as Record<string, number>;
+  const BADGE_BY_HREF: Record<string, number | undefined> = {
+    "/admin/queue": navCounts.queue,
+    "/admin/refunds": navCounts.refunds,
+    "/admin/visa": navCounts.visa,
+    "/admin/umrah/requests": navCounts.umrah_requests,
+    "/admin/applications": navCounts.partner_applications,
+  };
+  const navGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.map((item) => ({ ...item, badge: BADGE_BY_HREF[item.href] || undefined })),
+  }));
 
   return (
     <PortalShell
       portalName="Admin Console"
       roleLabel="Admin"
-      navGroups={NAV_GROUPS}
+      navGroups={navGroups}
       profileName={profile.full_name}
       profileEmail={profile.email}
       contexts={contexts}

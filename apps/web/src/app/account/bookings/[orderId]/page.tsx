@@ -18,10 +18,10 @@ import {
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getOrderForCheckout, describeOrderItem, hotelGuestNames } from "@/modules/payments/queries";
-import { getBookingRequests } from "@/modules/bookings/queries";
-import { withdrawBookingRequestAction } from "@/modules/bookings/actions";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { StatusTimeline, type TimelineStage } from "@/modules/bookings/components/status-timeline";
 import { BookingRequestDialog } from "@/modules/bookings/components/booking-request-dialog";
+import { WithdrawRequestButton } from "@/modules/bookings/components/withdraw-request-button";
 import {
   TYPE_ICON,
   TYPE_LABEL,
@@ -131,7 +131,11 @@ export default async function BookingDetailPage({
   // there" — both are a 404 to the customer.
   if (!order) notFound();
 
-  const [requests, supabase] = await Promise.all([getBookingRequests(orderId), createClient()]);
+  const trpc = await getServerTrpc();
+  const [requests, supabase] = await Promise.all([
+    trpc.bookings.requestsForOrder.query({ orderId }),
+    createClient(),
+  ]);
 
   const { data: invoice } = await supabase
     .from("invoices")
@@ -471,13 +475,7 @@ export default async function BookingDetailPage({
                   </div>
                   <StatusBadge status={request.status} />
                   {request.status === "requested" || request.status === "in_review" ? (
-                    <form action={withdrawBookingRequestAction}>
-                      <input type="hidden" name="requestId" value={request.id} />
-                      <input type="hidden" name="orderId" value={orderId} />
-                      <Button type="submit" variant="ghost" size="sm">
-                        Withdraw
-                      </Button>
-                    </form>
+                    <WithdrawRequestButton requestId={request.id} orderId={orderId} />
                   ) : null}
                 </li>
               ))}
@@ -487,12 +485,7 @@ export default async function BookingDetailPage({
           {requests.length > 0 ? <Separator /> : null}
 
           {isCancellableDirectly ? (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                This booking hasn&apos;t been paid yet, so you can cancel it yourself at no cost.
-              </p>
-              <CancelOrderButton orderId={orderId} redirectTo="/account/bookings" />
-            </div>
+            <CancelOrderButton orderId={orderId} redirectTo="/account/bookings" />
           ) : order.status === "cancelled" ? (
             <Alert>
               <AlertDescription>This booking has been cancelled.</AlertDescription>

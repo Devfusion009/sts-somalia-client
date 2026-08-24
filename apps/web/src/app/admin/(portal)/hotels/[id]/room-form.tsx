@@ -27,6 +27,8 @@ import { SubmitButton } from "@/components/submit-button";
 import { createRoom, updateRoom } from "@/modules/admin/actions";
 import { RoomTypeCombobox } from "@/modules/hotels/components/room-type-combobox";
 import { RoomAmenitiesField } from "@/modules/hotels/components/room-amenities-field";
+import { RoomFloorField } from "@/modules/hotels/components/room-floor-field";
+import { RoomSizeField } from "@/modules/hotels/components/room-size-field";
 import { ROOM_BED_TYPES } from "@/modules/hotels/constants";
 
 type Room = {
@@ -78,7 +80,7 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
           </>
         )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{room ? "Edit room" : "Add room"}</DialogTitle>
         </DialogHeader>
@@ -128,11 +130,11 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="floor">Floor</Label>
-              <Input id="floor" name="floor" placeholder="e.g. 2nd floor" defaultValue={room?.floor ?? ""} />
+              <RoomFloorField id="floor" defaultValue={room?.floor ?? null} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sizeSqm">Room size (m²)</Label>
-              <Input id="sizeSqm" name="sizeSqm" type="number" min={0} step="0.1" defaultValue={room?.size_sqm ?? ""} />
+              <Label htmlFor="sizeSqm">Room size</Label>
+              <RoomSizeField id="sizeSqm" defaultSqm={room?.size_sqm ?? null} />
             </div>
           </div>
 

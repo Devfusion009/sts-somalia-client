@@ -78,7 +78,7 @@ export default async function VenuePartnerLayout({ children }: { children: React
       contexts={contexts}
       isPlatformAdmin={profile.is_platform_admin}
     >
-      {account ? <OnboardingStatusBanner checklist={account.checklist} portalLabel="the Venue Portal" /> : null}
+      {account ? <OnboardingStatusBanner checklist={account.checklist} /> : null}
       {children}
     </PortalShell>
   );

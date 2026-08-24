@@ -2,7 +2,6 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { getMyPartnerId, getMyPartner } from "@/modules/hotels/partner-queries";
-import { getMyAffiliate } from "@/modules/affiliates/queries";
 import { getMyVenuePartnerId, getMyVenuePartner } from "@/modules/events/venue-partner-queries";
 import { getMyPartnerAccountId } from "@/modules/admin/partner-accounts";
 import { ACCOUNT_TYPE_LABEL, type PartnerAccountType, type PartnerAccountStatus } from "@/modules/admin/partner-account-shared";
@@ -54,23 +53,31 @@ async function statusFor(type: PartnerAccountType, entityId: string): Promise<Pa
  * one more `candidates.push`, and one more PORTAL_HREF_FOR_TYPE entry — no
  * caller of this function needs to change.
  */
-/** Hotel names this profile was directly assigned to manage (hotel_managers,
- * active rows only) — not a hotel_partner business member, see below. */
-async function getMyManagedHotelNames(profileId: string): Promise<string[]> {
+/**
+ * Deliberately NOT calling into apps/api here even though `affiliates` has
+ * migrated (phase 1) — this function is a cross-domain aggregator over
+ * agencies/hotels/affiliates/events, and the other three still read Supabase
+ * directly because their modules haven't migrated yet (agencies/hotels:
+ * phase 5). `identity` itself doesn't migrate until phase 2, and even then
+ * this specific aggregator can't fully move until its slowest dependency
+ * does — routing just this one branch through a network hop while the
+ * other three stay in-process would make this Promise.all's four branches
+ * behave inconsistently for no benefit, on a check that runs on every
+ * portal page load across all six portals. Revisit once every module this
+ * function touches has migrated. One-line duplicate of what used to be
+ * apps/web's modules/affiliates/queries.ts::getMyAffiliate.
+ */
+async function getMyAffiliateId(profileId: string): Promise<{ id: string } | null> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("hotel_managers")
-    .select("hotel:hotels(name)")
-    .eq("profile_id", profileId)
-    .eq("status", "active");
-  return (data ?? []).map((r) => r.hotel?.name).filter((n): n is string => !!n);
+  const { data } = await supabase.from("affiliates").select("id").eq("profile_id", profileId).maybeSingle();
+  return data;
 }
 
 export async function getMyPartnerContexts(profileId: string, fallbackName: string | null): Promise<PartnerContext[]> {
   const [agency, hotelPartnerId, affiliate, venuePartnerId] = await Promise.all([
     getMyAgency(profileId),
     getMyPartnerId(profileId),
-    getMyAffiliate(profileId),
+    getMyAffiliateId(profileId),
     getMyVenuePartnerId(profileId),
   ]);
 
@@ -98,26 +105,6 @@ export async function getMyPartnerContexts(profileId: string, fallbackName: stri
       status: c.status,
       href: PORTAL_HREF_FOR_TYPE[c.type],
     }));
-
-  // A hotel_manager has no hotel_partners business (no application, no
-  // partner_accounts row) — it's an admin-assigned hotel_managers row, so it
-  // can't come from the candidates/statusFor machinery above. Only surfaced
-  // when they're not already a real hotel_partner member: that card already
-  // opens /partner and (via getMyHotelScope) already lists every hotel they
-  // manage alongside the ones their business owns — no information is lost
-  // by not doubling it up here.
-  if (!hotelPartner) {
-    const managedHotels = await getMyManagedHotelNames(profileId);
-    if (managedHotels.length > 0) {
-      contexts.push({
-        type: "hotel_partner",
-        label: "Hotel Manager",
-        name: managedHotels.join(", "),
-        status: "live",
-        href: "/partner",
-      });
-    }
-  }
 
   return contexts;
 }

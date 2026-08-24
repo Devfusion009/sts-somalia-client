@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import { AlertCircle, Plus } from "lucide-react";
 import {
   Dialog,
@@ -15,23 +15,45 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
-import { createAffiliateLink } from "@/modules/affiliates/actions";
+import { trpc } from "@/lib/trpc/react";
 
 export function NewLinkForm() {
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useActionState(createAffiliateLink, null);
+  const utils = trpc.useUtils();
+  const createLink = trpc.affiliates.createLink.useMutation({
+    onSuccess: () => {
+      utils.affiliates.myLinks.invalidate();
+      utils.affiliates.dashboard.invalidate();
+      setOpen(false);
+    },
+  });
 
-  // Close the dialog once the action succeeds. Derived during render (not an
-  // effect) per React's guidance for reacting to a value change: comparing
-  // against the last-seen state and updating open state that changes.
-  const [lastState, setLastState] = useState(state);
-  if (state !== lastState) {
-    setLastState(state);
-    if (state && !state.error) setOpen(false);
+  // async + awaited mutateAsync (not the fire-and-forget .mutate()) so that
+  // SubmitButton's useFormStatus()-based pending state — unchanged from the
+  // Server Action version — tracks the mutation's actual duration instead of
+  // resolving the instant this function returns. The catch is deliberate:
+  // createLink.error (rendered below) is the display path for failures, so
+  // this only exists to stop the rejection from reaching a form-action error
+  // boundary.
+  async function handleSubmit(formData: FormData) {
+    try {
+      await createLink.mutateAsync({
+        campaignName: (formData.get("campaignName") as string) || undefined,
+        targetPath: (formData.get("targetPath") as string) || "/",
+      });
+    } catch {
+      // handled via createLink.error
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) createLink.reset();
+      }}
+    >
       <DialogTrigger render={<Button />}>
         <Plus /> New link
       </DialogTrigger>
@@ -40,11 +62,11 @@ export function NewLinkForm() {
           <DialogTitle>Create a tracked link</DialogTitle>
           <DialogDescription>Point it at any page on the site — a package, hotel, or the homepage.</DialogDescription>
         </DialogHeader>
-        <form action={formAction} className="space-y-4">
-          {state?.error ? (
+        <form action={handleSubmit} className="space-y-4">
+          {createLink.error ? (
             <Alert variant="destructive">
               <AlertCircle />
-              <AlertDescription>{state.error}</AlertDescription>
+              <AlertDescription>{createLink.error.message}</AlertDescription>
             </Alert>
           ) : null}
           <div className="space-y-2">

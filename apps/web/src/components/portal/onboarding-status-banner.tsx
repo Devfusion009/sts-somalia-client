@@ -1,6 +1,7 @@
-import { CheckCircle2, Circle, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Circle, ShieldCheck, EyeOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 type ChecklistItem = { key: string; label: string; description: string; done: boolean };
@@ -11,41 +12,47 @@ type ChecklistItem = { key: string; label: string; description: string; done: bo
  * mid-review, while nothing they created could go live anyway (see the
  * partner-facing status enum in partner-actions.ts: publishing is
  * admin-only). This makes that state visible where the partner actually
- * is, not just on the admin console they can't see.
+ * is, not just on the admin console they can't see — as a status badge, not
+ * caption prose: the checklist already shows what's left, so the one fact
+ * worth adding is what the incomplete state means for visibility.
  */
-export function OnboardingStatusBanner({ checklist, portalLabel }: { checklist: ChecklistItem[]; portalLabel: string }) {
+export function OnboardingStatusBanner({ checklist }: { checklist: ChecklistItem[] }) {
   const doneCount = checklist.filter((i) => i.done).length;
   if (doneCount === checklist.length) return null;
+  const percent = Math.round((doneCount / checklist.length) * 100);
 
   return (
-    <Card className="border-brand-gold/40 bg-brand-gold/5">
-      <CardContent className="space-y-3 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="flex items-center gap-2 text-sm font-medium">
-            <ShieldCheck className="size-4 text-brand-gold" />
-            Onboarding — {doneCount}/{checklist.length} complete
-          </p>
-          <p className="text-xs text-muted-foreground">
-            STS reviews and publishes your listings — nothing goes live to customers until then.
-          </p>
+    <Card className="border-brand-gold/40 bg-brand-gold/5 shadow-sm">
+      <CardContent className="space-y-4 py-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-gold/15 text-brand-gold">
+              <ShieldCheck className="size-4.5" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold">Onboarding</p>
+              <p className="text-xs text-muted-foreground">
+                {doneCount} of {checklist.length} steps done
+              </p>
+            </div>
+          </div>
+          <Badge variant="secondary" className="gap-1.5 border-transparent bg-brand-gold/15 text-brand-gold">
+            <EyeOff className="size-3.5" /> Not visible to customers yet
+          </Badge>
         </div>
-        <Progress value={Math.round((doneCount / checklist.length) * 100)} />
-        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+        <Progress value={percent} />
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           {checklist.map((item) => (
-            <div key={item.key} className="flex items-start gap-1.5 text-xs">
+            <div key={item.key} className="flex items-center gap-2 text-sm">
               {item.done ? (
-                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                <CheckCircle2 className="size-4 shrink-0 text-primary" />
               ) : (
-                <Circle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                <Circle className="size-4 shrink-0 text-muted-foreground" />
               )}
-              <span className={cn(item.done && "text-muted-foreground line-through")}>{item.label}</span>
+              <span className={cn(item.done ? "text-muted-foreground line-through" : "text-foreground")}>{item.label}</span>
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          You can keep using {portalLabel} while this finishes — it just won&apos;t be visible to real
-          customers yet.
-        </p>
       </CardContent>
     </Card>
   );

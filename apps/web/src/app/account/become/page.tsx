@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { CheckCircle2, Clock, XCircle, FileEdit, PartyPopper, AlertTriangle, Inbox } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, FileEdit, PartyPopper, AlertTriangle, Inbox, MessageSquareWarning } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,8 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { APP_CONFIG, REJECT_COOLDOWN_DAYS, type ApplicationKind } from "@/modules/partner-applications/config";
-import { getLatestApplication, getRecentApplications, type RecentApplication } from "@/modules/partner-applications/queries";
+import { APP_CONFIG, REJECT_COOLDOWN_DAYS, canApplicantEdit, docSlotsFor, type ApplicationKind } from "@/modules/partner-applications/config";
+import { getLatestApplication, getRecentApplications, getRejectedDocumentKeys, type RecentApplication } from "@/modules/partner-applications/queries";
 import { startApplication } from "@/modules/partner-applications/actions";
 import { portalHref } from "@/lib/subdomain";
 
@@ -48,7 +48,13 @@ const STATUS_BADGE_CLASS: Record<string, string> = {
   approved: "bg-primary/10 text-primary",
 };
 
-function RecentApplicationsSection({ applications }: { applications: RecentApplication[] }) {
+function RecentApplicationsSection({
+  applications,
+  rejectedDocKeys,
+}: {
+  applications: RecentApplication[];
+  rejectedDocKeys: Record<string, string[]>;
+}) {
   return (
     <Card>
       <CardHeader>
@@ -74,9 +80,16 @@ function RecentApplicationsSection({ applications }: { applications: RecentAppli
             <TableBody>
               {applications.map((app) => {
                 const cfg = APP_CONFIG[app.kind];
-                const editable = ["draft", "more_info_requested", "pending", "under_review"].includes(app.status);
+                const editable = canApplicantEdit(app.status, app.submitted_at);
                 const editLabel =
                   app.status === "draft" ? "Resume" : app.status === "more_info_requested" ? "Continue" : "Edit";
+                const adminMessage = app.status === "more_info_requested" ? app.review_notes : null;
+                // A rejected document reopens its own upload even on an
+                // application that is otherwise past the edit window — the
+                // read-only view page carries the replacement form — so this
+                // row stays actionable regardless of `editable`.
+                const rejectedKeys = rejectedDocKeys[app.id] ?? [];
+                const slotLabels = new Map(docSlotsFor(app.kind).map((slot) => [slot.key, slot.label]));
                 return (
                   <TableRow key={app.id}>
                     <TableCell className="font-medium">
@@ -88,18 +101,46 @@ function RecentApplicationsSection({ applications }: { applications: RecentAppli
                       <Badge className={`border-transparent ${STATUS_BADGE_CLASS[app.status] ?? "bg-muted text-muted-foreground"}`}>
                         {STATUS_LABEL[app.status] ?? app.status}
                       </Badge>
+                      {adminMessage ? (
+                        <span className="mt-1.5 flex max-w-xs items-start gap-1.5 text-xs text-destructive">
+                          <MessageSquareWarning className="mt-0.5 size-3.5 shrink-0" />
+                          {adminMessage}
+                        </span>
+                      ) : null}
+                      {rejectedKeys.length > 0 ? (
+                        <span className="mt-1.5 flex max-w-xs items-start gap-1.5 text-xs text-destructive">
+                          <XCircle className="mt-0.5 size-3.5 shrink-0" />
+                          Re-upload: {rejectedKeys.map((key) => slotLabels.get(key) ?? key).join(", ")}
+                        </span>
+                      ) : null}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {app.submitted_at ? format(new Date(app.submitted_at), "dd MMM yyyy") : "—"}
                     </TableCell>
                     <TableCell className="text-right">
                       {editable ? (
-                        <Button size="sm" variant="outline" render={<Link href={`/account/become/${app.kind}/${app.id}`} />}>
-                          {editLabel}
+                        <Button
+                          size="sm"
+                          variant={app.status === "more_info_requested" || rejectedKeys.length > 0 ? "default" : "outline"}
+                          render={
+                            <Link
+                              href={
+                                rejectedKeys.length > 0
+                                  ? `/account/become/${app.kind}/${app.id}?step=5`
+                                  : `/account/become/${app.kind}/${app.id}`
+                              }
+                            />
+                          }
+                        >
+                          {rejectedKeys.length > 0 ? "Re-upload" : editLabel}
                         </Button>
                       ) : (
-                        <Button size="sm" variant="outline" render={<Link href={`/account/become/${app.kind}/${app.id}/view`} />}>
-                          View
+                        <Button
+                          size="sm"
+                          variant={rejectedKeys.length > 0 ? "default" : "outline"}
+                          render={<Link href={`/account/become/${app.kind}/${app.id}/view`} />}
+                        >
+                          {rejectedKeys.length > 0 ? "Re-upload" : "View"}
                         </Button>
                       )}
                     </TableCell>
@@ -239,15 +280,15 @@ export default async function BecomePartnerPage({
   searchParams: Promise<{ program?: string; submitted?: string; cooldown?: string; error?: string }>;
 }) {
   const { program, submitted, cooldown, error } = await searchParams;
-  const defaultTab = VALID_PROGRAMS.includes(program as (typeof VALID_PROGRAMS)[number])
+  const requestedTab = VALID_PROGRAMS.includes(program as (typeof VALID_PROGRAMS)[number])
     ? (program as (typeof VALID_PROGRAMS)[number])
-    : "agent";
+    : null;
 
   const profile = await requireUser();
   const supabase = await createClient();
   const now = new Date().getTime();
 
-  const [agencyMember, hotelPartnerMember, venuePartnerMember, affiliate, agencyApp, hotelApp, venueApp, affiliateApp, recentApplications] = await Promise.all([
+  const [agencyMember, hotelPartnerMember, venuePartnerMember, affiliate, agencyApp, hotelApp, venueApp, affiliateApp, recentApplications, rejectedDocKeys] = await Promise.all([
     supabase.from("agency_members").select("agency_id").eq("profile_id", profile.id).eq("status", "active").maybeSingle(),
     supabase
       .from("hotel_partner_members")
@@ -267,7 +308,16 @@ export default async function BecomePartnerPage({
     getLatestApplication("venue_partner", profile.id),
     getLatestApplication("affiliate", profile.id),
     getRecentApplications(profile.id),
+    getRejectedDocumentKeys(),
   ]);
+
+  // An explicit ?program= always wins. Otherwise open on whichever program STS
+  // is waiting on the applicant for — landing on a default tab while the
+  // request sits unread behind another one is how it gets missed.
+  const needsActionTab = (Object.keys(TAB_TO_KIND) as Array<keyof typeof TAB_TO_KIND>).find((tab) =>
+    recentApplications.some((app) => app.kind === TAB_TO_KIND[tab] && app.status === "more_info_requested")
+  );
+  const defaultTab = requestedTab ?? needsActionTab ?? "agent";
 
   return (
     <div className="space-y-6">
@@ -351,7 +401,7 @@ export default async function BecomePartnerPage({
         </TabsContent>
       </Tabs>
 
-      <RecentApplicationsSection applications={recentApplications} />
+      <RecentApplicationsSection applications={recentApplications} rejectedDocKeys={rejectedDocKeys} />
     </div>
   );
 }

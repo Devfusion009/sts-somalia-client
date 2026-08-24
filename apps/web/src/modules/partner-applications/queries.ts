@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { APP_CONFIG, type ApplicationKind } from "./config";
+import { APP_CONFIG, canApplicantEdit, type ApplicationKind } from "./config";
 
 export type DocumentRef = {
   key: string;
@@ -32,10 +32,13 @@ export type ApplicationRow = {
   created_at: string;
 };
 
-/** Editable up to a final decision — draft/more_info_requested (never submitted or kicked back) or pending/under_review (submitted, but not yet approved/rejected). */
-const EDITABLE_STATUSES = ["draft", "more_info_requested", "pending", "under_review"] as const;
-
-/** RLS-scoped fetch that also proves "mine + still editable" (not yet approved/rejected). */
+/**
+ * RLS-scoped fetch that also proves "mine + still editable". The editability
+ * rule (status, plus the post-submission window) is evaluated in TS rather
+ * than as a query filter because it spans two columns conditionally —
+ * canApplicantEdit is the single definition, mirroring the
+ * applicant_can_edit() SQL function that the UPDATE policies enforce.
+ */
 export async function getEditableApplication(kind: ApplicationKind, id: string, userId: string) {
   const supabase = await createClient();
   const cfg = APP_CONFIG[kind];
@@ -44,9 +47,56 @@ export async function getEditableApplication(kind: ApplicationKind, id: string, 
     .select("*")
     .eq("id", id)
     .eq("applicant_id", userId)
-    .in("status", EDITABLE_STATUSES)
     .maybeSingle();
-  return { supabase, application: data as unknown as ApplicationRow | null };
+
+  const application = data as unknown as ApplicationRow | null;
+  if (!application || !canApplicantEdit(application.status, application.submitted_at)) {
+    return { supabase, application: null };
+  }
+  return { supabase, application };
+}
+
+export type DocumentReview = { status: "pending" | "verified" | "rejected"; note: string | null };
+
+/**
+ * Admin review state per document, keyed by doc_key. Applicants can read
+ * their own rows (RLS policy on partner_document_reviews) but never write
+ * them, so this is safe to call from any applicant-facing page. A document
+ * with no row has simply never been looked at.
+ */
+export async function getDocumentReviews(kind: ApplicationKind, id: string): Promise<Record<string, DocumentReview>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("partner_document_reviews")
+    .select("doc_key, status, note")
+    .eq("application_type", kind)
+    .eq("application_id", id);
+
+  const reviews: Record<string, DocumentReview> = {};
+  for (const row of data ?? []) {
+    reviews[row.doc_key] = { status: row.status as DocumentReview["status"], note: row.note };
+  }
+  return reviews;
+}
+
+/**
+ * Every document of the signed-in applicant's that an admin has rejected,
+ * grouped by application id. No applicant filter is needed (or possible —
+ * the table has no applicant column): the RLS read policy already scopes
+ * these rows to applications the caller owns.
+ */
+export async function getRejectedDocumentKeys(): Promise<Record<string, string[]>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("partner_document_reviews")
+    .select("application_id, doc_key")
+    .eq("status", "rejected");
+
+  const byApplication: Record<string, string[]> = {};
+  for (const row of data ?? []) {
+    (byApplication[row.application_id] ??= []).push(row.doc_key);
+  }
+  return byApplication;
 }
 
 /** Read-only fetch for the applicant's own application regardless of status — for the "view" page. */

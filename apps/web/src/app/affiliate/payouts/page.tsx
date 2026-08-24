@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/session";
-import { getMyAffiliate, getMyPayouts } from "@/modules/affiliates/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -20,8 +20,9 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = 
 };
 
 export default async function AffiliatePayoutsPage() {
-  const profile = await requireUser();
-  const affiliate = await getMyAffiliate(profile.id);
+  await requireUser();
+  const trpc = await getServerTrpc();
+  const affiliate = await trpc.affiliates.me.query();
 
   if (!affiliate) {
     return (
@@ -31,7 +32,7 @@ export default async function AffiliatePayoutsPage() {
     );
   }
 
-  const payouts = await getMyPayouts(affiliate.id);
+  const payouts = await trpc.affiliates.myPayouts.query();
 
   return (
     <div className="space-y-6">

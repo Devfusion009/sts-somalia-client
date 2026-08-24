@@ -4,6 +4,7 @@ import { CalendarDays } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getMyHotelScope, getHotelForEdit, getHotelFrontDesk } from "@/modules/hotels/partner-queries";
+import { getHotelManagers } from "@/modules/hotels/manager-queries";
 import { hotelGuestNames } from "@/modules/payments/queries";
 import { getRoomTypes } from "@/modules/hotels/room-types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,10 @@ import {
   removeHotelImagePartner,
   setHotelCoverImagePartner,
 } from "@/modules/hotels/hotel-gallery-actions";
+import { uploadHotelLogoPartner, removeHotelLogoPartner } from "@/modules/hotels/hotel-logo-actions";
+import { hotelLogoUrl } from "@/modules/hotels/images";
+import { HotelLogoUploader } from "@/components/admin/hotel-logo-uploader";
+import { HotelManagersSection } from "@/modules/hotels/components/manager-form";
 import { EditHotelForm } from "./edit-hotel-form";
 import { RoomDialog } from "./room-form";
 
@@ -29,16 +34,6 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const profile = await requireUser();
   const scope = await getMyHotelScope(profile.id);
-  if (scope.hotelIds.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          No active hotel partner account was found for your login. Please contact support.
-        </CardContent>
-      </Card>
-    );
-  }
-
   const hotel = await getHotelForEdit(id, scope.hotelIds);
   if (!hotel) notFound();
   const roomTypes = await getRoomTypes();
@@ -49,22 +44,23 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
   const canEditHotel = scope.partnerId !== null && hotel.partner_id === scope.partnerId;
 
   // Photos are media, not core identity — the owning partner always has
-  // them; a manager only when admin granted can_manage_photos (see
+  // them; a manager only when admin granted the 'photos' permission (see
   // hotel-gallery-actions.ts for the write-side check that actually matters).
   let canManagePhotos = canEditHotel;
   if (!canManagePhotos && scope.partnerId === null) {
     const supabase = await createClient();
     const { data: manager } = await supabase
       .from("hotel_managers")
-      .select("can_manage_photos")
+      .select("permissions")
       .eq("hotel_id", id)
       .eq("profile_id", profile.id)
       .eq("status", "active")
       .maybeSingle();
-    canManagePhotos = manager?.can_manage_photos ?? false;
+    canManagePhotos = manager?.permissions.includes("photos") ?? false;
   }
   const images = Array.isArray(hotel.images) ? hotel.images.filter((p): p is string => typeof p === "string") : [];
   const frontDesk = await getHotelFrontDesk(id, scope.hotelIds);
+  const managers = canEditHotel ? await getHotelManagers(id) : [];
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -118,6 +114,22 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
       {canManagePhotos ? (
         <Card>
           <CardHeader>
+            <CardTitle>Logo</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <HotelLogoUploader
+              hotelId={hotel.id}
+              logoUrl={hotelLogoUrl(hotel.logo_path)}
+              uploadAction={uploadHotelLogoPartner}
+              removeAction={removeHotelLogoPartner}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canManagePhotos ? (
+        <Card>
+          <CardHeader>
             <CardTitle>Photos &amp; media</CardTitle>
           </CardHeader>
           <CardContent>
@@ -129,6 +141,14 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
               removeAction={removeHotelImagePartner}
               setCoverAction={setHotelCoverImagePartner}
             />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canEditHotel ? (
+        <Card>
+          <CardContent>
+            <HotelManagersSection hotelId={hotel.id} managers={managers} />
           </CardContent>
         </Card>
       ) : null}

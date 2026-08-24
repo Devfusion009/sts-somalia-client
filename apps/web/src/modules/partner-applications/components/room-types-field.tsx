@@ -190,7 +190,13 @@ export function RoomTypesField({ initial }: { initial: RoomTypeRow[] }) {
   const [touched, setTouched] = useState<Record<string, Set<FieldKey>>>({});
   const [forceValidateAll, setForceValidateAll] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [mismatch, setMismatch] = useState<{ total: number; sum: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const rowsRef = useRef(rows);
+
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
 
   // Surfaces every row's inline errors the moment "Continue" is attempted,
   // not just on blur — the server (saveStep3) stays the real gatekeeper for
@@ -202,6 +208,42 @@ export function RoomTypesField({ initial }: { initial: RoomTypeRow[] }) {
     const handler = () => setForceValidateAll(true);
     form.addEventListener("submit", handler);
     return () => form.removeEventListener("submit", handler);
+  }, []);
+
+  // Catches the sum of per-row "Rooms" counts drifting from "Total rooms /
+  // units" — an easy slip since the two live in different parts of the
+  // form. Checked on the submit button's click, in the capture phase,
+  // rather than on the form's "submit" event: React 19's form-action
+  // handling responds to that native submit event as soon as it fires, so
+  // a listener added afterwards (a passive effect always runs after React
+  // has already wired up the form) never gets a chance to preventDefault()
+  // in time. A capture-phase click listener runs before the click's own
+  // default action — the thing that starts a submission in the first
+  // place — so it can still intercept it.
+  //
+  // Held behind a confirm dialog rather than a hard block: unlike the
+  // per-row errors above, the server doesn't enforce this, so silently
+  // preventing submission here would leave no way to advance if the
+  // mismatch is intentional (e.g. rooms held back, not yet itemized).
+  useEffect(() => {
+    const form = containerRef.current?.closest("form");
+    if (!form) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest('button[type="submit"], input[type="submit"]')) return;
+      const counts = rowsRef.current.filter((r) => !r.removing).map((r) => Number(r.count));
+      if (counts.some((n) => !Number.isInteger(n) || n < 1)) return;
+      const totalInput = form.elements.namedItem("totalRooms");
+      const total = totalInput instanceof HTMLInputElement ? Number(totalInput.value) : NaN;
+      if (!Number.isInteger(total) || total < 1) return;
+      const sum = counts.reduce((a, b) => a + b, 0);
+      if (sum !== total) {
+        e.preventDefault();
+        setMismatch({ total, sum });
+      }
+    };
+    form.addEventListener("click", handler, { capture: true });
+    return () => form.removeEventListener("click", handler, { capture: true });
   }, []);
 
   function updateRow(id: string, patch: Partial<RoomTypeRow>) {
@@ -274,10 +316,6 @@ export function RoomTypesField({ initial }: { initial: RoomTypeRow[] }) {
           <TooltipContent>Pick a common room type from the list, or type your own name.</TooltipContent>
         </Tooltip>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Add each room category you&apos;ll list with its inventory count, max occupancy, and an indicative nightly
-        rate — you can fine-tune rates and availability later in the partner portal.
-      </p>
 
       <div className="space-y-2">
         {rows.map((row, index) => {
@@ -346,7 +384,7 @@ export function RoomTypesField({ initial }: { initial: RoomTypeRow[] }) {
 
                 <div className="space-y-1">
                   <Label htmlFor={`${row.id}-maxOccupancy`} className="text-xs font-normal text-muted-foreground">
-                    Max guests
+                    Guests per room
                   </Label>
                   <Input
                     id={`${row.id}-maxOccupancy`}
@@ -428,6 +466,32 @@ export function RoomTypesField({ initial }: { initial: RoomTypeRow[] }) {
               }}
             >
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={mismatch !== null} onOpenChange={(open) => !open && setMismatch(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Room count doesn&apos;t match</AlertDialogTitle>
+            <AlertDialogDescription>
+              {mismatch && mismatch.sum > mismatch.total
+                ? `Your room types add up to ${mismatch.sum} rooms — ${mismatch.sum - mismatch.total} more than the ${mismatch.total} total rooms / units above.`
+                : mismatch
+                  ? `Your room types add up to ${mismatch.sum} rooms — ${mismatch.total - mismatch.sum} short of the ${mismatch.total} total rooms / units above.`
+                  : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setMismatch(null)}>Go back and fix</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setMismatch(null);
+                containerRef.current?.closest("form")?.requestSubmit();
+              }}
+            >
+              Continue anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

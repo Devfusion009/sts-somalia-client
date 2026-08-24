@@ -3,12 +3,14 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { phoneSchema } from "@/modules/partner-applications/schemas";
 import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
 import type { Database } from "@/lib/types/database.types";
 import { UMRAH_INCLUDE_KEYS } from "@/modules/umrah/includes";
 import { rememberRoomType } from "@/modules/hotels/room-types";
+import { commaList, parseLinks, replacePropertyLinks } from "@/modules/hotels/listing-fields";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type ListingStatus = Database["public"]["Enums"]["listing_status"];
@@ -390,51 +392,6 @@ const venueSchema = z.object({
   status: z.enum(["draft", "pending_review", "published", "suspended"]),
 });
 
-function commaList(input: string | undefined) {
-  if (!input) return [];
-  return input
-    .split(",")
-    .map((part) => part.trim().toLowerCase().replace(/\s+/g, "_"))
-    .filter(Boolean);
-}
-
-/** "Label | https://url" per line — the admin-facing format for the property_links textarea, shared by venues and hotels. */
-function parseLinks(input: string | undefined): Array<{ label: string; url: string }> {
-  if (!input) return [];
-  return input
-    .split("\n")
-    .map((line) => {
-      const [label, ...rest] = line.split("|");
-      return { label: label?.trim() ?? "", url: rest.join("|").trim() };
-    })
-    .filter((l) => l.label && l.url);
-}
-
-/** Replaces every property_links row for one hotel/venue with the freshly parsed set — same "full replace on save" semantics this form already uses for amenities/event types. */
-async function replacePropertyLinks(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  parent: { hotelId?: string; venueId?: string },
-  links: Array<{ label: string; url: string }>
-) {
-  if (parent.hotelId) {
-    await supabase.from("property_links").delete().eq("hotel_id", parent.hotelId);
-    if (links.length > 0) {
-      const hotelId = parent.hotelId;
-      await supabase
-        .from("property_links")
-        .insert(links.map((l, i) => ({ hotel_id: hotelId, label: l.label, url: l.url, sort_order: i })));
-    }
-  } else if (parent.venueId) {
-    await supabase.from("property_links").delete().eq("venue_id", parent.venueId);
-    if (links.length > 0) {
-      const venueId = parent.venueId;
-      await supabase
-        .from("property_links")
-        .insert(links.map((l, i) => ({ venue_id: venueId, label: l.label, url: l.url, sort_order: i })));
-    }
-  }
-}
-
 function venueInput(formData: FormData) {
   return {
     name: formData.get("name"),
@@ -738,7 +695,7 @@ const hotelSchema = z.object({
   addressLine: z.string().optional(),
   city: z.string().min(1, "Enter a city."),
   countryCode: z.string().min(2, "Enter a country code.").max(2),
-  phone: z.string().optional(),
+  phone: phoneSchema.optional(),
   contactEmail: z.string().email().optional().or(z.literal("")),
   checkInTime: z.string().optional(),
   checkOutTime: z.string().optional(),

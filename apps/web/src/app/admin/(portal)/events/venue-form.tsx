@@ -6,7 +6,6 @@ import { Plus, Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -36,7 +35,7 @@ function jsonList(raw: unknown): string {
   return Array.isArray(raw) ? raw.map((v) => String(v).replace(/_/g, " ")).join(", ") : "";
 }
 
-/** Inverse of parseLinks() in admin/actions.ts — prefills the textarea so re-saving without touching it doesn't wipe existing links. */
+/** Inverse of parseLinks() in listing-fields.ts — prefills the textarea so re-saving without touching it doesn't wipe existing links. */
 function linksList(links: Venue["property_links"]): string {
   if (!links || links.length === 0) return "";
   return [...links]
@@ -82,9 +81,6 @@ export function VenueForm({ venue }: { venue?: Venue }) {
           {venue ? <input type="hidden" name="id" value={venue.id} /> : null}
           <DialogHeader>
             <DialogTitle>{venue ? "Edit venue" : "Add venue"}</DialogTitle>
-            <DialogDescription>
-              Shown on the public Events &amp; Halls pages once published.
-            </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
@@ -195,13 +191,7 @@ export function VenueForm({ venue }: { venue?: Venue }) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="venue-links">Links (one per line: Label | URL)</Label>
-              <Textarea
-                id="venue-links"
-                name="links"
-                rows={3}
-                defaultValue={linksList(venue?.property_links)}
-                placeholder={"Website | https://example.so/\nWhatsApp | https://wa.me/252..."}
-              />
+              <Textarea id="venue-links" name="links" rows={3} defaultValue={linksList(venue?.property_links)} />
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">

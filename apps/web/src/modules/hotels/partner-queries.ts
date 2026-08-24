@@ -62,7 +62,11 @@ export async function getMyHotels(hotelIds: string[]) {
 export async function getHotelForEdit(hotelId: string, hotelIds: string[]) {
   if (!hotelIds.includes(hotelId)) return null;
   const supabase = await createClient();
-  const { data } = await supabase.from("hotels").select("*, hotel_rooms(*)").eq("id", hotelId).maybeSingle();
+  const { data } = await supabase
+    .from("hotels")
+    .select("*, hotel_rooms(*), property_links(label, url, sort_order)")
+    .eq("id", hotelId)
+    .maybeSingle();
 
   return data;
 }
@@ -132,7 +136,7 @@ export async function getPartnerBookings(hotelIds: string[]) {
   const { data } = await supabase
     .from("hotel_bookings")
     .select(
-      "id, hotel_id, check_in, check_out, num_rooms, num_adults, num_children, status, total_price, currency, created_at, hotels(name), hotel_rooms(name)"
+      "id, hotel_id, check_in, check_out, num_rooms, num_adults, num_children, status, total_price, currency, created_at, guest_details, hotels(name), hotel_rooms(name)"
     )
     .in("hotel_id", hotelIds)
     .order("created_at", { ascending: false });
@@ -143,7 +147,7 @@ export async function getPartnerBookings(hotelIds: string[]) {
 /**
  * Every hotel_id in scope where the current user can change booking status —
  * always every owned hotel, and only those managed hotels admin granted
- * can_manage_bookings on (20260821000002). Drives which rows on the
+ * the 'bookings' permission on (20260821000002). Drives which rows on the
  * bookings list get the editable status control vs. a read-only badge.
  */
 export async function getMyBookingManageableHotelIds(profileId: string, scope: HotelScope): Promise<Set<string>> {
@@ -156,7 +160,7 @@ export async function getMyBookingManageableHotelIds(profileId: string, scope: H
     .select("hotel_id")
     .eq("profile_id", profileId)
     .eq("status", "active")
-    .eq("can_manage_bookings", true)
+    .contains("permissions", ["bookings"])
     .in("hotel_id", scope.hotelIds);
 
   return new Set((data ?? []).map((row) => row.hotel_id));

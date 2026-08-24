@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 import { Bell, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { dismissNotification } from "@/modules/notifications/actions";
+import { trpc } from "@/lib/trpc/react";
 import { cn } from "@/lib/utils";
 
 type NotificationRow = {
@@ -15,8 +16,25 @@ type NotificationRow = {
   type: string;
   title: string;
   body: string | null;
+  data?: unknown;
   created_at: string;
 };
+
+/**
+ * Where a notification's title should take the admin. Everything else stays
+ * plain text — a link that lands on a list the admin then has to search is
+ * worse than no link.
+ */
+function targetHref(n: NotificationRow): string | null {
+  if (n.type === "new_order") return "/admin/queue";
+  if (n.type === "application_document_resubmitted") {
+    const data = n.data as { applicationType?: string; applicationId?: string } | null;
+    if (data?.applicationType && data?.applicationId) {
+      return `/admin/applications/${data.applicationType.replace("_", "-")}/${data.applicationId}`;
+    }
+  }
+  return null;
+}
 
 const POLL_MS = 30_000;
 
@@ -39,10 +57,19 @@ const POLL_MS = 30_000;
  *   path, no Realtime — neither exists in this codebase); refresh() just
  *   re-runs that fetch, so an order placed mid-session surfaces within the
  *   poll window instead of waiting for the admin's next navigation.
+ * - A toast on arrival, not just the badge count: an admin already sitting
+ *   on another page (or with the popover closed) had no way to notice a new
+ *   row short of the badge number changing in their peripheral vision. Fired
+ *   from a diff against the previously seen ids, so it only fires for rows
+ *   that appeared since the last render — never for the batch already unread
+ *   on first mount.
  */
 export function AdminNotificationBell({ notifications }: { notifications: NotificationRow[] }) {
-  const pathname = usePathname();
   const router = useRouter();
+  const dismiss = trpc.notifications.dismiss.useMutation({
+    onSuccess: () => router.refresh(),
+  });
+  const seenIds = useRef<Set<string> | null>(null);
 
   useEffect(() => {
     const tick = () => {
@@ -55,6 +82,20 @@ export function AdminNotificationBell({ notifications }: { notifications: Notifi
       document.removeEventListener("visibilitychange", tick);
     };
   }, [router]);
+
+  useEffect(() => {
+    if (seenIds.current) {
+      const newlyArrived = notifications.filter((n) => !seenIds.current!.has(n.id));
+      for (const n of newlyArrived) {
+        const href = targetHref(n);
+        toast.info(n.title, {
+          description: n.body ?? undefined,
+          action: href ? { label: "Open", onClick: () => router.push(href) } : undefined,
+        });
+      }
+    }
+    seenIds.current = new Set(notifications.map((n) => n.id));
+  }, [notifications, router]);
 
   const orderAlert = notifications.some((n) => n.type === "new_order");
 
@@ -92,8 +133,14 @@ export function AdminNotificationBell({ notifications }: { notifications: Notifi
             {notifications.map((n) => (
               <div key={n.id} className="flex items-start justify-between gap-2 px-3 py-2.5">
                 <div className="min-w-0">
-                  {n.type === "new_order" ? (
-                    <Link href="/admin/queue" className="truncate text-sm font-medium text-destructive hover:underline">
+                  {targetHref(n) ? (
+                    <Link
+                      href={targetHref(n)!}
+                      className={cn(
+                        "truncate text-sm font-medium hover:underline",
+                        n.type === "new_order" ? "text-destructive" : "text-primary"
+                      )}
+                    >
                       {n.title}
                     </Link>
                   ) : (
@@ -104,13 +151,15 @@ export function AdminNotificationBell({ notifications }: { notifications: Notifi
                     {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                   </p>
                 </div>
-                <form action={dismissNotification}>
-                  <input type="hidden" name="notificationId" value={n.id} />
-                  <input type="hidden" name="path" value={pathname} />
-                  <Button type="submit" size="icon" variant="ghost" className="size-6 shrink-0">
-                    <X className="size-3.5" />
-                  </Button>
-                </form>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-6 shrink-0"
+                  onClick={() => dismiss.mutate({ notificationId: n.id })}
+                >
+                  <X className="size-3.5" />
+                </Button>
               </div>
             ))}
           </div>

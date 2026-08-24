@@ -6,7 +6,6 @@ import { Plus, Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -62,7 +61,6 @@ export function UmrahPackageForm({ pkg }: { pkg?: UmrahPackage }) {
           {pkg ? <input type="hidden" name="id" value={pkg.id} /> : null}
           <DialogHeader>
             <DialogTitle>{pkg ? "Edit Umrah package" : "Add Umrah package"}</DialogTitle>
-            <DialogDescription>Shown to customers on the public Umrah page once published.</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">

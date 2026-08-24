@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { MuiProvider } from "@/components/mui-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { TrpcProvider } from "@/lib/trpc/provider";
 import "./globals.css";
 
 const inter = Inter({
@@ -126,8 +127,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <MuiProvider>
-            <TooltipProvider>{children}</TooltipProvider>
-            <Toaster />
+            <TrpcProvider>
+              <TooltipProvider>{children}</TooltipProvider>
+              <Toaster />
+            </TrpcProvider>
           </MuiProvider>
         </ThemeProvider>
       </body>

@@ -4,6 +4,16 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { SupabaseModule } from "./infra/supabase/supabase.module";
 import { RedisModule } from "./infra/redis/redis.module";
 import { HealthModule } from "./health/health.module";
+import { AffiliatesModule } from "./modules/affiliates/affiliates.module";
+import { PreferencesModule } from "./modules/preferences/preferences.module";
+import { IdentityModule } from "./modules/identity/identity.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
+import { OrdersModule } from "./modules/orders/orders.module";
+import { TravelersModule } from "./modules/travelers/travelers.module";
+import { BookingsModule } from "./modules/bookings/bookings.module";
+import { FlightsModule } from "./modules/flights/flights.module";
+import { EventsModule } from "./modules/events/events.module";
+import { PaymentsModule } from "./modules/payments/payments.module";
 
 @Module({
   imports: [
@@ -15,6 +25,16 @@ import { HealthModule } from "./health/health.module";
     SupabaseModule,
     RedisModule,
     HealthModule,
+    AffiliatesModule,
+    PreferencesModule,
+    IdentityModule,
+    NotificationsModule,
+    OrdersModule,
+    TravelersModule,
+    BookingsModule,
+    FlightsModule,
+    EventsModule,
+    PaymentsModule,
   ],
 })
 export class AppModule {}

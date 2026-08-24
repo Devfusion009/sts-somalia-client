@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { X, AlertCircle } from "lucide-react";
-import { cancelOrder } from "@/modules/orders/actions";
+import { trpc } from "@/lib/trpc/react";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +31,22 @@ export function CancelOrderButton({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useActionState(cancelOrder, null);
+  const router = useRouter();
+  const cancelOrder = trpc.orders.cancel.useMutation({
+    onSuccess: () => {
+      setOpen(false);
+      if (redirectTo) router.push(redirectTo);
+      else router.refresh();
+    },
+  });
+
+  async function handleSubmit(formData: FormData) {
+    try {
+      await cancelOrder.mutateAsync({ orderId, reason: (formData.get("reason") as string) || undefined });
+    } catch {
+      // handled via cancelOrder.error
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -45,15 +61,13 @@ export function CancelOrderButton({
             history as cancelled.
           </DialogDescription>
         </DialogHeader>
-        {state?.error ? (
+        {cancelOrder.error ? (
           <Alert variant="destructive">
             <AlertCircle />
-            <AlertDescription>{state.error}</AlertDescription>
+            <AlertDescription>{cancelOrder.error.message}</AlertDescription>
           </Alert>
         ) : null}
-        <form action={formAction} className="flex justify-end gap-2">
-          <input type="hidden" name="orderId" value={orderId} />
-          {redirectTo ? <input type="hidden" name="redirectTo" value={redirectTo} /> : null}
+        <form action={handleSubmit} className="flex justify-end gap-2">
           <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
             Keep order
           </Button>

@@ -56,6 +56,10 @@ export type ChecklistItem = {
   label: string;
   description: string;
   done: boolean;
+  /** Console tab where this item is actually reviewed or resolved — omitted for
+   * items that are only a fact captured on the original application, with no
+   * corresponding action anywhere in this console. */
+  tab?: "portfolio" | "commercial" | "documents" | "users";
 };
 
 export type DocumentRef = { key: string; label: string; storage_path: string; file_name: string; uploaded_at: string };
@@ -83,7 +87,7 @@ export type PartnerAccountDetail = {
   };
   members: AccountMember[];
   events: AccountEvent[];
-  docReviews: Map<string, { status: string; note: string | null; reviewed_at: string | null }>;
+  docReviews: Map<string, { status: string; note: string | null; reviewed_at: string | null; reviewer: ProfileRef }>;
   checklist: ChecklistItem[];
   // Type-specific payloads for the Properties/Portfolio/Commercial tabs.
   hotels: Array<{
@@ -231,7 +235,7 @@ export async function getPartnerAccount(accountId: string): Promise<PartnerAccou
       .order("created_at", { ascending: false }),
     supabase
       .from("partner_document_reviews")
-      .select("doc_key, status, note, reviewed_at")
+      .select("doc_key, status, note, reviewed_at, reviewer:reviewed_by(full_name, email)")
       .eq("application_type", acc.type)
       .eq("application_id", acc.application_id),
   ]);
@@ -255,7 +259,10 @@ export async function getPartnerAccount(accountId: string): Promise<PartnerAccou
   }));
 
   const docReviews = new Map(
-    (reviewRows ?? []).map((r) => [r.doc_key, { status: r.status, note: r.note, reviewed_at: r.reviewed_at }])
+    (reviewRows ?? []).map((r) => [
+      r.doc_key,
+      { status: r.status, note: r.note, reviewed_at: r.reviewed_at, reviewer: r.reviewer as unknown as ProfileRef },
+    ])
   );
 
   // Per-type entity + members + tab payloads.
@@ -508,6 +515,7 @@ function computeChecklist(
     label: "All KYC documents verified",
     description: `Every required document reviewed and marked verified (${requiredDocs.length} required).`,
     done: allDocsVerified,
+    tab: "documents",
   };
 
   if (type === "venue_partner") {
@@ -524,6 +532,7 @@ function computeChecklist(
         label: "First venue listed in the portal",
         description: "The partner has created at least one event venue in their Venue Portal.",
         done: input.venues.length > 0,
+        tab: "portfolio",
       },
     ];
   }
@@ -549,12 +558,14 @@ function computeChecklist(
         label: "First property listed in the portal",
         description: "The partner has created at least one hotel in their Partner Portal.",
         done: input.hotels.length > 0,
+        tab: "portfolio",
       },
       {
         key: "rooms_configured",
         label: "Rooms & live rates configured",
         description: "At least one bookable room with a nightly rate exists in the Partner Portal.",
         done: input.hotels.some((h) => h.rooms.length > 0),
+        tab: "portfolio",
       },
     ];
   }
@@ -566,6 +577,7 @@ function computeChecklist(
         label: "Commission rate configured",
         description: "Platform commission agreed and explicitly set on the agency (Commercial tab).",
         done: Boolean(input.agencySnapshot?.commissionRateSetAt),
+        tab: "commercial",
       },
       docsItem,
       {
@@ -575,12 +587,14 @@ function computeChecklist(
         done: Boolean(
           input.agencySnapshot && (input.agencySnapshot.creditBalance > 0 || input.agencySnapshot.creditLimit > 0)
         ),
+        tab: "portfolio",
       },
       {
         key: "team_active",
         label: "Team access in place",
         description: "At least one active member can sign in to the Agent Portal.",
         done: input.memberCount > 0,
+        tab: "users",
       },
     ];
   }
@@ -591,6 +605,7 @@ function computeChecklist(
       label: "Referral code issued",
       description: "A unique code the affiliate shares to attribute conversions.",
       done: Boolean(input.affiliateSnapshot?.referralCode),
+      tab: "portfolio",
     },
     docsItem,
     {
@@ -598,6 +613,7 @@ function computeChecklist(
       label: "First referral link created",
       description: "The affiliate has generated at least one tracked link in their dashboard.",
       done: (input.affiliateSnapshot?.linkCount ?? 0) > 0,
+      tab: "portfolio",
     },
   ];
 }
