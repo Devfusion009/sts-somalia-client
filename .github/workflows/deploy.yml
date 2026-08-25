@@ -1,0 +1,122 @@
+name: Deploy to AWS
+
+# apps/api builds fast (plain tsc) so it builds in place on the EC2 box
+# itself, the same way it was deployed manually. apps/web does NOT: a full
+# `next build` OOM'd the Lightsail box's 913MB RAM even with swap and a
+# raised V8 heap limit, and a raised-heap retry swap-thrashed it badly
+# enough to need a reboot. So apps/web builds here on the runner (7GB RAM)
+# and only the compiled `.next/standalone` output + static assets ship to
+# the box — the same fix that got it running manually.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2.pem
+          chmod 600 ~/.ssh/ec2.pem
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync source
+        run: |
+          rsync -az --delete \
+            --exclude node_modules --exclude .git --exclude .next --exclude dist \
+            --exclude .vercel --exclude '*.tsbuildinfo' --exclude '.env.local' \
+            -e "ssh -i ~/.ssh/ec2.pem" \
+            ./ ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/app/
+
+      - name: Write env file
+        run: |
+          ssh -i ~/.ssh/ec2.pem ubuntu@${{ secrets.EC2_HOST }} "cat > /home/ubuntu/app/apps/api/.env.local" <<EOF
+          PORT=4000
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SECRET_KEY=${{ secrets.SUPABASE_SECRET_KEY }}
+          REDIS_URL=${{ secrets.REDIS_URL }}
+          WEB_ORIGIN=${{ secrets.WEB_ORIGIN }}
+          NEXT_PUBLIC_SITE_URL=${{ secrets.NEXT_PUBLIC_SITE_URL }}
+          EOF
+
+      - name: Install, build, restart
+        run: |
+          ssh -i ~/.ssh/ec2.pem ubuntu@${{ secrets.EC2_HOST }} '
+            set -e
+            cd /home/ubuntu/app
+            npm install
+            npm run build -w api
+            pm2 describe sts-somalia-api > /dev/null 2>&1 \
+              && pm2 restart sts-somalia-api \
+              || pm2 start apps/api/dist/main.js --name sts-somalia-api --cwd /home/ubuntu/app/apps/api
+            pm2 save
+          '
+
+  deploy-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+        run: |
+          npm run build -w api
+          npm run build -w web
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.LIGHTSAIL_SSH_KEY }}" > ~/.ssh/lightsail.pem
+          chmod 600 ~/.ssh/lightsail.pem
+          ssh-keyscan -H "${{ secrets.LIGHTSAIL_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Ship build artifacts
+        run: |
+          rsync -az -e "ssh -i ~/.ssh/lightsail.pem" \
+            apps/web/.next/standalone/ ubuntu@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/app/
+          rsync -az -e "ssh -i ~/.ssh/lightsail.pem" \
+            apps/web/.next/static/ ubuntu@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/app/apps/web/.next/static/
+          rsync -az -e "ssh -i ~/.ssh/lightsail.pem" \
+            apps/web/public/ ubuntu@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/app/apps/web/public/
+
+      - name: Write env file
+        run: |
+          ssh -i ~/.ssh/lightsail.pem ubuntu@${{ secrets.LIGHTSAIL_HOST }} "cat > /home/ubuntu/app/apps/web/.env.local" <<EOF
+          PORT=3000
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_SITE_URL=${{ secrets.NEXT_PUBLIC_SITE_URL }}
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SECRET_KEY=${{ secrets.SUPABASE_SECRET_KEY }}
+          REDIS_URL=${{ secrets.REDIS_URL }}
+          EOF
+
+      - name: Restart
+        run: |
+          ssh -i ~/.ssh/lightsail.pem ubuntu@${{ secrets.LIGHTSAIL_HOST }} '
+            pm2 describe sts-somalia-web > /dev/null 2>&1 \
+              && pm2 restart sts-somalia-web \
+              || PORT=3000 HOSTNAME=0.0.0.0 pm2 start server.js --name sts-somalia-web --cwd /home/ubuntu/app/apps/web
+            pm2 save
+          '
