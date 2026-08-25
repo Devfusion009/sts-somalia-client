@@ -15,7 +15,11 @@ export default async function AccountOverviewPage() {
   const profile = await requireUser();
   const supabase = await createClient();
   const trpc = await getServerTrpc();
-  const selfTraveler = await trpc.travelers.selfTraveler.query();
+  // apps/api is a separate deployment (not yet reachable from every
+  // environment) — the rest of the overview page has nothing to do with
+  // traveler details, so it shouldn't 500 just because that one dependency
+  // is down.
+  const selfTraveler = await trpc.travelers.selfTraveler.query().catch(() => null);
 
   const [{ count: hotelCount }, { count: flightCount }, { count: visaCount }, { count: umrahCount }] =
     await Promise.all([

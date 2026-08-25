@@ -19,6 +19,7 @@ import {
   formatDate,
 } from "@/modules/bookings/components/booking-shared";
 import { cn } from "@/lib/utils";
+import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 
 export const metadata: Metadata = { title: "My Bookings" };
 
@@ -54,7 +55,15 @@ export default async function AccountBookingsPage({
   const view: View = viewParam === "list" ? "list" : "trips";
 
   const trpc = await getServerTrpc();
-  const { bookings, orderMeta } = await trpc.bookings.myBookings.query();
+  // apps/api is a separate deployment (not yet reachable from every
+  // environment) — an empty list here would read as "you have no bookings",
+  // which may be false, so this page blocks rather than degrades.
+  let bookings, orderMeta;
+  try {
+    ({ bookings, orderMeta } = await trpc.bookings.myBookings.query());
+  } catch {
+    return <UnavailableNotice label="My Bookings" />;
+  }
 
   const counts: Record<BookingTimeframe, number> = { upcoming: 0, past: 0, cancelled: 0 };
   for (const booking of bookings) counts[bookingTimeframe(booking)] += 1;

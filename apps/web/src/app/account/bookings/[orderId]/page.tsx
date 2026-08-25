@@ -132,8 +132,12 @@ export default async function BookingDetailPage({
   if (!order) notFound();
 
   const trpc = await getServerTrpc();
+  // apps/api is a separate deployment (not yet reachable from every
+  // environment) — this order's own status/timeline/payment all come from
+  // Supabase directly, so a failure here degrades only the modification/
+  // cancellation/refund request history rather than the whole page.
   const [requests, supabase] = await Promise.all([
-    trpc.bookings.requestsForOrder.query({ orderId }),
+    trpc.bookings.requestsForOrder.query({ orderId }).catch(() => []),
     createClient(),
   ]);
 

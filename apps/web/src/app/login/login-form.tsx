@@ -13,6 +13,7 @@ import { signInAction } from "@/lib/auth/actions";
 import { portalLoginHref } from "@/lib/subdomain";
 
 const AGENT_LOGIN_HREF = portalLoginHref("agent");
+const MANAGER_LOGIN_HREF = portalLoginHref("manager");
 
 const VALUE_PROPS = [
   {
@@ -172,11 +173,14 @@ export function LoginForm({ redirectTo, notice }: { redirectTo?: string; notice?
               Continue to Agent Portal <ArrowRight className="size-3" />
             </a>
           </p>
+          {/* A real <a>, not <Link> — same reasoning as the Agent Portal link
+              above: the Manager Portal is a separate origin once subdomains
+              are configured, which a client-side route push cannot cross. */}
           <p className="mt-1.5 text-center text-xs text-muted-foreground">
             Signing in as a hotel manager?{" "}
-            <Link href="/manager/login" className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">
+            <a href={MANAGER_LOGIN_HREF} className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">
               Continue to Hotel Manager Portal <ArrowRight className="size-3" />
-            </Link>
+            </a>
           </p>
         </CardContent>
       </Card>

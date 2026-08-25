@@ -3,12 +3,21 @@ import Link from "next/link";
 import { getServerTrpc } from "@/lib/trpc/server";
 import { TravelerManager } from "@/modules/travelers/components/traveler-manager";
 import { PassportExpiryAlert } from "@/modules/travelers/components/passport-alert";
+import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 
 export const metadata: Metadata = { title: "Saved Travelers" };
 
 export default async function AccountTravelersPage() {
   const trpc = await getServerTrpc();
-  const travelers = await trpc.travelers.myTravelers.query();
+  // apps/api is a separate deployment (not yet reachable from every
+  // environment) — an empty list here would read as "you have no saved
+  // travelers", which may be false, so this page blocks rather than degrades.
+  let travelers;
+  try {
+    travelers = await trpc.travelers.myTravelers.query();
+  } catch {
+    return <UnavailableNotice label="Saved Travelers" />;
+  }
   const companions = travelers.filter((t) => !t.is_self);
 
   return (

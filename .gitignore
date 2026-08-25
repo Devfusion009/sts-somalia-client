@@ -26,6 +26,11 @@ out/
 # apps/api's compiled output (tsc -p tsconfig.build.json)
 apps/api/dist/
 
+# packages/shared-types's compiled output (tsc) — apps/api and apps/web
+# both consume it via package.json main/types, so it must be built before
+# either app builds; see apps/api's "build" script.
+packages/shared-types/dist/
+
 # misc
 .DS_Store
 *.pem

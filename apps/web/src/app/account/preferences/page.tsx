@@ -2,12 +2,22 @@ import type { Metadata } from "next";
 import { getServerTrpc } from "@/lib/trpc/server";
 import { PreferencesForm } from "@/modules/preferences/components/preferences-form";
 import { getIntegrations } from "@/lib/integrations";
+import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 
 export const metadata: Metadata = { title: "Preferences" };
 
 export default async function AccountPreferencesPage() {
   const trpc = await getServerTrpc();
-  const [preferences, rates] = await Promise.all([trpc.preferences.me.query(), trpc.preferences.fxRates.query()]);
+  // apps/api is a separate deployment (not yet reachable from every
+  // environment) — falling back to default preferences here and letting the
+  // form save them would silently overwrite what the customer actually has
+  // saved, so this page blocks rather than degrades.
+  let preferences, rates;
+  try {
+    [preferences, rates] = await Promise.all([trpc.preferences.me.query(), trpc.preferences.fxRates.query()]);
+  } catch {
+    return <UnavailableNotice label="Preferences" />;
+  }
 
   // There is no SMS provider wired yet (Twilio is configured for WhatsApp
   // only). The form says so rather than offering a toggle that quietly does
