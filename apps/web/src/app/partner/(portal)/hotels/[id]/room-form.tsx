@@ -104,10 +104,10 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
                 id="totalUnits"
                 name="totalUnits"
                 type="number"
-                min={0}
+                min={1}
                 max={5000}
                 defaultValue={room?.total_units ?? ""}
-                placeholder="Not tracked"
+                required
               />
             </div>
             <div className="space-y-2">
