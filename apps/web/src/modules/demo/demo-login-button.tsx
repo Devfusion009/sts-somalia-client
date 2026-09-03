@@ -2,16 +2,17 @@
 
 import { useActionState, useEffect } from "react";
 import { Sparkles } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 import { SubmitButton } from "@/components/submit-button";
 import type { ActionState } from "@/lib/auth/actions";
 
 /**
- * Submits the SAME sign-in action the real form on this page uses, with a
- * hidden, pre-filled demo email/password — a real signInWithPassword()
- * call triggered by a click instead of typing, not a parallel auth path.
- * Rendering is gated server-side (DEMO_LOGIN_ENABLED) by the page itself;
- * this component has no opinion on that and just renders when asked to.
+ * Submits the SAME sign-in action the real form on this page would use,
+ * with a hidden, pre-filled demo email/password — a real
+ * signInWithPassword() call triggered by a click instead of typing, not a
+ * parallel auth path. This is the ONLY way in on a hosted, demo-enabled
+ * page — the page itself decides whether to render the real credential
+ * form or this button (DEMO_LOGIN_ENABLED, checked server-side), never
+ * both at once.
  */
 export function DemoLoginButton({
   action,
@@ -39,20 +40,13 @@ export function DemoLoginButton({
   }, [state]);
 
   return (
-    <div className="mt-4">
-      <div className="mb-4 flex items-center gap-3">
-        <Separator className="flex-1" />
-        <span className="text-xs text-muted-foreground">or</span>
-        <Separator className="flex-1" />
-      </div>
-      <form action={formAction}>
-        <input type="hidden" name="email" value={email} />
-        <input type="hidden" name="password" value={password} />
-        <SubmitButton variant="outline" className="w-full gap-1.5" pendingText="Signing in…">
-          <Sparkles className="size-4" /> {label}
-        </SubmitButton>
-        {state?.error ? <p className="mt-2 text-center text-xs text-destructive">{state.error}</p> : null}
-      </form>
-    </div>
+    <form action={formAction}>
+      <input type="hidden" name="email" value={email} />
+      <input type="hidden" name="password" value={password} />
+      <SubmitButton className="w-full gap-1.5" pendingText="Signing in…">
+        <Sparkles className="size-4" /> {label}
+      </SubmitButton>
+      {state?.error ? <p className="mt-2 text-center text-xs text-destructive">{state.error}</p> : null}
+    </form>
   );
 }
