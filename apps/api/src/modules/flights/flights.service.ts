@@ -64,10 +64,17 @@ export class FlightsService {
       return { error: access.message };
     }
 
+    const agencyCustomerId = await this.orders.resolveBookedForCustomer(agencyId, {
+      agencyCustomerId: input.agencyCustomerId,
+      newCustomerName: input.newCustomerName,
+      newCustomerPhone: input.newCustomerPhone,
+    });
+
     const { error } = await this.rls.get().from("flight_bookings").insert({
       customer_id: userId,
       booked_by: userId,
       agency_id: agencyId,
+      agency_customer_id: agencyCustomerId,
       provider: "quote_request",
       trip_type: input.tripType,
       origin_iata: input.origin,

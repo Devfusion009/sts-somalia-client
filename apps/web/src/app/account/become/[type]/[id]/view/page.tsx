@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import type { LucideIcon } from "lucide-react";
 import {
-  ArrowLeft,
   CheckCircle2,
   Clock,
   XCircle,
@@ -24,6 +22,7 @@ import {
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { BackLink } from "@/components/back-link";
 import { APP_CONFIG, docSlotsFor, type ApplicationKind } from "@/modules/partner-applications/config";
 import { getOwnedApplication, getDocumentReviews, type DocumentRef } from "@/modules/partner-applications/queries";
 import {
@@ -147,13 +146,7 @@ export default async function ApplicationViewPage({ params }: { params: Promise<
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/account/become"
-        aria-label="Back to Become a Partner"
-        className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-      </Link>
+      <BackLink href="/account/become" label="Back to Become a Partner" />
 
       <div className="rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">

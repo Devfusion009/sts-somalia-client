@@ -12,10 +12,14 @@ export function BankDetailsForm({
   bankName,
   bankAccountName,
   bankAccountNumber,
+  bankBranch,
+  bankSwiftCode,
 }: {
   bankName: string | null;
   bankAccountName: string | null;
   bankAccountNumber: string | null;
+  bankBranch: string | null;
+  bankSwiftCode: string | null;
 }) {
   const [state, formAction] = useActionState(updateAgencyBankDetailsAction, null);
 
@@ -42,6 +46,14 @@ export function BankDetailsForm({
         <div className="space-y-1.5">
           <Label htmlFor="bankAccountName">Account holder name</Label>
           <Input id="bankAccountName" name="bankAccountName" defaultValue={bankAccountName ?? ""} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="bankBranch">Branch</Label>
+          <Input id="bankBranch" name="bankBranch" defaultValue={bankBranch ?? ""} placeholder="e.g. Hodan, Mogadishu" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="bankSwiftCode">SWIFT/BIC code</Label>
+          <Input id="bankSwiftCode" name="bankSwiftCode" defaultValue={bankSwiftCode ?? ""} placeholder="e.g. SSBMSOSMXXX" className="uppercase" />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="bankAccountNumber">Account number</Label>

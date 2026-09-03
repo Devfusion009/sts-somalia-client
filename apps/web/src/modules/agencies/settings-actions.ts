@@ -19,6 +19,13 @@ const profileSchema = z.object({
     .toUpperCase()
     .refine((v) => v === "" || /^[A-Z]{2}$/.test(v), "Use a 2-letter country code, e.g. SO.")
     .optional(),
+  about: z.string().trim().max(600, "Keep the description under 600 characters.").optional(),
+  website: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^https?:\/\/\S+\.\S+/.test(v), "Enter a full URL, e.g. https://example.com.")
+    .optional(),
+  address: z.string().trim().max(300).optional(),
 });
 
 /**
@@ -42,6 +49,9 @@ export async function updateAgencyProfileAction(_prevState: ActionState, formDat
     contactEmail: formData.get("contactEmail"),
     contactPhone: formData.get("contactPhone") || undefined,
     countryCode: formData.get("countryCode") || undefined,
+    about: formData.get("about") || undefined,
+    website: formData.get("website") || undefined,
+    address: formData.get("address") || undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -55,6 +65,9 @@ export async function updateAgencyProfileAction(_prevState: ActionState, formDat
       contact_email: parsed.data.contactEmail,
       contact_phone: parsed.data.contactPhone || null,
       country_code: parsed.data.countryCode || null,
+      about: parsed.data.about || null,
+      website: parsed.data.website || null,
+      address: parsed.data.address || null,
     })
     .eq("id", membership.agency.id);
 
@@ -115,6 +128,8 @@ const bankDetailsSchema = z.object({
   bankName: z.string().trim().max(200).optional(),
   bankAccountName: z.string().trim().max(200).optional(),
   bankAccountNumber: z.string().trim().max(100).optional(),
+  bankBranch: z.string().trim().max(200).optional(),
+  bankSwiftCode: z.string().trim().max(20).optional(),
 });
 
 /**
@@ -136,6 +151,8 @@ export async function updateAgencyBankDetailsAction(_prevState: ActionState, for
     bankName: formData.get("bankName") || undefined,
     bankAccountName: formData.get("bankAccountName") || undefined,
     bankAccountNumber: formData.get("bankAccountNumber") || undefined,
+    bankBranch: formData.get("bankBranch") || undefined,
+    bankSwiftCode: formData.get("bankSwiftCode") || undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -146,6 +163,8 @@ export async function updateAgencyBankDetailsAction(_prevState: ActionState, for
       bank_name: parsed.data.bankName || null,
       bank_account_name: parsed.data.bankAccountName || null,
       bank_account_number: parsed.data.bankAccountNumber || null,
+      bank_branch: parsed.data.bankBranch || null,
+      bank_swift_code: parsed.data.bankSwiftCode ? parsed.data.bankSwiftCode.toUpperCase() : null,
     })
     .eq("id", membership.agency.id);
 

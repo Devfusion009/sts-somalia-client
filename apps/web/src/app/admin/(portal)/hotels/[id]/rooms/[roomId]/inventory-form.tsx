@@ -70,7 +70,7 @@ export function InventoryRangeForm({ hotelId, roomId, currency }: { hotelId: str
       </div>
 
       <SubmitButton className="gap-1.5" pendingText="Saving…">
-        <CalendarCheck2 className="size-4" /> Set availability
+        <CalendarCheck2 className="size-4" /> Save override
       </SubmitButton>
     </form>
   );
@@ -102,7 +102,7 @@ export function ClearInventoryForm({ hotelId, roomId }: { hotelId: string; roomI
         </div>
       </div>
       <SubmitButton variant="outline" className="gap-1.5" pendingText="Clearing…">
-        <Eraser className="size-4" /> Clear caps
+        <Eraser className="size-4" /> Clear overrides
       </SubmitButton>
     </form>
   );

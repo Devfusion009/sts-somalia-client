@@ -78,46 +78,68 @@ async function getAgencyCustomerContacts(
  * full read on every one of these tables.
  */
 export async function getCalendarBookings(from: string, to: string): Promise<CalendarBookingEvent[]> {
+  return getCalendarBookingsForRange(from, to);
+}
+
+/**
+ * Same booking set as getCalendarBookings, scoped to one agency's own
+ * customer bookings — the agent portal's Event Calendar. Every one of the
+ * four tables carries its own agency_id column (nullable — null on a
+ * direct/B2C booking), so filtering here excludes both other agencies'
+ * bookings and B2C bookings, with no separate query shape to maintain.
+ */
+export async function getAgencyCalendarBookings(agencyId: string, from: string, to: string): Promise<CalendarBookingEvent[]> {
+  return getCalendarBookingsForRange(from, to, agencyId);
+}
+
+async function getCalendarBookingsForRange(from: string, to: string, agencyId?: string): Promise<CalendarBookingEvent[]> {
   const supabase = await createClient();
 
-  const [hotelRes, flightRes, umrahRes, hallRes] = await Promise.all([
-    supabase
-      .from("hotel_bookings")
-      .select(
-        `id, check_in, check_out, num_rooms, num_adults, num_children, special_requests, status, total_price, currency,
-         hotel:hotel_id (name, city, address_line),
-         customer:customer_id (full_name, email, phone)`
-      )
-      .lte("check_in", to)
-      .gte("check_out", from),
-    supabase
-      .from("flight_bookings")
-      .select(
-        `id, origin_iata, destination_iata, depart_at, return_at, trip_type, cabin_class, status, total_price, currency,
-         customer:customer_id (full_name, email, phone)`
-      )
-      .gte("depart_at", `${from}T00:00:00Z`)
-      .lte("depart_at", `${to}T23:59:59Z`),
-    supabase
-      .from("umrah_bookings")
-      .select(
-        `id, num_pilgrims, special_requests, status, total_price, currency,
-         package:package_id (name),
-         departure:departure_id!inner (departure_date, return_date),
-         customer:customer_id (full_name, email, phone)`
-      )
-      .lte("departure.departure_date", to)
-      .gte("departure.return_date", from),
-    supabase
-      .from("hall_bookings")
-      .select(
-        `id, event_type, event_name, start_date, end_date, expected_guests, setup_requirements, status, price, currency,
-         venue:venue_id (name, city, address),
-         customer:customer_id (full_name, email, phone)`
-      )
-      .lte("start_date", to)
-      .gte("end_date", from),
-  ]);
+  let hotelQuery = supabase
+    .from("hotel_bookings")
+    .select(
+      `id, check_in, check_out, num_rooms, num_adults, num_children, special_requests, status, total_price, currency,
+       hotel:hotel_id (name, city, address_line),
+       customer:customer_id (full_name, email, phone)`
+    )
+    .lte("check_in", to)
+    .gte("check_out", from);
+  let flightQuery = supabase
+    .from("flight_bookings")
+    .select(
+      `id, origin_iata, destination_iata, depart_at, return_at, trip_type, cabin_class, status, total_price, currency,
+       customer:customer_id (full_name, email, phone)`
+    )
+    .gte("depart_at", `${from}T00:00:00Z`)
+    .lte("depart_at", `${to}T23:59:59Z`);
+  let umrahQuery = supabase
+    .from("umrah_bookings")
+    .select(
+      `id, num_pilgrims, special_requests, status, total_price, currency,
+       package:package_id (name),
+       departure:departure_id!inner (departure_date, return_date),
+       customer:customer_id (full_name, email, phone)`
+    )
+    .lte("departure.departure_date", to)
+    .gte("departure.return_date", from);
+  let hallQuery = supabase
+    .from("hall_bookings")
+    .select(
+      `id, event_type, event_name, start_date, end_date, expected_guests, setup_requirements, status, price, currency,
+       venue:venue_id (name, city, address),
+       customer:customer_id (full_name, email, phone)`
+    )
+    .lte("start_date", to)
+    .gte("end_date", from);
+
+  if (agencyId) {
+    hotelQuery = hotelQuery.eq("agency_id", agencyId);
+    flightQuery = flightQuery.eq("agency_id", agencyId);
+    umrahQuery = umrahQuery.eq("agency_id", agencyId);
+    hallQuery = hallQuery.eq("agency_id", agencyId);
+  }
+
+  const [hotelRes, flightRes, umrahRes, hallRes] = await Promise.all([hotelQuery, flightQuery, umrahQuery, hallQuery]);
 
   const contacts = await getAgencyCustomerContacts(supabase, {
     hotel: (hotelRes.data ?? []).map((b) => b.id),

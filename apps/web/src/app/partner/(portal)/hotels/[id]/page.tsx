@@ -7,6 +7,8 @@ import { getMyHotelScope, getHotelForEdit, getHotelFrontDesk } from "@/modules/h
 import { getHotelManagers } from "@/modules/hotels/manager-queries";
 import { hotelGuestNames } from "@/modules/payments/queries";
 import { getRoomTypes } from "@/modules/hotels/room-types";
+import { getHotelAvailability } from "@/modules/hotels/availability";
+import { AvailabilityBoard } from "@/modules/hotels/components/availability-board";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,6 +63,7 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
   const images = Array.isArray(hotel.images) ? hotel.images.filter((p): p is string => typeof p === "string") : [];
   const frontDesk = await getHotelFrontDesk(id, scope.hotelIds);
   const managers = canEditHotel ? await getHotelManagers(id) : [];
+  const availability = await getHotelAvailability(id, { days: 14 });
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -155,6 +158,16 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
 
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle>Availability</CardTitle>
+          <span className="text-xs text-muted-foreground">Next 14 nights · A agency · C customer</span>
+        </CardHeader>
+        <CardContent>
+          <AvailabilityBoard rooms={availability} roomHref={(roomId) => `/partner/hotels/${hotel.id}/rooms/${roomId}`} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle className="flex items-center gap-2">
             Rooms
             <Badge variant="secondary">{hotel.hotel_rooms.length}</Badge>
@@ -163,7 +176,7 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
         </CardHeader>
         <CardContent className="space-y-3">
           {hotel.hotel_rooms.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No rooms yet. Add one to start taking bookings.</p>
+            <p className="text-sm text-muted-foreground">No rooms yet.</p>
           ) : (
             hotel.hotel_rooms.map((room) => (
               <div
@@ -178,7 +191,7 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Up to {room.max_occupancy} guests · {room.currency} {room.base_price.toFixed(0)} / night
+                    {room.total_units === null ? "Count not set" : `${room.total_units} rooms`} · Up to {room.max_occupancy} guests · {room.currency} {room.base_price.toFixed(0)} / night
                     {room.floor ? ` · Floor ${room.floor}` : ""}
                   </p>
                 </div>

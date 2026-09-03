@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile, requireUser } from "@/lib/auth/session";
 import { assertAgencyCanBookProduct, createOrderForBooking, getActiveAgencyId } from "@/modules/orders/helpers";
+import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
 import {
   APPLICANT_TYPES,
   memberSchema,
@@ -88,6 +89,8 @@ export async function startVisaApplication(formData: FormData): Promise<void> {
   const access = await assertAgencyCanBookProduct(supabase, agencyId, "visa");
   if (!access.ok) redirect(`/visa/${visaTypeId}?blocked=1`);
 
+  const agencyCustomerId = await resolveBookedForCustomer(supabase, agencyId, formData);
+
   const { data: application, error } = await supabase
     .from("visa_applications")
     .insert({
@@ -95,6 +98,7 @@ export async function startVisaApplication(formData: FormData): Promise<void> {
       applicant_profile_id: user.id,
       submitted_by: user.id,
       agency_id: agencyId,
+      agency_customer_id: agencyCustomerId,
       status: "draft",
       price: visaType.price,
       currency: visaType.currency,
@@ -654,6 +658,7 @@ export async function submitVisaApplication(
     customerId: application.applicant_profile_id ?? user.id,
     bookedBy: user.id,
     agencyId: application.agency_id,
+    agencyCustomerId: application.agency_customer_id,
     currency: visaType.currency,
     itemType: "visa",
     price: total,

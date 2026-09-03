@@ -1,0 +1,29 @@
+import { requireUser } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
+import { getMyAgency } from "@/modules/agencies/queries";
+import { getBookingCustomers } from "@/modules/agencies/booking-context";
+import { BookingContextBar } from "@/modules/agencies/components/booking-context-bar";
+
+export default async function BookingDeskLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const profile = await requireUser();
+  const membership = await getMyAgency(profile.id);
+  if (!membership) return null;
+
+  const supabase = await createClient();
+  const customers = await getBookingCustomers(supabase, membership.agency.id);
+  const available =
+    Number(membership.agency.credit_balance ?? 0) + Number(membership.agency.credit_limit ?? 0);
+
+  return (
+    <div className="space-y-6">
+      {customers.length > 0 ? (
+        <BookingContextBar customers={customers} available={available} />
+      ) : null}
+      {children}
+    </div>
+  );
+}

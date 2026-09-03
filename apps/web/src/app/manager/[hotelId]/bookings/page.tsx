@@ -55,7 +55,10 @@ export default async function ManagerBookingsPage({ params }: { params: Promise<
                   <TableCell className="font-medium">
                     {hotelGuestNames(b.guest_details)[0] ?? "Guest"}
                   </TableCell>
-                  <TableCell>{b.hotel_rooms?.name}</TableCell>
+                  <TableCell>
+                    {b.hotel_rooms?.name}
+                    {b.channel === "b2b" ? <span className="ml-1.5 text-xs text-muted-foreground">Agency</span> : null}
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {b.check_in} → {b.check_out}
                   </TableCell>

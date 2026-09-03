@@ -87,8 +87,20 @@ export function stepLabel(kind: ApplicationKind, step: number): string {
 }
 
 export const BUSINESS_TYPES = ["sole_proprietorship", "partnership", "llc", "corporation"] as const;
+// SATTA (Somali Association of Travel and Tourism Agents) is Somalia's own
+// trade body — a full UFTAA member and IATA-affiliated — so it sits
+// alongside IATA/UFTAA rather than a generic "other association" catch-all.
+export const ORG_MEMBER_TYPES = ["satta", "iata", "uftaa", "other"] as const;
+export const ORG_MEMBER_TYPE_LABELS: Record<(typeof ORG_MEMBER_TYPES)[number], string> = {
+  satta: "SATTA (Somali Association of Travel and Tourism Agents)",
+  iata: "IATA",
+  uftaa: "UFTAA",
+  other: "Other",
+};
 export const VOLUME_RANGES = ["<20", "20-50", "50-100", "100-500", "500+"] as const;
 export const PRODUCTS = ["flights", "hotels", "visa", "umrah", "halls"] as const;
+/** Markup an applying agency can ask for on the Settlement step (whole percents; anything else is "Custom"). */
+export const MARKUP_PRESETS: readonly number[] = Array.from({ length: 27 }, (_, i) => i + 4);
 export const TRAFFIC_SOURCES = ["social_media", "blog", "email_list", "paid_ads", "other"] as const;
 export const PAYMENT_MODELS = ["prepaid_wallet", "credit_line"] as const;
 // Where an affiliate's audience actually is — the platform matters less than
@@ -240,13 +252,14 @@ export function docSlotsFor(kind: ApplicationKind): DocSlot[] {
     return [{ key: "contact_id", label: "Your ID or passport" }];
   }
   const base: DocSlot[] = [
-    { key: "business_registration", label: "Business registration certificate" },
+    { key: "business_registration", label: "Business registration certificate (Ministry of Commerce & Industry)" },
     { key: "trade_license", label: "Trade license", expiryField: true },
-    { key: "tax_registration", label: "Tax registration certificate" },
+    { key: "tax_registration", label: "Tax registration certificate (Somali Revenue Authority TIN)" },
     { key: "proof_of_address", label: "Proof of office address (utility bill or lease, issued within the last 3 months)" },
     { key: "contact_id", label: "Authorized contact's ID or passport" },
   ];
-  if (kind === "agency") base.push({ key: "iata_license", label: "IATA number or travel association license", optional: true });
+  if (kind === "agency")
+    base.push({ key: "iata_license", label: "Association or IATA membership certificate", optional: true, expiryField: true });
   if (kind === "hotel_partner") base.push({ key: "property_ownership", label: "Proof of property ownership or lease agreement" });
   if (kind === "venue_partner") base.push({ key: "property_ownership", label: "Proof of venue ownership or lease agreement" });
   return base;

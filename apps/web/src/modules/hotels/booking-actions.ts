@@ -4,11 +4,21 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { assertAgencyCanBookProduct, createOrderForBooking, getActiveAgencyId } from "@/modules/orders/helpers";
+import {
+  assertAgencyCanBookProduct,
+  createOrderForBooking,
+  deskOrderPath,
+  getActiveAgencyId,
+  isDeskBooking,
+} from "@/modules/orders/helpers";
 import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
 import { notifyPartnerOfBooking } from "@/lib/notifications/partner-booking-notify";
 
-export type ActionState = { error: string | null } | null;
+export type ActionState = {
+  error: string | null;
+  destination?: string;
+  orderId?: string;
+} | null;
 
 const bookingSchema = z
   .object({
@@ -118,30 +128,20 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
     currency: room.currency,
   };
 
-  let { data: booking, error: bookingError } = await supabase
+  // The database allocator decides the outcome: it seats the request when
+  // the nights have capacity, seats an agency request ahead of unconfirmed
+  // customer requests when they don't, and otherwise returns the row as
+  // 'waitlisted'. Staff work waitlisted requests from the admin queue.
+  const { data: booking, error: bookingError } = await supabase
     .from("hotel_bookings")
     .insert(bookingRow)
     .select()
     .single();
 
-  // Manual-booking workflow: full nights don't reject the request. The
-  // reserve trigger raises 'not enough rooms available on <date>' — catch
-  // exactly that and park the request as 'waitlisted' instead (the trigger
-  // skips reservation for waitlisted rows). Staff work it from the admin
-  // queue; promotion re-checks availability at that moment.
-  let waitlisted = false;
-  if (bookingError?.message.includes("not enough rooms available")) {
-    waitlisted = true;
-    ({ data: booking, error: bookingError } = await supabase
-      .from("hotel_bookings")
-      .insert({ ...bookingRow, status: "waitlisted" })
-      .select()
-      .single());
-  }
-
   if (bookingError || !booking) {
     return { error: bookingError?.message ?? "Could not create booking." };
   }
+  const waitlisted = booking.status === "waitlisted";
 
   // Org-level email/WhatsApp to the owning partner (the in-app bell already
   // reaches every partner staff member via the hotel_bookings insert
@@ -180,6 +180,12 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
     });
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not create order." };
+  }
+
+  // The desk keeps the agent in the portal for every outcome — its order
+  // page reads the same waitlisted/requested/payable state off the order.
+  if (isDeskBooking(formData, agencyId)) {
+    return { error: null, destination: deskOrderPath(order.id), orderId: order.id };
   }
 
   // A waitlisted request has no confirmed room yet, so pushing the customer

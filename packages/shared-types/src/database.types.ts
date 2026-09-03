@@ -379,10 +379,14 @@ export type Database = {
       }
       agencies: {
         Row: {
+          about: string | null
+          address: string | null
           allowed_products: Database["public"]["Enums"]["order_item_type"][]
           bank_account_name: string | null
           bank_account_number: string | null
+          bank_branch: string | null
           bank_name: string | null
+          bank_swift_code: string | null
           commission_rate: number
           commission_rate_set_at: string | null
           contact_email: string
@@ -401,12 +405,17 @@ export type Database = {
           status: Database["public"]["Enums"]["agency_status"]
           tier_id: string | null
           updated_at: string
+          website: string | null
         }
         Insert: {
+          about?: string | null
+          address?: string | null
           allowed_products?: Database["public"]["Enums"]["order_item_type"][]
           bank_account_name?: string | null
           bank_account_number?: string | null
+          bank_branch?: string | null
           bank_name?: string | null
+          bank_swift_code?: string | null
           commission_rate?: number
           commission_rate_set_at?: string | null
           contact_email: string
@@ -425,12 +434,17 @@ export type Database = {
           status?: Database["public"]["Enums"]["agency_status"]
           tier_id?: string | null
           updated_at?: string
+          website?: string | null
         }
         Update: {
+          about?: string | null
+          address?: string | null
           allowed_products?: Database["public"]["Enums"]["order_item_type"][]
           bank_account_name?: string | null
           bank_account_number?: string | null
+          bank_branch?: string | null
           bank_name?: string | null
+          bank_swift_code?: string | null
           commission_rate?: number
           commission_rate_set_at?: string | null
           contact_email?: string
@@ -449,6 +463,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["agency_status"]
           tier_id?: string | null
           updated_at?: string
+          website?: string | null
         }
         Relationships: [
           {
@@ -661,6 +676,7 @@ export type Database = {
           id: string
           notes: string | null
           phone: string | null
+          profile_id: string | null
           updated_at: string
         }
         Insert: {
@@ -672,6 +688,7 @@ export type Database = {
           id?: string
           notes?: string | null
           phone?: string | null
+          profile_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -683,6 +700,7 @@ export type Database = {
           id?: string
           notes?: string | null
           phone?: string | null
+          profile_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -696,6 +714,86 @@ export type Database = {
           {
             foreignKeyName: "agency_customers_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_customers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agency_markup_requests: {
+        Row: {
+          action: string
+          agency_id: string
+          created_at: string
+          id: string
+          item_type: Database["public"]["Enums"]["order_item_type"] | null
+          markup_type: Database["public"]["Enums"]["markup_type"]
+          requested_at: string
+          requested_by: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          value: number | null
+        }
+        Insert: {
+          action: string
+          agency_id: string
+          created_at?: string
+          id?: string
+          item_type?: Database["public"]["Enums"]["order_item_type"] | null
+          markup_type?: Database["public"]["Enums"]["markup_type"]
+          requested_at?: string
+          requested_by: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          value?: number | null
+        }
+        Update: {
+          action?: string
+          agency_id?: string
+          created_at?: string
+          id?: string
+          item_type?: Database["public"]["Enums"]["order_item_type"] | null
+          markup_type?: Database["public"]["Enums"]["markup_type"]
+          requested_at?: string
+          requested_by?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_markup_requests_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_markup_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_markup_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -776,6 +874,135 @@ export type Database = {
           {
             foreignKeyName: "agency_members_profile_id_fkey"
             columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agency_payout_requests: {
+        Row: {
+          agency_id: string
+          amount: number
+          bank_account_name: string | null
+          bank_account_number: string | null
+          bank_branch: string | null
+          bank_name: string | null
+          bank_swift_code: string | null
+          created_at: string
+          currency: string
+          failure_reason: string | null
+          id: string
+          method: string | null
+          paid_at: string | null
+          payout_id: string | null
+          proof_path: string | null
+          provider: string | null
+          provider_ref: string | null
+          rail: string
+          reference: string | null
+          requested_at: string
+          requested_by: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          sent_at: string | null
+          settled_by: string | null
+          status: Database["public"]["Enums"]["payout_request_status"]
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          amount: number
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_branch?: string | null
+          bank_name?: string | null
+          bank_swift_code?: string | null
+          created_at?: string
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          method?: string | null
+          paid_at?: string | null
+          payout_id?: string | null
+          proof_path?: string | null
+          provider?: string | null
+          provider_ref?: string | null
+          rail?: string
+          reference?: string | null
+          requested_at?: string
+          requested_by: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sent_at?: string | null
+          settled_by?: string | null
+          status?: Database["public"]["Enums"]["payout_request_status"]
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          amount?: number
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_branch?: string | null
+          bank_name?: string | null
+          bank_swift_code?: string | null
+          created_at?: string
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          method?: string | null
+          paid_at?: string | null
+          payout_id?: string | null
+          proof_path?: string | null
+          provider?: string | null
+          provider_ref?: string | null
+          rail?: string
+          reference?: string | null
+          requested_at?: string
+          requested_by?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sent_at?: string | null
+          settled_by?: string | null
+          status?: Database["public"]["Enums"]["payout_request_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_payout_requests_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_payout_requests_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "agency_commission_payouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_payout_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_payout_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_payout_requests_settled_by_fkey"
+            columns: ["settled_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -895,6 +1122,104 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      agency_topup_requests: {
+        Row: {
+          agency_id: string
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          method: string
+          note: string | null
+          proof_path: string | null
+          provider: string | null
+          provider_ref: string | null
+          rail: string
+          reference: string | null
+          requested_at: string
+          requested_by: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["topup_status"]
+          updated_at: string
+          wallet_transaction_id: string | null
+        }
+        Insert: {
+          agency_id: string
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          method: string
+          note?: string | null
+          proof_path?: string | null
+          provider?: string | null
+          provider_ref?: string | null
+          rail: string
+          reference?: string | null
+          requested_at?: string
+          requested_by: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["topup_status"]
+          updated_at?: string
+          wallet_transaction_id?: string | null
+        }
+        Update: {
+          agency_id?: string
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          method?: string
+          note?: string | null
+          proof_path?: string | null
+          provider?: string | null
+          provider_ref?: string | null
+          rail?: string
+          reference?: string | null
+          requested_at?: string
+          requested_by?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["topup_status"]
+          updated_at?: string
+          wallet_transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_topup_requests_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_topup_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_topup_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_topup_requests_wallet_transaction_id_fkey"
+            columns: ["wallet_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "agency_wallet_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       agency_wallet_transactions: {
         Row: {
@@ -1285,6 +1610,7 @@ export type Database = {
       }
       flight_bookings: {
         Row: {
+          agency_customer_id: string | null
           agency_id: string | null
           booked_by: string
           cabin_class: string
@@ -1305,6 +1631,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agency_customer_id?: string | null
           agency_id?: string | null
           booked_by: string
           cabin_class?: string
@@ -1325,6 +1652,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agency_customer_id?: string | null
           agency_id?: string | null
           booked_by?: string
           cabin_class?: string
@@ -1345,6 +1673,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "flight_bookings_agency_customer_id_fkey"
+            columns: ["agency_customer_id"]
+            isOneToOne: false
+            referencedRelation: "agency_customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "flight_bookings_agency_id_fkey"
             columns: ["agency_id"]
@@ -1636,18 +1971,23 @@ export type Database = {
       hotel_bookings: {
         Row: {
           agency_id: string | null
+          allocated_at: string | null
           booked_by: string
+          channel: string
           check_in: string
           check_out: string
           created_at: string
           currency: string
           customer_id: string
+          displaced_at: string | null
+          displaced_by: string | null
           guest_details: Json
           hotel_id: string
           id: string
           num_adults: number
           num_children: number
           num_rooms: number
+          priority: number
           room_id: string
           special_requests: string | null
           status: Database["public"]["Enums"]["booking_status"]
@@ -1656,18 +1996,23 @@ export type Database = {
         }
         Insert: {
           agency_id?: string | null
+          allocated_at?: string | null
           booked_by: string
+          channel?: string
           check_in: string
           check_out: string
           created_at?: string
           currency?: string
           customer_id: string
+          displaced_at?: string | null
+          displaced_by?: string | null
           guest_details?: Json
           hotel_id: string
           id?: string
           num_adults?: number
           num_children?: number
           num_rooms?: number
+          priority?: number
           room_id: string
           special_requests?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
@@ -1676,18 +2021,23 @@ export type Database = {
         }
         Update: {
           agency_id?: string | null
+          allocated_at?: string | null
           booked_by?: string
+          channel?: string
           check_in?: string
           check_out?: string
           created_at?: string
           currency?: string
           customer_id?: string
+          displaced_at?: string | null
+          displaced_by?: string | null
           guest_details?: Json
           hotel_id?: string
           id?: string
           num_adults?: number
           num_children?: number
           num_rooms?: number
+          priority?: number
           room_id?: string
           special_requests?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
@@ -1714,6 +2064,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_bookings_displaced_by_fkey"
+            columns: ["displaced_by"]
+            isOneToOne: false
+            referencedRelation: "hotel_bookings"
             referencedColumns: ["id"]
           },
           {
@@ -1951,7 +2308,6 @@ export type Database = {
       }
       hotel_room_inventory: {
         Row: {
-          booked_units: number
           date: string
           id: string
           price_override: number | null
@@ -1959,7 +2315,6 @@ export type Database = {
           total_units: number
         }
         Insert: {
-          booked_units?: number
           date: string
           id?: string
           price_override?: number | null
@@ -1967,7 +2322,6 @@ export type Database = {
           total_units: number
         }
         Update: {
-          booked_units?: number
           date?: string
           id?: string
           price_override?: number | null
@@ -2018,6 +2372,7 @@ export type Database = {
           name: string
           size_sqm: number | null
           status: Database["public"]["Enums"]["listing_status"]
+          total_units: number | null
           updated_at: string
         }
         Insert: {
@@ -2035,6 +2390,7 @@ export type Database = {
           name: string
           size_sqm?: number | null
           status?: Database["public"]["Enums"]["listing_status"]
+          total_units?: number | null
           updated_at?: string
         }
         Update: {
@@ -2052,6 +2408,7 @@ export type Database = {
           name?: string
           size_sqm?: number | null
           status?: Database["public"]["Enums"]["listing_status"]
+          total_units?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -2409,6 +2766,7 @@ export type Database = {
           agency_customer_id: string | null
           agency_id: string | null
           booked_by: string
+          booking_batch_id: string | null
           created_at: string
           currency: string
           customer_id: string
@@ -2431,6 +2789,7 @@ export type Database = {
           agency_customer_id?: string | null
           agency_id?: string | null
           booked_by: string
+          booking_batch_id?: string | null
           created_at?: string
           currency?: string
           customer_id: string
@@ -2453,6 +2812,7 @@ export type Database = {
           agency_customer_id?: string | null
           agency_id?: string | null
           booked_by?: string
+          booking_batch_id?: string | null
           created_at?: string
           currency?: string
           customer_id?: string
@@ -3951,6 +4311,7 @@ export type Database = {
       visa_applications: {
         Row: {
           admin_notes: string | null
+          agency_customer_id: string | null
           agency_id: string | null
           applicant_notes: string | null
           applicant_profile_id: string | null
@@ -3979,6 +4340,7 @@ export type Database = {
         }
         Insert: {
           admin_notes?: string | null
+          agency_customer_id?: string | null
           agency_id?: string | null
           applicant_notes?: string | null
           applicant_profile_id?: string | null
@@ -4007,6 +4369,7 @@ export type Database = {
         }
         Update: {
           admin_notes?: string | null
+          agency_customer_id?: string | null
           agency_id?: string | null
           applicant_notes?: string | null
           applicant_profile_id?: string | null
@@ -4034,6 +4397,13 @@ export type Database = {
           visa_type_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "visa_applications_agency_customer_id_fkey"
+            columns: ["agency_customer_id"]
+            isOneToOne: false
+            referencedRelation: "agency_customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "visa_applications_agency_id_fkey"
             columns: ["agency_id"]
@@ -4325,6 +4695,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _allocate_hotel_booking: {
+        Args: { b: Database["public"]["Tables"]["hotel_bookings"]["Row"] }
+        Returns: string
+      }
       _apply_order_cancellation: {
         Args: { reason?: string; target_order_id: string }
         Returns: undefined
@@ -4348,6 +4722,11 @@ export type Database = {
         }
       }
       admin_nav_counts: { Args: never; Returns: Json }
+      admin_payout_queue_totals: { Args: never; Returns: Json }
+      agency_earnings_summary: {
+        Args: { target_agency_id: string }
+        Returns: Json
+      }
       applicant_can_edit: {
         Args: { p_status: string; p_submitted_at: string }
         Returns: boolean
@@ -4391,6 +4770,10 @@ export type Database = {
         Args: { p_hotel_id: string }
         Returns: boolean
       }
+      cancel_agency_topup: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
       cancel_order: {
         Args: { reason?: string; target_order_id: string }
         Returns: undefined
@@ -4403,12 +4786,31 @@ export type Database = {
         Args: { target_order_id: string }
         Returns: undefined
       }
+      credit_agency_wallet_internal: {
+        Args: {
+          actor?: string
+          target_agency_id: string
+          target_order_id?: string
+          tx_amount: number
+          tx_note?: string
+          tx_type: Database["public"]["Enums"]["wallet_tx_type"]
+        }
+        Returns: string
+      }
       current_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       expire_stale_holds: { Args: never; Returns: number }
+      fail_agency_payout_request: {
+        Args: { p_reason: string; p_request_id: string }
+        Returns: undefined
+      }
+      fail_agency_topup: {
+        Args: { p_reason?: string; p_request_id: string }
+        Returns: undefined
+      }
       generate_affiliate_application_ref: { Args: never; Returns: string }
       generate_agency_application_ref: { Args: never; Returns: string }
       generate_hall_booking_ref: { Args: never; Returns: string }
@@ -4430,6 +4832,33 @@ export type Database = {
         Args: { check_role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
       }
+      hotel_availability: {
+        Args: {
+          p_days?: number
+          p_from: string
+          p_hotel_id: string
+          p_room_id?: string
+        }
+        Returns: {
+          available: number
+          b2b: number
+          b2c: number
+          booked: number
+          capacity: number
+          confirmed: number
+          night: string
+          pending: number
+          price_override: number
+          room_id: string
+          room_name: string
+          room_status: Database["public"]["Enums"]["listing_status"]
+          room_total_units: number
+        }[]
+      }
+      hotel_booking_holds_units: {
+        Args: { p_status: Database["public"]["Enums"]["booking_status"] }
+        Returns: boolean
+      }
       hotel_manager_can_manage_bookings: {
         Args: { target_hotel_id: string }
         Returns: boolean
@@ -4441,6 +4870,24 @@ export type Database = {
       hotel_manager_has_permission: {
         Args: { perm: string; target_hotel_id: string }
         Returns: boolean
+      }
+      hotel_room_nights: {
+        Args: {
+          p_exclude_booking?: string
+          p_from: string
+          p_room_id: string
+          p_to: string
+        }
+        Returns: {
+          b2b: number
+          b2c: number
+          booked: number
+          capacity: number
+          confirmed: number
+          night: string
+          pending: number
+          price_override: number
+        }[]
       }
       is_admin: { Args: never; Returns: boolean }
       is_affiliate_owner: {
@@ -4471,7 +4918,21 @@ export type Database = {
         Args: { target_partner_id: string }
         Returns: boolean
       }
+      mark_agency_payout_sent: {
+        Args: {
+          p_method: string
+          p_proof_path?: string
+          p_reference?: string
+          p_request_id: string
+          p_sent_at?: string
+        }
+        Returns: undefined
+      }
       my_operable_hotel_ids: { Args: never; Returns: string[] }
+      notify_admins_application_updated: {
+        Args: { p_application_id: string; p_kind: string }
+        Returns: undefined
+      }
       partner_application_table: { Args: { p_kind: string }; Returns: string }
       promote_user_role: {
         Args: {
@@ -4526,6 +4987,33 @@ export type Database = {
         Args: { p_manager_id: string }
         Returns: undefined
       }
+      request_agency_markup_change: {
+        Args: {
+          p_action: string
+          p_agency_id: string
+          p_item_type?: string
+          p_markup_type?: Database["public"]["Enums"]["markup_type"]
+          p_value?: number
+        }
+        Returns: string
+      }
+      request_agency_payout: {
+        Args: { p_agency_id: string; p_amount: number }
+        Returns: string
+      }
+      request_agency_topup: {
+        Args: {
+          p_agency_id: string
+          p_amount: number
+          p_method: string
+          p_note?: string
+          p_proof_path?: string
+          p_provider?: string
+          p_rail: string
+          p_reference?: string
+        }
+        Returns: string
+      }
       resubmit_kyc_document: {
         Args: {
           p_application_id: string
@@ -4539,13 +5027,28 @@ export type Database = {
         }
         Returns: undefined
       }
-      room_available_units: {
-        Args: {
-          stay_check_in: string
-          stay_check_out: string
-          target_room_id: string
-        }
+      review_agency_commission_entries: {
+        Args: { p_decision: string; p_entry_ids: string[] }
         Returns: number
+      }
+      review_agency_markup_request: {
+        Args: { p_decision: string; p_note?: string; p_request_id: string }
+        Returns: undefined
+      }
+      review_agency_payout_request: {
+        Args: { p_decision: string; p_note?: string; p_request_id: string }
+        Returns: undefined
+      }
+      review_agency_topup: {
+        Args: { p_decision: string; p_note?: string; p_request_id: string }
+        Returns: undefined
+      }
+      room_units_left: {
+        Args: { p_check_in: string; p_check_out: string; p_room_ids: string[] }
+        Returns: {
+          room_id: string
+          units_left: number
+        }[]
       }
       set_account_status: {
         Args: {
@@ -4557,6 +5060,20 @@ export type Database = {
       set_platform_admin: {
         Args: { new_is_platform_admin: boolean; target_user_id: string }
         Returns: undefined
+      }
+      settle_agency_payout_request: {
+        Args: {
+          p_method?: string
+          p_paid_at?: string
+          p_proof_path?: string
+          p_reference?: string
+          p_request_id: string
+        }
+        Returns: string
+      }
+      settle_agency_topup: {
+        Args: { p_provider_ref?: string; p_request_id: string }
+        Returns: string
       }
       shares_active_org_with: {
         Args: { target_profile_id: string }
@@ -4636,9 +5153,17 @@ export type Database = {
         | "failed"
         | "refunded"
         | "partially_refunded"
+      payout_request_status:
+        | "pending"
+        | "approved"
+        | "processing"
+        | "rejected"
+        | "failed"
+        | "paid"
       payout_status: "pending" | "processing" | "paid" | "failed"
       pilgrim_gender: "male" | "female"
       refund_request_status: "pending" | "approved" | "rejected"
+      topup_status: "pending" | "approved" | "rejected" | "cancelled" | "failed"
       traveler_document_type:
         | "passport_bio"
         | "passport_photo"
@@ -4888,9 +5413,18 @@ export const Constants = {
         "refunded",
         "partially_refunded",
       ],
+      payout_request_status: [
+        "pending",
+        "approved",
+        "processing",
+        "rejected",
+        "failed",
+        "paid",
+      ],
       payout_status: ["pending", "processing", "paid", "failed"],
       pilgrim_gender: ["male", "female"],
       refund_request_status: ["pending", "approved", "rejected"],
+      topup_status: ["pending", "approved", "rejected", "cancelled", "failed"],
       traveler_document_type: [
         "passport_bio",
         "passport_photo",

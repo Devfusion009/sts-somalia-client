@@ -18,7 +18,6 @@ import {
 import {
   AlertDialog,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -222,9 +221,6 @@ export function HotelManagerRow({ hotelId, manager }: { hotelId: string; manager
             <input type="hidden" name="managerId" value={manager.id} />
             <AlertDialogHeader>
               <AlertDialogTitle>Remove {manager.profile?.full_name ?? manager.profile?.email}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                They immediately lose access to this hotel&apos;s rooms, inventory and bookings.
-              </AlertDialogDescription>
             </AlertDialogHeader>
             {state?.error ? <p className="my-2 text-xs text-destructive">{state.error}</p> : null}
             <AlertDialogFooter>

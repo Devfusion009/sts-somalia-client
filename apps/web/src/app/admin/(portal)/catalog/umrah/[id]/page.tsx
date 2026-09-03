@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,14 +43,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="-ml-2 mb-1 gap-1 text-muted-foreground"
-            render={<Link href="/admin/catalog/umrah" />}
-          >
-            <ArrowLeft className="size-3.5" /> All packages
-          </Button>
+          <BackLink href="/admin/catalog/umrah" label="All packages" className="mb-3" />
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-heading text-2xl font-semibold">{pkg.name}</h1>
             <Badge className={cn("border-transparent capitalize", STATUS_STYLES[pkg.status])}>

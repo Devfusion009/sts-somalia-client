@@ -220,15 +220,23 @@ export default async function AdminOrdersPage({
                           {order.status.replace(/_/g, " ")}
                         </Badge>
                         {order.agency?.name ? (
-                          <Badge variant="outline" className="gap-1">
+                          <Badge className="gap-1 border-transparent bg-primary font-semibold text-primary-foreground">
                             <Users className="size-3" /> {order.agency.name}
                           </Badge>
                         ) : (
                           <Badge variant="outline">Direct (B2C)</Badge>
                         )}
                       </div>
+                      {/* On an agency order customer_id holds the agent who placed
+                          it, so the guest has to come from the agency's own client
+                          record or the name here is the wrong person. */}
                       <p className="mt-1.5 text-sm font-medium">
-                        {order.customer?.full_name ?? "—"}
+                        {order.agency_customer?.full_name ?? order.customer?.full_name ?? "—"}
+                        {order.agency_customer?.full_name && order.customer?.full_name ? (
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            · booked by {order.customer.full_name}
+                          </span>
+                        ) : null}
                       </p>
                       <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
                         {order.customer?.email ? (

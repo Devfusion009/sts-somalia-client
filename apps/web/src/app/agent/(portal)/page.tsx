@@ -7,7 +7,6 @@ import {
   PartyPopper,
   Percent,
   Plane,
-  Stamp,
   Ticket,
   Users,
   Wallet,
@@ -22,7 +21,8 @@ import {
   getAgencyOnboardingStatus,
   getAgencyRecentActivity,
 } from "@/modules/agencies/queries";
-import { resolveDateRange, percentChange } from "@/lib/date-range";
+import { resolveDateRange, percentChange, bucketLabel } from "@/lib/date-range";
+import { SalesTimelineChart } from "@/modules/agencies/components/sales-timeline-chart";
 import { LowBalanceBanner } from "@/modules/notifications/components/low-balance-banner";
 import { BroadcastBanner } from "@/modules/notifications/components/broadcast-banner";
 import { AgencySupportCard } from "@/modules/agencies/components/agency-support-card";
@@ -36,44 +36,32 @@ import { cn } from "@/lib/utils";
 
 const SERVICE_TILES = [
   {
-    href: "/flights",
-    title: "Flight Booking",
-    description: "Search and book flights for your clients",
+    href: "/agent/book/flights",
+    title: "Flights",
     icon: Plane,
     tint: "bg-primary/10 text-primary",
   },
   {
-    href: "/hotels",
-    title: "Hotel Booking",
-    description: "Find and book hotels worldwide",
+    href: "/agent/book/hotels",
+    title: "Hotels",
     icon: Hotel,
-    tint: "bg-brand-accent/10 text-brand-accent",
+    tint: "bg-chart-2/10 text-chart-2",
   },
   {
-    href: "/visa",
-    title: "Visa Management",
-    description: "Apply and track visa applications",
-    icon: Stamp,
-    tint: "bg-chart-3/10 text-chart-3",
-  },
-  {
-    href: "/umrah",
-    title: "Umrah Packages",
-    description: "Book Umrah packages for your customers",
+    href: "/agent/book/umrah",
+    title: "Umrah",
     icon: Landmark,
     tint: "bg-chart-4/10 text-chart-4",
   },
   {
-    href: "/events",
+    href: "/agent/book/events",
     title: "Event Halls",
-    description: "Reserve halls for weddings and events",
     icon: PartyPopper,
     tint: "bg-brand-gold/15 text-brand-gold",
   },
   {
     href: "/agent/bookings",
     title: "My Bookings",
-    description: "View and manage your agency bookings",
     icon: Ticket,
     tint: "bg-secondary text-secondary-foreground",
   },
@@ -215,6 +203,15 @@ export default async function AgentDashboardPage({
         />
       </div>
 
+      <SalesTimelineChart
+        currency={currency}
+        data={metrics.buckets.map((key, i) => ({
+          label: bucketLabel(key, range.granularity),
+          sales: metrics.revenue.series[i] ?? 0,
+          tickets: metrics.bookings.series[i] ?? 0,
+        }))}
+      />
+
       {/* Service tiles */}
       <section>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -232,7 +229,6 @@ export default async function AgentDashboardPage({
                   </span>
                   <div className="flex-1">
                     <p className="font-heading text-sm font-bold">{tile.title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{tile.description}</p>
                   </div>
                   <span className="flex items-center gap-1 text-xs font-semibold text-primary">
                     Open <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />

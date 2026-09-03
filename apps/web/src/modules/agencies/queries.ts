@@ -8,6 +8,54 @@ import { bucketKey, enumerateBuckets } from "@/lib/date-range";
  * shape as the checkout query so `describeOrderItem` from the payments
  * module can label items uniformly.
  */
+/** Every order placed in one group submission from the desk. */
+export async function getAgencyBatchOrders(agencyId: string, batchId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("orders")
+    .select(
+      `*,
+       agency_customer:agency_customer_id (id, full_name, phone),
+       order_items (
+         *,
+         hotel_booking:hotel_booking_id (id, status, check_in, check_out, num_rooms, guest_details, hotel:hotel_id (name)),
+         flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at),
+         visa_application:visa_application_id (id, application_ref, applicant_type, visa_type:visa_type_id (name, destination_country_code)),
+         umrah_booking:umrah_booking_id (id, num_pilgrims, booking_kind, status, package:package_id (name), custom_request:custom_request_id (reference, departure_date)),
+         hall_booking:hall_booking_id (id, status, start_date, end_date, event_type, venue:venue_id (name))
+       ),
+       payments (*)`
+    )
+    .eq("agency_id", agencyId)
+    .eq("booking_batch_id", batchId)
+    .order("created_at");
+  return data ?? [];
+}
+
+/** One order from the agency's own book — the desk's post-booking view. */
+export async function getAgencyOrder(agencyId: string, orderId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("orders")
+    .select(
+      `*,
+       agency_customer:agency_customer_id (id, full_name, phone),
+       order_items (
+         *,
+         hotel_booking:hotel_booking_id (id, status, check_in, check_out, num_rooms, guest_details, hotel:hotel_id (name)),
+         flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at),
+         visa_application:visa_application_id (id, application_ref, applicant_type, visa_type:visa_type_id (name, destination_country_code)),
+         umrah_booking:umrah_booking_id (id, num_pilgrims, booking_kind, status, package:package_id (name), custom_request:custom_request_id (reference, departure_date)),
+         hall_booking:hall_booking_id (id, status, start_date, end_date, event_type, venue:venue_id (name))
+       ),
+       payments (*)`
+    )
+    .eq("id", orderId)
+    .eq("agency_id", agencyId)
+    .maybeSingle();
+  return data;
+}
+
 export async function getAgencyOrders(agencyId: string) {
   const supabase = await createClient();
   const { data } = await supabase
@@ -37,7 +85,7 @@ export async function getMyAgency(profileId: string) {
   const { data: membership } = await supabase
     .from("agency_members")
     .select(
-      "agency_id, role_in_agency, agencies(id, name, legal_name, registration_number, status, commission_rate, commission_rate_set_at, contact_email, contact_phone, country_code, credit_balance, credit_limit, logo_path, bank_name, bank_account_name, bank_account_number)"
+      "agency_id, role_in_agency, agencies(id, name, legal_name, registration_number, status, commission_rate, commission_rate_set_at, contact_email, contact_phone, country_code, credit_balance, credit_limit, logo_path, bank_name, bank_account_name, bank_account_number, bank_branch, bank_swift_code, about, website, address)"
     )
     .eq("profile_id", profileId)
     .eq("status", "active")
@@ -232,6 +280,148 @@ export type AgencyCommissionPayout = Awaited<
   ReturnType<typeof getAgencyCommissionPayouts>
 >[number];
 
+export type AgencyEarningsSummary = {
+  /** Everything ever earned that wasn't reversed — commission + markup. */
+  totalEarned: number;
+  /** Booked and paid, waiting on an STS review. */
+  inReview: number;
+  /** Approved by STS, before requests already in flight are netted out. */
+  confirmed: number;
+  /** Sitting in an open payout request. */
+  requested: number;
+  /** confirmed − requested: what a new payout request can draw on. */
+  available: number;
+  paidOut: number;
+};
+
+const EMPTY_EARNINGS: AgencyEarningsSummary = {
+  totalEarned: 0,
+  inReview: 0,
+  confirmed: 0,
+  requested: 0,
+  available: 0,
+  paidOut: 0,
+};
+
+/**
+ * The six numbers behind the Finance Overview, from one RPC rather than a
+ * client-side sum of the whole ledger — see agency_earnings_summary in
+ * 20260902000001_agency_earnings_review_and_payouts.sql for why `available`
+ * nets out in-flight requests.
+ */
+export async function getAgencyEarningsSummary(agencyId: string): Promise<AgencyEarningsSummary> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("agency_earnings_summary", { target_agency_id: agencyId });
+  if (!data) return EMPTY_EARNINGS;
+  const raw = data as Record<keyof AgencyEarningsSummary, number | string>;
+  return {
+    totalEarned: Number(raw.totalEarned),
+    inReview: Number(raw.inReview),
+    confirmed: Number(raw.confirmed),
+    requested: Number(raw.requested),
+    available: Number(raw.available),
+    paidOut: Number(raw.paidOut),
+  };
+}
+
+export async function getAgencyPayoutRequests(agencyId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agency_payout_requests")
+    .select(
+      "*, requester:profiles!agency_payout_requests_requested_by_fkey(full_name, email), reviewer:profiles!agency_payout_requests_reviewed_by_fkey(full_name, email)"
+    )
+    .eq("agency_id", agencyId)
+    .order("requested_at", { ascending: false })
+    .limit(25);
+  return data ?? [];
+}
+
+export type AgencyPayoutRequest = Awaited<ReturnType<typeof getAgencyPayoutRequests>>[number];
+
+/** The buckets the admin withdrawals queue filters by, in workflow order. */
+export const PAYOUT_QUEUE_FILTERS = {
+  open: ["pending", "approved", "processing"],
+  pending: ["pending"],
+  approved: ["approved"],
+  processing: ["processing"],
+  paid: ["paid"],
+  closed: ["rejected", "failed"],
+} as const;
+
+export type PayoutQueueFilter = keyof typeof PAYOUT_QUEUE_FILTERS;
+
+/**
+ * Every agency's requests in one queue — the admin working a payout run is
+ * asking "who is owed money today", not "what does this one agency need",
+ * which is the question getAgencyPayoutRequests answers on an agency page.
+ */
+export async function getPayoutQueue(filter: PayoutQueueFilter = "open") {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agency_payout_requests")
+    .select(
+      "*, agency:agencies(id, name, bank_name, bank_account_name, bank_account_number, bank_branch, bank_swift_code), requester:profiles!agency_payout_requests_requested_by_fkey(full_name, email), reviewer:profiles!agency_payout_requests_reviewed_by_fkey(full_name, email)"
+    )
+    .in("status", [...PAYOUT_QUEUE_FILTERS[filter]])
+    .order("requested_at", { ascending: false })
+    .limit(100);
+  return data ?? [];
+}
+
+export type PayoutQueueRow = Awaited<ReturnType<typeof getPayoutQueue>>[number];
+
+export type PayoutQueueTotals = {
+  toReviewCount: number;
+  toReviewAmount: number;
+  toPayCount: number;
+  toPayAmount: number;
+  inTransitCount: number;
+  inTransitAmount: number;
+  paidThisMonth: number;
+};
+
+const EMPTY_PAYOUT_TOTALS: PayoutQueueTotals = {
+  toReviewCount: 0,
+  toReviewAmount: 0,
+  toPayCount: 0,
+  toPayAmount: 0,
+  inTransitCount: 0,
+  inTransitAmount: 0,
+  paidThisMonth: 0,
+};
+
+export async function getPayoutQueueTotals(): Promise<PayoutQueueTotals> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("admin_payout_queue_totals");
+  if (!data) return EMPTY_PAYOUT_TOTALS;
+  const raw = data as Record<keyof PayoutQueueTotals, number | string>;
+  return {
+    toReviewCount: Number(raw.toReviewCount),
+    toReviewAmount: Number(raw.toReviewAmount),
+    toPayCount: Number(raw.toPayCount),
+    toPayAmount: Number(raw.toPayAmount),
+    inTransitCount: Number(raw.inTransitCount),
+    inTransitAmount: Number(raw.inTransitAmount),
+    paidThisMonth: Number(raw.paidThisMonth),
+  };
+}
+
+export async function getAgencyTopupRequests(agencyId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agency_topup_requests")
+    .select(
+      "*, requester:profiles!agency_topup_requests_requested_by_fkey(full_name, email), reviewer:profiles!agency_topup_requests_reviewed_by_fkey(full_name, email)"
+    )
+    .eq("agency_id", agencyId)
+    .order("requested_at", { ascending: false })
+    .limit(25);
+  return data ?? [];
+}
+
+export type AgencyTopupRequest = Awaited<ReturnType<typeof getAgencyTopupRequests>>[number];
+
 /** Markup rules for an agency: one default (item_type null) + per-vertical overrides. */
 export async function getAgencyMarkups(agencyId: string) {
   const supabase = await createClient();
@@ -241,6 +431,55 @@ export async function getAgencyMarkups(agencyId: string) {
     .eq("agency_id", agencyId)
     .order("item_type", { ascending: true, nullsFirst: true });
   return data ?? [];
+}
+
+/**
+ * Markup change requests for one agency, newest first — read by both the
+ * agent portal (members policy) and the admin agency page (admin policy).
+ * Both FKs to profiles are named explicitly: an unqualified profiles join is
+ * ambiguous (PGRST201) and silently returns nothing.
+ */
+export async function getAgencyMarkupRequests(agencyId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agency_markup_requests")
+    .select(
+      "*, requester:profiles!agency_markup_requests_requested_by_fkey(full_name, email), reviewer:profiles!agency_markup_requests_reviewed_by_fkey(full_name, email)"
+    )
+    .eq("agency_id", agencyId)
+    .order("requested_at", { ascending: false })
+    .limit(20);
+  return data ?? [];
+}
+
+export type AgencyMarkupRequest = Awaited<ReturnType<typeof getAgencyMarkupRequests>>[number];
+
+/**
+ * Admin: every pending markup request across all agencies (oldest first),
+ * plus the live rule each one would replace, keyed `${agency_id}:${scope}`
+ * — the approval queue on /admin/agencies.
+ */
+export async function getPendingMarkupRequestsForAdmin() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agency_markup_requests")
+    .select("*, agency:agencies(id, name), requester:profiles!agency_markup_requests_requested_by_fkey(full_name, email)")
+    .eq("status", "pending")
+    .order("requested_at", { ascending: true });
+  const requests = data ?? [];
+
+  const currentRules = new Map<string, { markup_type: string; value: number }>();
+  const agencyIds = [...new Set(requests.map((r) => r.agency_id))];
+  if (agencyIds.length > 0) {
+    const { data: rules } = await supabase
+      .from("agency_markups")
+      .select("agency_id, item_type, markup_type, value")
+      .in("agency_id", agencyIds);
+    for (const rule of rules ?? []) {
+      currentRules.set(`${rule.agency_id}:${rule.item_type ?? "all"}`, { markup_type: rule.markup_type, value: rule.value });
+    }
+  }
+  return { requests, currentRules };
 }
 
 /** Admin: every agency with member count (RLS admin policy grants the read). */
@@ -264,6 +503,23 @@ export async function getAgencyForAdmin(agencyId: string) {
     .eq("id", agencyId)
     .maybeSingle();
   return data;
+}
+
+/** Admin: how many clients this agency's book holds (and how many hold an STS account). */
+export async function getAgencyCustomerCounts(agencyId: string) {
+  const supabase = await createClient();
+  const [{ count: total }, { count: registered }] = await Promise.all([
+    supabase
+      .from("agency_customers")
+      .select("id", { count: "exact", head: true })
+      .eq("agency_id", agencyId),
+    supabase
+      .from("agency_customers")
+      .select("id", { count: "exact", head: true })
+      .eq("agency_id", agencyId)
+      .not("profile_id", "is", null),
+  ]);
+  return { total: total ?? 0, registered: registered ?? 0 };
 }
 
 /** Admin: all tiers, sorted for display, with how many agencies use each. */
@@ -370,6 +626,8 @@ export async function getAgencyTeam(agencyId: string) {
 // ---------------------------------------------------------------------------
 
 export type AgencyPeriodMetrics = {
+  /** Bucket keys for the series arrays — label with bucketLabel() at render time. */
+  buckets: string[];
   bookings: { current: number; previous: number; series: number[] };
   revenue: { current: number; previous: number; series: number[]; currency: string };
   earned: {
@@ -459,6 +717,7 @@ export async function getAgencyPeriodMetrics(
   const earnedPrevious = (entriesPrev.data ?? []).reduce((sum, e) => sum + Number(e.amount), 0);
 
   return {
+    buckets,
     bookings: { current: bookingsCurrent, previous: bookingsPrevious, series: bookingsSeries },
     revenue: {
       current: Math.round(revenueCurrent),
@@ -583,29 +842,6 @@ export async function getRecentReviewedRefundRequestsForAdmin(limit = 25) {
   return data ?? [];
 }
 
-/**
- * This agency's own hall bookings overlapping [from, to] — full detail
- * (customer, event name, guests), since RLS already scopes this to the
- * agency's own agency_id. For cross-agency "is this venue free" checks
- * without exposing another agency's data, see getVenueOccupiedRanges in
- * modules/events/queries.ts (get_venue_occupied_ranges RPC).
- */
-export async function getAgencyHallBookingsInRange(agencyId: string, from: string, to: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("hall_bookings")
-    .select(
-      "id, venue_id, event_type, event_name, start_date, end_date, expected_guests, status, customer:customer_id (full_name, email), venue:venue_id (name)"
-    )
-    .eq("agency_id", agencyId)
-    .lte("start_date", to)
-    .gte("end_date", from)
-    .order("start_date", { ascending: true });
-  return data ?? [];
-}
-
-export type AgencyHallBooking = Awaited<ReturnType<typeof getAgencyHallBookingsInRange>>[number];
-
 export type AgencyActivityItem = {
   id: string;
   kind: "booking" | "wallet" | "payout";
@@ -670,7 +906,7 @@ export async function getAgencyRecentActivity(agencyId: string, limit = 10): Pro
         amount: Number(t.amount),
         currency: "USD",
         createdAt: t.created_at,
-        href: "/agent/wallet",
+        href: "/agent/finance/transactions",
       })
     ),
     ...(payouts ?? []).map(
@@ -689,3 +925,99 @@ export async function getAgencyRecentActivity(agencyId: string, limit = 10): Pro
 
   return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, limit);
 }
+
+// ---------------------------------------------------------------------------
+// Customer book — the agency's clients with their booking history. Rows link
+// to the registered B2C account behind the same email (profile_id, maintained
+// by DB triggers) so the agent can see which clients hold an STS account.
+// ---------------------------------------------------------------------------
+
+export type AgencyCustomerWithStats = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  profile_id: string | null;
+  created_at: string;
+  bookings: number;
+  spent: number;
+  currency: string;
+  lastBookingAt: string | null;
+};
+
+export async function getAgencyCustomersWithStats(
+  agencyId: string,
+  search?: string
+): Promise<AgencyCustomerWithStats[]> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("agency_customers")
+    .select(
+      "id, full_name, email, phone, notes, profile_id, created_at, orders(id, total, currency, status, created_at)"
+    )
+    .eq("agency_id", agencyId)
+    .order("full_name");
+
+  const q = search?.trim().replace(/[,%]/g, "");
+  if (q) {
+    query = query.or(`full_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`);
+  }
+
+  const { data } = await query;
+  return (data ?? []).map((c) => {
+    const paid = c.orders.filter((o) => PAID_ORDER_STATUSES.includes(o.status));
+    const lastBooking = c.orders.reduce<string | null>(
+      (latest, o) => (latest === null || o.created_at > latest ? o.created_at : latest),
+      null
+    );
+    return {
+      id: c.id,
+      full_name: c.full_name,
+      email: c.email,
+      phone: c.phone,
+      notes: c.notes,
+      profile_id: c.profile_id,
+      created_at: c.created_at,
+      bookings: c.orders.length,
+      spent: Math.round(paid.reduce((sum, o) => sum + Number(o.total), 0)),
+      currency: paid[0]?.currency ?? "USD",
+      lastBookingAt: lastBooking,
+    };
+  });
+}
+
+/**
+ * One client with their full history: every order the agency placed for
+ * them (labelled per vertical) plus flight quote requests, which have no
+ * order until STS staff finalize one.
+ */
+export async function getAgencyCustomerDetail(agencyId: string, customerId: string) {
+  const supabase = await createClient();
+  const [{ data: customer }, { data: orders }, { data: flightQuotes }] = await Promise.all([
+    supabase
+      .from("agency_customers")
+      .select("id, full_name, email, phone, notes, profile_id, created_at, created_by")
+      .eq("agency_id", agencyId)
+      .eq("id", customerId)
+      .maybeSingle(),
+    supabase
+      .from("orders")
+      .select("id, order_number, status, total, currency, created_at, order_items(item_type)")
+      .eq("agency_id", agencyId)
+      .eq("agency_customer_id", customerId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("flight_bookings")
+      .select("id, origin_iata, destination_iata, depart_at, return_at, status, created_at")
+      .eq("agency_id", agencyId)
+      .eq("agency_customer_id", customerId)
+      .eq("provider", "quote_request")
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (!customer) return null;
+  return { customer, orders: orders ?? [], flightQuotes: flightQuotes ?? [] };
+}
+
+export type AgencyCustomerDetail = NonNullable<Awaited<ReturnType<typeof getAgencyCustomerDetail>>>;

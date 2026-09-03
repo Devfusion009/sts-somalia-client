@@ -5,7 +5,6 @@ import { AlertCircle, Plus, UserRoundPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -42,9 +41,6 @@ export function AddMemberForm() {
           <DialogTitle className="flex items-center gap-2">
             <UserRoundPlus className="size-4 text-primary" /> Add a team member
           </DialogTitle>
-          <DialogDescription>
-            They need an existing STS account (ask them to sign up first if they haven&apos;t).
-          </DialogDescription>
         </DialogHeader>
         <form
           action={(formData) => {
@@ -64,7 +60,7 @@ export function AddMemberForm() {
             <Label htmlFor="email">
               Account email <span className="text-destructive">*</span>
             </Label>
-            <Input id="email" name="email" type="email" placeholder="name@example.com" required />
+            <Input id="email" name="email" type="email" required />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="role">

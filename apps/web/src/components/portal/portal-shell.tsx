@@ -31,9 +31,11 @@ import {
   ScrollText,
   Megaphone,
   TrendingDown,
+  TrendingUp,
   Plug,
   FileText,
   BadgePlus,
+  CirclePlus,
   BadgeMinus,
   FileClock,
   RotateCcw,
@@ -102,10 +104,12 @@ export const PORTAL_ICONS = {
   "credit-note": BadgePlus,
   "debit-note": BadgeMinus,
   statement: FileClock,
+  earnings: TrendingUp,
   refund: RotateCcw,
   calendar: CalendarRange,
   photos: Images,
   reviews: Star,
+  "new-booking": CirclePlus,
 } satisfies Record<string, LucideIcon>;
 
 export type PortalIconName = keyof typeof PORTAL_ICONS;

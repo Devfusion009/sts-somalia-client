@@ -64,6 +64,9 @@ export default async function AgentSettingsPage() {
               contactEmail={agency.contact_email}
               contactPhone={agency.contact_phone}
               countryCode={agency.country_code}
+              about={agency.about}
+              website={agency.website}
+              address={agency.address}
             />
           ) : (
             <dl className="grid gap-4 text-sm sm:grid-cols-2">
@@ -90,6 +93,18 @@ export default async function AgentSettingsPage() {
               <div>
                 <dt className="text-muted-foreground">Contact phone</dt>
                 <dd className="font-medium">{agency.contact_phone ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Website</dt>
+                <dd className="font-medium">{agency.website ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Office address</dt>
+                <dd className="font-medium">{agency.address ?? "—"}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-muted-foreground">About</dt>
+                <dd className="font-medium">{agency.about ?? "—"}</dd>
               </div>
             </dl>
           )}

@@ -84,21 +84,6 @@ export async function getRoomForInventory(roomId: string, hotelId: string, hotel
   return data;
 }
 
-/** Upcoming capped nights for a room (today onwards, capped window). */
-export async function getRoomInventory(roomId: string, days = 60) {
-  const supabase = await createClient();
-  const from = new Date().toISOString().slice(0, 10);
-  const to = new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
-  const { data } = await supabase
-    .from("hotel_room_inventory")
-    .select("id, date, total_units, booked_units, price_override")
-    .eq("room_id", roomId)
-    .gte("date", from)
-    .lte("date", to)
-    .order("date");
-  return data ?? [];
-}
-
 /**
  * The front-desk snapshot for one hotel: who's actually staying right now,
  * arriving today, and leaving today — read straight off hotel_bookings
@@ -136,7 +121,7 @@ export async function getPartnerBookings(hotelIds: string[]) {
   const { data } = await supabase
     .from("hotel_bookings")
     .select(
-      "id, hotel_id, check_in, check_out, num_rooms, num_adults, num_children, status, total_price, currency, created_at, guest_details, hotels(name), hotel_rooms(name)"
+      "id, hotel_id, check_in, check_out, num_rooms, num_adults, num_children, status, channel, total_price, currency, created_at, guest_details, hotels(name), hotel_rooms(name)"
     )
     .in("hotel_id", hotelIds)
     .order("created_at", { ascending: false });

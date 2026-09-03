@@ -610,6 +610,11 @@ export const requestFlightQuoteSchema = z
     adults: z.coerce.number().int().min(1, "At least one passenger.").max(9, "Maximum 9 passengers."),
     contactPhone: z.string().min(7, "Enter a contact phone number."),
     notes: z.string().max(1000).optional(),
+    // Agent-only "Booking for" fields, same vocabulary as
+    // resolveBookedForCustomerSchema; ignored for non-agency callers.
+    agencyCustomerId: z.string().optional(),
+    newCustomerName: z.string().optional(),
+    newCustomerPhone: z.string().optional(),
   })
   .refine((d) => d.origin !== d.destination, {
     message: "Origin and destination must be different.",

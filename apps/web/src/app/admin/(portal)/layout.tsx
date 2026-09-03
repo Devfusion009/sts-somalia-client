@@ -24,6 +24,16 @@ import { ShieldAlert } from "lucide-react";
 // managing what's for sale). Settings + Developer also merged: four
 // platform-configuration items split into two groups of two had no
 // defensible boundary either.
+//
+// "Finance" added (2026-09-03, per user request) on the same job-not-topic
+// rule: moving money is its own job, and it had no home at all — payout
+// requests were reachable only by drilling into one agency at a time, which
+// is the wrong shape for a bank run that spans agencies. It costs no extra
+// group: "Reports" was a single Aging Report (a receivables view, so it
+// belongs here anyway) and Refund Requests moved across from Bookings &
+// Orders, where it was the one item that isn't a customer booking to
+// fulfil. Wallet top-ups and earnings review are the obvious next tenants —
+// both still live on the agency page today.
 const NAV_GROUPS: PortalNavGroup[] = [
   {
     label: "Overview",
@@ -37,7 +47,6 @@ const NAV_GROUPS: PortalNavGroup[] = [
       { href: "/admin/queue", label: "Order Queue", icon: "bookings" },
       { href: "/admin/calendar", label: "Booking Calendar", icon: "calendar" },
       { href: "/admin/orders", label: "Orders & Payments", icon: "orders" },
-      { href: "/admin/refunds", label: "Refund Requests", icon: "refund" },
       { href: "/admin/visa", label: "Visa Applications", icon: "visa" },
       { href: "/admin/umrah/requests", label: "Private Umrah", icon: "bookings" },
     ],
@@ -63,8 +72,13 @@ const NAV_GROUPS: PortalNavGroup[] = [
     ],
   },
   {
-    label: "Reports",
-    items: [{ href: "/admin/reports/aging", label: "Aging Report", icon: "aging" }],
+    label: "Finance",
+    items: [
+      // First: it is the only one where someone is waiting on their money.
+      { href: "/admin/finance/withdrawals", label: "Withdrawals", icon: "payouts" },
+      { href: "/admin/refunds", label: "Refund Requests", icon: "refund" },
+      { href: "/admin/reports/aging", label: "Aging Report", icon: "aging" },
+    ],
   },
   {
     label: "Settings",
@@ -141,6 +155,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     "/admin/visa": navCounts.visa,
     "/admin/umrah/requests": navCounts.umrah_requests,
     "/admin/applications": navCounts.partner_applications,
+    // Requests waiting to be reviewed, plus approved ones waiting to be
+    // sent — both are work only an admin can clear.
+    "/admin/finance/withdrawals": navCounts.payout_requests,
+    // The agency decisions that still have no home of their own — markup
+    // changes, earnings waiting on review, offline top-ups — are all made
+    // on an agency's own page, so they share that page's badge rather than
+    // splitting into nav items that would lead back to the same place.
+    // Payouts left this sum when Withdrawals got its own item: counting the
+    // same request twice would make the sidebar overstate the backlog.
+    "/admin/agencies":
+      (navCounts.markup_requests ?? 0) + (navCounts.earnings_reviews ?? 0) + (navCounts.topup_requests ?? 0),
   };
   const navGroups = NAV_GROUPS.map((group) => ({
     ...group,

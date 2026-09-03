@@ -41,6 +41,7 @@ type Room = {
   amenities: unknown;
   base_price: number;
   currency: string;
+  total_units: number | null;
   status: string;
 };
 
@@ -96,7 +97,19 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
             <Textarea id="room-description" name="description" rows={2} defaultValue={room?.description ?? ""} />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="totalUnits">Rooms of this type</Label>
+              <Input
+                id="totalUnits"
+                name="totalUnits"
+                type="number"
+                min={0}
+                max={5000}
+                defaultValue={room?.total_units ?? ""}
+                placeholder="Not tracked"
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="maxOccupancy">Max occupancy</Label>
               <Input
@@ -143,9 +156,9 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
                 id="basePrice"
                 name="basePrice"
                 type="number"
-                min={0}
+                min="0.01"
                 step="0.01"
-                defaultValue={room?.base_price}
+                defaultValue={room?.base_price || ""}
                 required
               />
             </div>

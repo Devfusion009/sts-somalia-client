@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { Bell, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,12 @@ type NotificationRow = {
  */
 function targetHref(n: NotificationRow): string | null {
   if (n.type === "new_order") return "/admin/queue";
-  if (n.type === "application_document_resubmitted") {
+  if (n.type === "payout_request") return "/admin/finance/withdrawals?status=pending";
+  if (n.type === "markup_request") {
+    const data = n.data as { agencyId?: string } | null;
+    if (data?.agencyId) return `/admin/agencies/${data.agencyId}`;
+  }
+  if (n.type === "application_document_resubmitted" || n.type === "application_submitted" || n.type === "application_updated") {
     const data = n.data as { applicationType?: string; applicationId?: string } | null;
     if (data?.applicationType && data?.applicationId) {
       return `/admin/applications/${data.applicationType.replace("_", "-")}/${data.applicationId}`;
@@ -147,9 +152,7 @@ export function AdminNotificationBell({ notifications }: { notifications: Notifi
                     <p className="truncate text-sm font-medium">{n.title}</p>
                   )}
                   {n.body ? <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</p> : null}
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-                  </p>
+                  <p className="mt-1 text-[10px] text-muted-foreground">{format(new Date(n.created_at), "MMM d, yyyy 'at' h:mm a")}</p>
                 </div>
                 <Button
                   type="button"

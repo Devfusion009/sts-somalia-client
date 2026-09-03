@@ -39,13 +39,25 @@ export async function POST(request: Request) {
   };
 
   if (event.type === "checkout.session.completed") {
+    const admin = createAdminClient();
     const paymentId = event.data.object.metadata?.payment_id;
+    const topupId = event.data.object.metadata?.topup_id;
+
     if (paymentId) {
-      const admin = createAdminClient();
       await admin
         .from("payments")
         .update({ status: "succeeded", provider_ref: event.data.object.id })
         .eq("id", paymentId);
+    }
+
+    // Agency wallet funding settles through the same webhook, told apart by
+    // the metadata the top-up charge carried. settle_agency_topup is
+    // idempotent, so a redelivered event never credits the wallet twice.
+    if (topupId) {
+      await admin.rpc("settle_agency_topup", {
+        p_request_id: topupId,
+        p_provider_ref: event.data.object.id,
+      });
     }
   }
 

@@ -16,8 +16,18 @@ type NotificationRow = {
   type: string;
   title: string;
   body: string | null;
+  data?: unknown;
   created_at: string;
 };
+
+function targetHref(n: NotificationRow): string | null {
+  if (ACTIONABLE_TYPES.has(n.type)) return "/account/become";
+  if (n.type === "booking_waitlisted") {
+    const orderId = (n.data as { order_id?: string } | null)?.order_id;
+    return orderId ? `/account/bookings/${orderId}` : "/account/bookings";
+  }
+  return null;
+}
 
 const POLL_MS = 30_000;
 
@@ -81,8 +91,14 @@ export function CustomerNotificationBell({ notifications }: { notifications: Not
             {notifications.map((n) => (
               <div key={n.id} className="flex items-start justify-between gap-2 px-3 py-2.5">
                 <div className="min-w-0">
-                  {ACTIONABLE_TYPES.has(n.type) ? (
-                    <Link href="/account/become" className="truncate text-sm font-medium text-destructive hover:underline">
+                  {targetHref(n) ? (
+                    <Link
+                      href={targetHref(n)!}
+                      className={cn(
+                        "truncate text-sm font-medium hover:underline",
+                        ACTIONABLE_TYPES.has(n.type) ? "text-destructive" : "text-primary"
+                      )}
+                    >
                       {n.title}
                     </Link>
                   ) : (

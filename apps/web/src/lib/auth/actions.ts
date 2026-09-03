@@ -7,7 +7,12 @@ import { createClient } from "@/lib/supabase/server";
 import { pathPrefixFor, rootOrigin, type PortalSubdomain } from "@/lib/subdomain";
 import { recordLoginEvent } from "@/lib/auth/login-history";
 
-export type ActionState = { error: string | null; destination?: string } | null;
+/** `orderId` is set by desk bookings so a group submission can collect the orders it created. */
+export type ActionState = {
+  error: string | null;
+  destination?: string;
+  orderId?: string;
+} | null;
 
 const credentialsSchema = z.object({
   email: z.string().email("Enter a valid email address."),

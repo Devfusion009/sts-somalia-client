@@ -6,12 +6,12 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser, requirePlatformAdmin } from "@/lib/auth/session";
-import { getActiveAgencyId } from "@/modules/orders/helpers";
+import { deskOrderPath, getActiveAgencyId } from "@/modules/orders/helpers";
 import { getPaymentMethod } from "./registry";
 import { initiateWithProvider, type InitiationResult } from "./providers";
 import { MIN_DEPOSIT_FRACTION } from "./constants";
 
-export type ActionState = { error: string | null } | null;
+export type ActionState = { error: string | null; destination?: string } | null;
 
 const initiateSchema = z.object({
   orderId: z.string().uuid(),
@@ -89,7 +89,7 @@ export async function initiatePayment(
   }
 
   if (parsed.data.methodId === "agency_wallet") {
-    return payFromAgencyWallet(supabase, profile.id, order, amount);
+    return payFromAgencyWallet(supabase, profile.id, order, amount, formData.get("desk") === "1");
   }
 
   const method = getPaymentMethod(parsed.data.methodId);
@@ -186,7 +186,9 @@ async function payFromAgencyWallet(
   supabase: Awaited<ReturnType<typeof createClient>>,
   profileId: string,
   order: { id: string; order_number: string; currency: string; agency_id: string | null },
-  amount: number
+  amount: number,
+  /** Paid from the agent booking desk, which stays inside the portal. */
+  desk = false
 ): Promise<ActionState> {
   if (!order.agency_id) {
     return { error: "This order is not an agency booking." };
@@ -232,6 +234,9 @@ async function payFromAgencyWallet(
 
   await admin.from("payments").update({ status: "succeeded" }).eq("id", payment.id);
   const { data: settled } = await admin.from("orders").select("status").eq("id", order.id).maybeSingle();
+  if (desk) {
+    return { error: null, destination: deskOrderPath(order.id) };
+  }
   redirect(settled?.status === "paid" ? `/checkout/${order.id}/success` : `/checkout/${order.id}`);
 }
 

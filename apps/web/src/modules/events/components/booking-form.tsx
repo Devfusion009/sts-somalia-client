@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, CalendarDays } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +27,7 @@ export function HallBookingForm({
   eventTypes,
   maxGuests,
   bookedForSlot,
+  action,
 }: {
   venueId: string;
   currency: string;
@@ -34,10 +36,21 @@ export function HallBookingForm({
   eventTypes: string[];
   maxGuests: number | null;
   bookedForSlot?: React.ReactNode;
+  /** The agent desk swaps in its group action, which books for every selected customer. */
+  action?: typeof createHallBooking;
 }) {
-  const [state, formAction] = useActionState(createHallBooking, null);
+  const [state, formAction] = useActionState(action ?? createHallBooking, null);
   const [guests, setGuests] = useState(100);
   const [startDate, setStartDate] = useState("");
+  const router = useRouter();
+
+  // Desk submissions get a path back instead of a redirect, because a Server
+  // Action redirect into the agent portal lands on the wrong host.
+  useEffect(() => {
+    if (state?.destination) {
+      router.push(state.destination);
+    }
+  }, [state, router]);
 
   const options = eventTypes.length > 0 ? eventTypes : ["wedding", "conference", "other"];
   const perPerson = priceUnit === "per_person";

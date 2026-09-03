@@ -123,11 +123,9 @@ export async function getHotelBySlug(slug: string) {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Remaining units per room for a stay: min(total - booked) across the
- * stay's capped nights (hotel_room_inventory is public-readable). A room
- * missing from the map has no caps in the range — treat as unrestricted.
- * Nights are check_in (inclusive) to check_out (exclusive), matching the
- * reservation trigger in the DB.
+ * Units left per room for a stay, from the database ledger (capacity minus
+ * every held booking, per night, minimum across the stay). A room missing
+ * from the map has no tracked night in the range — not sold out.
  */
 export async function getRoomAvailability(
   roomIds: string[],
@@ -145,17 +143,14 @@ export async function getRoomAvailability(
   }
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("hotel_room_inventory")
-    .select("room_id, total_units, booked_units")
-    .in("room_id", roomIds)
-    .gte("date", checkIn)
-    .lt("date", checkOut);
+  const { data } = await supabase.rpc("room_units_left", {
+    p_room_ids: roomIds.slice(0, 50),
+    p_check_in: checkIn,
+    p_check_out: checkOut,
+  });
 
   for (const row of data ?? []) {
-    const left = row.total_units - row.booked_units;
-    const current = availability.get(row.room_id);
-    availability.set(row.room_id, current === undefined ? left : Math.min(current, left));
+    availability.set(row.room_id, row.units_left);
   }
   return availability;
 }

@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 import { getHotelByIdAdmin, getHotelBookingsForHotel, getHotelPartnersForSelect } from "@/modules/admin/queries";
 import { getRoomTypes } from "@/modules/hotels/room-types";
+import { getHotelAvailability } from "@/modules/hotels/availability";
+import { AvailabilityBoard } from "@/modules/hotels/components/availability-board";
 import { getHotelManagers } from "@/modules/hotels/manager-queries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +70,7 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
   const roomTypes = await getRoomTypes();
   const partners = await getHotelPartnersForSelect();
   const managers = await getHotelManagers(id);
+  const availability = await getHotelAvailability(id, { days: 14 });
 
   const images = Array.isArray(hotel.images) ? hotel.images.filter((p): p is string => typeof p === "string") : [];
 
@@ -75,9 +79,7 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <Link href="/admin/hotels" className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="size-3.5" /> All hotels
-            </Link>
+            <BackLink href="/admin/hotels" label="All hotels" className="mb-3" />
             <div className="flex flex-wrap items-center gap-2.5">
               <h1 className="font-heading text-2xl font-semibold tracking-tight">{hotel.name}</h1>
               <Badge className={cn("border-transparent capitalize", HOTEL_STATUS_STYLES[hotel.status] ?? "bg-muted text-muted-foreground")}>
@@ -165,6 +167,18 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
+          <h2 className="font-heading text-base font-semibold">Availability</h2>
+          <span className="text-xs text-muted-foreground">Next 14 nights · A agency · C customer</span>
+        </div>
+        <Card className="py-3">
+          <CardContent className="px-3">
+            <AvailabilityBoard rooms={availability} roomHref={(roomId) => `/admin/hotels/${hotel.id}/rooms/${roomId}`} />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
           <h2 className="font-heading text-base font-semibold">Rooms</h2>
           <RoomDialog hotelId={hotel.id} roomTypes={roomTypes} />
         </div>
@@ -173,6 +187,7 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
             <TableHeader>
               <TableRow>
                 <TableHead>Room</TableHead>
+                <TableHead>Count</TableHead>
                 <TableHead>Occupancy</TableHead>
                 <TableHead>Price / night</TableHead>
                 <TableHead>Status</TableHead>
@@ -182,8 +197,8 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
             <TableBody>
               {hotel.hotel_rooms.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                    No rooms yet — add the first room type.
+                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                    No rooms yet.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -196,6 +211,13 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
                           {[room.bed_type, room.floor ? `Floor ${room.floor}` : null].filter(Boolean).join(" · ")}
                         </p>
                       ) : null}
+                    </TableCell>
+                    <TableCell>
+                      {room.total_units === null ? (
+                        <Badge variant="outline" className="text-muted-foreground">Not set</Badge>
+                      ) : (
+                        room.total_units
+                      )}
                     </TableCell>
                     <TableCell>{room.max_occupancy} guests</TableCell>
                     <TableCell>

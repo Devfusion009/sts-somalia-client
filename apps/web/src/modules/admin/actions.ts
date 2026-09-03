@@ -10,6 +10,7 @@ import type { ActionState } from "@/lib/auth/actions";
 import type { Database } from "@/lib/types/database.types";
 import { UMRAH_INCLUDE_KEYS } from "@/modules/umrah/includes";
 import { rememberRoomType } from "@/modules/hotels/room-types";
+import { repriceQuotedOrder } from "@/modules/orders/helpers";
 import { commaList, parseLinks, replacePropertyLinks } from "@/modules/hotels/listing-fields";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
@@ -583,18 +584,11 @@ export async function updateHallBookingPrice(
 
   const { data: item } = await supabase
     .from("order_items")
-    .select("id, order:order_id (id, status)")
+    .select("id, order:order_id (id, status, agency_id)")
     .eq("hall_booking_id", bookingId)
     .maybeSingle();
   if (item?.order && item.order.status === "pending_payment") {
-    await supabase
-      .from("order_items")
-      .update({ unit_price: price, total_price: price })
-      .eq("id", item.id);
-    await supabase
-      .from("orders")
-      .update({ subtotal: price, total: price })
-      .eq("id", item.order.id);
+    await repriceQuotedOrder(supabase, item.order, item.id, "hall", price);
   }
 
   revalidatePath("/admin/events");
@@ -626,18 +620,11 @@ export async function updateHotelBookingPrice(
 
   const { data: item } = await supabase
     .from("order_items")
-    .select("id, order:order_id (id, status)")
+    .select("id, order:order_id (id, status, agency_id)")
     .eq("hotel_booking_id", bookingId)
     .maybeSingle();
   if (item?.order && item.order.status === "pending_payment") {
-    await supabase
-      .from("order_items")
-      .update({ unit_price: price, total_price: price })
-      .eq("id", item.id);
-    await supabase
-      .from("orders")
-      .update({ subtotal: price, total: price })
-      .eq("id", item.order.id);
+    await repriceQuotedOrder(supabase, item.order, item.id, "hotel", price);
   }
 
   revalidatePath("/admin/queue");
@@ -804,8 +791,11 @@ const roomSchema = z.object({
         return [];
       }
     }),
-  basePrice: z.coerce.number().min(0),
+  // Matches hotel_rooms_base_price_positive (20260903000006): no room ships
+  // without a nightly rate.
+  basePrice: z.coerce.number().gt(0, "Enter the nightly rate."),
   currency: z.string().min(3).max(3).default("USD"),
+  totalUnits: z.coerce.number().int().min(0).max(5000).optional(),
   status: z.enum(["draft", "pending_review", "published", "suspended"]),
 });
 
@@ -820,6 +810,7 @@ function roomInput(formData: FormData) {
     amenities: formData.get("amenities") || undefined,
     basePrice: formData.get("basePrice"),
     currency: formData.get("currency") || "USD",
+    totalUnits: formData.get("totalUnits") || undefined,
     status: formData.get("status"),
   };
 }
@@ -835,6 +826,7 @@ function roomRow(data: z.infer<typeof roomSchema>) {
     amenities: data.amenities,
     base_price: data.basePrice,
     currency: data.currency.toUpperCase(),
+    total_units: data.totalUnits ?? null,
     status: data.status as ListingStatus,
   };
 }
@@ -893,7 +885,7 @@ const inventoryRangeSchema = z
     path: ["endDate"],
   });
 
-/** Admin equivalent of setRoomInventory (src/modules/hotels/inventory-actions.ts) — bulk-sets nightly availability, no partner-ownership check. */
+/** Admin equivalent of setRoomInventory (modules/hotels/inventory-actions.ts) — per-date capacity/price overrides on top of the room's baseline count. */
 export async function setRoomInventoryAdmin(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requirePlatformAdmin();
   const parsed = inventoryRangeSchema.safeParse({
@@ -949,7 +941,6 @@ export async function clearRoomInventoryAdmin(_prev: ActionState, formData: Form
     .from("hotel_room_inventory")
     .delete()
     .eq("room_id", parsed.data.roomId)
-    .eq("booked_units", 0)
     .gte("date", parsed.data.startDate)
     .lte("date", parsed.data.endDate);
   if (error) return { error: error.message };

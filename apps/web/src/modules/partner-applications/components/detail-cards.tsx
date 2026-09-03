@@ -213,6 +213,7 @@ function SettlementFields(kind: ApplicationType, d: Details): Array<[string, str
   if (kind === "agency") {
     return [
       ["Payment Model", d.paymentModel === "credit_line" ? "Credit line" : d.paymentModel ? "Prepaid wallet" : "—"],
+      ["Requested Markup", d.requestedMarkupPercent == null || d.requestedMarkupPercent === "" ? "—" : `${d.requestedMarkupPercent}%`],
       ["Estimated Monthly Volume", s(d.estimatedMonthlyVolume)],
       ["Bank Name", s(d.bankName)],
       ["Account Name", s(d.bankAccountName)],
