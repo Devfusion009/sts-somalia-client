@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
 import { signInAction } from "@/lib/auth/actions";
 import { portalLoginHref } from "@/lib/subdomain";
+import { DemoLoginButton } from "@/modules/demo/demo-login-button";
 
 const AGENT_LOGIN_HREF = portalLoginHref("agent");
 const MANAGER_LOGIN_HREF = portalLoginHref("manager");
@@ -56,7 +57,16 @@ const VALUE_PROPS = [
  * Admin deliberately isn't mentioned anywhere on this page: that portal
  * stays reachable only via the dedicated, unlinked /admin/login.
  */
-export function LoginForm({ redirectTo, notice }: { redirectTo?: string; notice?: string }) {
+export function LoginForm({
+  redirectTo,
+  notice,
+  demoAccount,
+}: {
+  redirectTo?: string;
+  notice?: string;
+  /** Set only when DEMO_LOGIN_ENABLED is true server-side — see /login/page.tsx. */
+  demoAccount?: { email: string; password: string; label: string };
+}) {
   const [personalState, personalAction] = useActionState(signInAction, null);
 
   return (
@@ -182,6 +192,14 @@ export function LoginForm({ redirectTo, notice }: { redirectTo?: string; notice?
               Continue to Hotel Manager Portal <ArrowRight className="size-3" />
             </a>
           </p>
+          {demoAccount ? (
+            <DemoLoginButton
+              action={signInAction}
+              email={demoAccount.email}
+              password={demoAccount.password}
+              label={demoAccount.label}
+            />
+          ) : null}
         </CardContent>
       </Card>
     </div>
