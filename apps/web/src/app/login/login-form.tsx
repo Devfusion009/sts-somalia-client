@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
 import { signInAction } from "@/lib/auth/actions";
 import { portalLoginHref } from "@/lib/subdomain";
-import { DemoLoginButton } from "@/modules/demo/demo-login-button";
+import { DemoAccountsList, type DemoAccountEntry } from "@/modules/demo/demo-accounts-list";
 
 const AGENT_LOGIN_HREF = portalLoginHref("agent");
 const MANAGER_LOGIN_HREF = portalLoginHref("manager");
@@ -60,12 +60,12 @@ const VALUE_PROPS = [
 export function LoginForm({
   redirectTo,
   notice,
-  demoAccount,
+  demoAccounts,
 }: {
   redirectTo?: string;
   notice?: string;
   /** Set only when DEMO_LOGIN_ENABLED is true server-side — see /login/page.tsx. */
-  demoAccount?: { email: string; password: string; label: string };
+  demoAccounts?: DemoAccountEntry[];
 }) {
   const [personalState, personalAction] = useActionState(signInAction, null);
 
@@ -140,66 +140,68 @@ export function LoginForm({
               <AlertDescription>{notice}</AlertDescription>
             </Alert>
           ) : null}
-          {personalState?.error ? (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle />
-              <AlertDescription>{personalState.error}</AlertDescription>
-            </Alert>
-          ) : null}
-          <form action={personalAction} className="space-y-4">
-            {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" autoComplete="email" required />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link href="/forgot-password" className="text-xs text-primary hover:underline">
-                  Forgot password?
+          {demoAccounts ? (
+            <DemoAccountsList accounts={demoAccounts} />
+          ) : (
+            <>
+              {personalState?.error ? (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertCircle />
+                  <AlertDescription>{personalState.error}</AlertDescription>
+                </Alert>
+              ) : null}
+              <form action={personalAction} className="space-y-4">
+                {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" name="email" type="email" autoComplete="email" required />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+                      Forgot password?
+                    </Link>
+                  </div>
+                  <PasswordInput id="password" name="password" autoComplete="current-password" required />
+                </div>
+                <SubmitButton className="w-full" pendingText="Logging in…">
+                  Log in
+                </SubmitButton>
+              </form>
+              <p className="mt-4 text-center text-sm text-muted-foreground">
+                Don&apos;t have an account?{" "}
+                <Link href="/signup" className="font-medium text-primary hover:underline">
+                  Sign up
                 </Link>
-              </div>
-              <PasswordInput id="password" name="password" autoComplete="current-password" required />
-            </div>
-            <SubmitButton className="w-full" pendingText="Logging in…">
-              Log in
-            </SubmitButton>
-          </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="font-medium text-primary hover:underline">
-              Sign up
-            </Link>
-          </p>
-          {/* A real <a>, not <Link>: the Agent Portal is a separate origin
-              once subdomains are configured, which a client-side route push
-              cannot cross. Quiet footnote, not a tab — signing in here
-              already reaches an approved agent's dashboard via the account
-              switcher, this is only for people who want to skip straight
-              there. */}
-          <p className="mt-3 text-center text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">Agent:</span> Signing in as a travel agent?{" "}
-            <a href={AGENT_LOGIN_HREF} className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">
-              Continue to Agent Portal <ArrowRight className="size-3" />
-            </a>
-          </p>
-          {/* A real <a>, not <Link> — same reasoning as the Agent Portal link
-              above: the Manager Portal is a separate origin once subdomains
-              are configured, which a client-side route push cannot cross. */}
-          <p className="mt-1.5 text-center text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">Hotel Manager:</span> Signing in as a hotel manager?{" "}
-            <a href={MANAGER_LOGIN_HREF} className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">
-              Continue to Hotel Manager Portal <ArrowRight className="size-3" />
-            </a>
-          </p>
-          {demoAccount ? (
-            <DemoLoginButton
-              action={signInAction}
-              email={demoAccount.email}
-              password={demoAccount.password}
-              label={demoAccount.label}
-            />
-          ) : null}
+              </p>
+            </>
+          )}
+          {demoAccounts ? null : (
+            <>
+              {/* A real <a>, not <Link>: the Agent Portal is a separate origin
+                  once subdomains are configured, which a client-side route push
+                  cannot cross. Quiet footnote, not a tab — signing in here
+                  already reaches an approved agent's dashboard via the account
+                  switcher, this is only for people who want to skip straight
+                  there. */}
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">Agent:</span> Signing in as a travel agent?{" "}
+                <a href={AGENT_LOGIN_HREF} className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">
+                  Continue to Agent Portal <ArrowRight className="size-3" />
+                </a>
+              </p>
+              {/* A real <a>, not <Link> — same reasoning as the Agent Portal link
+                  above: the Manager Portal is a separate origin once subdomains
+                  are configured, which a client-side route push cannot cross. */}
+              <p className="mt-1.5 text-center text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">Hotel Manager:</span> Signing in as a hotel manager?{" "}
+                <a href={MANAGER_LOGIN_HREF} className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">
+                  Continue to Hotel Manager Portal <ArrowRight className="size-3" />
+                </a>
+              </p>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

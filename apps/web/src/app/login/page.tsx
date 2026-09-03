@@ -3,8 +3,22 @@ import Link from "next/link";
 import Image from "next/image";
 import { LoginForm } from "./login-form";
 import { DEMO_LOGIN_ENABLED, DEMO_ACCOUNTS } from "@/modules/demo/config";
+import type { DemoAccountEntry } from "@/modules/demo/demo-accounts-list";
+import {
+  signInAction,
+  signInToAgentPortalAction,
+  signInToAdminPortalAction,
+  signInToManagerPortalAction,
+} from "@/lib/auth/actions";
 
 export const metadata: Metadata = { title: "Log in" };
+
+const DEMO_ACCOUNT_ENTRIES: DemoAccountEntry[] = [
+  { action: signInAction, ...DEMO_ACCOUNTS.customer },
+  { action: signInToAgentPortalAction, ...DEMO_ACCOUNTS.agent },
+  { action: signInToAdminPortalAction, ...DEMO_ACCOUNTS.admin },
+  { action: signInToManagerPortalAction, ...DEMO_ACCOUNTS.manager },
+];
 
 /**
  * Lives at the top level (not under the (auth) route group) so it can use
@@ -29,7 +43,7 @@ export default async function LoginPage({
       <LoginForm
         redirectTo={redirect_to}
         notice={notice}
-        demoAccount={DEMO_LOGIN_ENABLED ? DEMO_ACCOUNTS.customer : undefined}
+        demoAccounts={DEMO_LOGIN_ENABLED ? DEMO_ACCOUNT_ENTRIES : undefined}
       />
     </div>
   );
