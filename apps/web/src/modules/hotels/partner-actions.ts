@@ -230,7 +230,10 @@ const roomSchema = z.object({
   // database (see 20260903000006).
   basePrice: z.coerce.number().gt(0, "Enter the nightly rate."),
   currency: z.string().min(3).max(3).default("USD"),
-  totalUnits: z.coerce.number().int().min(0).max(5000).optional(),
+  // Matches hotel_rooms_total_units_positive (20260903000009): the room-count
+  // gap this closed — every room needs a real count or availability can
+  // never be computed (see room_units_left / hotel_room_nights).
+  totalUnits: z.coerce.number().int().min(1, "Enter how many rooms of this type exist.").max(5000),
   status: z.enum(PARTNER_LISTING_STATUSES),
 });
 
