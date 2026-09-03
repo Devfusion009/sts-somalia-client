@@ -41,6 +41,8 @@ export default async function AgentBankDetailsPage() {
               bankName={agency.bank_name}
               bankAccountName={agency.bank_account_name}
               bankAccountNumber={agency.bank_account_number}
+              bankBranch={agency.bank_branch}
+              bankSwiftCode={agency.bank_swift_code}
             />
           ) : (
             <dl className="grid gap-4 text-sm sm:grid-cols-2">
@@ -51,6 +53,14 @@ export default async function AgentBankDetailsPage() {
               <div>
                 <dt className="text-muted-foreground">Account holder name</dt>
                 <dd className="font-medium">{agency.bank_account_name ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Branch</dt>
+                <dd className="font-medium">{agency.bank_branch ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">SWIFT/BIC code</dt>
+                <dd className="font-medium">{agency.bank_swift_code ?? "—"}</dd>
               </div>
               <div className="sm:col-span-2">
                 <dt className="text-muted-foreground">Account number</dt>

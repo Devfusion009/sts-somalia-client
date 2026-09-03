@@ -5,7 +5,6 @@ import { AlertCircle, Plus, UserRoundPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -17,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { createAgencyCustomer } from "@/modules/agencies/customer-actions";
+import { PhoneField } from "@/modules/partner-applications/components/phone-field";
 
 export function AddCustomerForm() {
   const [open, setOpen] = useState(false);
@@ -41,10 +41,6 @@ export function AddCustomerForm() {
           <DialogTitle className="flex items-center gap-2">
             <UserRoundPlus className="size-4 text-primary" /> New customer
           </DialogTitle>
-          <DialogDescription>
-            Save a client to your agency book — they&apos;ll appear in the &ldquo;Booking
-            for&rdquo; picker on every booking form.
-          </DialogDescription>
         </DialogHeader>
         <form
           action={(formData) => {
@@ -64,16 +60,16 @@ export function AddCustomerForm() {
             <Label htmlFor="fullName">
               Full name <span className="text-destructive">*</span>
             </Label>
-            <Input id="fullName" name="fullName" placeholder="Amina Hassan" required />
+            <Input id="fullName" name="fullName" required />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" name="phone" placeholder="+252…" />
+              <Label>Phone</Label>
+              <PhoneField name="phone" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" placeholder="name@example.com" />
+              <Input id="email" name="email" type="email" />
             </div>
           </div>
           <div className="space-y-1.5">

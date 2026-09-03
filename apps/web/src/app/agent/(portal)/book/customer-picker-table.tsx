@@ -1,0 +1,142 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { format } from "date-fns";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { selectBookingCustomers } from "@/modules/agencies/booking-context-actions";
+
+export type PickerRow = {
+  id: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  profile_id: string | null;
+  bookings: number;
+  lastBookingAt: string | null;
+};
+
+/**
+ * One customer is the common case and stays a single click ("Select"). The
+ * checkboxes are for the case that actually needs the desk — a group going
+ * on one departure — where the same product is booked for everyone at once.
+ */
+export function CustomerPickerTable({ rows }: { rows: PickerRow[] }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  const allChecked = rows.length > 0 && rows.every((row) => selected.has(row.id));
+
+  function toggle(id: string) {
+    setSelected((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function commit(ids: string[]) {
+    startTransition(async () => {
+      const result = await selectBookingCustomers(ids);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <>
+      <Card className="overflow-hidden py-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    aria-label="Select all"
+                    checked={allChecked}
+                    onCheckedChange={() =>
+                      setSelected(allChecked ? new Set() : new Set(rows.map((row) => row.id)))
+                    }
+                  />
+                </TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead className="text-right">Bookings</TableHead>
+                <TableHead className="text-right">Last booking</TableHead>
+                <TableHead className="text-right" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.id} data-state={selected.has(row.id) ? "selected" : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      aria-label={row.full_name}
+                      checked={selected.has(row.id)}
+                      onCheckedChange={() => toggle(row.id)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{row.full_name}</span>
+                      {row.profile_id ? (
+                        <Badge className="border-transparent bg-primary/10 text-primary">
+                          STS account
+                        </Badge>
+                      ) : null}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {row.phone ?? row.email ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-right text-sm">{row.bookings}</TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">
+                    {row.lastBookingAt ? format(new Date(row.lastBookingAt), "d MMM yyyy") : "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={pending}
+                      onClick={() => commit([row.id])}
+                    >
+                      Select
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      {selected.size > 0 ? (
+        <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-end gap-2 rounded-lg bg-card px-4 py-3 shadow-md ring-1 ring-foreground/10">
+          <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>
+            Clear
+          </Button>
+          <Button size="sm" disabled={pending} onClick={() => commit([...selected])}>
+            Continue with {selected.size} customer{selected.size === 1 ? "" : "s"}
+          </Button>
+        </div>
+      ) : null}
+    </>
+  );
+}

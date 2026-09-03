@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, PenLine } from "lucide-react";
+import { Plus, Trash2, PenLine, Check, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -29,15 +29,47 @@ export function OptionPicker({
 }: {
   name: string;
   defaultValue?: string | null;
-  options: Array<{ value: string; label: string; hint?: string }>;
+  options: Array<{ value: string; label: string; hint?: string; icon?: LucideIcon }>;
   onChange?: (value: string) => void;
-  layout?: "wrap" | "stack";
+  layout?: "wrap" | "stack" | "cards";
 }) {
   const [selected, setSelected] = useState(defaultValue || "");
 
   function select(value: string) {
     setSelected(value);
     onChange?.(value);
+  }
+
+  if (layout === "cards") {
+    return (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <input type="hidden" name={name} value={selected} />
+        {options.map((option) => {
+          const active = selected === option.value;
+          const Icon = option.icon;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => select(option.value)}
+              aria-pressed={active}
+              className={cn(
+                "relative flex flex-col items-center gap-2 rounded-xl border p-4 text-center text-sm font-medium transition-colors",
+                active ? "border-primary bg-primary/5 text-foreground" : "border-border bg-transparent text-foreground hover:bg-accent"
+              )}
+            >
+              {active ? (
+                <span className="absolute top-2 right-2 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Check className="size-2.5" />
+                </span>
+              ) : null}
+              {Icon ? <Icon className={cn("size-5", active ? "text-primary" : "text-muted-foreground")} /> : null}
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    );
   }
 
   return (

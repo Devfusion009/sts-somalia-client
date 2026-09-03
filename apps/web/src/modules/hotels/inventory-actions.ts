@@ -155,7 +155,6 @@ export async function clearRoomInventory(
     .from("hotel_room_inventory")
     .delete()
     .eq("room_id", room.id)
-    .eq("booked_units", 0)
     .gte("date", parsed.data.startDate)
     .lte("date", parsed.data.endDate);
   if (error) return { error: error.message };

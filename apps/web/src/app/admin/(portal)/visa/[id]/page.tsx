@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft, Check, Download, ExternalLink, X } from "lucide-react";
+import { Check, Download, ExternalLink, X } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getVisaApplicationAdmin, getVisaOrderAdmin } from "@/modules/admin/queries";
 import { adminResolveDocumentRequest } from "@/modules/visa/admin-actions";
@@ -68,9 +68,7 @@ export default async function AdminVisaDetailPage({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="sm" render={<Link href="/admin/visa" />} className="gap-1">
-          <ArrowLeft className="size-4" /> All applications
-        </Button>
+        <BackLink href="/admin/visa" label="All applications" />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4">

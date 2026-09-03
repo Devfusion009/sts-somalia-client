@@ -18,13 +18,25 @@ export const phoneSchema = z.string().regex(/^\+\d{1,4}\d{6,10}$/, "Enter a vali
  * comfortably under that limit.
  */
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
-export const ALLOWED_UPLOAD_TYPES = ["image/jpeg", "image/png", "application/pdf"];
+export const ALLOWED_UPLOAD_TYPES = ["application/pdf"];
 export const UPLOAD_SIZE_ERROR = "File must be 5MB or smaller.";
-export const UPLOAD_TYPE_ERROR = "Only JPG, PNG, or PDF files are accepted.";
+export const UPLOAD_TYPE_ERROR = "Only PDF files are accepted.";
 
 /** Shared by every client-side file input that posts to a Server Action. */
 export function checkUploadFile(file: File): string | null {
   if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) return UPLOAD_TYPE_ERROR;
   if (file.size > MAX_UPLOAD_BYTES) return UPLOAD_SIZE_ERROR;
+  return null;
+}
+
+/** A logo is a branding image, not a compliance document — its own (looser, image-only) limits. */
+export const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+export const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+export const LOGO_SIZE_ERROR = "Logo must be 2MB or smaller.";
+export const LOGO_TYPE_ERROR = "Only PNG, JPG, WebP, or SVG images are accepted.";
+
+export function checkLogoFile(file: File): string | null {
+  if (!ALLOWED_LOGO_TYPES.includes(file.type)) return LOGO_TYPE_ERROR;
+  if (file.size > MAX_LOGO_BYTES) return LOGO_SIZE_ERROR;
   return null;
 }

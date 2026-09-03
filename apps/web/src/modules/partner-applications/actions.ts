@@ -10,6 +10,7 @@ import {
   REJECT_COOLDOWN_DAYS,
   EARLIEST_BUSINESS_YEAR,
   CURRENT_YEAR,
+  MARKUP_PRESETS,
   docSlotsFor,
   missingRequiredDocSlots,
   type ApplicationKind,
@@ -21,6 +22,10 @@ import {
   ALLOWED_UPLOAD_TYPES,
   UPLOAD_SIZE_ERROR,
   UPLOAD_TYPE_ERROR,
+  MAX_LOGO_BYTES,
+  ALLOWED_LOGO_TYPES,
+  LOGO_SIZE_ERROR,
+  LOGO_TYPE_ERROR,
 } from "./schemas";
 
 export type ActionState = { error: string | null } | null;
@@ -96,6 +101,7 @@ const step1BusinessSchema = z.object({
   officeStreet: z.string().optional(),
   officeCity: z.string().min(1, "Enter the city."),
   officeRegion: z.string().optional(),
+  officeCountry: z.string().optional(),
   businessPhone: phoneSchema,
   businessEmail: z.string().email("Enter a valid business email."),
   website: z.string().optional(),
@@ -155,6 +161,7 @@ export async function saveStep1(_prev: ActionState, formData: FormData): Promise
       officeStreet: parsed.data.officeStreet || null,
       officeCity: parsed.data.officeCity,
       officeRegion: parsed.data.officeRegion || null,
+      officeCountry: parsed.data.officeCountry || null,
       businessPhone: parsed.data.businessPhone,
       businessEmail: parsed.data.businessEmail,
       website: parsed.data.website || null,
@@ -232,6 +239,8 @@ const step3AgencySchema = z.object({
   staffCount: z.string().optional(),
   monthlyVolume: z.string().min(1, "Select an estimated monthly volume."),
   products: z.string().optional(), // comma-separated
+  isOrgMember: z.string().optional(),
+  orgMemberType: z.string().optional(),
   iataNumber: z.string().optional(),
 });
 
@@ -287,6 +296,8 @@ export async function saveStep3(_prev: ActionState, formData: FormData): Promise
       staffCount: parsed.data.staffCount || null,
       monthlyVolume: parsed.data.monthlyVolume,
       products: parsed.data.products ? parsed.data.products.split(",").filter(Boolean) : [],
+      isOrgMember: parsed.data.isOrgMember || null,
+      orgMemberType: parsed.data.isOrgMember === "yes" ? parsed.data.orgMemberType || null : null,
       iataNumber: parsed.data.iataNumber || null,
     };
   } else if (kind === "hotel_partner") {
@@ -358,11 +369,34 @@ export async function saveStep3(_prev: ActionState, formData: FormData): Promise
 // ---------------------------------------------------------------------------
 const step4AgencySchema = z.object({
   paymentModel: z.enum(["prepaid_wallet", "credit_line"]),
+  requestedMarkupPreset: z.string().optional(),
+  requestedMarkupCustom: z.string().optional(),
   estimatedMonthlyVolume: z.string().optional(),
   bankName: z.string().optional(),
   bankAccountName: z.string().optional(),
   bankAccountNumber: z.string().optional(),
+  remarks: z.string().optional(),
 });
+
+/**
+ * Preset + custom inputs collapse to one number. An empty custom box (the
+ * applicant just switched the select to "Custom") is not an error — the
+ * form autosaves on every change, and submitApplication is the gate that
+ * requires a value.
+ */
+function resolveRequestedMarkup(preset: string | undefined, custom: string | undefined): { value: number | null } | { error: string } {
+  if (!preset) return { value: null };
+  if (preset === "custom") {
+    const raw = (custom ?? "").trim();
+    if (raw === "") return { value: null };
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > 100) return { error: "Markup must be between 0% and 100%." };
+    return { value: Math.round(n * 100) / 100 };
+  }
+  const n = Number(preset);
+  if (!MARKUP_PRESETS.includes(n)) return { error: "Select a markup rate." };
+  return { value: n };
+}
 
 // A hotel is a supplier, not a buyer: it never taps a wallet/credit line, it
 // gets PAID OUT for completed stays, so bank details are mandatory here
@@ -398,12 +432,16 @@ export async function saveStep4(_prev: ActionState, formData: FormData): Promise
   } else {
     const parsed = step4AgencySchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return { error: parsed.error.issues[0].message };
+    const markup = resolveRequestedMarkup(parsed.data.requestedMarkupPreset, parsed.data.requestedMarkupCustom);
+    if ("error" in markup) return { error: markup.error };
     patch = {
       paymentModel: parsed.data.paymentModel,
+      requestedMarkupPercent: markup.value,
       estimatedMonthlyVolume: parsed.data.estimatedMonthlyVolume || null,
       bankName: parsed.data.bankName || null,
       bankAccountName: parsed.data.bankAccountName || null,
       bankAccountNumber: parsed.data.bankAccountNumber || null,
+      remarks: parsed.data.remarks || null,
     };
   }
 
@@ -505,6 +543,62 @@ export async function removeApplicationDocument(formData: FormData): Promise<voi
   const next = existing.filter((d) => d.key !== docKey);
   await supabase.from(APP_CONFIG[kind].table).update({ document_refs: next } as never).eq("id", id);
   revalidatePath(wizardPath(kind, id, 5));
+}
+
+// ---------------------------------------------------------------------------
+// Organization logo — optional branding image, not a compliance document:
+// its own bucket (partner-logos, public), no expiry/verify workflow, stored
+// as a path in business_details rather than in document_refs.
+// ---------------------------------------------------------------------------
+export async function uploadOrgLogo(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const kind = kindOf(formData);
+  if (kind === "affiliate") return { error: "Not available for this application type." };
+  const id = String(formData.get("applicationId"));
+  const file = formData.get("file");
+
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to upload." };
+  if (!ALLOWED_LOGO_TYPES.includes(file.type)) return { error: LOGO_TYPE_ERROR };
+  if (file.size > MAX_LOGO_BYTES) return { error: LOGO_SIZE_ERROR };
+
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(kind, id, user.id);
+  if (!application) return { error: "This application can no longer be edited." };
+
+  const previousPath = (application.business_details as Record<string, unknown> | null)?.logoPath;
+
+  const storagePath = `${kind}/${id}/${Date.now()}-${sanitizeFilename(file.name)}`;
+  const { error: uploadError } = await supabase.storage.from("partner-logos").upload(storagePath, file, { contentType: file.type });
+  if (uploadError) return { error: uploadError.message };
+
+  if (typeof previousPath === "string" && previousPath) {
+    await supabase.storage.from("partner-logos").remove([previousPath]);
+  }
+
+  const details = mergeDetails(application.business_details, { logoPath: storagePath, logoFileName: file.name });
+  const { error } = await supabase.from(APP_CONFIG[kind].table).update({ business_details: details } as never).eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath(wizardPath(kind, id, 1));
+  return { error: null };
+}
+
+export async function removeOrgLogo(formData: FormData): Promise<void> {
+  const kind = kindOf(formData);
+  if (kind === "affiliate") return;
+  const id = String(formData.get("applicationId"));
+
+  const user = await requireUser();
+  const { supabase, application } = await getEditableApplication(kind, id, user.id);
+  if (!application) return;
+
+  const logoPath = (application.business_details as Record<string, unknown> | null)?.logoPath;
+  if (typeof logoPath === "string" && logoPath) {
+    await supabase.storage.from("partner-logos").remove([logoPath]);
+  }
+
+  const details = mergeDetails(application.business_details, { logoPath: null, logoFileName: null });
+  await supabase.from(APP_CONFIG[kind].table).update({ business_details: details } as never).eq("id", id);
+  revalidatePath(wizardPath(kind, id, 1));
 }
 
 /** Separate from the upload itself so an applicant can correct/renew the expiry on an already-uploaded license without re-uploading the file. */
@@ -668,10 +762,39 @@ export async function submitApplication(_prev: ActionState, formData: FormData):
   if (!application) return { error: "This application can no longer be edited." };
 
   const details = (application.business_details ?? {}) as Record<string, unknown>;
+  // The agency application is a single scrolling page (no per-step "Continue"
+  // gate to force each section's required fields before the next one is
+  // reachable), so its submit check enumerates every field the page marks
+  // required rather than the three-key spot-check the other kinds rely on.
   const requiredDetailKeys =
-    kind === "affiliate" ? ["fullName", "email", "idNumber"] : ["legalBusinessName", "contactFullName", "contactEmail"];
+    kind === "affiliate"
+      ? ["fullName", "email", "idNumber"]
+      : kind === "agency"
+        ? [
+            "legalBusinessName",
+            "businessType",
+            "yearEstablished",
+            "officeCity",
+            "businessPhone",
+            "businessEmail",
+            "contactFullName",
+            "contactRole",
+            "contactIdNumber",
+            "contactMobile",
+            "contactEmail",
+            "monthlyVolume",
+            "paymentModel",
+          ]
+        : ["legalBusinessName", "contactFullName", "contactEmail"];
   if (requiredDetailKeys.some((key) => !details[key])) {
-    return { error: "Please complete the earlier steps before submitting." };
+    return {
+      error: kind === "agency" ? "Complete all required fields above before submitting." : "Please complete the earlier steps before submitting.",
+    };
+  }
+  // Checked separately from the list above: 0% is a legitimate markup and
+  // the falsy test there would reject it.
+  if (kind === "agency" && (details.requestedMarkupPercent === null || details.requestedMarkupPercent === undefined)) {
+    return { error: "Select your markup rate before submitting." };
   }
 
   const refs: DocumentRef[] = Array.isArray(application.document_refs) ? (application.document_refs as DocumentRef[]) : [];
@@ -689,6 +812,7 @@ export async function submitApplication(_prev: ActionState, formData: FormData):
   // reference number or overwrite its original submission timestamp —
   // both are things admins and applicants already cite when talking about
   // this specific application.
+  const wasAlreadySubmitted = application.status === "pending" || application.status === "under_review";
   let refData = application.reference_number;
   if (!refData) {
     const { data: newRef, error: refError } = await supabase.rpc(cfg.refRpc);
@@ -705,6 +829,16 @@ export async function submitApplication(_prev: ActionState, formData: FormData):
     })
     .eq("id", id);
   if (error) return { error: error.message };
+
+  // A fresh draft/more_info_requested -> pending transition is already
+  // covered by the notify_on_application_submitted DB trigger. This is the
+  // other case: the applicant edited an application that was already
+  // pending/under_review and explicitly resubmitted it — status never
+  // transitions, so that trigger stays silent by design, and admins would
+  // otherwise never learn the edit happened at all.
+  if (wasAlreadySubmitted) {
+    await supabase.rpc("notify_admins_application_updated", { p_kind: kind, p_application_id: id });
+  }
 
   revalidatePath("/account/become");
   redirect(

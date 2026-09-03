@@ -35,7 +35,7 @@ export function LowBalanceBanner() {
           <AlertTitle>{n.title}</AlertTitle>
           <AlertDescription className="flex flex-wrap items-center gap-2">
             <span>{n.body}</span>
-            <Button size="sm" variant="outline" className="h-7" render={<Link href="/agent/wallet" />}>
+            <Button size="sm" variant="outline" className="h-7" render={<Link href="/agent/finance" />}>
               Go to Wallet
             </Button>
           </AlertDescription>

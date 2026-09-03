@@ -59,7 +59,6 @@ export function PhoneField({
       <Input
         inputMode="numeric"
         autoComplete="tel-national"
-        placeholder="615551234"
         value={number}
         onChange={(e) => handleNumberChange(e.target.value)}
         required={required}

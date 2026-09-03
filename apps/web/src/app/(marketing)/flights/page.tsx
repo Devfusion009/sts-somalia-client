@@ -32,6 +32,7 @@ import {
   type FlightSearchDefaults,
 } from "@/modules/flights/components/flight-search-form";
 import { QuoteRequestForm } from "@/modules/flights/components/quote-request-form";
+import { AgencyBookingSlot } from "@/modules/agencies/components/agency-booking-slot";
 
 export const metadata: Metadata = { title: "Flights" };
 
@@ -262,7 +263,7 @@ export default async function FlightsPage({
                   <p className="mb-4 text-xs text-muted-foreground">
                     Send a quote request and our team will hold the fare and arrange payment.
                   </p>
-                  <QuoteRequestForm defaults={defaults} signedIn={Boolean(profile)} />
+                  <QuoteRequestForm defaults={defaults} signedIn={Boolean(profile)} bookedForSlot={<AgencyBookingSlot />} />
                 </CardContent>
               </Card>
             </div>
@@ -287,7 +288,7 @@ export default async function FlightsPage({
                 </p>
               </CardHeader>
               <CardContent>
-                <QuoteRequestForm defaults={defaults} signedIn={Boolean(profile)} />
+                <QuoteRequestForm defaults={defaults} signedIn={Boolean(profile)} bookedForSlot={<AgencyBookingSlot />} />
               </CardContent>
             </Card>
           )}

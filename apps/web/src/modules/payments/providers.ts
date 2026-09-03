@@ -1,12 +1,36 @@
 import "server-only";
 import { getIntegrations } from "@/lib/integrations";
+import { portalOrigin } from "@/lib/subdomain";
 import type { PaymentMethodDef } from "./registry";
 
 /**
- * Gateway adapters. Each adapter takes the created (still-unsettled) payment
- * row and returns one uniform result the checkout flow can act on. All HTTP
- * is plain fetch — no per-gateway SDK dependencies.
+ * Gateway adapters. Each adapter takes one neutral `GatewayCharge` and
+ * returns a uniform result the caller can act on. All HTTP is plain fetch —
+ * no per-gateway SDK dependencies.
+ *
+ * The charge is deliberately purpose-agnostic: a customer paying for an
+ * order and an agency funding its wallet are the same operation as far as a
+ * gateway is concerned, so both go through these adapters and a new gateway
+ * only has to be written once. `initiateWithProvider` (checkout) and
+ * `initiateTopupWithProvider` (wallet funding) differ only in the charge
+ * they build.
  */
+
+export type GatewayCharge = {
+  /** Our own record id — a payments row, or an agency_topup_requests row. */
+  recordId: string;
+  /** Human-facing reference shown to the payer and sent to the gateway. */
+  reference: string;
+  amount: number;
+  currency: string;
+  description: string;
+  method: PaymentMethodDef;
+  payerPhone?: string;
+  successUrl: string;
+  cancelUrl: string;
+  /** Passed through to the gateway so its webhook can find this record. */
+  metadata: Record<string, string>;
+};
 
 export type InitiationInput = {
   paymentId: string;
@@ -26,9 +50,65 @@ export type InitiationResult =
   | { type: "error"; message: string };
 
 export async function initiateWithProvider(input: InitiationInput): Promise<InitiationResult> {
+  const { siteUrl } = getIntegrations();
+  return chargeWithProvider({
+    recordId: input.paymentId,
+    reference: input.orderNumber,
+    amount: input.amount,
+    currency: input.currency,
+    description: input.description,
+    method: input.method,
+    payerPhone: input.payerPhone,
+    successUrl: `${siteUrl}/checkout/${input.orderId}/success`,
+    cancelUrl: `${siteUrl}/checkout/${input.orderId}`,
+    metadata: { order_id: input.orderId, payment_id: input.paymentId },
+  });
+}
+
+export type TopupInitiationInput = {
+  topupId: string;
+  agencyName: string;
+  amount: number;
+  currency: string;
+  method: PaymentMethodDef;
+  payerPhone?: string;
+};
+
+/**
+ * Wallet funding through the same gateways as checkout. Manual methods never
+ * reach here — those are the offline rail, where an admin confirms the money
+ * arrived (see review_agency_topup).
+ */
+export async function initiateTopupWithProvider(input: TopupInitiationInput): Promise<InitiationResult> {
+  const { siteUrl } = getIntegrations();
+  if (input.method.provider === "manual" || input.method.provider === "wallet") {
+    return { type: "error", message: "That method is confirmed by STS, not by a gateway." };
+  }
+
+  // Where the gateway sends the agent back. NOT siteUrl: that is the B2C
+  // origin, and once the portals are split across hosts, /agent on the public
+  // host is exactly what proxy.ts blocks — the agent would finish paying and
+  // land on the storefront. portalOrigin() returns "" while portals are still
+  // path-based, which correctly falls back to the single origin.
+  const agentOrigin = portalOrigin("agent") || siteUrl;
+  return chargeWithProvider({
+    recordId: input.topupId,
+    reference: `TOPUP-${input.topupId.slice(0, 8).toUpperCase()}`,
+    amount: input.amount,
+    currency: input.currency,
+    description: `STS wallet top-up · ${input.agencyName}`,
+    method: input.method,
+    payerPhone: input.payerPhone,
+    successUrl: `${agentOrigin}/agent/finance/top-up?status=success`,
+    cancelUrl: `${agentOrigin}/agent/finance/top-up?status=cancelled`,
+    metadata: { topup_id: input.topupId },
+  });
+}
+
+async function chargeWithProvider(input: GatewayCharge): Promise<InitiationResult> {
   switch (input.method.provider) {
     case "test":
-      return { type: "success", providerRef: `test_${input.paymentId}` };
+      return { type: "success", providerRef: `test_${input.recordId}` };
     case "manual":
       return initiateManual(input);
     case "stripe":
@@ -44,7 +124,7 @@ export async function initiateWithProvider(input: InitiationInput): Promise<Init
   }
 }
 
-function initiateManual(input: InitiationInput): InitiationResult {
+function initiateManual(input: GatewayCharge): InitiationResult {
   const { bankTransfer } = getIntegrations();
   if (input.method.id === "bank_transfer") {
     return {
@@ -52,32 +132,30 @@ function initiateManual(input: InitiationInput): InitiationResult {
       instructions:
         `Transfer ${input.currency} ${input.amount.toFixed(2)} to ${bankTransfer.bankName}, ` +
         `account "${bankTransfer.accountName}", account no. ${bankTransfer.accountNumber}. ` +
-        `Use ${input.orderNumber} as the transfer reference, then share the receipt with our team ` +
+        `Use ${input.reference} as the transfer reference, then share the receipt with our team ` +
         `on +252 611 444 420. We confirm transfers within one working day.`,
     };
   }
   return {
     type: "instructions",
     instructions:
-      `Visit any STS office and quote order ${input.orderNumber} to pay ` +
+      `Visit any STS office and quote ${input.reference} to pay ` +
       `${input.currency} ${input.amount.toFixed(2)} in cash. Head office: Sultan Business Park, ` +
       `Waaberi District, 21 Oct Street, Muqdisho — open Sat–Thu, 8:00–17:00.`,
   };
 }
 
-async function initiateStripe(input: InitiationInput): Promise<InitiationResult> {
-  const { siteUrl } = getIntegrations();
+async function initiateStripe(input: GatewayCharge): Promise<InitiationResult> {
   const params = new URLSearchParams({
     mode: "payment",
     "line_items[0][price_data][currency]": input.currency.toLowerCase(),
     "line_items[0][price_data][product_data][name]": input.description,
     "line_items[0][price_data][unit_amount]": String(Math.round(input.amount * 100)),
     "line_items[0][quantity]": "1",
-    success_url: `${siteUrl}/checkout/${input.orderId}/success`,
-    cancel_url: `${siteUrl}/checkout/${input.orderId}`,
-    client_reference_id: input.orderId,
-    "metadata[order_id]": input.orderId,
-    "metadata[payment_id]": input.paymentId,
+    success_url: input.successUrl,
+    cancel_url: input.cancelUrl,
+    client_reference_id: input.recordId,
+    ...Object.fromEntries(Object.entries(input.metadata).map(([k, v]) => [`metadata[${k}]`, v])),
   });
 
   const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
@@ -96,10 +174,10 @@ async function initiateStripe(input: InitiationInput): Promise<InitiationResult>
 }
 
 /** WaafiPay wallet purchase (EVC Plus / ZAAD / Sahal) — pushes a USSD approval to the payer. */
-async function initiateWaafi(input: InitiationInput): Promise<InitiationResult> {
+async function initiateWaafi(input: GatewayCharge): Promise<InitiationResult> {
   const body = {
     schemaVersion: "1.0",
-    requestId: input.paymentId,
+    requestId: input.recordId,
     timestamp: new Date().toISOString(),
     channelName: "WEB",
     serviceName: "API_PURCHASE",
@@ -110,8 +188,8 @@ async function initiateWaafi(input: InitiationInput): Promise<InitiationResult> 
       paymentMethod: "MWALLET_ACCOUNT",
       payerInfo: { accountNo: input.payerPhone },
       transactionInfo: {
-        referenceId: input.orderNumber,
-        invoiceId: input.paymentId,
+        referenceId: input.reference,
+        invoiceId: input.recordId,
         amount: input.amount.toFixed(2),
         currency: input.currency,
         description: input.description,
@@ -139,7 +217,7 @@ async function initiateWaafi(input: InitiationInput): Promise<InitiationResult> 
 }
 
 /** eDahab invoice — customer approves it from the eDahab app/USSD menu. */
-async function initiateEdahab(input: InitiationInput): Promise<InitiationResult> {
+async function initiateEdahab(input: GatewayCharge): Promise<InitiationResult> {
   const body = {
     apiKey: process.env.EDAHAB_API_KEY,
     edahabNumber: input.payerPhone,

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,12 +65,7 @@ export function VisaTypeEditor({ visaType }: { visaType?: VisaType }) {
   return (
     <div className="space-y-6 pb-24">
       <div>
-        <Link
-          href="/admin/catalog/visa"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" /> All visa types
-        </Link>
+        <BackLink href="/admin/catalog/visa" label="All visa types" />
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="font-heading text-2xl font-semibold">
             {isEdit ? `Edit visa type` : "Add visa type"}

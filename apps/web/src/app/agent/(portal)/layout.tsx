@@ -8,8 +8,10 @@ import { getMyPartnerAccountId, getPartnerAccount } from "@/modules/admin/partne
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
 import { OnboardingStatusBanner } from "@/components/portal/onboarding-status-banner";
+import { AgentNotificationBell } from "@/components/portal/agent-notification-bell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getServerTrpc } from "@/lib/trpc/server";
 
 /** Portal-scoped title — see the admin portal layout for why this lives on the layout. */
 export const metadata: Metadata = {
@@ -24,27 +26,30 @@ const NAV_GROUPS: PortalNavGroup[] = [
     label: "Agent",
     items: [
       { href: "/agent", label: "Dashboard", icon: "overview" },
+      { href: "/agent/book", label: "New Booking", icon: "new-booking" },
       { href: "/agent/bookings", label: "Bookings", icon: "bookings" },
       { href: "/agent/calendar", label: "Event Calendar", icon: "calendar" },
       { href: "/agent/customers", label: "Customers", icon: "profile" },
     ],
   },
+  // Ordered as the money actually moves: what's in the account, what moved
+  // through it, what can be taken out, what STS billed, what was earned,
+  // and the rate that earning is calculated from.
   {
     label: "Finance",
     items: [
-      { href: "/agent/wallet", label: "Wallet", icon: "payouts" },
-      { href: "/agent/reports", label: "Earnings", icon: "payments" },
+      { href: "/agent/finance", label: "Overview", icon: "payouts" },
+      { href: "/agent/finance/transactions", label: "Transactions", icon: "payments" },
+      { href: "/agent/finance/withdrawals", label: "Withdraw Earnings", icon: "bank" },
+      { href: "/agent/finance/billing", label: "Billing", icon: "invoice" },
+      { href: "/agent/reports", label: "Earnings", icon: "earnings" },
       { href: "/agent/markups", label: "Markups", icon: "catalog" },
     ],
   },
   {
     label: "My Account",
     items: [
-      { href: "/agent/invoices", label: "My Invoices", icon: "invoice" },
       { href: "/agent/bank-details", label: "Bank Details", icon: "bank" },
-      { href: "/agent/credit-notes", label: "Credit Notes", icon: "credit-note" },
-      { href: "/agent/debit-notes", label: "Debit Notes", icon: "debit-note" },
-      { href: "/agent/statement", label: "Statement", icon: "statement" },
       { href: "/agent/refunds", label: "Refunds", icon: "refund" },
     ],
   },
@@ -90,9 +95,15 @@ export default async function AgentLayout({ children }: { children: React.ReactN
     return <PortalSuspendedNotice portalLabel="Agent Portal" />;
   }
 
-  const [accountId, contexts] = await Promise.all([
+  const trpc = await getServerTrpc();
+  const [accountId, contexts, notifications] = await Promise.all([
     getMyPartnerAccountId("agency", membership.agency.id),
     getMyPartnerContexts(profile.id, profile.full_name),
+    // apps/api is a separate deployment (not yet reachable from every
+    // environment) — the rest of the agent portal has nothing to do with
+    // notifications, so it shouldn't 500 just because that one dependency
+    // is down.
+    trpc.notifications.unread.query({ limit: 10 }).catch(() => []),
   ]);
   const account = accountId ? await getPartnerAccount(accountId) : null;
 
@@ -115,6 +126,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
       isPlatformAdmin={profile.is_platform_admin}
       accent="agent"
       brandLogoUrl={agencyLogoUrl(membership.agency.logo_path)}
+      headerExtra={<AgentNotificationBell notifications={notifications} />}
     >
       {account ? <OnboardingStatusBanner checklist={account.checklist} /> : null}
       {children}

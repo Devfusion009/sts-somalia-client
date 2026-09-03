@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { updateAgencyProfileAction } from "@/modules/agencies/settings-actions";
 
@@ -15,6 +16,9 @@ export function AgencyProfileForm({
   contactEmail,
   contactPhone,
   countryCode,
+  about,
+  website,
+  address,
 }: {
   name: string;
   legalName: string | null;
@@ -22,6 +26,9 @@ export function AgencyProfileForm({
   contactEmail: string;
   contactPhone: string | null;
   countryCode: string | null;
+  about: string | null;
+  website: string | null;
+  address: string | null;
 }) {
   const [state, formAction] = useActionState(updateAgencyProfileAction, null);
 
@@ -75,6 +82,18 @@ export function AgencyProfileForm({
         <div className="space-y-1.5">
           <Label htmlFor="contactPhone">Contact phone</Label>
           <Input id="contactPhone" name="contactPhone" type="tel" defaultValue={contactPhone ?? ""} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="website">Website</Label>
+          <Input id="website" name="website" type="url" defaultValue={website ?? ""} placeholder="https://" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="address">Office address</Label>
+          <Input id="address" name="address" defaultValue={address ?? ""} />
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="about">About the agency</Label>
+          <Textarea id="about" name="about" rows={3} maxLength={600} defaultValue={about ?? ""} />
         </div>
       </div>
 

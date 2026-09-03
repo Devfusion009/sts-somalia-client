@@ -127,12 +127,63 @@ async function notifyApplicantInApp(
   });
 }
 
+/**
+ * Moves the branding logo an applicant uploaded during the wizard (public
+ * `partner-logos` bucket, keyed by application id) into the approved
+ * agency's own `agency-logos` bucket (keyed by agency id, the bucket
+ * agencyLogoUrl reads from) and points agencies.logo_path at it. Best
+ * effort: approval has already succeeded by the time this runs, so a
+ * failure here just leaves the agency without a logo rather than failing
+ * the approval.
+ */
+async function carryOverAgencyLogo(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  agencyId: string,
+  logoPath: string
+) {
+  const { data: file, error: downloadError } = await supabase.storage.from("partner-logos").download(logoPath);
+  if (downloadError || !file) return;
+
+  const filename = logoPath.split("/").pop() ?? "logo";
+  const storagePath = `${agencyId}/${Date.now()}-${filename}`;
+  const { error: uploadError } = await supabase.storage
+    .from("agency-logos")
+    .upload(storagePath, file, { contentType: file.type });
+  if (uploadError) return;
+
+  await supabase.from("agencies").update({ logo_path: storagePath }).eq("id", agencyId);
+}
+
 const APPLICATION_SLUG: Record<ApplicationType, string> = {
   agency: "agency",
   hotel_partner: "hotel-partner",
   affiliate: "affiliate",
   venue_partner: "venue-partner",
 };
+
+/**
+ * Every required KYC document must be individually marked Verified (on the
+ * application's Documents tab) before the application itself can be
+ * approved — approving used to be possible with zero documents reviewed,
+ * which let a partner account go live with unverified KYC.
+ */
+async function findUnverifiedRequiredDocs(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  type: ApplicationType,
+  applicationId: string
+): Promise<string[]> {
+  const requiredDocs = docSlotsFor(type).filter((slot) => !slot.optional);
+  if (requiredDocs.length === 0) return [];
+
+  const { data: reviews } = await supabase
+    .from("partner_document_reviews")
+    .select("doc_key, status")
+    .eq("application_type", type)
+    .eq("application_id", applicationId);
+
+  const verifiedKeys = new Set((reviews ?? []).filter((r) => r.status === "verified").map((r) => r.doc_key));
+  return requiredDocs.filter((slot) => !verifiedKeys.has(slot.key)).map((slot) => slot.label);
+}
 
 /**
  * "Approve & Create Partner Account". The RPC provisions the operational
@@ -153,6 +204,11 @@ export async function approveApplication(
   const note = String(formData.get("note") ?? "").trim() || undefined;
   const supabase = await createClient();
 
+  const unverified = await findUnverifiedRequiredDocs(supabase, type, applicationId);
+  if (unverified.length > 0) {
+    return { error: `Verify all required documents before approving: ${unverified.join(", ")}.` };
+  }
+
   const info = await loadApplicantInfo(supabase, type, applicationId);
 
   let error: { message: string } | null = null;
@@ -163,9 +219,8 @@ export async function approveApplication(
       .select("business_details")
       .eq("id", applicationId)
       .maybeSingle();
-    const products = Array.isArray((appRow?.business_details as { products?: unknown } | null)?.products)
-      ? ((appRow!.business_details as { products: unknown[] }).products as string[])
-      : [];
+    const businessDetails = appRow?.business_details as { products?: unknown; logoPath?: unknown } | null;
+    const products = Array.isArray(businessDetails?.products) ? (businessDetails!.products as string[]) : [];
     const allowedProducts = products.map((p) => PRODUCT_TO_ITEM_TYPE[p]).filter((p): p is NonNullable<typeof p> => !!p);
 
     const result = await supabase.rpc("approve_agency_application", {
@@ -174,6 +229,11 @@ export async function approveApplication(
       p_note: note,
     });
     error = result.error;
+
+    const logoPath = typeof businessDetails?.logoPath === "string" ? businessDetails.logoPath : null;
+    if (!error && result.data && logoPath) {
+      await carryOverAgencyLogo(supabase, result.data, logoPath);
+    }
   } else {
     const result = await supabase.rpc(APPROVE_RPC[type], { application_id: applicationId, p_note: note });
     error = result.error;

@@ -5,7 +5,6 @@ import { UserPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -38,10 +37,6 @@ export function OnboardPartnerDialog() {
         <form action={formAction}>
           <DialogHeader>
             <DialogTitle>Onboard a hotel partner</DialogTitle>
-            <DialogDescription>
-              For a hotel operator STS already has a deal with — skips the self-serve application
-              queue and creates their partner account immediately.
-            </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">

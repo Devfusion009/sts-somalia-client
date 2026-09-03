@@ -4,11 +4,21 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { assertAgencyCanBookProduct, createOrderForBooking, getActiveAgencyId } from "@/modules/orders/helpers";
+import {
+  assertAgencyCanBookProduct,
+  createOrderForBooking,
+  deskOrderPath,
+  getActiveAgencyId,
+  isDeskBooking,
+} from "@/modules/orders/helpers";
 import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
 import { notifyPartnerOfBooking } from "@/lib/notifications/partner-booking-notify";
 
-export type ActionState = { error: string | null } | null;
+export type ActionState = {
+  error: string | null;
+  destination?: string;
+  orderId?: string;
+} | null;
 
 const bookingSchema = z.object({
   venueId: z.string().uuid(),
@@ -156,6 +166,10 @@ export async function createHallBooking(
   // gymnastics whenever the venue quotes differently. The request lands in
   // the admin queue; the customer pays from their booking page once the
   // price is confirmed. Fixed-price venues keep the pay-now flow.
+  if (isDeskBooking(formData, agencyId)) {
+    return { error: null, destination: deskOrderPath(order.id), orderId: order.id };
+  }
+
   if (venue.price_unit === "per_person" || Number(venue.base_price) === 0) {
     redirect(`/account/bookings/${order.id}?requested=1`);
   }

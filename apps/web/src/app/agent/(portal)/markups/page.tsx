@@ -1,9 +1,8 @@
-import { Percent, Trash2 } from "lucide-react";
+import { format } from "date-fns";
 import { requireUser } from "@/lib/auth/session";
-import { getMyAgency, getAgencyMarkups } from "@/modules/agencies/queries";
-import { deleteAgencyMarkup } from "@/modules/agencies/markup-actions";
+import { getMyAgency, getAgencyMarkups, getAgencyMarkupRequests } from "@/modules/agencies/queries";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { WithdrawRequestButton, RequestRemovalButton } from "./markup-row-actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -13,14 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { scopeLabel, markupLabel, requestedLabel } from "@/modules/agencies/markup-labels";
 import { MarkupForm } from "./markup-form";
 
-const VERTICAL_LABELS: Record<string, string> = {
-  hotel: "Hotels",
-  flight: "Flights",
-  visa: "Visa",
-  umrah: "Umrah",
-  hall: "Events & Halls",
+const REQUEST_STATUS_STYLES: Record<string, string> = {
+  pending: "bg-brand-gold/15 text-brand-gold",
+  approved: "bg-primary/10 text-primary",
+  rejected: "bg-destructive/10 text-destructive",
 };
 
 export default async function AgentMarkupsPage() {
@@ -28,49 +27,88 @@ export default async function AgentMarkupsPage() {
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
 
-  // Owner and admin both manage markups (matches the RLS policy on
-  // agency_markups) — kept as `isOwner` to minimize diff noise below.
   const isOwner = membership.roleInAgency === "owner" || membership.roleInAgency === "admin";
-  const markups = await getAgencyMarkups(membership.agency.id);
+  const [markups, requests] = await Promise.all([
+    getAgencyMarkups(membership.agency.id),
+    getAgencyMarkupRequests(membership.agency.id),
+  ]);
+  const pendingScopes = new Set(requests.filter((r) => r.status === "pending").map((r) => r.item_type ?? "all"));
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Markups</h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          Your margin on top of STS net prices. When your agency books, the markup is added to
-          the price automatically — and paid back to you as earnings when the order settles. A
-          vertical-specific rule overrides the default.
-        </p>
-      </div>
+      <h1 className="font-heading text-2xl font-bold">Markups</h1>
 
       {isOwner ? (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Percent className="size-4 text-primary" /> Add or update a rule
-            </CardTitle>
+            <CardTitle className="text-base">Add or update a rule</CardTitle>
           </CardHeader>
           <CardContent>
-            <MarkupForm />
+            <MarkupForm pendingScopes={[...pendingScopes]} />
           </CardContent>
         </Card>
-      ) : (
-        <Card className="bg-secondary/60">
-          <CardContent className="pt-6 text-sm text-muted-foreground">
-            Markup rules are managed by your agency owner — shown here for reference.
-          </CardContent>
+      ) : null}
+
+      {requests.length > 0 ? (
+        <Card className="overflow-hidden py-0">
+          <CardHeader className="border-b border-border !py-4">
+            <CardTitle className="text-base">Change requests</CardTitle>
+          </CardHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Applies to</TableHead>
+                <TableHead>Requested</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Reviewed</TableHead>
+                {isOwner ? <TableHead className="text-right">Actions</TableHead> : null}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {requests.map((request) => (
+                <TableRow key={request.id}>
+                  <TableCell className="font-medium">{scopeLabel(request.item_type)}</TableCell>
+                  <TableCell className="font-semibold">
+                    {requestedLabel(request)}
+                    <p className="text-xs font-normal text-muted-foreground">
+                      {format(new Date(request.requested_at), "dd MMM yyyy, hh:mm a")}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={cn("border-transparent capitalize", REQUEST_STATUS_STYLES[request.status])}>
+                      {request.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="max-w-xs text-sm">
+                    {request.reviewed_at ? (
+                      <>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(request.reviewed_at), "dd MMM yyyy, hh:mm a")}
+                        </p>
+                        {request.review_note ? <p className="mt-0.5">{request.review_note}</p> : null}
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  {isOwner ? (
+                    <TableCell className="text-right">
+                      {request.status === "pending" ? <WithdrawRequestButton requestId={request.id} /> : null}
+                    </TableCell>
+                  ) : null}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Card>
-      )}
+      ) : null}
 
       <Card className="overflow-hidden py-0">
         <CardHeader className="border-b border-border !py-4">
           <CardTitle className="text-base">Active Rules</CardTitle>
         </CardHeader>
         {markups.length === 0 ? (
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No markup rules yet — bookings use STS net prices as-is.
-          </CardContent>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">No markup rules yet.</CardContent>
         ) : (
           <Table>
             <TableHeader>
@@ -87,29 +125,17 @@ export default async function AgentMarkupsPage() {
                     {rule.item_type === null ? (
                       <Badge variant="secondary">All services (default)</Badge>
                     ) : (
-                      <span className="font-medium">
-                        {VERTICAL_LABELS[rule.item_type] ?? rule.item_type}
-                      </span>
+                      <span className="font-medium">{scopeLabel(rule.item_type)}</span>
                     )}
                   </TableCell>
-                  <TableCell className="font-semibold">
-                    {rule.markup_type === "percent"
-                      ? `${Number(rule.value)}%`
-                      : `USD ${Number(rule.value).toFixed(2)}`}
-                  </TableCell>
+                  <TableCell className="font-semibold">{markupLabel(rule.markup_type, rule.value)}</TableCell>
                   {isOwner ? (
                     <TableCell className="text-right">
-                      <form action={deleteAgencyMarkup} className="inline">
-                        <input type="hidden" name="markupId" value={rule.id} />
-                        <Button
-                          type="submit"
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="size-3.5" /> Remove
-                        </Button>
-                      </form>
+                      {pendingScopes.has(rule.item_type ?? "all") ? (
+                        <Badge className={cn("border-transparent", REQUEST_STATUS_STYLES.pending)}>Change pending</Badge>
+                      ) : (
+                        <RequestRemovalButton markupId={rule.id} />
+                      )}
                     </TableCell>
                   ) : null}
                 </TableRow>

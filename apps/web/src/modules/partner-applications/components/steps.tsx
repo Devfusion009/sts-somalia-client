@@ -2,7 +2,35 @@
 
 import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, ArrowLeft, Check, CloudUpload, FileCheck2, FileText, Loader2, MoreVertical, Paperclip, ShieldCheck, XCircle } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  ArrowLeft,
+  Building2,
+  Check,
+  CloudUpload,
+  FileBadge2,
+  FileCheck2,
+  FileText,
+  Globe,
+  Handshake,
+  Hash,
+  IdCard,
+  Landmark,
+  Loader2,
+  Mail,
+  MapPinned,
+  MoreVertical,
+  Paperclip,
+  Receipt,
+  Shield,
+  ShieldCheck,
+  Tag,
+  User,
+  Wallet,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -17,6 +45,8 @@ import { PhoneField } from "./phone-field";
 import { AnalogTimeField } from "./analog-time-field";
 import { RoomTypesField, type RoomTypeRow } from "./room-types-field";
 import { RoleField } from "./role-field";
+import { CountryField } from "./country-field";
+import { YearField } from "./year-field";
 import { LocationField } from "@/components/location-field";
 import {
   saveStep1,
@@ -39,6 +69,8 @@ import {
   CURRENT_YEAR,
   VOLUME_RANGES,
   PRODUCTS,
+  ORG_MEMBER_TYPES,
+  ORG_MEMBER_TYPE_LABELS,
   TRAFFIC_SOURCES,
   AUDIENCE_LOCATIONS,
   AUDIENCE_LOCATION_LABELS,
@@ -53,6 +85,7 @@ import {
   CANCELLATION_POLICY_LABELS,
   PAYOUT_FREQUENCIES,
   PAYOUT_FREQUENCY_LABELS,
+  MARKUP_PRESETS,
   docSlotsFor,
   missingRequiredDocSlots,
   stepLabel,
@@ -60,11 +93,30 @@ import {
   type DocSlot,
 } from "../config";
 import type { ApplicationRow, DocumentRef, DocumentReview } from "../queries";
+import { partnerLogoUrl } from "../logo-url";
 
 type AppRow = ApplicationRow;
 
 function s(v: unknown): string {
   return typeof v === "string" ? v : "";
+}
+
+const BUSINESS_TYPE_ICONS: Record<(typeof BUSINESS_TYPES)[number], LucideIcon> = {
+  sole_proprietorship: User,
+  partnership: Handshake,
+  llc: Shield,
+  corporation: Landmark,
+};
+
+
+/** A plain `<Input>` with a leading icon — the small visual lift image-based reference forms use on every field, applied to this wizard's identity/document-number inputs. */
+function IconInput({ icon: Icon, className, ...props }: { icon: LucideIcon } & React.ComponentProps<typeof Input>) {
+  return (
+    <div className="relative">
+      <Icon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Input className={cn("pl-9", className)} {...props} />
+    </div>
+  );
 }
 
 /**
@@ -273,38 +325,36 @@ export function StepBusiness({ kind, application, backHref }: { kind: Applicatio
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Legal business name *</Label>
-          <Input name="legalBusinessName" defaultValue={s(d.legalBusinessName)} required />
+          <IconInput icon={Building2} name="legalBusinessName" defaultValue={s(d.legalBusinessName)} required />
         </div>
         <div className="space-y-1.5">
           <Label>Trading name (if different)</Label>
-          <Input name="tradingName" defaultValue={s(d.tradingName)} />
+          <IconInput icon={Tag} name="tradingName" defaultValue={s(d.tradingName)} />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 sm:col-span-2">
           <Label>Business type *</Label>
           <OptionPicker
             name="businessType"
             defaultValue={s(d.businessType)}
-            options={BUSINESS_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) }))}
+            layout="cards"
+            options={BUSINESS_TYPES.map((t) => ({
+              value: t,
+              label: t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+              icon: BUSINESS_TYPE_ICONS[t],
+            }))}
           />
         </div>
         <div className="space-y-1.5">
           <Label>Year established *</Label>
-          <Input
-            name="yearEstablished"
-            type="number"
-            min={EARLIEST_BUSINESS_YEAR}
-            max={CURRENT_YEAR}
-            defaultValue={s(d.yearEstablished)}
-            required
-          />
+          <YearField name="yearEstablished" defaultValue={s(d.yearEstablished)} min={EARLIEST_BUSINESS_YEAR} max={CURRENT_YEAR} required />
         </div>
         <div className="space-y-1.5">
           <Label>Business registration number</Label>
-          <Input name="registrationNumber" defaultValue={s(d.registrationNumber)} />
+          <IconInput icon={FileBadge2} name="registrationNumber" defaultValue={s(d.registrationNumber)} />
         </div>
         <div className="space-y-1.5">
           <Label>Tax identification number</Label>
-          <Input name="taxId" defaultValue={s(d.taxId)} />
+          <IconInput icon={Receipt} name="taxId" defaultValue={s(d.taxId)} />
         </div>
       </div>
 
@@ -312,15 +362,19 @@ export function StepBusiness({ kind, application, backHref }: { kind: Applicatio
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="space-y-1.5 sm:col-span-3">
           <Label>Office street address</Label>
-          <Input name="officeStreet" defaultValue={s(d.officeStreet)} />
+          <IconInput icon={MapPinned} name="officeStreet" defaultValue={s(d.officeStreet)} />
         </div>
         <div className="space-y-1.5">
           <Label>City *</Label>
           <LocationField name="officeCity" defaultValue={s(d.officeCity)} required />
         </div>
-        <div className="space-y-1.5 sm:col-span-2">
+        <div className="space-y-1.5">
           <Label>Region</Label>
           <Input name="officeRegion" defaultValue={s(d.officeRegion)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Country</Label>
+          <CountryField name="officeCountry" defaultValue={s(d.officeCountry) || "Somalia"} />
         </div>
       </div>
 
@@ -346,11 +400,11 @@ export function StepBusiness({ kind, application, backHref }: { kind: Applicatio
         </div>
         <div className="space-y-1.5">
           <Label>Business email *</Label>
-          <Input name="businessEmail" type="email" defaultValue={s(d.businessEmail)} required />
+          <IconInput icon={Mail} name="businessEmail" type="email" defaultValue={s(d.businessEmail)} required />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Website (optional)</Label>
-          <Input name="website" defaultValue={s(d.website)} placeholder="https://" />
+          <IconInput icon={Globe} name="website" defaultValue={s(d.website)} placeholder="https://" />
         </div>
       </div>
 
@@ -394,7 +448,7 @@ export function StepContact({ kind, application }: { kind: ApplicationKind; appl
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Full name *</Label>
-          <Input name="contactFullName" defaultValue={s(d.contactFullName)} required />
+          <IconInput icon={User} name="contactFullName" defaultValue={s(d.contactFullName)} required />
         </div>
         <div className="space-y-1.5">
           <Label>Role / title *</Label>
@@ -402,7 +456,7 @@ export function StepContact({ kind, application }: { kind: ApplicationKind; appl
         </div>
         <div className="space-y-1.5">
           <Label>National ID or passport number *</Label>
-          <Input name="contactIdNumber" defaultValue={s(d.contactIdNumber)} required />
+          <IconInput icon={IdCard} name="contactIdNumber" defaultValue={s(d.contactIdNumber)} required />
         </div>
         <div className="space-y-1.5">
           <Label>Mobile number *</Label>
@@ -410,7 +464,7 @@ export function StepContact({ kind, application }: { kind: ApplicationKind; appl
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Email *</Label>
-          <Input name="contactEmail" type="email" defaultValue={s(d.contactEmail)} required />
+          <IconInput icon={Mail} name="contactEmail" type="email" defaultValue={s(d.contactEmail)} required />
         </div>
       </div>
 
@@ -462,6 +516,52 @@ function ProductsField({ initial }: { initial: string[] }) {
       </div>
       {/* the server action reads "products" as one comma-joined string, not repeated form entries */}
       <input type="hidden" name="products" value={checked.join(",")} />
+    </div>
+  );
+}
+
+/** Yes/No gate over a trade-association type picker — the picker (and the membership certificate upload elsewhere on the page) only makes sense once "Yes" is chosen. */
+function OrgMemberField({
+  initialIsMember,
+  initialType,
+  initialNumber,
+}: {
+  initialIsMember: string;
+  initialType: string;
+  initialNumber: string;
+}) {
+  const [isMember, setIsMember] = useState(initialIsMember || "no");
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="space-y-1.5">
+        <Label>Member of a travel trade association?</Label>
+        <OptionPicker
+          name="isOrgMember"
+          defaultValue={isMember}
+          onChange={setIsMember}
+          options={[
+            { value: "yes", label: "Yes" },
+            { value: "no", label: "No" },
+          ]}
+        />
+      </div>
+      {isMember === "yes" ? (
+        <>
+          <div className="space-y-1.5">
+            <Label>Association</Label>
+            <OptionPicker
+              name="orgMemberType"
+              defaultValue={initialType}
+              options={ORG_MEMBER_TYPES.map((t) => ({ value: t, label: ORG_MEMBER_TYPE_LABELS[t] }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Membership number</Label>
+            <Input name="iataNumber" defaultValue={initialNumber} />
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -697,11 +797,10 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
             options={VOLUME_RANGES.map((r) => ({ value: r, label: r }))}
           />
         </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label>IATA number or local travel association license (optional)</Label>
-          <Input name="iataNumber" defaultValue={s(d.iataNumber)} />
-        </div>
       </div>
+      <Separator />
+      <OrgMemberField initialIsMember={s(d.isOrgMember)} initialType={s(d.orgMemberType)} initialNumber={s(d.iataNumber)} />
+      <Separator />
       <ProductsField initial={initialProducts} />
       <StepNav backHref={backHref} saving={pending} saved={saved} />
     </form>
@@ -715,6 +814,9 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
   const [state, formAction, pending] = useActionState(saveStep4, null);
   const d = application.business_details;
   const [paymentModel, setPaymentModel] = useState(s(d.paymentModel) || "prepaid_wallet");
+  const savedMarkup = d.requestedMarkupPercent == null || d.requestedMarkupPercent === "" ? null : Number(d.requestedMarkupPercent);
+  const savedMarkupIsPreset = savedMarkup !== null && MARKUP_PRESETS.includes(savedMarkup);
+  const [markupPreset, setMarkupPreset] = useState(savedMarkup === null ? "" : savedMarkupIsPreset ? String(savedMarkup) : "custom");
   const formRef = useRef<HTMLFormElement>(null);
   const autosave = useAutosave(formRef, formAction);
   const saved = isSaved(state, pending);
@@ -751,15 +853,15 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="space-y-1.5">
             <Label>Bank name *</Label>
-            <Input name="bankName" defaultValue={s(d.bankName)} required />
+            <IconInput icon={Landmark} name="bankName" defaultValue={s(d.bankName)} required />
           </div>
           <div className="space-y-1.5">
             <Label>Account name *</Label>
-            <Input name="bankAccountName" defaultValue={s(d.bankAccountName)} required />
+            <IconInput icon={User} name="bankAccountName" defaultValue={s(d.bankAccountName)} required />
           </div>
           <div className="space-y-1.5">
             <Label>Account number *</Label>
-            <Input name="bankAccountNumber" defaultValue={s(d.bankAccountNumber)} required />
+            <IconInput icon={Hash} name="bankAccountNumber" defaultValue={s(d.bankAccountNumber)} required />
           </div>
         </div>
 
@@ -780,10 +882,10 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
           name="paymentModel"
           defaultValue={paymentModel}
           onChange={setPaymentModel}
-          layout="stack"
+          layout="cards"
           options={[
-            { value: "prepaid_wallet", label: "Prepaid wallet top-up" },
-            { value: "credit_line", label: "Request a credit line" },
+            { value: "prepaid_wallet", label: "Prepaid wallet top-up", icon: Wallet },
+            { value: "credit_line", label: "Request a credit line", icon: Landmark },
           ]}
         />
       </div>
@@ -796,20 +898,66 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
       ) : null}
 
       <Separator />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="requestedMarkupPreset">Your markup on STS net prices *</Label>
+          <select
+            id="requestedMarkupPreset"
+            name="requestedMarkupPreset"
+            value={markupPreset}
+            onChange={(e) => setMarkupPreset(e.target.value)}
+            required
+            className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <option value="" disabled>
+              Select
+            </option>
+            {MARKUP_PRESETS.map((p) => (
+              <option key={p} value={String(p)}>
+                {p}%
+              </option>
+            ))}
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        {markupPreset === "custom" ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="requestedMarkupCustom">Custom markup (%) *</Label>
+            <Input
+              id="requestedMarkupCustom"
+              name="requestedMarkupCustom"
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              defaultValue={savedMarkup !== null && !savedMarkupIsPreset ? String(savedMarkup) : ""}
+              required
+            />
+          </div>
+        ) : null}
+      </div>
+
+      <Separator />
       <p className="text-sm font-medium">Bank account details (for refunds / payouts)</p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="space-y-1.5">
           <Label>Bank name</Label>
-          <Input name="bankName" defaultValue={s(d.bankName)} />
+          <IconInput icon={Landmark} name="bankName" defaultValue={s(d.bankName)} />
         </div>
         <div className="space-y-1.5">
           <Label>Account name</Label>
-          <Input name="bankAccountName" defaultValue={s(d.bankAccountName)} />
+          <IconInput icon={User} name="bankAccountName" defaultValue={s(d.bankAccountName)} />
         </div>
         <div className="space-y-1.5">
           <Label>Account number</Label>
-          <Input name="bankAccountNumber" defaultValue={s(d.bankAccountNumber)} />
+          <IconInput icon={Hash} name="bankAccountNumber" defaultValue={s(d.bankAccountNumber)} />
         </div>
+      </div>
+
+      <Separator />
+      <div className="space-y-1.5">
+        <Label>Remarks</Label>
+        <Textarea name="remarks" rows={3} defaultValue={s(d.remarks)} />
       </div>
 
       <StepNav backHref={backHref} saving={pending} saved={saved} />
@@ -999,7 +1147,7 @@ function DocUploadRow({
             <input
               type="file"
               name="file"
-              accept="image/jpeg,image/png,application/pdf"
+              accept="application/pdf"
               required
               className="sr-only"
               disabled={pending}
@@ -1049,14 +1197,6 @@ export function StepDocuments({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <FileText className="size-4.5" />
-        </span>
-        <div>
-          <p className="text-sm font-semibold">Upload Documents</p>
-        </div>
-      </div>
       {slots.map((slot, i) => (
         <DocUploadRow
           key={slot.key}
@@ -1156,6 +1296,17 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
             <SummaryRow label="City" value={d.officeCity} />
             <SummaryRow label="Business phone" value={d.businessPhone} />
             <SummaryRow label="Business email" value={d.businessEmail} />
+            <div className="flex items-center justify-between gap-4 py-1 text-sm">
+              <span className="text-muted-foreground">Organization logo</span>
+              {typeof d.logoPath === "string" && d.logoPath ? (
+                <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-card">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={partnerLogoUrl(d.logoPath)!} alt="" className="size-full object-contain" />
+                </span>
+              ) : (
+                <span className="text-right font-medium text-muted-foreground/50">Not added</span>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -1245,7 +1396,13 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
           {kind === "hotel_partner" || kind === "venue_partner" ? (
             <SummaryRow label="Payout frequency" value={d.payoutFrequency ? PAYOUT_FREQUENCY_LABELS[String(d.payoutFrequency)] : null} />
           ) : (
-            <SummaryRow label="Payment model" value={d.paymentModel === "credit_line" ? "Credit line" : "Prepaid wallet"} />
+            <>
+              <SummaryRow label="Payment model" value={d.paymentModel === "credit_line" ? "Credit line" : "Prepaid wallet"} />
+              <SummaryRow
+                label="Markup"
+                value={d.requestedMarkupPercent == null || d.requestedMarkupPercent === "" ? null : `${d.requestedMarkupPercent}%`}
+              />
+            </>
           )}
           <SummaryRow label="Bank" value={d.bankName} />
           <SummaryRow label="Account name" value={d.bankAccountName} />

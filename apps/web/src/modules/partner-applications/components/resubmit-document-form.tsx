@@ -80,7 +80,7 @@ export function ResubmitDocumentForm({
         ref={inputRef}
         type="file"
         name="file"
-        accept="image/jpeg,image/png,application/pdf"
+        accept="application/pdf"
         required
         className="sr-only"
         onChange={(e) => applyFile(e.target.files?.[0] ?? null)}

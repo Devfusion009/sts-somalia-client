@@ -8,6 +8,7 @@ import {
   Landmark,
   PartyPopper,
   Plane,
+  Plus,
   Stamp,
 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
@@ -73,8 +74,11 @@ export default async function AgentBookingsPage({
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="font-heading text-2xl font-bold">Agency Bookings</h1>
+        <Button className="gap-1.5" render={<Link href="/agent/book" />}>
+          <Plus className="size-4" /> New booking
+        </Button>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -98,10 +102,7 @@ export default async function AgentBookingsPage({
         <Card>
           <CardContent className="flex flex-col items-center gap-2 py-16 text-center">
             <p className="font-medium">No bookings {activeFilter !== "all" ? "in this category " : ""}yet</p>
-            <p className="text-sm text-muted-foreground">
-              Bookings made while signed in to this account are attributed here automatically.
-            </p>
-            <Button className="mt-2" render={<Link href="/agent" />}>
+            <Button className="mt-2" render={<Link href="/agent/book" />}>
               Start a booking
             </Button>
           </CardContent>
@@ -123,6 +124,12 @@ export default async function AgentBookingsPage({
               <TableBody>
                 {filtered.map((order) => {
                   const paid = order.payments.find((p) => p.status === "succeeded");
+                  // Manual hotels seeded "price on request" sit at total 0
+                  // until STS quotes them from the admin queue — offering
+                  // "Pay now" on those reads as a free booking.
+                  const awaitingPrice =
+                    Number(order.total) === 0 &&
+                    (order.status === "pending_payment" || order.status === "held");
                   return (
                     <TableRow key={order.id}>
                       <TableCell>
@@ -147,6 +154,11 @@ export default async function AgentBookingsPage({
                                     <p className="truncate text-xs text-muted-foreground">
                                       {info.subtitle}
                                     </p>
+                                  ) : null}
+                                  {item.item_type === "hotel" && item.hotel_booking?.status === "waitlisted" ? (
+                                    <Badge className="mt-0.5 border-transparent bg-brand-gold/15 text-brand-gold">Waitlisted</Badge>
+                                  ) : item.item_type === "hotel" && item.hotel_booking?.status === "confirmed" ? (
+                                    <Badge className="mt-0.5 border-transparent bg-primary/10 text-primary">Room confirmed</Badge>
                                   ) : null}
                                 </div>
                               </div>
@@ -190,12 +202,29 @@ export default async function AgentBookingsPage({
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-semibold">
-                        {order.currency} {Number(order.total).toFixed(0)}
+                        {awaitingPrice
+                          ? "On request"
+                          : `${order.currency} ${Number(order.total).toFixed(0)}`}
                       </TableCell>
                       <TableCell className="text-right">
-                        {order.status === "held" || order.status === "pending_payment" ? (
+                        {awaitingPrice ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">
+                              Awaiting price
+                            </Badge>
+                            <CancelOrderButton
+                              orderId={order.id}
+                              redirectTo="/agent/bookings"
+                              label="Cancel"
+                            />
+                          </div>
+                        ) : order.status === "held" || order.status === "pending_payment" ? (
                           <div className="flex justify-end gap-2">
-                            <Button size="sm" className="gap-1" render={<Link href={`/checkout/${order.id}`} />}>
+                            <Button
+                              size="sm"
+                              className="gap-1"
+                              render={<Link href={`/agent/book/order/${order.id}`} />}
+                            >
                               Pay now <ArrowRight className="size-3.5" />
                             </Button>
                             <CancelOrderButton orderId={order.id} redirectTo="/agent/bookings" label="Cancel" />

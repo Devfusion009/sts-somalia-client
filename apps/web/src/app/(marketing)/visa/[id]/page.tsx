@@ -21,6 +21,7 @@ import { parseDocumentSlots } from "@/modules/visa/schemas";
 import { countryFlag, countryName } from "@/lib/countries";
 import { VisaTypeBanner, fmtMoney, processingText } from "@/modules/visa/components/visa-shared";
 import { SubmitButton } from "@/components/submit-button";
+import { AgencyBookingSlot } from "@/modules/agencies/components/agency-booking-slot";
 
 export async function generateMetadata({
   params,
@@ -201,8 +202,9 @@ export default async function VisaDetailPage({
                   </AlertDescription>
                 </Alert>
               ) : null}
-              <form action={startVisaApplication} className="pt-2">
+              <form action={startVisaApplication} className="space-y-3 pt-2">
                 <input type="hidden" name="visaTypeId" value={visa.id} />
+                <AgencyBookingSlot />
                 <SubmitButton size="lg" className="w-full gap-2" pendingText="Starting application…">
                   Apply Now <ArrowRight className="size-4" />
                 </SubmitButton>

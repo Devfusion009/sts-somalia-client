@@ -106,6 +106,63 @@ export async function createOrderForBooking(
   return order;
 }
 
+/**
+ * Where the agent booking desk lands once an order exists.
+ *
+ * The B2C destinations every vertical redirects to (/checkout, /account/...)
+ * are unreachable from the portal: under subdomain isolation proxy.ts 404s
+ * /agent on the root host and rewrites everything else into the portal's own
+ * namespace, and portal sessions are host-only, so an agent following one of
+ * those links is neither routed nor signed in. Desk submissions return this
+ * path in the action state and navigate client-side instead of redirecting —
+ * a Server Action redirect to a portal path is resolved without re-entering
+ * the proxy and lands on the wrong host in this Next.js version, the same
+ * trap signInToPortalAction documents.
+ */
+export function deskOrderPath(orderId: string) {
+  return `/agent/book/order/${orderId}`;
+}
+
+/** A booking placed from the agent desk rather than the public site. */
+export function isDeskBooking(formData: FormData, agencyId: string | null) {
+  return Boolean(agencyId) && formData.get("desk") === "1";
+}
+
+/**
+ * Re-prices an unpaid order after staff quote a manual booking's net rate.
+ *
+ * Must recompute the agency margin, not just overwrite the totals: an order
+ * is subtotal (net) + markup_amount, and writing `total = price` on an agency
+ * booking silently hands the agency's margin back to STS while leaving a
+ * stale markup_amount on the row. Same arithmetic as createOrderForBooking,
+ * so a quoted order and a self-priced one settle identically.
+ */
+export async function repriceQuotedOrder(
+  supabase: TypedClient,
+  order: { id: string; agency_id: string | null },
+  itemId: string,
+  itemType: OrderItemType,
+  netPrice: number
+) {
+  const markupAmount = order.agency_id
+    ? await getAgencyMarkupAmount(supabase, order.agency_id, itemType, netPrice)
+    : 0;
+
+  await supabase
+    .from("order_items")
+    .update({ unit_price: netPrice, quantity: 1, total_price: netPrice })
+    .eq("id", itemId);
+
+  await supabase
+    .from("orders")
+    .update({
+      subtotal: netPrice,
+      markup_amount: markupAmount,
+      total: netPrice + markupAmount,
+    })
+    .eq("id", order.id);
+}
+
 /** The current user's active agency membership, if any (for B2B attribution). */
 export async function getActiveAgencyId(supabase: TypedClient, profileId: string) {
   const { data } = await supabase

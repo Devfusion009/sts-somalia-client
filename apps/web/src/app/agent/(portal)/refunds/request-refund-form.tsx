@@ -5,7 +5,6 @@ import { AlertCircle, Plus, RotateCcw } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -47,7 +46,6 @@ export function RequestRefundForm({
           <DialogTitle className="flex items-center gap-2">
             <RotateCcw className="size-4 text-primary" /> Request a refund
           </DialogTitle>
-          <DialogDescription>An admin reviews every request — approving credits your wallet directly.</DialogDescription>
         </DialogHeader>
         <form
           action={(formData) => {

@@ -15,6 +15,7 @@ import { BookingStatusControl } from "./booking-status-control";
 
 const STATUS_BADGE: Record<string, string> = {
   pending: "bg-brand-gold/15 text-brand-gold",
+  waitlisted: "bg-brand-gold/15 text-brand-gold",
   confirmed: "bg-primary/10 text-primary",
   completed: "bg-primary/10 text-primary",
   cancelled: "bg-destructive/10 text-destructive",
@@ -58,7 +59,10 @@ export default async function PartnerBookingsPage() {
             <TableBody>
               {bookings.map((b) => (
                 <TableRow key={b.id}>
-                  <TableCell className="font-medium">{b.hotels?.name}</TableCell>
+                  <TableCell className="font-medium">
+                    {b.hotels?.name}
+                    {b.channel === "b2b" ? <span className="ml-1.5 text-xs font-normal text-muted-foreground">Agency</span> : null}
+                  </TableCell>
                   <TableCell>{b.hotel_rooms?.name}</TableCell>
                   <TableCell className="text-sm">
                     {b.check_in} → {b.check_out}

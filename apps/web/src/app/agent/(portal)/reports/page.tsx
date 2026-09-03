@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { BadgeDollarSign, CalendarClock, Download, FileText, TrendingUp } from "lucide-react";
+import { BadgeDollarSign, Banknote, CalendarClock, Download, FileText, TrendingUp } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
   getMyAgency,
   getAgencyCommissionEntries,
   getAgencyCommissionPayouts,
+  getAgencyEarningsSummary,
   type AgencyCommissionEntry,
 } from "@/modules/agencies/queries";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,15 @@ const ENTRY_STATUS_STYLES: Record<string, string> = {
   reversed: "bg-destructive/10 text-destructive",
 };
 
+// The same four words the Finance Overview pipeline uses — an agent should
+// never have to map "confirmed" here onto "available to withdraw" there.
+const ENTRY_STATUS_LABELS: Record<string, string> = {
+  pending: "In review",
+  confirmed: "Available",
+  paid_out: "Paid out",
+  reversed: "Reversed",
+};
+
 function money(amount: number) {
   return `USD ${amount.toFixed(2)}`;
 }
@@ -60,9 +70,10 @@ export default async function AgentReportsPage({
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
 
-  const [entries, payouts] = await Promise.all([
+  const [entries, payouts, summary] = await Promise.all([
     getAgencyCommissionEntries(membership.agency.id, { from, to, itemType }),
     getAgencyCommissionPayouts(membership.agency.id),
+    getAgencyEarningsSummary(membership.agency.id),
   ]);
   const earning = entries.filter((e) => e.status !== "reversed");
 
@@ -70,9 +81,6 @@ export default async function AgentReportsPage({
   const thisMonth = monthKey(new Date().toISOString());
   const earnedThisMonth = earning
     .filter((e) => monthKey(e.created_at) === thisMonth)
-    .reduce((sum, e) => sum + Number(e.amount), 0);
-  const pendingPayout = earning
-    .filter((e) => e.status === "pending" || e.status === "confirmed")
     .reduce((sum, e) => sum + Number(e.amount), 0);
 
   const byMonth = new Map<string, { bookings: number; commission: number; markup: number; total: number }>();
@@ -103,11 +111,18 @@ export default async function AgentReportsPage({
       tint: "bg-chart-3/10 text-chart-3",
     },
     {
-      label: "Awaiting Payout",
-      value: money(pendingPayout),
-      sub: "Confirmed, not yet paid out",
+      label: "In review by STS",
+      value: money(summary.inReview),
+      sub: undefined,
       icon: CalendarClock,
       tint: "bg-brand-gold/15 text-brand-gold",
+    },
+    {
+      label: "Available to withdraw",
+      value: money(summary.available),
+      sub: undefined,
+      icon: Banknote,
+      tint: "bg-chart-3/10 text-chart-3",
     },
   ];
 
@@ -142,7 +157,7 @@ export default async function AgentReportsPage({
 
       <ReportFilters defaultFrom={from} defaultTo={to} defaultType={type} verticals={VERTICAL_LABELS} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (
           <Card key={stat.label}>
             <CardContent className="flex items-start justify-between gap-3 pt-6">
@@ -248,7 +263,7 @@ export default async function AgentReportsPage({
                             ENTRY_STATUS_STYLES[entry.status] ?? "bg-muted text-muted-foreground"
                           )}
                         >
-                          {entry.status.replace(/_/g, " ")}
+                          {ENTRY_STATUS_LABELS[entry.status] ?? entry.status.replace(/_/g, " ")}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -266,7 +281,7 @@ export default async function AgentReportsPage({
         </CardHeader>
         {payouts.length === 0 ? (
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No payouts recorded yet — earnings accrue here until STS pays them out.
+            No payouts yet.
           </CardContent>
         ) : (
           <div className="overflow-x-auto">

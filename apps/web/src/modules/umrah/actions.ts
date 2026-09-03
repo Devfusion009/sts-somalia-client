@@ -5,7 +5,13 @@ import { z } from "zod";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { assertAgencyCanBookProduct, createOrderForBooking, getActiveAgencyId } from "@/modules/orders/helpers";
+import {
+  assertAgencyCanBookProduct,
+  createOrderForBooking,
+  deskOrderPath,
+  getActiveAgencyId,
+  isDeskBooking,
+} from "@/modules/orders/helpers";
 import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
 import type { ActionState } from "@/lib/auth/actions";
 
@@ -151,6 +157,10 @@ export async function createUmrahBooking(_prevState: ActionState, formData: Form
     });
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not create the order." };
+  }
+
+  if (isDeskBooking(formData, agencyId)) {
+    return { error: null, destination: deskOrderPath(order.id), orderId: order.id };
   }
 
   redirect(`/checkout/${order.id}`);

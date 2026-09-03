@@ -154,6 +154,22 @@ else
   echo "Supabase is up"
 fi
 
+# A foreign process on :3000 (another project's `next dev`, a stray server
+# left over from a crashed session) makes `docker compose up` fail with
+# "port is already allocated" — a message that names Docker, not the real
+# cause. Free the port first. `docker-proxy` doesn't count: that's this
+# project's own container from a prior run, and compose recreates it in
+# place without a port conflict.
+for pid in $(lsof -ti tcp:3000 -sTCP:LISTEN 2>/dev/null); do
+  comm="$(ps -p "$pid" -o comm= 2>/dev/null || true)"
+  if [ "$comm" = "docker-proxy" ]; then
+    continue
+  fi
+  cmd="$(ps -p "$pid" -o args= 2>/dev/null || echo "$comm")"
+  echo "Port 3000 is held by another process (PID $pid: $cmd) — killing it."
+  kill "$pid" 2>/dev/null || true
+done
+
 echo
 echo "Starting app + api + redis — $MODE_LABEL"
 echo

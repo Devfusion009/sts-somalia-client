@@ -53,10 +53,7 @@ export default async function PartnerDashboardPage() {
               <Badge variant="secondary">Manager</Badge>
             )}
           </div>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {partner ? `Commission rate: ${partner.commission_rate}% · ` : ""}Here&apos;s how your
-            properties are performing.
-          </p>
+          {partner ? <p className="mt-0.5 text-sm text-muted-foreground">Commission rate: {partner.commission_rate}%</p> : null}
         </div>
         {scope.partnerId ? (
           <Button render={<Link href="/partner/hotels/new" />} className="gap-1.5">
@@ -91,9 +88,12 @@ export default async function PartnerDashboardPage() {
         </CardHeader>
         <CardContent>
           {recent.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No bookings yet — they&apos;ll appear here as soon as travelers book your rooms.
-            </p>
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <span className="flex size-11 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+                <Ticket className="size-5" />
+              </span>
+              <p className="text-sm text-muted-foreground">No bookings yet.</p>
+            </div>
           ) : (
             <Table>
               <TableHeader>

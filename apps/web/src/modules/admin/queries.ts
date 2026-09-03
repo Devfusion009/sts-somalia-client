@@ -273,7 +273,7 @@ export async function getAllOrders() {
   const { data } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, currency, subtotal, discount_total, total, created_at, paid_at, notes, customer:profiles!orders_customer_id_fkey(full_name, email, phone), agency:agencies(name), payments(id, provider, method_label, amount, currency, status, payer_phone, created_at), invoices(invoice_number, status), order_items(id, item_type, quantity, total_price, hotel_booking:hotel_booking_id(check_in, check_out, num_rooms, num_adults, status, hotel:hotel_id(name, city)), flight_booking:flight_booking_id(origin_iata, destination_iata, depart_at, return_at, status), visa_application:visa_application_id(application_ref, status, travel_details, visa_type:visa_type_id(name, destination_country_code)), umrah_booking:umrah_booking_id(num_pilgrims, status, package:package_id(name, duration_days), departure:departure_id(departure_date, return_date)), hall_booking:hall_booking_id(event_type, start_date, end_date, status, venue:venue_id(name, city)))"
+      "id, order_number, status, currency, subtotal, discount_total, total, created_at, paid_at, notes, customer:profiles!orders_customer_id_fkey(full_name, email, phone), agency:agencies(name), agency_customer:agency_customer_id(full_name, phone), payments(id, provider, method_label, amount, currency, status, payer_phone, created_at), invoices(invoice_number, status), order_items(id, item_type, quantity, total_price, hotel_booking:hotel_booking_id(check_in, check_out, num_rooms, num_adults, status, hotel:hotel_id(name, city)), flight_booking:flight_booking_id(origin_iata, destination_iata, depart_at, return_at, status), visa_application:visa_application_id(application_ref, status, travel_details, visa_type:visa_type_id(name, destination_country_code)), umrah_booking:umrah_booking_id(num_pilgrims, status, package:package_id(name, duration_days), departure:departure_id(departure_date, return_date)), hall_booking:hall_booking_id(event_type, start_date, end_date, status, venue:venue_id(name, city)))"
     )
     .order("created_at", { ascending: false })
     .limit(200);
@@ -586,18 +586,6 @@ export async function getHotelRoomAdmin(roomId: string) {
   const supabase = await createClient();
   const { data } = await supabase.from("hotel_rooms").select("*, hotel:hotel_id(id, name)").eq("id", roomId).maybeSingle();
   return data;
-}
-
-export async function getRoomInventoryAdmin(roomId: string, fromDate: string, toDate: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("hotel_room_inventory")
-    .select("*")
-    .eq("room_id", roomId)
-    .gte("date", fromDate)
-    .lte("date", toDate)
-    .order("date", { ascending: true });
-  return data ?? [];
 }
 
 export async function getHotelBookingsForHotel(hotelId: string) {

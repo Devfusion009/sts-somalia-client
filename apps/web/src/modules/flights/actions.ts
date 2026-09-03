@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { assertAgencyCanBookProduct, getActiveAgencyId } from "@/modules/orders/helpers";
+import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
 
 export type QuoteActionState = { error: string | null; success?: boolean } | null;
 
@@ -56,10 +57,13 @@ export async function requestFlightQuote(
   const access = await assertAgencyCanBookProduct(supabase, agencyId, "flight");
   if (!access.ok) return { error: access.message };
 
+  const agencyCustomerId = await resolveBookedForCustomer(supabase, agencyId, formData);
+
   const { error } = await supabase.from("flight_bookings").insert({
     customer_id: user.id,
     booked_by: user.id,
     agency_id: agencyId,
+    agency_customer_id: agencyCustomerId,
     provider: "quote_request",
     trip_type: d.tripType,
     origin_iata: d.origin,

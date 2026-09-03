@@ -54,6 +54,24 @@ async function requirePartnerId() {
  */
 async function requireHotelScope(): Promise<HotelScope> {
   const profile = await requireUser();
+
+  // STS-managed hotels carry partner_id null and have no manager, so
+  // my_operable_hotel_ids() returns nothing for a platform admin — which left
+  // the admin console unable to save a room on its own catalogue at all, and
+  // therefore unable to put a price on the 50 manual hotels seeded with
+  // base_price 0 (see 20260817000001). RLS already grants admins full control
+  // of these tables ("hotel_rooms: admin manage"); this is the app-side half
+  // of the same rule.
+  //
+  // Deliberately NOT folded into my_operable_hotel_ids(): that RPC also
+  // decides who may enter the hotel PARTNER portal (holdsPortalAudience),
+  // so widening it there would hand every admin a partner account.
+  if (profile.is_platform_admin) {
+    const supabase = await createClient();
+    const { data } = await supabase.from("hotels").select("id");
+    return { partnerId: null, hotelIds: (data ?? []).map((hotel) => hotel.id) };
+  }
+
   const scope = await getMyHotelScope(profile.id);
   if (scope.hotelIds.length === 0) {
     throw new Error("No hotel access found for this user.");
@@ -207,8 +225,12 @@ const roomSchema = z.object({
         return [];
       }
     }),
-  basePrice: z.coerce.number().min(0),
+  // A room without a nightly rate can't be priced, marked up, quoted or paid
+  // for — hotel_rooms_base_price_positive enforces the same rule in the
+  // database (see 20260903000006).
+  basePrice: z.coerce.number().gt(0, "Enter the nightly rate."),
   currency: z.string().min(3).max(3).default("USD"),
+  totalUnits: z.coerce.number().int().min(0).max(5000).optional(),
   status: z.enum(PARTNER_LISTING_STATUSES),
 });
 
@@ -238,6 +260,7 @@ export async function createRoom(_prevState: ActionState, formData: FormData): P
     amenities: formData.get("amenities") || undefined,
     basePrice: formData.get("basePrice"),
     currency: formData.get("currency") || "USD",
+    totalUnits: formData.get("totalUnits") || undefined,
     status: formData.get("status"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -254,6 +277,7 @@ export async function createRoom(_prevState: ActionState, formData: FormData): P
     amenities: parsed.data.amenities,
     base_price: parsed.data.basePrice,
     currency: parsed.data.currency.toUpperCase(),
+    total_units: parsed.data.totalUnits ?? null,
     status: parsed.data.status,
   });
 
@@ -291,6 +315,7 @@ export async function updateRoom(_prevState: ActionState, formData: FormData): P
     amenities: formData.get("amenities") || undefined,
     basePrice: formData.get("basePrice"),
     currency: formData.get("currency") || "USD",
+    totalUnits: formData.get("totalUnits") || undefined,
     status: formData.get("status"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -313,6 +338,7 @@ export async function updateRoom(_prevState: ActionState, formData: FormData): P
       amenities: parsed.data.amenities,
       base_price: parsed.data.basePrice,
       currency: parsed.data.currency.toUpperCase(),
+      total_units: parsed.data.totalUnits ?? null,
       ...statusUpdate,
     })
     .eq("id", roomId)

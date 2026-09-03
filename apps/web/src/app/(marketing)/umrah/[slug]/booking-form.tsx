@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, CalendarDays, User, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,16 +76,28 @@ export function BookingForm({
   basePrice,
   departures,
   bookedForSlot,
+  action,
 }: {
   packageSlug: string;
   currency: string;
   basePrice: number;
   departures: Departure[];
   bookedForSlot?: React.ReactNode;
+  /** The agent desk swaps in its group action, which books for every selected customer. */
+  action?: typeof createUmrahBooking;
 }) {
-  const [state, formAction] = useActionState(createUmrahBooking, null);
+  const [state, formAction] = useActionState(action ?? createUmrahBooking, null);
   const [selectedId, setSelectedId] = useState<string | null>(departures[0]?.id ?? null);
   const [numPilgrims, setNumPilgrims] = useState(1);
+  const router = useRouter();
+
+  // Desk submissions get a path back instead of a redirect, because a Server
+  // Action redirect into the agent portal lands on the wrong host.
+  useEffect(() => {
+    if (state?.destination) {
+      router.push(state.destination);
+    }
+  }, [state, router]);
 
   const selected = useMemo(
     () => departures.find((d) => d.id === selectedId) ?? null,

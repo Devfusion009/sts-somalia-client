@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import {
-  ArrowLeft,
   ArrowRight,
   CreditCard,
   Download,
@@ -30,6 +29,7 @@ import {
 } from "@/modules/bookings/components/booking-shared";
 import { CancelOrderButton } from "@/modules/orders/components/cancel-order-button";
 import { Button } from "@/components/ui/button";
+import { BackLink } from "@/components/back-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -186,14 +186,7 @@ export default async function BookingDetailPage({
   return (
     <div className="space-y-6">
       <div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-ml-2 mb-2 gap-1.5 text-muted-foreground"
-          render={<Link href="/account/bookings" />}
-        >
-          <ArrowLeft className="size-4" /> All bookings
-        </Button>
+        <BackLink href="/account/bookings" label="All bookings" className="mb-3" />
 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

@@ -1,23 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarDays, ImageIcon } from "lucide-react";
-import { getHotelRoomAdmin, getRoomInventoryAdmin } from "@/modules/admin/queries";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { AlertCircle, Pencil } from "lucide-react";
+import { BackLink } from "@/components/back-link";
+import { getHotelRoomAdmin } from "@/modules/admin/queries";
+import { getHotelAvailability } from "@/modules/hotels/availability";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GalleryManager } from "@/components/admin/gallery-manager";
+import { RoomNightsTable } from "@/modules/hotels/components/room-nights-table";
 import { uploadRoomImages, removeRoomImage, setRoomCoverImage } from "@/modules/admin/property-gallery-actions";
 import { InventoryRangeForm, ClearInventoryForm } from "./inventory-form";
 
@@ -30,29 +22,67 @@ export default async function AdminRoomInventoryPage({
   const room = await getHotelRoomAdmin(roomId);
   if (!room || room.hotel_id !== id) notFound();
 
-  const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-  const in60Days = new Date(now.getTime() + 60 * 86_400_000).toISOString().slice(0, 10);
-  const inventory = await getRoomInventoryAdmin(roomId, today, in60Days);
+  const [availability] = await getHotelAvailability(id, { roomId, days: 60 });
+  const nights = availability?.nights ?? [];
   const images = Array.isArray(room.images) ? room.images.filter((p): p is string => typeof p === "string") : [];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <Link
-          href={`/admin/hotels/${id}`}
-          className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" /> {room.hotel?.name}
-        </Link>
-        <h1 className="font-heading text-2xl font-semibold">{room.name} — availability &amp; photos</h1>
+        <BackLink href={`/admin/hotels/${id}`} label={room.hotel?.name ?? "Hotel"} className="mb-3" />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="font-heading text-2xl font-semibold">{room.name}</h1>
+          {room.total_units === null ? (
+            <Badge variant="outline" className="text-muted-foreground">Count not set</Badge>
+          ) : (
+            <Badge variant="secondary">{room.total_units} rooms</Badge>
+          )}
+        </div>
+      </div>
+
+      {room.total_units === null ? (
+        <Alert>
+          <AlertCircle />
+          <AlertDescription className="flex flex-wrap items-center gap-2">
+            <span>Room count not set.</span>
+            <Button size="sm" variant="outline" className="h-7 gap-1.5" render={<Link href={`/admin/hotels/${id}`} />}>
+              <Pencil className="size-3.5" /> Edit room
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <Card className="overflow-hidden py-0">
+        <CardHeader className="border-b border-border !py-4">
+          <CardTitle className="text-base">Next 60 nights</CardTitle>
+        </CardHeader>
+        <div className="overflow-x-auto">
+          <RoomNightsTable nights={nights} currency={room.currency} />
+        </div>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Override dates</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <InventoryRangeForm hotelId={id} roomId={roomId} currency={room.currency} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Clear overrides</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ClearInventoryForm hotelId={id} roomId={roomId} />
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ImageIcon className="size-4 text-primary" /> Room photos
-          </CardTitle>
+          <CardTitle className="text-base">Photos</CardTitle>
         </CardHeader>
         <CardContent>
           <GalleryManager
@@ -63,76 +93,6 @@ export default async function AdminRoomInventoryPage({
             removeAction={removeRoomImage}
             setCoverAction={setRoomCoverImage}
           />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Set availability</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <InventoryRangeForm hotelId={id} roomId={roomId} currency={room.currency} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle className="flex items-center gap-2">
-            <CalendarDays className="size-4 text-primary" /> Next 60 days
-          </CardTitle>
-          <Badge variant="secondary">{inventory.length} capped</Badge>
-        </CardHeader>
-        {inventory.length > 0 ? (
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Capacity</TableHead>
-                  <TableHead className="text-right">Booked</TableHead>
-                  <TableHead className="text-right">Left</TableHead>
-                  <TableHead className="text-right">Nightly price</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {inventory.map((row) => {
-                  const left = row.total_units - row.booked_units;
-                  return (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium">
-                        {new Date(`${row.date}T00:00:00`).toLocaleDateString(undefined, {
-                          weekday: "short",
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </TableCell>
-                      <TableCell className="text-right">{row.total_units}</TableCell>
-                      <TableCell className="text-right">{row.booked_units}</TableCell>
-                      <TableCell className="text-right">
-                        {left <= 0 ? (
-                          <Badge variant="destructive">Sold out</Badge>
-                        ) : (
-                          <span className={left <= 3 ? "font-semibold text-brand-gold" : ""}>{left}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {row.price_override != null ? `${room.currency} ${Number(row.price_override).toFixed(0)}` : "base"}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        ) : null}
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Clear caps</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ClearInventoryForm hotelId={id} roomId={roomId} />
         </CardContent>
       </Card>
     </div>

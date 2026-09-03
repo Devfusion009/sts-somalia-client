@@ -2,7 +2,26 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, ExternalLink, User, UserCheck, Mail, FileCheck2, Building2, BedDouble, PartyPopper } from "lucide-react";
+import {
+  ExternalLink,
+  User,
+  UserCheck,
+  Mail,
+  FileCheck2,
+  Building2,
+  BedDouble,
+  PartyPopper,
+  Clock,
+  Search,
+  MessageCircleQuestion,
+  CheckCircle2,
+  XCircle,
+  Check,
+  X,
+  Percent,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import {
   getApplicationDetail,
@@ -14,7 +33,6 @@ import {
 import { startReview } from "@/modules/admin/application-actions";
 import { getAccountIdsByApplication } from "@/modules/admin/partner-accounts";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
@@ -29,6 +47,7 @@ import {
   DocFileIcon,
   type Details,
 } from "@/modules/partner-applications/components/detail-cards";
+import { partnerLogoUrl } from "@/modules/partner-applications/logo-url";
 
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-brand-gold/15 text-brand-gold",
@@ -36,6 +55,14 @@ const STATUS_STYLES: Record<string, string> = {
   more_info_requested: "bg-destructive/10 text-destructive",
   approved: "bg-primary/10 text-primary",
   rejected: "bg-muted text-muted-foreground",
+};
+
+const STATUS_META: Record<string, { label: string; icon: LucideIcon }> = {
+  pending: { label: "Pending Review", icon: Clock },
+  under_review: { label: "Under Review", icon: Search },
+  more_info_requested: { label: "Awaiting Applicant", icon: MessageCircleQuestion },
+  approved: { label: "Approved", icon: CheckCircle2 },
+  rejected: { label: "Rejected", icon: XCircle },
 };
 
 const TYPE_FROM_SLUG: Record<string, ApplicationType> = {
@@ -64,10 +91,56 @@ const DOCUMENT_BUCKET = "kyc-documents";
 type DocumentRef = { key: string; label: string; storage_path: string; file_name: string; uploaded_at: string };
 
 function StatusBadge({ status }: { status: string }) {
+  const meta = STATUS_META[status];
+  const Icon = meta?.icon;
   return (
-    <Badge className={`border-transparent capitalize ${STATUS_STYLES[status] ?? "bg-muted text-muted-foreground"}`}>
-      {status.replace(/_/g, " ")}
-    </Badge>
+    <span
+      className={cn(
+        "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold",
+        STATUS_STYLES[status] ?? "bg-muted text-muted-foreground"
+      )}
+    >
+      {Icon ? <Icon className="size-4" /> : null}
+      {meta?.label ?? status.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+/** Compact 3-node pipeline (Submitted -> Under Review -> Decision) so the admin sees where an application sits at a glance, not just its current label. */
+function ReviewPipeline({ status }: { status: string }) {
+  const inReview = status !== "pending";
+  const decided = status === "approved" || status === "rejected";
+  const rejected = status === "rejected";
+  const nodes = [
+    { label: "Submitted", done: true, active: false },
+    { label: "Under Review", done: inReview, active: status === "under_review" || status === "more_info_requested" },
+    { label: "Decision", done: decided, active: false, rejected },
+  ];
+  return (
+    <div className="flex items-center">
+      {nodes.map((node, i) => (
+        <div key={node.label} className={cn("flex items-center", i < nodes.length - 1 && "flex-1")}>
+          <div className="flex flex-col items-center gap-1.5">
+            <span
+              className={cn(
+                "flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+                node.rejected && node.done
+                  ? "bg-destructive text-destructive-foreground"
+                  : node.done
+                    ? "bg-primary text-primary-foreground"
+                    : node.active
+                      ? "bg-primary/15 text-primary ring-2 ring-primary/40"
+                      : "bg-muted text-muted-foreground"
+              )}
+            >
+              {node.done ? (node.rejected ? <X className="size-3.5" /> : <Check className="size-3.5" />) : i + 1}
+            </span>
+            <span className="text-center text-[10px] leading-tight whitespace-nowrap text-muted-foreground">{node.label}</span>
+          </div>
+          {i < nodes.length - 1 ? <span className={cn("mx-1 h-px flex-1", node.done ? "bg-primary" : "bg-border")} /> : null}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -111,9 +184,9 @@ export default async function ApplicationDetailPage({
 
   const applicant = application.applicant as unknown as { full_name: string | null; email: string; phone: string | null } | null;
   const reviewer = application.reviewer as unknown as { full_name: string | null; email: string } | null;
-  const isActionable = application.status === "pending" || application.status === "under_review";
   const TypeIcon = TYPE_ICON[type];
   const details = ((application as { business_details?: unknown }).business_details ?? {}) as Details;
+  const logoUrl = partnerLogoUrl(typeof details.logoPath === "string" ? details.logoPath : null);
 
   // The account that signed in and submitted is routinely a different person
   // from the business's authorized contact — showing only the former under a
@@ -127,19 +200,36 @@ export default async function ApplicationDetailPage({
       ? []
       : [{ icon: UserCheck, label: "Authorized contact", value: String(details.contactFullName ?? "—") || "—" }]),
     { icon: FileCheck2, label: "Documents", value: signedDocs.length === 0 ? "None" : `${verifiedDocs}/${signedDocs.length} verified` },
+    ...(type === "agency"
+      ? [
+          {
+            icon: Percent,
+            label: "Requested markup",
+            value:
+              details.requestedMarkupPercent == null || details.requestedMarkupPercent === ""
+                ? "—"
+                : `${details.requestedMarkupPercent}%`,
+          },
+        ]
+      : []),
   ];
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" render={<Link href="/admin/applications" />} className="gap-1">
-        <ArrowLeft className="size-4" /> All applications
-      </Button>
+      <BackLink href="/admin/applications" label="Back to all applications" />
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <TypeIcon className="size-5" />
-          </span>
+          {logoUrl ? (
+            <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logoUrl} alt="" className="size-full object-contain" />
+            </span>
+          ) : (
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <TypeIcon className="size-5" />
+            </span>
+          )}
           <div>
             <h1 className="font-heading text-xl font-semibold">{name}</h1>
             <p className="text-sm text-muted-foreground">
@@ -150,13 +240,6 @@ export default async function ApplicationDetailPage({
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge status={application.status} />
-          {application.status === "pending" ? (
-            <form action={startReview.bind(null, type, id)}>
-              <Button size="sm" variant="outline" type="submit">
-                Start review
-              </Button>
-            </form>
-          ) : null}
           {application.status === "approved" && partnerAccountId ? (
             <Button size="sm" render={<Link href={`/admin/partners/${slug}/${partnerAccountId}`} />}>
               Manage Partner Account
@@ -188,8 +271,8 @@ export default async function ApplicationDetailPage({
         ))}
       </dl>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
-        <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-6">
           {Object.keys(details).length === 0 ? null : type === "affiliate" ? (
             <AffiliateDetailCards details={details} elevated />
           ) : (
@@ -298,16 +381,48 @@ export default async function ApplicationDetailPage({
         </div>
 
         <div className="space-y-4">
-          {isActionable ? (
-            <Card className="shadow-sm">
-              <CardHeader>
-                <SectionTitle>Decision</SectionTitle>
-              </CardHeader>
-              <CardContent>
+          <Card className="shadow-sm">
+            <CardHeader>
+              <SectionTitle>Application Review</SectionTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ReviewPipeline status={application.status} />
+              <Separator />
+              {application.status === "pending" ? (
+                <div className="space-y-3">
+                  <form action={startReview.bind(null, type, id)}>
+                    <Button type="submit" variant="outline" className="w-full gap-1.5">
+                      <Search className="size-4" /> Start Review
+                    </Button>
+                  </form>
+                  <ApplicationActions applicationId={application.id} type={type} />
+                </div>
+              ) : application.status === "under_review" ? (
                 <ApplicationActions applicationId={application.id} type={type} />
-              </CardContent>
-            </Card>
-          ) : null}
+              ) : application.status === "more_info_requested" ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MessageCircleQuestion className="size-4 shrink-0 text-destructive" /> Waiting on the applicant to respond.
+                </p>
+              ) : (
+                <div className="flex items-center gap-2 text-sm">
+                  {application.status === "approved" ? (
+                    <CheckCircle2 className="size-4 shrink-0 text-primary" />
+                  ) : (
+                    <XCircle className="size-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <div>
+                    <p className="font-medium">
+                      {application.status === "approved" ? "Approved" : "Rejected"}
+                      {reviewer ? ` by ${reviewer.full_name ?? reviewer.email}` : ""}
+                    </p>
+                    {application.reviewed_at ? (
+                      <p className="text-xs text-muted-foreground">{format(new Date(application.reviewed_at), "dd MMM yyyy, hh:mm a")}</p>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card className="shadow-sm">
             <CardHeader>

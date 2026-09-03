@@ -19,9 +19,11 @@ import type { FlightSearchDefaults } from "./flight-search-form";
 export function QuoteRequestForm({
   defaults,
   signedIn,
+  bookedForSlot,
 }: {
   defaults: FlightSearchDefaults;
   signedIn: boolean;
+  bookedForSlot?: React.ReactNode;
 }) {
   const [state, formAction] = useActionState(requestFlightQuote, null);
 
@@ -66,6 +68,8 @@ export function QuoteRequestForm({
       />
       <input type="hidden" name="cabinClass" value={defaults.cabin ?? "economy"} />
       <input type="hidden" name="adults" value={defaults.adults ?? "1"} />
+
+      {bookedForSlot}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">

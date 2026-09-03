@@ -168,7 +168,7 @@ export function LoginForm({ redirectTo, notice }: { redirectTo?: string; notice?
               switcher, this is only for people who want to skip straight
               there. */}
           <p className="mt-3 text-center text-xs text-muted-foreground">
-            Signing in as a travel agent?{" "}
+            <span className="font-semibold text-foreground">Agent:</span> Signing in as a travel agent?{" "}
             <a href={AGENT_LOGIN_HREF} className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">
               Continue to Agent Portal <ArrowRight className="size-3" />
             </a>
@@ -177,7 +177,7 @@ export function LoginForm({ redirectTo, notice }: { redirectTo?: string; notice?
               above: the Manager Portal is a separate origin once subdomains
               are configured, which a client-side route push cannot cross. */}
           <p className="mt-1.5 text-center text-xs text-muted-foreground">
-            Signing in as a hotel manager?{" "}
+            <span className="font-semibold text-foreground">Hotel Manager:</span> Signing in as a hotel manager?{" "}
             <a href={MANAGER_LOGIN_HREF} className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">
               Continue to Hotel Manager Portal <ArrowRight className="size-3" />
             </a>

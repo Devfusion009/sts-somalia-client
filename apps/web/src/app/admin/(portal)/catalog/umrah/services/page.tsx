@@ -1,8 +1,7 @@
-import Link from "next/link";
-import { ArrowLeft, MapPin, Star } from "lucide-react";
+import { MapPin, Star } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { getUmrahServicesAdmin } from "@/modules/umrah/custom-queries";
 import {
   PRICE_UNIT_LABELS,
@@ -33,14 +32,7 @@ export default async function AdminUmrahServicesPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Button
-            render={<Link href="/admin/catalog/umrah" />}
-            variant="ghost"
-            size="sm"
-            className="-ml-2 mb-1 gap-1.5 text-muted-foreground"
-          >
-            <ArrowLeft className="size-3.5" /> Umrah catalog
-          </Button>
+          <BackLink href="/admin/catalog/umrah" label="Umrah catalog" className="mb-3" />
           <h1 className="font-heading text-2xl font-semibold">Private Umrah services</h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
             The options customers choose from when they build a private trip, and what each one

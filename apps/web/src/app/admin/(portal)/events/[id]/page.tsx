@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ImageIcon, MessageSquareText } from "lucide-react";
+import { ImageIcon, MessageSquareText } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 import { getVenueByIdAdmin } from "@/modules/admin/queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GalleryManager } from "@/components/admin/gallery-manager";
@@ -22,9 +22,7 @@ export default async function AdminVenueDetailPage({ params }: { params: Promise
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link href="/admin/events" className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="size-3.5" /> All venues
-          </Link>
+          <BackLink href="/admin/events" label="All venues" className="mb-3" />
           <h1 className="font-heading text-2xl font-semibold">{venue.name}</h1>
           <p className="text-sm text-muted-foreground">{venue.city}</p>
         </div>
