@@ -110,6 +110,7 @@ jobs:
           SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SECRET_KEY=${{ secrets.SUPABASE_SECRET_KEY }}
           REDIS_URL=${{ secrets.REDIS_URL }}
+          DEMO_LOGIN_ENABLED=true
           EOF
 
       - name: Restart

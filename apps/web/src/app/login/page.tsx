@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { LoginForm } from "./login-form";
+import { DEMO_LOGIN_ENABLED, DEMO_ACCOUNTS } from "@/modules/demo/config";
 
 export const metadata: Metadata = { title: "Log in" };
 
@@ -25,7 +26,11 @@ export default async function LoginPage({
       <Link href="/" className="flex items-center">
         <Image src="/logo.png" alt="STS Somalia" width={714} height={312} priority className="h-11 w-auto" />
       </Link>
-      <LoginForm redirectTo={redirect_to} notice={notice} />
+      <LoginForm
+        redirectTo={redirect_to}
+        notice={notice}
+        demoAccount={DEMO_LOGIN_ENABLED ? DEMO_ACCOUNTS.customer : undefined}
+      />
     </div>
   );
 }
