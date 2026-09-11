@@ -24,7 +24,10 @@ export function ApplicationSummary({
   application,
   priceLabel = "Price",
 }: {
-  application: Pick<WizardApplication, "applicant_type" | "members" | "currency" | "price"> & {
+  application: Pick<
+    WizardApplication,
+    "applicant_type" | "members" | "currency" | "price" | "resolved_price" | "resolved_processing_fee"
+  > & {
     visa_type: WizardApplication["visa_type"];
   };
   priceLabel?: string;
@@ -34,7 +37,14 @@ export function ApplicationSummary({
 
   const memberCount =
     application.applicant_type === "single" ? 1 : Math.max(application.members.length, 1);
-  const total = Number(visaType.price) * memberCount;
+  // resolved_* is stamped once nationality is known (step 2 onward) and
+  // reflects any nationality-specific rule; before that, or with no rule,
+  // it falls back to the visa type's own listed price/fee.
+  const unitPrice = Number(application.resolved_price ?? visaType.price);
+  const unitFee = Number(application.resolved_processing_fee ?? visaType.processing_fee ?? 0);
+  const price = unitPrice * memberCount;
+  const feeAmount = unitFee * memberCount;
+  const total = price + feeAmount;
 
   const rows = [
     { icon: StickyNote, label: "Visa Type", value: visaType.name },
@@ -77,7 +87,19 @@ export function ApplicationSummary({
             </div>
           ))}
         </dl>
-        <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+        {feeAmount > 0 ? (
+          <div className="mt-4 space-y-1.5 border-t border-border pt-4 text-sm">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Visa fee</span>
+              <span>{fmtMoney(price, visaType.currency)}</span>
+            </div>
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Processing fee</span>
+              <span>{fmtMoney(feeAmount, visaType.currency)}</span>
+            </div>
+          </div>
+        ) : null}
+        <div className={`flex items-center justify-between ${feeAmount > 0 ? "mt-1.5" : "mt-4 border-t border-border pt-4"}`}>
           <span className="text-sm text-muted-foreground">{priceLabel}</span>
           <span className="font-heading text-xl font-bold text-primary">
             {fmtMoney(total, visaType.currency)}
@@ -85,7 +107,7 @@ export function ApplicationSummary({
         </div>
         {memberCount > 1 ? (
           <p className="mt-1 text-right text-xs text-muted-foreground">
-            {fmtMoney(visaType.price, visaType.currency)} × {memberCount} applicants
+            {fmtMoney(unitPrice, visaType.currency)} × {memberCount} applicants
           </p>
         ) : null}
         <p className="mt-2 text-xs text-muted-foreground">All fees are non-refundable.</p>
@@ -94,9 +116,6 @@ export function ApplicationSummary({
       <div className="rounded-2xl border border-border bg-secondary/50 p-5">
         <p className="flex items-center gap-2 text-sm font-semibold">
           <Headset className="size-4 text-primary" /> Need Help?
-        </p>
-        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-          If you have any questions about this application, our support team is here to help.
         </p>
         <Button
           variant="outline"

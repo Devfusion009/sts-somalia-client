@@ -2372,7 +2372,7 @@ export type Database = {
           name: string
           size_sqm: number | null
           status: Database["public"]["Enums"]["listing_status"]
-          total_units: number | null
+          total_units: number
           updated_at: string
         }
         Insert: {
@@ -2390,7 +2390,7 @@ export type Database = {
           name: string
           size_sqm?: number | null
           status?: Database["public"]["Enums"]["listing_status"]
-          total_units?: number | null
+          total_units: number
           updated_at?: string
         }
         Update: {
@@ -2408,7 +2408,7 @@ export type Database = {
           name?: string
           size_sqm?: number | null
           status?: Database["public"]["Enums"]["listing_status"]
-          total_units?: number | null
+          total_units?: number
           updated_at?: string
         }
         Relationships: [
@@ -2771,6 +2771,7 @@ export type Database = {
           currency: string
           customer_id: string
           discount_total: number
+          fee_total: number
           hold_expires_at: string | null
           id: string
           markup_amount: number
@@ -2794,6 +2795,7 @@ export type Database = {
           currency?: string
           customer_id: string
           discount_total?: number
+          fee_total?: number
           hold_expires_at?: string | null
           id?: string
           markup_amount?: number
@@ -2817,6 +2819,7 @@ export type Database = {
           currency?: string
           customer_id?: string
           discount_total?: number
+          fee_total?: number
           hold_expires_at?: string | null
           id?: string
           markup_amount?: number
@@ -3162,6 +3165,7 @@ export type Database = {
       platform_api_integrations: {
         Row: {
           category: string
+          config: Json
           created_at: string
           credentials_encrypted: string | null
           id: string
@@ -3175,6 +3179,7 @@ export type Database = {
         }
         Insert: {
           category: string
+          config?: Json
           created_at?: string
           credentials_encrypted?: string | null
           id?: string
@@ -3188,6 +3193,7 @@ export type Database = {
         }
         Update: {
           category?: string
+          config?: Json
           created_at?: string
           credentials_encrypted?: string | null
           id?: string
@@ -4324,6 +4330,7 @@ export type Database = {
           custom_answers: Json
           decided_at: string | null
           decided_by: string | null
+          fee_amount: number
           id: string
           partner_last_synced_at: string | null
           partner_provider_key: string | null
@@ -4331,6 +4338,12 @@ export type Database = {
           partner_ref: string | null
           partner_status: string | null
           price: number
+          resolved_documents: Json | null
+          resolved_eligibility_requirements: string | null
+          resolved_price: number | null
+          resolved_processing_days_max: number | null
+          resolved_processing_days_min: number | null
+          resolved_processing_fee: number | null
           status: Database["public"]["Enums"]["visa_status"]
           submitted_by: string
           travel_details: Json
@@ -4353,6 +4366,7 @@ export type Database = {
           custom_answers?: Json
           decided_at?: string | null
           decided_by?: string | null
+          fee_amount?: number
           id?: string
           partner_last_synced_at?: string | null
           partner_provider_key?: string | null
@@ -4360,6 +4374,12 @@ export type Database = {
           partner_ref?: string | null
           partner_status?: string | null
           price: number
+          resolved_documents?: Json | null
+          resolved_eligibility_requirements?: string | null
+          resolved_price?: number | null
+          resolved_processing_days_max?: number | null
+          resolved_processing_days_min?: number | null
+          resolved_processing_fee?: number | null
           status?: Database["public"]["Enums"]["visa_status"]
           submitted_by: string
           travel_details?: Json
@@ -4382,6 +4402,7 @@ export type Database = {
           custom_answers?: Json
           decided_at?: string | null
           decided_by?: string | null
+          fee_amount?: number
           id?: string
           partner_last_synced_at?: string | null
           partner_provider_key?: string | null
@@ -4389,6 +4410,12 @@ export type Database = {
           partner_ref?: string | null
           partner_status?: string | null
           price?: number
+          resolved_documents?: Json | null
+          resolved_eligibility_requirements?: string | null
+          resolved_price?: number | null
+          resolved_processing_days_max?: number | null
+          resolved_processing_days_min?: number | null
+          resolved_processing_fee?: number | null
           status?: Database["public"]["Enums"]["visa_status"]
           submitted_by?: string
           travel_details?: Json
@@ -4511,9 +4538,12 @@ export type Database = {
           file_name: string | null
           file_size: number | null
           id: string
+          rejection_reason: string | null
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           storage_path: string
           uploaded_by: string
-          verified: boolean
         }
         Insert: {
           application_id: string
@@ -4523,9 +4553,12 @@ export type Database = {
           file_name?: string | null
           file_size?: number | null
           id?: string
+          rejection_reason?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           storage_path: string
           uploaded_by: string
-          verified?: boolean
         }
         Update: {
           application_id?: string
@@ -4535,9 +4568,12 @@ export type Database = {
           file_name?: string | null
           file_size?: number | null
           id?: string
+          rejection_reason?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           storage_path?: string
           uploaded_by?: string
-          verified?: boolean
         }
         Relationships: [
           {
@@ -4545,6 +4581,13 @@ export type Database = {
             columns: ["application_id"]
             isOneToOne: false
             referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_documents_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -4605,6 +4648,170 @@ export type Database = {
             columns: ["application_id"]
             isOneToOne: false
             referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visa_nationality_rules: {
+        Row: {
+          created_at: string
+          eligibility_requirements: string | null
+          id: string
+          nationality_code: string
+          price: number | null
+          processing_days_max: number | null
+          processing_days_min: number | null
+          processing_fee: number | null
+          required_documents: Json | null
+          updated_at: string
+          visa_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          eligibility_requirements?: string | null
+          id?: string
+          nationality_code: string
+          price?: number | null
+          processing_days_max?: number | null
+          processing_days_min?: number | null
+          processing_fee?: number | null
+          required_documents?: Json | null
+          updated_at?: string
+          visa_type_id: string
+        }
+        Update: {
+          created_at?: string
+          eligibility_requirements?: string | null
+          id?: string
+          nationality_code?: string
+          price?: number | null
+          processing_days_max?: number | null
+          processing_days_min?: number | null
+          processing_fee?: number | null
+          required_documents?: Json | null
+          updated_at?: string
+          visa_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_nationality_rules_visa_type_id_fkey"
+            columns: ["visa_type_id"]
+            isOneToOne: false
+            referencedRelation: "visa_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visa_processing_jobs: {
+        Row: {
+          application_id: string
+          appointment_date: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          failure_reason: string | null
+          id: string
+          lodged_with: string | null
+          lodgement_date: string | null
+          lodgement_reference: string | null
+          partner_last_synced_at: string | null
+          partner_raw_payload: Json | null
+          partner_ref: string | null
+          partner_status: string | null
+          provider_key: string | null
+          route: string
+          status: string
+        }
+        Insert: {
+          application_id: string
+          appointment_date?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          failure_reason?: string | null
+          id?: string
+          lodged_with?: string | null
+          lodgement_date?: string | null
+          lodgement_reference?: string | null
+          partner_last_synced_at?: string | null
+          partner_raw_payload?: Json | null
+          partner_ref?: string | null
+          partner_status?: string | null
+          provider_key?: string | null
+          route: string
+          status?: string
+        }
+        Update: {
+          application_id?: string
+          appointment_date?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          failure_reason?: string | null
+          id?: string
+          lodged_with?: string | null
+          lodgement_date?: string | null
+          lodgement_reference?: string | null
+          partner_last_synced_at?: string | null
+          partner_raw_payload?: Json | null
+          partner_ref?: string | null
+          partner_status?: string | null
+          provider_key?: string | null
+          route?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_processing_jobs_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_processing_jobs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visa_processing_notes: {
+        Row: {
+          application_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_processing_notes_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_processing_notes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -4740,6 +4947,23 @@ export type Database = {
           tx_type: Database["public"]["Enums"]["wallet_tx_type"]
         }
         Returns: string
+      }
+      apply_visa_partner_status_update: {
+        Args: {
+          p_application_id: string
+          p_note?: string
+          p_status: Database["public"]["Enums"]["visa_status"]
+        }
+        Returns: Database["public"]["Enums"]["visa_status"]
+      }
+      apply_visa_status_transition_internal: {
+        Args: {
+          p_actor?: string
+          p_application_id: string
+          p_note?: string
+          p_status: Database["public"]["Enums"]["visa_status"]
+        }
+        Returns: Database["public"]["Enums"]["visa_status"]
       }
       approve_affiliate_application: {
         Args: { application_id: string; p_note?: string }
@@ -4987,6 +5211,16 @@ export type Database = {
         Args: { p_manager_id: string }
         Returns: undefined
       }
+      replace_rejected_visa_document: {
+        Args: {
+          p_content_type?: string
+          p_document_id: string
+          p_file_name?: string
+          p_file_size?: number
+          p_storage_path: string
+        }
+        Returns: string
+      }
       request_agency_markup_change: {
         Args: {
           p_action: string
@@ -5013,6 +5247,24 @@ export type Database = {
           p_reference?: string
         }
         Returns: string
+      }
+      resolve_visa_pricing: {
+        Args: { p_nationality_code: string; p_visa_type_id: string }
+        Returns: {
+          eligibility_requirements: string
+          price: number
+          processing_days_max: number
+          processing_days_min: number
+          processing_fee: number
+          required_documents: Json
+        }[]
+      }
+      resolve_visa_processing_route: {
+        Args: { p_visa_type_id: string }
+        Returns: {
+          provider_key: string
+          route: string
+        }[]
       }
       resubmit_kyc_document: {
         Args: {
@@ -5061,6 +5313,14 @@ export type Database = {
         Args: { new_is_platform_admin: boolean; target_user_id: string }
         Returns: undefined
       }
+      set_visa_application_status: {
+        Args: {
+          p_application_id: string
+          p_note?: string
+          p_status: Database["public"]["Enums"]["visa_status"]
+        }
+        Returns: Database["public"]["Enums"]["visa_status"]
+      }
       settle_agency_payout_request: {
         Args: {
           p_method?: string
@@ -5082,6 +5342,10 @@ export type Database = {
       update_hotel_manager_permissions: {
         Args: { p_manager_id: string; p_permissions: string[] }
         Returns: undefined
+      }
+      visa_application_outstanding_items: {
+        Args: { p_application_id: string }
+        Returns: string
       }
     }
     Enums: {
@@ -5196,6 +5460,7 @@ export type Database = {
         | "submitted"
         | "in_review"
         | "additional_info_required"
+        | "ready_for_processing"
         | "processing"
         | "approved"
         | "rejected"
@@ -5460,6 +5725,7 @@ export const Constants = {
         "submitted",
         "in_review",
         "additional_info_required",
+        "ready_for_processing",
         "processing",
         "approved",
         "rejected",

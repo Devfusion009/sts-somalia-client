@@ -1,7 +1,12 @@
+import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getTopupOptions } from "@/modules/payments/topup";
 import { FundWalletDialog } from "./fund-wallet-dialog";
+
+function money(amount: number, currency: string) {
+  return `${currency} ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
 
 /**
  * The agency-balance step of a desk payment.
@@ -11,6 +16,12 @@ import { FundWalletDialog } from "./fund-wallet-dialog";
  * when it can't. The old shape — an enabled Pay button that fails with a
  * sentence about topping up — left the agent at the counter with nowhere to
  * go and the customer waiting.
+ *
+ * Laid out as a receipt — one line item per row, the running math ending in
+ * a single emphasized total — rather than a row of same-weight stat boxes:
+ * that shape reads as a checkout summary the agent already trusts, and
+ * (unlike a multi-column stat grid) a single wide amount can never force a
+ * whole row wider than the page.
  */
 export function WalletPaymentPanel({
   due,
@@ -32,63 +43,70 @@ export function WalletPaymentPanel({
   children: React.ReactNode;
 }) {
   const shortfall = Math.max(due - available, 0);
+  const remaining = available - due;
   const options = getTopupOptions();
 
   return (
-    <Card>
-      <CardContent className="space-y-3">
-        <dl className="space-y-1.5 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-muted-foreground">Agency balance available</dt>
-            <dd className="font-medium tabular-nums">
-              {currency} {available.toFixed(0)}
-            </dd>
+    <Card className="overflow-hidden py-0">
+      <CardContent className="divide-y divide-border px-0 py-0">
+        <div className="space-y-2 px-4 py-4 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">Agency balance</span>
+            <span className="font-medium tabular-nums">{money(available, currency)}</span>
           </div>
-          {shortfall > 0 ? (
-            <>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Amount due</dt>
-                <dd className="font-medium tabular-nums">
-                  {currency} {due.toFixed(0)}
-                </dd>
-              </div>
-              <div className="flex justify-between border-t border-border pt-1.5">
-                <dt className="font-medium text-destructive">Short by</dt>
-                <dd className="font-semibold tabular-nums text-destructive">
-                  {currency} {shortfall.toFixed(0)}
-                </dd>
-              </div>
-            </>
-          ) : null}
-          {pendingTopupTotal > 0 ? (
-            <div className="flex items-center justify-between">
-              <dt className="text-muted-foreground">Top-up filed</dt>
-              <dd className="flex items-center gap-2 tabular-nums">
-                {currency} {pendingTopupTotal.toFixed(0)}
-                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">
-                  Awaiting STS
-                </Badge>
-              </dd>
-            </div>
-          ) : null}
-        </dl>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">Amount due</span>
+            <span className="font-medium tabular-nums">{money(due, currency)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-border pt-2.5">
+            {shortfall > 0 ? (
+              <>
+                <span className="font-medium text-destructive">Short by</span>
+                <span className="font-heading text-lg font-bold tabular-nums text-destructive">
+                  {money(shortfall, currency)}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="font-medium">Balance after payment</span>
+                <span className="font-heading text-lg font-bold tabular-nums text-primary">
+                  {money(remaining, currency)}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
 
-        {shortfall === 0 ? (
-          children
-        ) : canTopUp ? (
-          <FundWalletDialog
-            amount={shortfall}
-            currency={currency}
-            returnTo={returnTo}
-            offline={options.offline}
-            online={options.online}
-            bankTransfer={options.bankTransfer}
-          />
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Only the agency owner or an admin can add money.
-          </p>
-        )}
+        {pendingTopupTotal > 0 ? (
+          <div className="flex items-center justify-between gap-3 bg-brand-gold/5 px-4 py-2.5 text-sm">
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <AlertTriangle className="size-3.5 text-brand-gold" /> Top-up filed, awaiting STS
+            </span>
+            <span className="flex items-center gap-2 font-medium tabular-nums">
+              {money(pendingTopupTotal, currency)}
+              <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Pending</Badge>
+            </span>
+          </div>
+        ) : null}
+
+        <div className="px-4 py-4">
+          {shortfall === 0 ? (
+            children
+          ) : canTopUp ? (
+            <FundWalletDialog
+              amount={shortfall}
+              currency={currency}
+              returnTo={returnTo}
+              offline={options.offline}
+              online={options.online}
+              bankTransfer={options.bankTransfer}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Only the agency owner or an admin can add money.
+            </p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

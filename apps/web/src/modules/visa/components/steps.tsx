@@ -69,6 +69,24 @@ import type { WizardApplication } from "@/modules/visa/queries";
 /* Shared bits                                                               */
 /* ------------------------------------------------------------------------- */
 
+/**
+ * Desk (agent-portal) step submissions come back with a destination instead
+ * of a server redirect — see advanceWizard() in actions.ts for why a
+ * redirect() can't be trusted to land on the agent host. A plain assignment,
+ * not router.push(), for the same reason PayFromWalletForm uses one: it
+ * always resolves against the actual current origin.
+ */
+function useDeskNavigate(state: ActionState) {
+  useEffect(() => {
+    if (state?.destination) window.location.href = state.destination;
+  }, [state]);
+}
+
+/** The wizard's own host path — desk pages are re-hosted, not forked, so every intra-wizard link derives from the same single switch. */
+function wizardBasePath(desk: boolean) {
+  return desk ? "/agent/book/visa/apply" : "/visa/apply";
+}
+
 function StepHeading({ index, title, subtitle }: { index?: number; title: string; subtitle: string }) {
   return (
     <div>
@@ -339,11 +357,15 @@ function MemberDialog({
 export function StepApplicantType({
   application,
   backHref,
+  desk = false,
 }: {
   application: WizardApplication;
   backHref: string;
+  /** Agent-desk host — see advanceWizard() in actions.ts. */
+  desk?: boolean;
 }) {
   const [state, formAction] = useActionState(saveApplicantType, null);
+  useDeskNavigate(state);
   const [applicantType, setApplicantType] = useState(application.applicant_type);
   const members = application.members;
   const others = members.filter((m) => !m.is_primary);
@@ -521,6 +543,7 @@ export function StepApplicantType({
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="applicationId" value={application.id} />
         <input type="hidden" name="applicantType" value={applicantType} />
+        {desk ? <input type="hidden" name="desk" value="1" /> : null}
         <ErrorAlert state={state} />
         <div className="flex items-center justify-between">
           <BackButton href={backHref} />
@@ -537,8 +560,16 @@ export function StepApplicantType({
 /* Step 2 — personal information                                              */
 /* ------------------------------------------------------------------------- */
 
-export function StepPersonalInfo({ application }: { application: WizardApplication }) {
+export function StepPersonalInfo({
+  application,
+  desk = false,
+}: {
+  application: WizardApplication;
+  /** Agent-desk host — see advanceWizard() in actions.ts. */
+  desk?: boolean;
+}) {
   const [state, formAction] = useActionState(savePersonalInfo, null);
+  useDeskNavigate(state);
   const t = (application.traveler_details ?? {}) as Record<string, string>;
   const c = (application.contact_details ?? {}) as Record<string, string>;
   // After a validation error, prefer what the user just typed over saved data.
@@ -547,6 +578,7 @@ export function StepPersonalInfo({ application }: { application: WizardApplicati
   return (
     <form action={formAction} className="space-y-6">
       <input type="hidden" name="applicationId" value={application.id} />
+      {desk ? <input type="hidden" name="desk" value="1" /> : null}
       <StepHeading
         title="Personal Information"
         subtitle="Please enter your personal details as shown in your passport."
@@ -612,7 +644,7 @@ export function StepPersonalInfo({ application }: { application: WizardApplicati
       <ErrorAlert state={state} />
 
       <div className="flex items-center justify-between">
-        <BackButton href={`/visa/apply/${application.id}?step=1`} />
+        <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=1`} />
         <SubmitButton pendingText="Saving…" className="gap-2">
           Save &amp; Continue <ArrowRight className="size-4" />
         </SubmitButton>
@@ -662,11 +694,15 @@ function YesNo({ name, label, defaultValue }: { name: string; label: string; def
 export function StepTravelInfo({
   application,
   destination,
+  desk = false,
 }: {
   application: WizardApplication;
   destination: string;
+  /** Agent-desk host — see advanceWizard() in actions.ts. */
+  desk?: boolean;
 }) {
   const [state, formAction] = useActionState(saveTravelInfo, null);
+  useDeskNavigate(state);
   const t = (application.travel_details ?? {}) as Record<string, string | boolean | null>;
   const v = state?.values ?? {};
   const str = (key: string) => (typeof t[key] === "string" ? (t[key] as string) : "");
@@ -676,6 +712,7 @@ export function StepTravelInfo({
   return (
     <form action={formAction} className="space-y-6">
       <input type="hidden" name="applicationId" value={application.id} />
+      {desk ? <input type="hidden" name="desk" value="1" /> : null}
       <StepHeading
         title="Travel Information"
         subtitle="Please enter your travel details for your visa application."
@@ -800,7 +837,7 @@ export function StepTravelInfo({
       <ErrorAlert state={state} />
 
       <div className="flex items-center justify-between">
-        <BackButton href={`/visa/apply/${application.id}?step=2`} />
+        <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=2`} />
         <SubmitButton pendingText="Saving…" className="gap-2">
           Save &amp; Continue <ArrowRight className="size-4" />
         </SubmitButton>
@@ -963,13 +1000,17 @@ function UploadSlot({
 export function StepDocuments({
   application,
   vaultOptions = [],
+  desk = false,
 }: {
   application: WizardApplication;
   /** The customer's document vault, offered as an alternative to uploading. */
   vaultOptions?: VaultOption[];
+  /** Agent-desk host — see advanceWizard() in actions.ts. */
+  desk?: boolean;
 }) {
   const [state, formAction] = useActionState(continueFromDocuments, null);
-  const slots = parseDocumentSlots(application.visa_type?.required_documents);
+  useDeskNavigate(state);
+  const slots = parseDocumentSlots(application.resolved_documents ?? application.visa_type?.required_documents);
   const byKey = new Map(application.documents.map((d) => [d.document_type, d]));
 
   return (
@@ -995,7 +1036,8 @@ export function StepDocuments({
 
       <form action={formAction} className="flex items-center justify-between">
         <input type="hidden" name="applicationId" value={application.id} />
-        <BackButton href={`/visa/apply/${application.id}?step=3`} />
+        {desk ? <input type="hidden" name="desk" value="1" /> : null}
+        <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=3`} />
         <SubmitButton pendingText="Checking…" className="gap-2">
           Save &amp; Continue <ArrowRight className="size-4" />
         </SubmitButton>
@@ -1055,17 +1097,25 @@ function ReviewGrid({ rows }: { rows: Array<[string, string]> }) {
   );
 }
 
-export function StepReview({ application }: { application: WizardApplication }) {
+export function StepReview({
+  application,
+  desk = false,
+}: {
+  application: WizardApplication;
+  /** Agent-desk host — see advanceWizard() in actions.ts. */
+  desk?: boolean;
+}) {
   const [state, formAction] = useActionState(submitVisaApplication, null);
+  useDeskNavigate(state);
   const t = (application.traveler_details ?? {}) as Record<string, string>;
   const c = (application.contact_details ?? {}) as Record<string, string>;
   const travel = (application.travel_details ?? {}) as Record<string, string | boolean | null>;
-  const slots = parseDocumentSlots(application.visa_type?.required_documents);
+  const slots = parseDocumentSlots(application.resolved_documents ?? application.visa_type?.required_documents);
   const byKey = new Map(application.documents.map((d) => [d.document_type, d]));
   const questions = parseApplicationQuestions(application.visa_type?.application_questions);
   const answers = (application.custom_answers ?? {}) as Record<string, string>;
   const termsAndConditions = application.visa_type?.terms_and_conditions;
-  const editBase = `/visa/apply/${application.id}?step=`;
+  const editBase = `${wizardBasePath(desk)}/${application.id}?step=`;
 
   const str = (v: unknown) => (typeof v === "string" ? v : "");
 
@@ -1158,6 +1208,7 @@ export function StepReview({ application }: { application: WizardApplication }) 
 
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="applicationId" value={application.id} />
+        {desk ? <input type="hidden" name="desk" value="1" /> : null}
         {termsAndConditions ? (
           <div className="space-y-2 rounded-lg border border-border p-4">
             <p className="text-sm font-semibold">Terms &amp; Conditions</p>

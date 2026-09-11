@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { createHotelBooking } from "@/modules/hotels/booking-actions";
@@ -35,6 +36,7 @@ export function DeskBookingForm({
   customerCount = 1,
   markup,
   available,
+  roomsLeft,
   defaults,
 }: {
   hotelId: string;
@@ -46,6 +48,8 @@ export function DeskBookingForm({
   markup: AgencyMarkupRule | null;
   /** Agency balance plus credit line — the shortfall is shown before confirming, not at payment. */
   available: number;
+  /** Units left for the dates the page loaded with — bounds the Rooms picker. */
+  roomsLeft?: number;
   defaults?: { checkIn?: string; checkOut?: string; guests?: string };
 }) {
   const isGroup = customerCount > 1;
@@ -62,6 +66,8 @@ export function DeskBookingForm({
   const [checkOut, setCheckOut] = useState(defaults?.checkOut ?? "");
   const [numRooms, setNumRooms] = useState(1);
   const router = useRouter();
+  const maxRooms = Math.max(1, Math.min(20, roomsLeft ?? 20));
+  const roomOptions = Array.from({ length: maxRooms }, (_, index) => index + 1);
 
   // The action hands back a path rather than redirecting; see deskOrderPath.
   useEffect(() => {
@@ -130,15 +136,22 @@ export function DeskBookingForm({
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor={`numRooms-${room.id}`}>Rooms</Label>
-              <Input
-                id={`numRooms-${room.id}`}
+              <Select
                 name="numRooms"
-                type="number"
-                min={1}
-                max={20}
-                value={numRooms}
-                onChange={(event) => setNumRooms(Number(event.target.value) || 1)}
-              />
+                value={String(numRooms)}
+                onValueChange={(value) => setNumRooms(Number(value))}
+              >
+                <SelectTrigger id={`numRooms-${room.id}`} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {roomOptions.map((count) => (
+                    <SelectItem key={count} value={String(count)}>
+                      {count}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor={`numAdults-${room.id}`}>Adults</Label>

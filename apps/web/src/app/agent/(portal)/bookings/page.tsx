@@ -133,7 +133,12 @@ export default async function AgentBookingsPage({
                   return (
                     <TableRow key={order.id}>
                       <TableCell>
-                        <p className="font-mono text-xs font-medium">{order.order_number}</p>
+                        <Link
+                          href={`/agent/bookings/${order.id}`}
+                          className="font-mono text-xs font-medium text-primary hover:underline"
+                        >
+                          {order.order_number}
+                        </Link>
                         <p className="text-xs text-muted-foreground">
                           {format(new Date(order.created_at), "d MMM yyyy")}
                         </p>

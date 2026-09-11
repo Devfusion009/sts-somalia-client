@@ -17,6 +17,7 @@ type NotificationRow = {
   type: string;
   title: string;
   body: string | null;
+  data?: unknown;
   created_at: string;
 };
 
@@ -27,6 +28,13 @@ function targetHref(n: NotificationRow): string | null {
   if (n.type === "topup_reviewed") return "/agent/finance/top-up";
   if (n.type === "markup_request_reviewed") return "/agent/markups";
   if (n.type === "partner_onboarding_reminder") return "/agent";
+  // The agent portal has no per-application visa view yet (that arrives with
+  // the desk in M7), so this lands on the filtered agency bookings list.
+  if (n.type === "visa_status_changed") return "/agent/bookings?type=visa";
+  if (n.type === "wallet_booking_payment") {
+    const data = n.data as { orderId?: string } | null;
+    return data?.orderId ? `/agent/book/order/${data.orderId}` : "/agent/bookings";
+  }
   if (ACTIONABLE_TYPES.has(n.type) || n.type === "application_documents_verified") return "/account/become";
   return null;
 }

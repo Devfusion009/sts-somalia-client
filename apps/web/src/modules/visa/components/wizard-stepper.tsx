@@ -22,10 +22,13 @@ export function WizardStepper({
   applicationId,
   currentStep,
   maxStep,
+  basePath = "/visa/apply",
 }: {
   applicationId: string;
   currentStep: number;
   maxStep: number;
+  /** Desk host passes "/agent/book/visa/apply" — same steps, portal-hosted. */
+  basePath?: string;
 }) {
   return (
     <aside className="space-y-4">
@@ -88,7 +91,7 @@ export function WizardStepper({
                   <span className="block rounded-lg px-2 py-2">{content}</span>
                 ) : (
                   <Link
-                    href={`/visa/apply/${applicationId}?step=${step}`}
+                    href={`${basePath}/${applicationId}?step=${step}`}
                     className={cn(
                       "block rounded-lg px-2 py-2 transition-colors hover:bg-accent/60",
                       isCurrent && "bg-secondary"

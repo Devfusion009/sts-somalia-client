@@ -170,7 +170,9 @@ export default async function DeskOrderPage({
         >
           <PayFromWalletForm
             orderId={order.id}
-            amountLabel={`${order.currency} ${balance.toFixed(0)}`}
+            amount={balance}
+            available={available}
+            currency={order.currency}
           />
         </WalletPaymentPanel>
       ) : null}

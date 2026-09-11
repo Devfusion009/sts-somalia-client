@@ -125,6 +125,7 @@ export default async function AgentHotelRoomsPage({
                           customerCount={customers.length}
                           markup={markup}
                           available={available}
+                          roomsLeft={left}
                           defaults={{ checkIn, checkOut, guests }}
                         />
                       </TableCell>

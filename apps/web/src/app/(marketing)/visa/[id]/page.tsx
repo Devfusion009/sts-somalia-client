@@ -15,10 +15,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { getVisaTypeById } from "@/modules/visa/queries";
+import { getVisaTypeById, getResolvedVisaPricing } from "@/modules/visa/queries";
 import { startVisaApplication } from "@/modules/visa/actions";
 import { parseDocumentSlots } from "@/modules/visa/schemas";
-import { countryFlag, countryName } from "@/lib/countries";
+import { countryFlag, countryName, COUNTRY_OPTIONS } from "@/lib/countries";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { VisaTypeBanner, fmtMoney, processingText } from "@/modules/visa/components/visa-shared";
 import { SubmitButton } from "@/components/submit-button";
 import { AgencyBookingSlot } from "@/modules/agencies/components/agency-booking-slot";
@@ -61,14 +63,21 @@ export default async function VisaDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ blocked?: string }>;
+  searchParams: Promise<{ blocked?: string; nationality?: string }>;
 }) {
   const { id } = await params;
-  const { blocked } = await searchParams;
+  const { blocked, nationality } = await searchParams;
   const visa = await getVisaTypeById(id);
   if (!visa) notFound();
 
-  const slots = parseDocumentSlots(visa.required_documents);
+  // A nationality in the URL means the customer chose it before seeing a
+  // price — resolve_visa_pricing is the same function the wizard freezes a
+  // snapshot from later, so this preview can never quote a different number
+  // than what they're actually charged.
+  const resolved = nationality ? await getResolvedVisaPricing(visa.id, nationality) : null;
+  const price = resolved?.price ?? visa.price;
+  const processingFee = resolved?.processing_fee ?? visa.processing_fee;
+  const slots = parseDocumentSlots(resolved?.required_documents ?? visa.required_documents);
   const destination = countryName(visa.destination_country_code);
 
   return (
@@ -90,14 +99,36 @@ export default async function VisaDetailPage({
         right={
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-xs text-muted-foreground">Price From</p>
-              <p className="font-heading text-xl font-bold text-primary">
-                {fmtMoney(visa.price, visa.currency)}
-              </p>
+              <p className="text-xs text-muted-foreground">{nationality ? "Price for you" : "Price From"}</p>
+              <p className="font-heading text-xl font-bold text-primary">{fmtMoney(price, visa.currency)}</p>
             </div>
           </div>
         }
       />
+
+      <form className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        <div className="min-w-48 flex-1 space-y-1.5">
+          <Label htmlFor="nationality-select" className="text-xs text-muted-foreground">
+            Your passport nationality
+          </Label>
+          <select
+            id="nationality-select"
+            name="nationality"
+            defaultValue={nationality ?? ""}
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Select nationality</option>
+            {COUNTRY_OPTIONS.map(([code, name]) => (
+              <option key={code} value={code}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Button type="submit" variant="outline" size="sm">
+          See price &amp; requirements
+        </Button>
+      </form>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_340px]">
         <div className="space-y-8">
@@ -181,17 +212,23 @@ export default async function VisaDetailPage({
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Government &amp; service fee</span>
-                <span className="font-semibold">{fmtMoney(visa.price, visa.currency)}</span>
+                <span className="font-semibold">{fmtMoney(price, visa.currency)}</span>
               </div>
+              {Number(processingFee) > 0 ? (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Processing fee</span>
+                  <span className="font-semibold">{fmtMoney(processingFee!, visa.currency)}</span>
+                </div>
+              ) : null}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Per applicant</span>
                 <span className="font-semibold">Yes</span>
               </div>
               <Separator />
               <div className="flex justify-between text-base">
-                <span className="font-semibold">Total from</span>
+                <span className="font-semibold">{nationality ? "Total for you" : "Total from"}</span>
                 <span className="font-heading font-bold text-primary">
-                  {fmtMoney(visa.price, visa.currency)}
+                  {fmtMoney(Number(price) + Number(processingFee ?? 0), visa.currency)}
                 </span>
               </div>
               {blocked ? (
@@ -204,6 +241,7 @@ export default async function VisaDetailPage({
               ) : null}
               <form action={startVisaApplication} className="space-y-3 pt-2">
                 <input type="hidden" name="visaTypeId" value={visa.id} />
+                {nationality ? <input type="hidden" name="nationality" value={nationality} /> : null}
                 <AgencyBookingSlot />
                 <SubmitButton size="lg" className="w-full gap-2" pendingText="Starting application…">
                   Apply Now <ArrowRight className="size-4" />

@@ -37,6 +37,7 @@ const TRANSITIONS = [
   "submitted",
   "in_review",
   "additional_info_required",
+  "ready_for_processing",
   "processing",
   "approved",
   "rejected",
@@ -61,8 +62,12 @@ export function StatusControl({
       <input type="hidden" name="status" value={status} />
       <div className="space-y-1.5">
         <Label>Move to status</Label>
-        <Select value={status} onValueChange={(v) => setStatus(v as string)}>
-          <SelectTrigger className="w-full capitalize">
+        <Select
+          value={status}
+          onValueChange={(v) => setStatus(v as string)}
+          items={TRANSITIONS.map((s) => ({ value: s, label: VISA_STATUS_LABELS[s] ?? s }))}
+        >
+          <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -197,12 +202,15 @@ export function ResultUpload({ applicationId }: { applicationId: string }) {
 export function PartnerControl({
   applicationId,
   partnerName,
+  partnerAvailable,
   partnerRef,
   partnerStatus,
   partnerLastSyncedAt,
 }: {
   applicationId: string;
   partnerName: string;
+  /** False when the provider has no active credentials — the button would only fail if clicked. */
+  partnerAvailable: boolean;
   partnerRef: string | null;
   partnerStatus: string | null;
   partnerLastSyncedAt: string | null;
@@ -243,6 +251,10 @@ export function PartnerControl({
             </Button>
           </form>
         </>
+      ) : !partnerAvailable ? (
+        <Alert variant="destructive">
+          <AlertDescription>{partnerName} has no active credentials — configure it under Integrations.</AlertDescription>
+        </Alert>
       ) : (
         <form action={submitAction}>
           <input type="hidden" name="applicationId" value={applicationId} />

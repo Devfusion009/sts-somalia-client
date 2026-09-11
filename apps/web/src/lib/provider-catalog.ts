@@ -61,6 +61,30 @@ export const PROVIDER_CATALOG: ProviderDefinition[] = [
     signupUrl: "https://www.zylalabs.com/api-marketplace/travel+&+transportation/visa+checker+api/2154",
     credentialFields: [{ key: "api_key", label: "Bearer API Key" }],
   },
+  {
+    key: "sandbox",
+    category: "visa_processing",
+    name: "Sandbox (testing)",
+    description: "In-process fake visa-processing partner — no real vendor, no network calls. Proves the partner contract works before a real vendor is signed.",
+    selfServe: true,
+    docsUrl: "internal:visa-processing-sandbox",
+    signupUrl: "internal:visa-processing-sandbox",
+    credentialFields: [{ key: "webhook_secret", label: "Webhook secret", placeholder: "any value — used to sign test webhook calls" }],
+  },
+  {
+    key: "custom",
+    category: "visa_processing",
+    name: "Custom REST partner",
+    description: "Any visa-processing vendor with an ordinary REST + webhook API, wired up by configuration rather than a new adapter.",
+    selfServe: true,
+    docsUrl: "internal:visa-processing-custom",
+    signupUrl: "internal:visa-processing-custom",
+    credentialFields: [
+      { key: "auth_header_name", label: "Auth header name", placeholder: "Authorization" },
+      { key: "auth_header_value", label: "Auth header value", placeholder: "Bearer sk_live_..." },
+      { key: "webhook_secret", label: "Webhook secret", placeholder: "the vendor's HMAC signing secret" },
+    ],
+  },
 ];
 
 export function getProvider(key: string): ProviderDefinition | undefined {

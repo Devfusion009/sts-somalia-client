@@ -27,9 +27,9 @@ function sanitizeFilename(name: string) {
 
 /**
  * Offline rail — the way STS funds agencies today. Nothing is credited here:
- * this records what the agent says they sent (and, optionally, a photo of
- * the slip) and puts it in front of an admin. review_agency_topup is what
- * actually moves the balance, once a human has seen the money arrive.
+ * this records what the agent says they sent, with a photo of the slip, and
+ * puts it in front of an admin. review_agency_topup is what actually moves
+ * the balance, once a human has seen the money arrive.
  */
 export async function requestOfflineTopup(
   _prevState: ActionState,
@@ -62,18 +62,15 @@ export async function requestOfflineTopup(
   // The slip is uploaded before the request row exists, so the path is keyed
   // by agency (which is also what the storage policy checks) rather than by
   // a request id that isn't known yet.
-  let proofPath: string | null = null;
   const proof = formData.get("proof");
-  if (proof instanceof File && proof.size > 0) {
-    if (proof.size > MAX_PROOF_BYTES) return { error: "That file is larger than 5 MB." };
-    if (!PROOF_TYPES.includes(proof.type)) return { error: "Upload a JPG, PNG, WebP, or PDF." };
-    const path = `${membership.agency.id}/${Date.now()}-${sanitizeFilename(proof.name)}`;
-    const { error: uploadError } = await supabase.storage
-      .from("payment-proofs")
-      .upload(path, proof, { contentType: proof.type });
-    if (uploadError) return { error: uploadError.message };
-    proofPath = path;
-  }
+  if (!(proof instanceof File) || proof.size === 0) return { error: "Attach a receipt for this payment." };
+  if (proof.size > MAX_PROOF_BYTES) return { error: "That file is larger than 5 MB." };
+  if (!PROOF_TYPES.includes(proof.type)) return { error: "Upload a JPG, PNG, WebP, or PDF." };
+  const path = `${membership.agency.id}/${Date.now()}-${sanitizeFilename(proof.name)}`;
+  const { error: uploadError } = await supabase.storage
+    .from("payment-proofs")
+    .upload(path, proof, { contentType: proof.type });
+  if (uploadError) return { error: uploadError.message };
 
   const { error } = await supabase.rpc("request_agency_topup", {
     p_agency_id: membership.agency.id,
@@ -81,11 +78,11 @@ export async function requestOfflineTopup(
     p_rail: "offline",
     p_method: parsed.data.method,
     p_reference: parsed.data.reference,
-    p_proof_path: proofPath ?? undefined,
+    p_proof_path: path,
     p_note: parsed.data.note,
   });
   if (error) {
-    if (proofPath) await supabase.storage.from("payment-proofs").remove([proofPath]);
+    await supabase.storage.from("payment-proofs").remove([path]);
     return { error: error.message };
   }
 

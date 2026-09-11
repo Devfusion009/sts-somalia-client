@@ -131,6 +131,12 @@ export default async function CheckoutPage({
                   <span>{money(order.markup_amount, order.currency)}</span>
                 </div>
               ) : null}
+              {Number(order.fee_total) > 0 ? (
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Processing fee</span>
+                  <span>{money(order.fee_total, order.currency)}</span>
+                </div>
+              ) : null}
               <Separator />
               <div className="flex items-center justify-between text-base font-semibold">
                 <span>Total Fee</span>

@@ -17,7 +17,6 @@ export default async function ManagerLoginPage({
     <PortalLoginShell portalLabel="Manager Portal" accent="manager">
       <PortalLoginForm
         title="Hotel manager sign-in"
-        description="Log in to manage bookings, rooms, and your hotel profile."
         action={signInToManagerPortalAction}
         redirectTo={redirect_to}
         demoAccount={DEMO_LOGIN_ENABLED ? DEMO_ACCOUNTS.manager : undefined}

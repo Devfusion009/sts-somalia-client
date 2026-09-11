@@ -53,12 +53,28 @@ export type EdgeSession = {
  * Large sessions are split across `.0`, `.1`, … chunks, so the parts are
  * reassembled in index order before decoding.
  */
+// supabase-js names the session cookie after the first hostname label of the
+// URL it was created against (`sb-<label>-auth-token`), so a browser that has
+// reached this app through two different Supabase hostnames — 127.0.0.1 from
+// `next dev` and host.docker.internal from the Docker stack — carries two
+// sb-*-auth-token cookies at once. Taking whichever one happens to sort first
+// meant a stale, expired token from the other setup could shadow the live
+// session and bounce a real admin to the login page in a loop. Prefer the
+// cookie that belongs to the Supabase instance this deployment actually talks
+// to; only fall back to "any" when that one isn't present at all.
+const STORAGE_KEY = SUPABASE_URL
+  ? `sb-${new URL(SUPABASE_URL).hostname.split(".")[0]}-auth-token`
+  : null;
+
 function readSessionCookie(request: NextRequest): string | null {
   const all = request.cookies.getAll();
-  const base = all.filter((c) => /^sb-.*-auth-token$/.test(c.name));
+  const own = STORAGE_KEY ? all.filter((c) => c.name === STORAGE_KEY || c.name.startsWith(`${STORAGE_KEY}.`)) : [];
+  const pool = own.length > 0 ? own : all;
+
+  const base = pool.filter((c) => /^sb-.*-auth-token$/.test(c.name));
   if (base.length > 0) return base[0].value;
 
-  const chunks = all
+  const chunks = pool
     .filter((c) => /^sb-.*-auth-token\.\d+$/.test(c.name))
     .sort((a, b) => Number(a.name.split(".").pop()) - Number(b.name.split(".").pop()));
   return chunks.length > 0 ? chunks.map((c) => c.value).join("") : null;

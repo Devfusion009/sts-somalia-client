@@ -32,8 +32,11 @@ import { ShieldAlert } from "lucide-react";
 // group: "Reports" was a single Aging Report (a receivables view, so it
 // belongs here anyway) and Refund Requests moved across from Bookings &
 // Orders, where it was the one item that isn't a customer booking to
-// fulfil. Wallet top-ups and earnings review are the obvious next tenants —
-// both still live on the agency page today.
+// fulfil. Wallet top-ups got its own item the same way Withdrawals did
+// (2026-09-07) — it was reachable only by drilling into one agency at a
+// time, so an admin had no way to see money sent by other agencies waiting
+// to be confirmed. Earnings review is the one still living on the agency
+// page today.
 const NAV_GROUPS: PortalNavGroup[] = [
   {
     label: "Overview",
@@ -74,7 +77,11 @@ const NAV_GROUPS: PortalNavGroup[] = [
   {
     label: "Finance",
     items: [
-      // First: it is the only one where someone is waiting on their money.
+      // First two: someone is waiting on money in both directions — an
+      // agency that already sent cash/EVC and is blocked from booking until
+      // it's credited, or one that's owed a payout. Neither can happen
+      // anywhere but here.
+      { href: "/admin/finance/top-ups", label: "Top-ups", icon: "credit-note" },
       { href: "/admin/finance/withdrawals", label: "Withdrawals", icon: "payouts" },
       { href: "/admin/refunds", label: "Refund Requests", icon: "refund" },
       { href: "/admin/reports/aging", label: "Aging Report", icon: "aging" },
@@ -158,14 +165,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     // Requests waiting to be reviewed, plus approved ones waiting to be
     // sent — both are work only an admin can clear.
     "/admin/finance/withdrawals": navCounts.payout_requests,
+    // Offline top-ups an agency says it already sent — reviewing one credits
+    // the wallet immediately, so this is time-sensitive the same way a
+    // payout is.
+    "/admin/finance/top-ups": navCounts.topup_requests,
     // The agency decisions that still have no home of their own — markup
-    // changes, earnings waiting on review, offline top-ups — are all made
-    // on an agency's own page, so they share that page's badge rather than
-    // splitting into nav items that would lead back to the same place.
-    // Payouts left this sum when Withdrawals got its own item: counting the
-    // same request twice would make the sidebar overstate the backlog.
-    "/admin/agencies":
-      (navCounts.markup_requests ?? 0) + (navCounts.earnings_reviews ?? 0) + (navCounts.topup_requests ?? 0),
+    // changes and earnings waiting on review — are made on an agency's own
+    // page, so they share that page's badge rather than splitting into nav
+    // items that would lead back to the same place. Payouts and top-ups
+    // left this sum when they got their own items: counting the same
+    // request twice would make the sidebar overstate the backlog.
+    "/admin/agencies": (navCounts.markup_requests ?? 0) + (navCounts.earnings_reviews ?? 0),
   };
   const navGroups = NAV_GROUPS.map((group) => ({
     ...group,

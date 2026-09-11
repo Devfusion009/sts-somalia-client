@@ -133,6 +133,7 @@ export const VISA_STATUS_LABELS: Record<string, string> = {
   submitted: "Submitted",
   in_review: "Under Review",
   additional_info_required: "Additional Documents",
+  ready_for_processing: "Ready for Processing",
   processing: "Under Processing",
   approved: "Approved",
   rejected: "Rejected",

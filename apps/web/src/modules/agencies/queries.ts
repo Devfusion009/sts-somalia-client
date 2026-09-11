@@ -422,6 +422,78 @@ export async function getAgencyTopupRequests(agencyId: string) {
 
 export type AgencyTopupRequest = Awaited<ReturnType<typeof getAgencyTopupRequests>>[number];
 
+/** The buckets the admin top-ups queue filters by. */
+export const TOPUP_QUEUE_FILTERS = {
+  pending: ["pending"],
+  approved: ["approved"],
+  declined: ["rejected", "cancelled", "failed"],
+} as const;
+
+export type TopupQueueFilter = keyof typeof TOPUP_QUEUE_FILTERS | "all";
+
+/**
+ * Every agency's top-up requests in one queue — an admin confirming money
+ * sent today is asking "who sent us money", not "what does this one agency
+ * need", which is the question getAgencyTopupRequests answers on an agency
+ * page.
+ */
+export async function getTopupQueue(filter: TopupQueueFilter = "pending") {
+  const supabase = await createClient();
+  let query = supabase
+    .from("agency_topup_requests")
+    .select(
+      "*, agency:agencies(id, name), requester:profiles!agency_topup_requests_requested_by_fkey(full_name, email)"
+    )
+    .order("requested_at", { ascending: false })
+    .limit(100);
+  if (filter !== "all") {
+    query = query.in("status", [...TOPUP_QUEUE_FILTERS[filter]]);
+  }
+  const { data } = await query;
+  return data ?? [];
+}
+
+export type TopupQueueRow = Awaited<ReturnType<typeof getTopupQueue>>[number];
+
+export type TopupQueueTotals = {
+  toReviewCount: number;
+  toReviewAmount: number;
+  creditedThisMonth: number;
+  declinedCount: number;
+};
+
+/**
+ * Simple aggregates over a table small enough not to need its own RPC (the
+ * payouts queue's admin_payout_queue_totals exists because that table also
+ * tracks multi-stage transit; top-ups only ever go pending → one decision).
+ */
+export async function getTopupQueueTotals(): Promise<TopupQueueTotals> {
+  const supabase = await createClient();
+  const startOfMonth = new Date();
+  startOfMonth.setUTCDate(1);
+  startOfMonth.setUTCHours(0, 0, 0, 0);
+
+  const [{ data: pending }, { data: approved }, { count: declinedCount }] = await Promise.all([
+    supabase.from("agency_topup_requests").select("amount").eq("status", "pending"),
+    supabase
+      .from("agency_topup_requests")
+      .select("amount")
+      .eq("status", "approved")
+      .gte("reviewed_at", startOfMonth.toISOString()),
+    supabase
+      .from("agency_topup_requests")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["rejected", "failed"]),
+  ]);
+
+  return {
+    toReviewCount: pending?.length ?? 0,
+    toReviewAmount: (pending ?? []).reduce((sum, row) => sum + Number(row.amount), 0),
+    creditedThisMonth: (approved ?? []).reduce((sum, row) => sum + Number(row.amount), 0),
+    declinedCount: declinedCount ?? 0,
+  };
+}
+
 /** Markup rules for an agency: one default (item_type null) + per-vertical overrides. */
 export async function getAgencyMarkups(agencyId: string) {
   const supabase = await createClient();

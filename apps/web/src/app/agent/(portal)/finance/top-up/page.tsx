@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { OfflineTopupForm, OnlineTopupForm } from "./top-up-forms";
+import { BankTransferDetails, OfflineTopupForm, OnlineTopupForm } from "./top-up-forms";
 
 export const metadata: Metadata = { title: "Add Money" };
 
@@ -84,20 +84,7 @@ export default async function AgentTopUpPage({ searchParams }: { searchParams: P
               <CardTitle className="text-base">I sent money to STS</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <dl className="grid gap-1.5 rounded-lg bg-secondary/50 px-3 py-3 text-sm">
-                <div className="flex justify-between gap-3">
-                  <dt className="text-muted-foreground">Bank</dt>
-                  <dd className="font-medium">{options.bankTransfer.bankName}</dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-muted-foreground">Account name</dt>
-                  <dd className="truncate font-medium">{options.bankTransfer.accountName}</dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-muted-foreground">Account number</dt>
-                  <dd className="font-mono font-medium">{options.bankTransfer.accountNumber}</dd>
-                </div>
-              </dl>
+              <BankTransferDetails bankTransfer={options.bankTransfer} />
               <OfflineTopupForm methods={options.offline} />
             </CardContent>
           </Card>

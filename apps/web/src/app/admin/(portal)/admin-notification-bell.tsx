@@ -28,7 +28,11 @@ type NotificationRow = {
 function targetHref(n: NotificationRow): string | null {
   if (n.type === "new_order") return "/admin/queue";
   if (n.type === "payout_request") return "/admin/finance/withdrawals?status=pending";
-  if (n.type === "markup_request") {
+  if (n.type === "visa_application_submitted" || n.type === "visa_status_changed") {
+    const applicationId = (n.data as { applicationId?: string } | null)?.applicationId;
+    if (applicationId) return `/admin/visa/${applicationId}`;
+  }
+  if (n.type === "markup_request" || n.type === "wallet_booking_payment") {
     const data = n.data as { agencyId?: string } | null;
     if (data?.agencyId) return `/admin/agencies/${data.agencyId}`;
   }

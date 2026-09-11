@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { Check, Download, ExternalLink, X } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
-import { getVisaApplicationAdmin, getVisaOrderAdmin } from "@/modules/admin/queries";
+import { getVisaApplicationAdmin, getVisaOrderAdmin, getVisaProcessingWorkspace, isVisaOrderPaid } from "@/modules/admin/queries";
 import { adminResolveDocumentRequest } from "@/modules/visa/admin-actions";
 import { countryFlag, countryName } from "@/lib/countries";
 import { VisaStatusBadge } from "@/modules/visa/components/visa-shared";
@@ -21,7 +21,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { StatusControl, RequestDocumentDialog, ResultUpload, PartnerControl } from "./visa-controls";
+import { DocumentReviewControls } from "./document-review-controls";
+import { ManualProcessingWorkspace } from "./manual-processing-workspace";
 import { getProvider } from "@/lib/provider-catalog";
+import { isPartnerProviderAvailable } from "@/modules/visa/partner/registry";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Review Visa Application" };
@@ -48,7 +51,15 @@ export default async function AdminVisaDetailPage({
   const application = await getVisaApplicationAdmin(id);
   if (!application || !application.visa_type) notFound();
 
-  const order = await getVisaOrderAdmin(application.id);
+  const [order, workspace] = await Promise.all([
+    getVisaOrderAdmin(application.id),
+    getVisaProcessingWorkspace(application.id, application.visa_type.id),
+  ]);
+  const partnerAvailable =
+    workspace.route === "partner" && workspace.providerKey
+      ? await isPartnerProviderAvailable(workspace.providerKey)
+      : false;
+  const canLodgeManually = ["ready_for_processing", "processing"].includes(application.status);
   const supabase = await createClient();
   const signedDocs = await Promise.all(
     application.documents.map(async (doc) => {
@@ -217,25 +228,51 @@ export default async function AdminVisaDetailPage({
                 {signedDocs.map((doc) => (
                   <div
                     key={doc.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5"
+                    className="space-y-2 rounded-lg border border-border px-3 py-2.5"
                   >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {doc.file_name ?? doc.document_type}
-                      </p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {doc.document_type.replace(/_/g, " ").replace("request:", "requested: ")}
-                      </p>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {doc.file_name ?? doc.document_type}
+                        </p>
+                        <p className="text-xs text-muted-foreground capitalize">
+                          {doc.document_type.replace(/_/g, " ").replace("request:", "requested: ")}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Badge
+                          className={cn(
+                            "border-transparent capitalize",
+                            doc.review_status === "accepted"
+                              ? "bg-primary/10 text-primary"
+                              : doc.review_status === "rejected"
+                                ? "bg-destructive/10 text-destructive"
+                                : "bg-brand-gold/15 text-brand-gold"
+                          )}
+                        >
+                          {doc.review_status}
+                        </Badge>
+                        {doc.url ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            render={<a href={doc.url} target="_blank" rel="noreferrer" />}
+                            className="gap-1 text-primary"
+                          >
+                            View <ExternalLink className="size-3.5" />
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
-                    {doc.url ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        render={<a href={doc.url} target="_blank" rel="noreferrer" />}
-                        className="gap-1 text-primary"
-                      >
-                        View <ExternalLink className="size-3.5" />
-                      </Button>
+                    {doc.rejection_reason ? (
+                      <p className="text-xs text-destructive">{doc.rejection_reason}</p>
+                    ) : null}
+                    {doc.document_type !== "visa_result" ? (
+                      <DocumentReviewControls
+                        documentId={doc.id}
+                        applicationId={application.id}
+                        reviewStatus={doc.review_status}
+                      />
                     ) : null}
                   </div>
                 ))}
@@ -344,16 +381,74 @@ export default async function AdminVisaDetailPage({
         </div>
 
         <div className="space-y-4">
+          {order ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Finance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <dl className="divide-y divide-border text-sm">
+                  <div className="flex items-center justify-between py-2 first:pt-0">
+                    <dt className="text-muted-foreground">Visa service price</dt>
+                    <dd className="font-medium">{order.currency} {Number(order.subtotal).toFixed(0)}</dd>
+                  </div>
+                  {Number(order.markup_amount) > 0 ? (
+                    <div className="flex items-center justify-between py-2">
+                      <dt className="text-muted-foreground">Agency service fee</dt>
+                      <dd className="font-medium">{order.currency} {Number(order.markup_amount).toFixed(0)}</dd>
+                    </div>
+                  ) : null}
+                  {Number(order.fee_total) > 0 ? (
+                    <div className="flex items-center justify-between py-2">
+                      <dt className="text-muted-foreground">STS processing fee</dt>
+                      <dd className="font-medium">{order.currency} {Number(order.fee_total).toFixed(0)}</dd>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center justify-between py-2">
+                    <dt className="font-medium">Total</dt>
+                    <dd className="font-semibold">{order.currency} {Number(order.total).toFixed(0)}</dd>
+                  </div>
+                  <div className="flex items-center justify-between py-2">
+                    <dt className="text-muted-foreground">Paid</dt>
+                    <dd className="font-medium">{order.currency} {order.paid.toFixed(0)}{order.method ? ` — ${order.method}` : ""}</dd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 last:pb-0">
+                    <dt className="text-muted-foreground">Remaining</dt>
+                    <dd className="font-medium">{order.currency} {order.remaining.toFixed(0)}</dd>
+                  </div>
+                </dl>
+                {application.status === "rejected" && order.paid > 0 ? (
+                  <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+                    {application.agency_id
+                      ? "No refund issued. The agency can file a refund request from their portal."
+                      : "No refund issued. This platform has no refund flow for card/mobile-money customers yet — process it outside the system."}
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Decision</CardTitle>
             </CardHeader>
             <CardContent>
-              <StatusControl applicationId={application.id} currentStatus={application.status} />
+              {application.status === "submitted" && !isVisaOrderPaid(order?.status) ? (
+                <p className="text-sm text-muted-foreground">Awaiting payment.</p>
+              ) : (
+                // Keyed on status: the lodge form and document review forms move the
+                // application from beside this control, and its local selection must
+                // follow the row rather than keep offering the transition it just made.
+                <StatusControl
+                  key={application.status}
+                  applicationId={application.id}
+                  currentStatus={application.status}
+                />
+              )}
             </CardContent>
           </Card>
 
-          {application.visa_type.processing_mode === "partner" ? (
+          {workspace.route === "partner" ? (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Partner processing</CardTitle>
@@ -361,12 +456,8 @@ export default async function AdminVisaDetailPage({
               <CardContent>
                 <PartnerControl
                   applicationId={application.id}
-                  partnerName={
-                    application.visa_type.partner_provider_key === "manual" || !application.visa_type.partner_provider_key
-                      ? "Manual hand-off"
-                      : (getProvider(application.visa_type.partner_provider_key)?.name ??
-                        application.visa_type.partner_provider_key)
-                  }
+                  partnerName={getProvider(workspace.providerKey ?? "")?.name ?? workspace.providerKey ?? "Partner"}
+                  partnerAvailable={partnerAvailable}
                   partnerRef={application.partner_ref}
                   partnerStatus={application.partner_status}
                   partnerLastSyncedAt={application.partner_last_synced_at}
@@ -375,6 +466,23 @@ export default async function AdminVisaDetailPage({
             </Card>
           ) : null}
 
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                {workspace.route === "partner" ? "Manual fallback" : "Processing"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ManualProcessingWorkspace
+                applicationId={application.id}
+                activeJob={workspace.manualActiveJob}
+                pastJobs={workspace.manualPastJobs}
+                notes={workspace.notes}
+                canLodge={canLodgeManually}
+              />
+            </CardContent>
+          </Card>
+
           {decided ? (
             <Card>
               <CardHeader>
@@ -382,17 +490,7 @@ export default async function AdminVisaDetailPage({
                   <Download className="size-4 text-primary" /> Visa document
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {signedDocs.some((d) => d.document_type === "visa_result") ? (
-                  <p className="text-xs text-muted-foreground">
-                    A visa document is attached — the customer can download it from their tracking
-                    page. Uploading again replaces nothing; the newest file is shown.
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Attach the approved visa (PDF/scan) so the customer can download it.
-                  </p>
-                )}
+              <CardContent>
                 <ResultUpload applicationId={application.id} />
               </CardContent>
             </Card>

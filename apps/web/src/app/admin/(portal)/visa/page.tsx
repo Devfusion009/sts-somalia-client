@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -11,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getVisaApplicationsAdmin } from "@/modules/admin/queries";
+import { getVisaApplicationsAdmin, isVisaOrderPaid } from "@/modules/admin/queries";
 import { countryFlag, countryName } from "@/lib/countries";
 import { VisaStatusBadge } from "@/modules/visa/components/visa-shared";
 import { VISA_STATUS_LABELS } from "@/modules/visa/schemas";
@@ -23,6 +24,7 @@ const FILTERS = [
   "submitted",
   "in_review",
   "additional_info_required",
+  "ready_for_processing",
   "processing",
   "approved",
   "rejected",
@@ -81,6 +83,7 @@ export default async function AdminVisaPage({
               <TableHead>Type</TableHead>
               <TableHead>Submitted</TableHead>
               <TableHead>Fee</TableHead>
+              <TableHead>Payment</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right" />
             </TableRow>
@@ -88,7 +91,7 @@ export default async function AdminVisaPage({
           <TableBody>
             {applications.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
                   No visa applications{status ? ` with status "${VISA_STATUS_LABELS[status] ?? status}"` : ""} yet.
                 </TableCell>
               </TableRow>
@@ -113,6 +116,16 @@ export default async function AdminVisaPage({
                     <TableCell>{new Date(app.created_at).toLocaleDateString()}</TableCell>
                     <TableCell>
                       {app.currency} {Number(app.price).toFixed(0)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={cn(
+                          "border-transparent",
+                          isVisaOrderPaid(app.orderStatus) ? "bg-primary/10 text-primary" : "bg-brand-gold/15 text-brand-gold"
+                        )}
+                      >
+                        {isVisaOrderPaid(app.orderStatus) ? "Paid" : "Awaiting payment"}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <VisaStatusBadge status={app.status} />

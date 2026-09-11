@@ -86,6 +86,8 @@ const TONES = {
   violet: "bg-chart-4/10 text-chart-4",
   gold: "bg-brand-gold/10 text-brand-gold",
   red: "bg-destructive/10 text-destructive",
+  // Same visual language as VisaStatusBadge's own ready_for_processing tint.
+  cyan: "bg-chart-2/10 text-chart-2",
 } as const;
 
 type Tone = keyof typeof TONES;
@@ -116,6 +118,7 @@ const VISA_PIPELINE_STAGES = [
   "submitted",
   "in_review",
   "additional_info_required",
+  "ready_for_processing",
   "processing",
   "approved",
   "issued",
@@ -127,6 +130,7 @@ const VISA_STAGE_ICON: Record<string, LucideIcon> = {
   submitted: Send,
   in_review: Eye,
   additional_info_required: AlertCircle,
+  ready_for_processing: ClipboardCheck,
   processing: Clock,
   approved: CheckCircle2,
   issued: BadgeCheck,
@@ -138,6 +142,7 @@ const VISA_STAGE_TONE: Record<string, Tone> = {
   submitted: "blue",
   in_review: "violet",
   additional_info_required: "orange",
+  ready_for_processing: "cyan",
   processing: "gold",
   approved: "teal",
   issued: "teal",
@@ -187,6 +192,7 @@ export default async function AdminDashboardPage({
     (visaStats.byStatus["submitted"] ?? 0) +
     (visaStats.byStatus["in_review"] ?? 0) +
     (visaStats.byStatus["additional_info_required"] ?? 0) +
+    (visaStats.byStatus["ready_for_processing"] ?? 0) +
     (visaStats.byStatus["processing"] ?? 0);
 
   const usersByRoleData = Object.entries(ROLE_CHART_LABELS).map(([role, label]) => ({

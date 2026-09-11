@@ -12,6 +12,7 @@ import { UMRAH_INCLUDE_KEYS } from "@/modules/umrah/includes";
 import { rememberRoomType } from "@/modules/hotels/room-types";
 import { repriceQuotedOrder } from "@/modules/orders/helpers";
 import { commaList, parseLinks, replacePropertyLinks } from "@/modules/hotels/listing-fields";
+import { sanitizeKey, parseDocumentSlotsJson } from "./visa-type-utils";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type ListingStatus = Database["public"]["Enums"]["listing_status"];
@@ -73,58 +74,6 @@ const visaTypeSchema = z.object({
     message: "Choose which partner processes this visa type.",
     path: ["partnerProviderKey"],
   });
-
-/**
- * A document slot's / question's `key` becomes a literal identifier
- * downstream — a form field name, a storage-path segment
- * (uploadVisaDocument builds `${applicationId}/${key}-...`), and a
- * `document_type`/`custom_answers` jsonb key. Free text typed into the
- * admin's row editor is NOT trusted as-is; it's re-sanitized here
- * regardless of what the client already did, the same way the old
- * pipe-text format silently enforced this by only ever accepting
- * `[a-z0-9_]` in that position.
- */
-function sanitizeKey(input: string, fallback: string) {
-  const key = input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9_]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return key || fallback;
-}
-
-/**
- * Rows from the admin's structured document-slot editor, serialized as one
- * JSON string (see DocumentSlotsField). Replaces the old
- * `key|Label|required|maxMB|description` pipe-text textarea — the DB has
- * always stored this as real jsonb, so there's no format to preserve here,
- * just structure + key sanitization to re-apply.
- */
-function parseDocumentSlotsJson(input: string | undefined) {
-  if (!input) return [];
-  let rows: unknown;
-  try {
-    rows = JSON.parse(input);
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(rows)) return [];
-  return rows
-    .map((row, i) => {
-      const r = (row ?? {}) as Record<string, string>;
-      const key = sanitizeKey(r.key ?? "", `document_${i + 1}`);
-      const label = (r.label ?? "").trim() || key.replace(/_/g, " ");
-      const maxMb = Number(r.max_mb);
-      return {
-        key,
-        label,
-        required: r.required !== "optional" && r.required !== "false",
-        ...(maxMb > 0 ? { max_mb: maxMb } : {}),
-        ...(r.description?.trim() ? { description: r.description.trim() } : {}),
-      };
-    })
-    .filter((slot) => slot.label);
-}
 
 /** Rows from the admin's structured application-questions editor — same JSON + key-sanitization approach as document slots. */
 function parseApplicationQuestionsJson(input: string | undefined) {

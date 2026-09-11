@@ -35,6 +35,8 @@ export async function createOrderForBooking(
     currency: string;
     itemType: OrderItemType;
     price: number;
+    /** Order-level platform fee (e.g. visa processing fee) — added on top, never marked up. */
+    feeAmount?: number;
     hotelBookingId?: string;
     flightBookingId?: string;
     visaApplicationId?: string;
@@ -57,7 +59,8 @@ export async function createOrderForBooking(
   const markupAmount = params.agencyId
     ? await getAgencyMarkupAmount(supabase, params.agencyId, params.itemType, params.price)
     : 0;
-  const total = params.price + markupAmount;
+  const feeAmount = params.feeAmount ?? 0;
+  const total = params.price + markupAmount + feeAmount;
 
   const { data: order, error: orderError } = await supabase
     .from("orders")
@@ -69,6 +72,7 @@ export async function createOrderForBooking(
       affiliate_id: affiliateId,
       affiliate_click_id: affiliateClickId,
       markup_amount: markupAmount,
+      fee_total: feeAmount,
       currency: params.currency,
       subtotal: params.price,
       total,

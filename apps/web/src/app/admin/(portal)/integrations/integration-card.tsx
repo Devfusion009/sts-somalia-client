@@ -29,6 +29,7 @@ import {
   deleteIntegrationCredentials,
   testIntegrationConnection,
 } from "@/modules/admin/integrations/actions";
+import { CustomPartnerConfigForm } from "./custom-partner-config-form";
 
 /**
  * The card's headline state. Derived rather than stored: "live" is the
@@ -242,6 +243,8 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
             </a>
           </div>
         </form>
+
+        {provider.key === "custom" ? <CustomPartnerConfigForm config={status.config} /> : null}
       </CardContent>
     </Card>
   );

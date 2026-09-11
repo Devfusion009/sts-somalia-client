@@ -10,15 +10,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import {
+  BankTransferDetails,
   OfflineTopupForm,
   OnlineTopupForm,
+  type BankTransfer,
   type Method,
 } from "@/app/agent/(portal)/finance/top-up/top-up-forms";
-
-type BankTransfer = { bankName: string; accountName: string; accountNumber: string };
 
 /**
  * The top-up flow at the point it's needed: opened from a booking the wallet
@@ -57,48 +57,29 @@ export function FundWalletDialog({
         </DialogHeader>
 
         {online.length > 0 ? (
-          <div className="grid grid-cols-2 gap-1 rounded-lg bg-secondary/60 p-1">
-            {(
-              [
-                ["online", "Pay now"],
-                ["offline", "I sent money"],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setRail(key)}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  rail === key
-                    ? "bg-card text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {rail === "online" && online.length > 0 ? (
-          <OnlineTopupForm methods={online} defaultAmount={amount} returnTo={returnTo} />
+          <Tabs value={rail} onValueChange={(value) => setRail(value as "online" | "offline")}>
+            <TabsList className="w-full">
+              <TabsTrigger value="online">Pay now</TabsTrigger>
+              <TabsTrigger value="offline">I sent money</TabsTrigger>
+            </TabsList>
+            <TabsContent value="online" className="mt-4">
+              <OnlineTopupForm methods={online} defaultAmount={amount} returnTo={returnTo} />
+            </TabsContent>
+            <TabsContent value="offline" className="mt-4 space-y-4">
+              <BankTransferDetails bankTransfer={bankTransfer} />
+              <OfflineTopupForm
+                methods={offline}
+                defaultAmount={amount}
+                onSuccess={() => {
+                  setOpen(false);
+                  router.refresh();
+                }}
+              />
+            </TabsContent>
+          </Tabs>
         ) : (
           <div className="space-y-4">
-            <dl className="grid gap-1.5 rounded-lg bg-secondary/50 px-3 py-3 text-sm">
-              <div className="flex justify-between gap-3">
-                <dt className="text-muted-foreground">Bank</dt>
-                <dd className="font-medium">{bankTransfer.bankName}</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-muted-foreground">Account name</dt>
-                <dd className="truncate font-medium">{bankTransfer.accountName}</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-muted-foreground">Account number</dt>
-                <dd className="font-mono font-medium">{bankTransfer.accountNumber}</dd>
-              </div>
-            </dl>
+            <BankTransferDetails bankTransfer={bankTransfer} />
             <OfflineTopupForm
               methods={offline}
               defaultAmount={amount}

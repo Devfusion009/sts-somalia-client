@@ -528,5 +528,6 @@ export async function reviewAgencyTopup(
 
   revalidatePath(`/admin/agencies/${parsed.data.agencyId}`);
   revalidatePath("/admin/agencies");
+  revalidatePath("/admin/finance/top-ups");
   return { error: null };
 }

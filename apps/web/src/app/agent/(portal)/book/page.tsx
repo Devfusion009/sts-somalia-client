@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Hotel, Landmark, PartyPopper, Plane, Search } from "lucide-react";
+import { Hotel, Landmark, PartyPopper, Plane, Search, Stamp } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getMyAgency, getAgencyCustomersWithStats } from "@/modules/agencies/queries";
@@ -19,6 +19,7 @@ const SERVICES = [
     icon: PartyPopper,
     tint: "bg-brand-gold/15 text-brand-gold",
   },
+  { href: "/agent/book/visa", label: "Visa", icon: Stamp, tint: "bg-chart-3/10 text-chart-3" },
 ];
 
 export default async function BookingDeskPage({

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getVisaTypeAdmin } from "@/modules/admin/queries";
+import { getVisaTypeAdmin, getVisaNationalityRulesAdmin } from "@/modules/admin/queries";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { VisaTypeEditor } from "../../visa-type-editor";
+import { NationalityRulesSection } from "../../nationality-rules-section";
 
 export async function generateMetadata({
   params,
@@ -17,6 +19,19 @@ export default async function EditVisaTypePage({ params }: { params: Promise<{ i
   const { id } = await params;
   const visaType = await getVisaTypeAdmin(id);
   if (!visaType) notFound();
+  const rules = await getVisaNationalityRulesAdmin(id);
 
-  return <VisaTypeEditor visaType={visaType} />;
+  return (
+    <div className="space-y-6">
+      <VisaTypeEditor visaType={visaType} />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Nationality overrides</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <NationalityRulesSection visaTypeId={id} visaCurrency={visaType.currency} rules={rules} />
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

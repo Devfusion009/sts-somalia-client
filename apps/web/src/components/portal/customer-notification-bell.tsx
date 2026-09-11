@@ -26,6 +26,10 @@ function targetHref(n: NotificationRow): string | null {
     const orderId = (n.data as { order_id?: string } | null)?.order_id;
     return orderId ? `/account/bookings/${orderId}` : "/account/bookings";
   }
+  if (n.type === "visa_status_changed") {
+    const applicationId = (n.data as { applicationId?: string } | null)?.applicationId;
+    return applicationId ? `/account/visa/${applicationId}` : "/account/visa";
+  }
   return null;
 }
 

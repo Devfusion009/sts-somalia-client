@@ -27,6 +27,7 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   submitted: "bg-chart-3/10 text-chart-3",
   in_review: "bg-brand-gold/15 text-brand-gold",
   additional_info_required: "bg-brand-accent/10 text-brand-accent",
+  ready_for_processing: "bg-chart-2/10 text-chart-2",
   processing: "bg-chart-4/10 text-chart-4",
   approved: "bg-primary/10 text-primary",
   issued: "bg-primary/10 text-primary",

@@ -296,6 +296,16 @@ export async function getVisaTypeAdmin(id: string) {
   return data;
 }
 
+export async function getVisaNationalityRulesAdmin(visaTypeId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("visa_nationality_rules")
+    .select("*")
+    .eq("visa_type_id", visaTypeId)
+    .order("nationality_code");
+  return data ?? [];
+}
+
 export async function getUmrahPackagesAdmin() {
   const supabase = await createClient();
   const { data } = await supabase
@@ -436,19 +446,27 @@ export async function getTopHotels(limit = 5) {
 // ---------------------------------------------------------------------------
 // Visa application management
 // ---------------------------------------------------------------------------
+/** True once STS has actually been paid — the line an unpaid submission must cross before it's staff-actionable (locked decision D2). */
+export function isVisaOrderPaid(orderStatus: string | null | undefined) {
+  return orderStatus === "paid" || orderStatus === "partially_paid";
+}
+
 export async function getVisaApplicationsAdmin(status?: string) {
   const supabase = await createClient();
   let query = supabase
     .from("visa_applications")
     .select(
-      "id, application_ref, applicant_type, status, price, currency, created_at, traveler_details, visa_type:visa_type_id(name, destination_country_code)"
+      "id, application_ref, applicant_type, status, price, currency, created_at, traveler_details, visa_type:visa_type_id(name, destination_country_code), order_items(order:order_id(status))"
     )
     .neq("status", "draft")
     .order("created_at", { ascending: false })
     .limit(300);
   if (status) query = query.eq("status", status as never);
   const { data } = await query;
-  return data ?? [];
+  return (data ?? []).map((row) => ({
+    ...row,
+    orderStatus: row.order_items[0]?.order?.status ?? null,
+  }));
 }
 
 export async function getVisaApplicationAdmin(id: string) {
@@ -475,14 +493,62 @@ export async function getVisaApplicationAdmin(id: string) {
   return data;
 }
 
+/**
+ * Which workspace an application belongs in (manual or partner), plus its
+ * processing attempts and staff notes. resolve_visa_processing_route is the
+ * same function the ready-for-processing guard trigger calls, so the admin
+ * page and the database can never disagree about the route.
+ */
+export async function getVisaProcessingWorkspace(applicationId: string, visaTypeId: string) {
+  const supabase = await createClient();
+  const [{ data: routeRows }, { data: jobs }, { data: notes }] = await Promise.all([
+    supabase.rpc("resolve_visa_processing_route", { p_visa_type_id: visaTypeId }),
+    supabase
+      .from("visa_processing_jobs")
+      .select("*")
+      .eq("application_id", applicationId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("visa_processing_notes")
+      .select("*, author:profiles!visa_processing_notes_created_by_fkey (full_name)")
+      .eq("application_id", applicationId)
+      .order("created_at", { ascending: false }),
+  ]);
+  const resolved = routeRows?.[0] ?? { route: "manual", provider_key: null };
+  const route = resolved.route as "manual" | "partner";
+  const manualJobs = (jobs ?? []).filter((j) => j.route === "manual");
+  return {
+    route,
+    providerKey: resolved.provider_key,
+    // The manual workspace renders regardless of route (it's the fallback
+    // whenever a configured partner errors), so it only ever sees manual
+    // attempts — a partner job's columns would be null in its fields anyway.
+    manualActiveJob: manualJobs.find((j) => j.status === "active") ?? null,
+    manualPastJobs: manualJobs.filter((j) => j.status !== "active"),
+    notes: notes ?? [],
+  };
+}
+
 export async function getVisaOrderAdmin(applicationId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("order_items")
-    .select("order:order_id (id, order_number, status, total, currency)")
+    .select(
+      "order:order_id (id, order_number, status, subtotal, markup_amount, fee_total, total, currency, payments(status, method_label, amount))"
+    )
     .eq("visa_application_id", applicationId)
     .maybeSingle();
-  return data?.order ?? null;
+  const order = data?.order ?? null;
+  if (!order) return null;
+
+  const succeeded = order.payments.filter((p) => p.status === "succeeded");
+  const paid = succeeded.reduce((sum, p) => sum + Number(p.amount), 0);
+  return {
+    ...order,
+    paid,
+    remaining: Number(order.total) - paid,
+    method: succeeded.at(-1)?.method_label ?? null,
+  };
 }
 
 export async function getVisaStatsAdmin() {

@@ -3,7 +3,7 @@
 import { useActionState, useEffect } from "react";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/password-input";
 import { Label } from "@/components/ui/label";
@@ -22,13 +22,11 @@ import { DemoLoginButton } from "@/modules/demo/demo-login-button";
  */
 export function PortalLoginForm({
   title,
-  description,
   action,
   redirectTo,
   demoAccount,
 }: {
   title: string;
-  description: string;
   action: (prevState: ActionState, formData: FormData) => Promise<ActionState>;
   redirectTo?: string;
   /** Set only when DEMO_LOGIN_ENABLED is true (hosted) — replaces the credential form below with a one-click button. */
@@ -56,7 +54,6 @@ export function PortalLoginForm({
     <Card>
       <CardHeader>
         <CardTitle className="font-heading text-2xl">{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         {demoAccount ? (

@@ -5,7 +5,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile, requireUser } from "@/lib/auth/session";
-import { assertAgencyCanBookProduct, createOrderForBooking, getActiveAgencyId } from "@/modules/orders/helpers";
+import {
+  assertAgencyCanBookProduct,
+  createOrderForBooking,
+  getActiveAgencyId,
+  deskOrderPath,
+} from "@/modules/orders/helpers";
 import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
 import {
   APPLICANT_TYPES,
@@ -21,6 +26,8 @@ export type ActionState = {
   /** Submitted field values echoed back so forms can re-fill after a
    *  validation error (React 19 resets uncontrolled fields post-action). */
   values?: Record<string, string>;
+  /** Set only for desk (agent-portal) submissions — see advanceWizard(). */
+  destination?: string;
 } | null;
 
 function formValues(formData: FormData): Record<string, string> {
@@ -53,6 +60,26 @@ async function getEditableApplication(applicationId: string, userId: string) {
 
 function wizardPath(applicationId: string, step: number) {
   return `/visa/apply/${applicationId}?step=${step}`;
+}
+
+function deskWizardPath(applicationId: string, step: number) {
+  return `/agent/book/visa/apply/${applicationId}?step=${step}`;
+}
+
+/**
+ * Ends a wizard step. Sessions on the agent portal (host-only auth cookies —
+ * see lib/subdomain.ts's cookieDomain) can't follow a Server Action redirect()
+ * to a path meant for the public site's host: the same trap deskOrderPath
+ * documents for hotel bookings. A desk submission gets its destination back
+ * as state and navigates client-side instead (window.location.href, which
+ * always resolves against the actual current origin); everyone else gets a
+ * normal server redirect.
+ */
+function advanceWizard(formData: FormData, applicationId: string, step: number): ActionState {
+  if (formData.get("desk") === "1") {
+    return { error: null, destination: deskWizardPath(applicationId, step) };
+  }
+  redirect(wizardPath(applicationId, step));
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +118,15 @@ export async function startVisaApplication(formData: FormData): Promise<void> {
 
   const agencyCustomerId = await resolveBookedForCustomer(supabase, agencyId, formData);
 
+  // A nationality chosen on the detail page before "Apply Now" seeds both
+  // the field itself and its resolved quote, so step 2 opens already
+  // agreeing with what the customer was just shown — not a separate value
+  // they have to re-enter and hope matches.
+  const nationality = formData.get("nationality")?.toString().trim().toUpperCase();
+  const resolved = nationality
+    ? (await supabase.rpc("resolve_visa_pricing", { p_visa_type_id: visaType.id, p_nationality_code: nationality })).data?.[0]
+    : null;
+
   const { data: application, error } = await supabase
     .from("visa_applications")
     .insert({
@@ -103,12 +139,75 @@ export async function startVisaApplication(formData: FormData): Promise<void> {
       price: visaType.price,
       currency: visaType.currency,
       contact_details: { email: user.email ?? "", mobile: user.phone ?? "" },
+      ...(nationality ? { traveler_details: { nationality } } : {}),
+      ...(resolved
+        ? {
+            resolved_price: resolved.price,
+            resolved_processing_fee: resolved.processing_fee,
+            resolved_processing_days_min: resolved.processing_days_min,
+            resolved_processing_days_max: resolved.processing_days_max,
+            resolved_documents: resolved.required_documents,
+            resolved_eligibility_requirements: resolved.eligibility_requirements,
+          }
+        : {}),
     })
     .select("id")
     .single();
 
   if (error || !application) redirect("/visa");
   redirect(wizardPath(application.id, 1));
+}
+
+/**
+ * Desk equivalent of startVisaApplication — separate function rather than a
+ * branch inside it, because that one is bound straight to a <form action>
+ * (no useActionState) and always ends in redirect(); this one is read
+ * through useActionState so the desk page can navigate to the destination
+ * itself. Always for the agent's own agency, and always for the customer
+ * already selected at /agent/book (agencyCustomerId), not a self-service
+ * applicant_profile_id.
+ */
+export async function startDeskVisaApplication(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({ visaTypeId: z.string().uuid(), agencyCustomerId: z.string().uuid() })
+    .safeParse({
+      visaTypeId: formData.get("visaTypeId"),
+      agencyCustomerId: formData.get("agencyCustomerId"),
+    });
+  if (!parsed.success) return { error: "Invalid request." };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const agencyId = await getActiveAgencyId(supabase, user.id);
+  if (!agencyId) return { error: "You are not an active member of an agency." };
+  const access = await assertAgencyCanBookProduct(supabase, agencyId, "visa");
+  if (!access.ok) return { error: access.message };
+
+  const { data: visaType } = await supabase
+    .from("visa_types")
+    .select("*")
+    .eq("id", parsed.data.visaTypeId)
+    .eq("status", "published")
+    .maybeSingle();
+  if (!visaType) return { error: "This visa product is no longer available." };
+
+  const { data: application, error } = await supabase
+    .from("visa_applications")
+    .insert({
+      visa_type_id: visaType.id,
+      submitted_by: user.id,
+      agency_id: agencyId,
+      agency_customer_id: parsed.data.agencyCustomerId,
+      status: "draft",
+      price: visaType.price,
+      currency: visaType.currency,
+    })
+    .select("id")
+    .single();
+  if (error || !application) return { error: error?.message ?? "Could not start the application." };
+
+  return { error: null, destination: deskWizardPath(application.id, 1) };
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +264,7 @@ export async function saveApplicantType(
       .eq("is_primary", false);
   }
 
-  redirect(wizardPath(application.id, 2));
+  return advanceWizard(formData, application.id, 2);
 }
 
 export async function saveVisaMember(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -259,6 +358,20 @@ export async function savePersonalInfo(
   if (!application) return { error: "This application can no longer be edited." };
 
   const d = parsed.data;
+
+  // Nationality is now known (or has changed) — freeze what this applicant
+  // is actually quoted and required to provide. Re-resolving on every save
+  // of this step (rather than only once) means correcting a typo'd
+  // nationality before submitting updates the quote; nothing re-resolves
+  // once the application leaves draft (RLS already blocks the customer from
+  // editing past that point), so a later rules edit can't reach back into
+  // an application already assessed against the old numbers.
+  const { data: resolvedRows } = await supabase.rpc("resolve_visa_pricing", {
+    p_visa_type_id: application.visa_type_id,
+    p_nationality_code: d.nationality,
+  });
+  const resolved = resolvedRows?.[0];
+
   await supabase
     .from("visa_applications")
     .update({
@@ -276,6 +389,12 @@ export async function savePersonalInfo(
       },
       contact_details: { email: d.email, mobile: d.mobile },
       current_step: Math.max(application.current_step, 3),
+      resolved_price: resolved?.price ?? null,
+      resolved_processing_fee: resolved?.processing_fee ?? null,
+      resolved_processing_days_min: resolved?.processing_days_min ?? null,
+      resolved_processing_days_max: resolved?.processing_days_max ?? null,
+      resolved_documents: resolved?.required_documents ?? null,
+      resolved_eligibility_requirements: resolved?.eligibility_requirements ?? null,
     })
     .eq("id", application.id);
 
@@ -299,7 +418,7 @@ export async function savePersonalInfo(
     await supabase.from("visa_members").insert(primaryRow);
   }
 
-  redirect(wizardPath(application.id, 3));
+  return advanceWizard(formData, application.id, 3);
 }
 
 // ---------------------------------------------------------------------------
@@ -370,7 +489,7 @@ export async function saveTravelInfo(
     })
     .eq("id", application.id);
 
-  redirect(wizardPath(application.id, 4));
+  return advanceWizard(formData, application.id, 4);
 }
 
 // ---------------------------------------------------------------------------
@@ -579,7 +698,7 @@ export async function continueFromDocuments(
     .from("visa_applications")
     .update({ current_step: Math.max(application.current_step, 5) })
     .eq("id", application.id);
-  redirect(wizardPath(application.id, 5));
+  return advanceWizard(formData, application.id, 5);
 }
 
 // ---------------------------------------------------------------------------
@@ -637,7 +756,11 @@ export async function submitVisaApplication(
     return { error: `Please answer: ${unanswered.map((q) => q.label).join(", ")} — review step 3.` };
   }
 
-  const slots = parseDocumentSlots(visaType.required_documents);
+  // resolved_documents/price/fee were stamped in step 2 once nationality was
+  // known (see savePersonalInfo) — that snapshot is what this applicant was
+  // actually told to provide and quoted, not the visa type's raw default,
+  // which a nationality rule may have overridden.
+  const slots = parseDocumentSlots(application.resolved_documents ?? visaType.required_documents);
   const uploadedKeys = new Set(application.documents.map((d) => d.document_type));
   const missing = slots.filter((s) => s.required && !uploadedKeys.has(s.key));
   if (missing.length > 0) {
@@ -646,13 +769,27 @@ export async function submitVisaApplication(
 
   const applicantCount =
     application.applicant_type === "single" ? 1 : Math.max(application.members.length, 1);
-  const total = Number(visaType.price) * applicantCount;
+  const unitPrice = Number(application.resolved_price ?? visaType.price);
+  const total = unitPrice * applicantCount;
+  // Resolved once here, same as price — a later change to the rule or to
+  // visa_types.processing_fee must not retroactively change what this
+  // applicant was already quoted and billed.
+  const unitFee = Number(application.resolved_processing_fee ?? visaType.processing_fee ?? 0);
+  const feeAmount = unitFee * applicantCount;
 
   const { error: updateError } = await supabase
     .from("visa_applications")
-    .update({ status: "submitted", price: total, current_step: 6 })
+    .update({ price: total, fee_amount: feeAmount, current_step: 6 })
     .eq("id", application.id);
   if (updateError) return { error: updateError.message };
+
+  // Status moves only through set_visa_application_status — that is what puts
+  // the arrival in front of admins and confirms it to the applicant.
+  const { error: statusError } = await supabase.rpc("set_visa_application_status", {
+    p_application_id: application.id,
+    p_status: "submitted",
+  });
+  if (statusError) return { error: statusError.message };
 
   const order = await createOrderForBooking(supabase, {
     customerId: application.applicant_profile_id ?? user.id,
@@ -662,9 +799,16 @@ export async function submitVisaApplication(
     currency: visaType.currency,
     itemType: "visa",
     price: total,
+    feeAmount,
     visaApplicationId: application.id,
   });
 
+  // Desk submissions settle on the agent portal's own order page (wallet
+  // payment, same as every other vertical's desk flow) — never the public
+  // checkout, which the agent's host-only session can't authenticate on.
+  if (formData.get("desk") === "1") {
+    return { error: null, destination: deskOrderPath(order.id) };
+  }
   redirect(`/checkout/${order.id}`);
 }
 
@@ -730,6 +874,53 @@ export async function uploadRequestedDocument(
     .update({ status: "uploaded", document_id: doc.id })
     .eq("id", request.id);
   if (linkError) return { error: linkError.message };
+
+  revalidatePath(`/account/visa/${parsed.data.applicationId}`);
+  return { error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Replace a document STS rejected
+// ---------------------------------------------------------------------------
+export async function replaceRejectedDocument(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = z
+    .object({ documentId: z.string().uuid(), applicationId: z.string().uuid() })
+    .safeParse({
+      documentId: formData.get("documentId"),
+      applicationId: formData.get("applicationId"),
+    });
+  if (!parsed.success) return { error: "Invalid request." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to upload." };
+  if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) {
+    return { error: "Only JPG, PNG, or PDF files are accepted." };
+  }
+  if (file.size > MAX_UPLOAD_BYTES_DEFAULT) return { error: "Files must be 5MB or smaller." };
+
+  await requireUser();
+  const supabase = await createClient();
+
+  const storagePath = `${parsed.data.applicationId}/replace-${parsed.data.documentId}-${Date.now()}-${sanitizeFilename(file.name)}`;
+  const { error: uploadError } = await supabase.storage
+    .from("visa-documents")
+    .upload(storagePath, file, { contentType: file.type });
+  if (uploadError) return { error: uploadError.message };
+
+  // The swap, the ownership check, and the hand-back to review all happen in
+  // replace_rejected_visa_document — visa_documents has no update policy for
+  // the applicant, and widening one would also let them edit review fields.
+  const { error } = await supabase.rpc("replace_rejected_visa_document", {
+    p_document_id: parsed.data.documentId,
+    p_storage_path: storagePath,
+    p_file_name: file.name,
+    p_file_size: file.size,
+    p_content_type: file.type,
+  });
+  if (error) return { error: error.message };
 
   revalidatePath(`/account/visa/${parsed.data.applicationId}`);
   return { error: null };

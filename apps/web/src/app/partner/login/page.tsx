@@ -16,7 +16,6 @@ export default async function PartnerLoginPage({
     <PortalLoginShell portalLabel="Partner Portal" accent="partner">
       <PortalLoginForm
         title="Hotel partner sign-in"
-        description="Log in to manage your properties, rooms, and bookings."
         action={signInToPartnerPortalAction}
         redirectTo={redirect_to}
       />

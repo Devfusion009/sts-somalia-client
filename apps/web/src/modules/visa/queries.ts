@@ -35,6 +35,22 @@ export async function getVisaTypeById(id: string) {
   return data;
 }
 
+/**
+ * What this visa type actually costs and requires for one nationality —
+ * read-only preview for the browse/detail pages, before any application
+ * exists to stamp a snapshot onto. Same function the wizard uses to freeze
+ * that snapshot once nationality is confirmed (see savePersonalInfo), so a
+ * quoted price here can never disagree with what the wizard later resolves.
+ */
+export async function getResolvedVisaPricing(visaTypeId: string, nationalityCode: string) {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("resolve_visa_pricing", {
+    p_visa_type_id: visaTypeId,
+    p_nationality_code: nationalityCode,
+  });
+  return data?.[0] ?? null;
+}
+
 /** The signed-in user's applications (any status), newest first. */
 export async function getMyVisaApplications() {
   const supabase = await createClient();
@@ -111,8 +127,20 @@ export async function getOrderForVisaApplication(applicationId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("order_items")
-    .select("order_id, order:order_id (id, status, total, currency, order_number)")
+    .select(
+      "order_id, order:order_id (id, status, subtotal, markup_amount, fee_total, total, currency, order_number, payments(status, amount, method_label))"
+    )
     .eq("visa_application_id", applicationId)
     .maybeSingle();
-  return data?.order ?? null;
+  const order = data?.order ?? null;
+  if (!order) return null;
+
+  const succeeded = order.payments.filter((p) => p.status === "succeeded");
+  const paid = succeeded.reduce((sum, p) => sum + Number(p.amount), 0);
+  return {
+    ...order,
+    paid,
+    remaining: Number(order.total) - paid,
+    method: succeeded.at(-1)?.method_label ?? null,
+  };
 }
