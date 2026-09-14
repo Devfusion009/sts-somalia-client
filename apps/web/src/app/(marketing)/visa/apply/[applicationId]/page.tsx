@@ -9,7 +9,6 @@ import { TRAVELER_DOCUMENT_TYPES } from "@/modules/travelers/schemas";
 import { countryName } from "@/lib/countries";
 import { VisaTypeBanner } from "@/modules/visa/components/visa-shared";
 import { WizardStepper } from "@/modules/visa/components/wizard-stepper";
-import { ApplicationSummary } from "@/modules/visa/components/application-summary";
 import {
   StepApplicantType,
   StepPersonalInfo,
@@ -46,19 +45,32 @@ export default async function VisaWizardPage({
 
   // Only the document step offers vault reuse, so only that step pays for the
   // query. Every other step would be loading a list nothing renders.
-  const vaultOptions =
-    step === 4
-      ? (await trpc.travelers.myDocuments.query()).map((doc) => ({
-          id: doc.id,
-          label:
-            doc.label ??
-            `${VAULT_TYPE_LABELS.get(doc.document_type) ?? "Document"}${
-              doc.traveler ? ` — ${doc.traveler.full_name}` : ""
-            }`,
-          fileName: doc.file_name,
-          documentType: doc.document_type,
-        }))
-      : [];
+  // Reuse is a convenience on top of uploading fresh files, not a dependency
+  // of the step itself — if the API is unreachable, fall back to no saved
+  // documents rather than taking the whole wizard down.
+  let vaultOptions: {
+    id: string;
+    label: string;
+    fileName: string;
+    documentType: string;
+  }[] = [];
+  if (step === 4) {
+    try {
+      const documents = await trpc.travelers.myDocuments.query();
+      vaultOptions = documents.map((doc) => ({
+        id: doc.id,
+        label:
+          doc.label ??
+          `${VAULT_TYPE_LABELS.get(doc.document_type) ?? "Document"}${
+            doc.traveler ? ` — ${doc.traveler.full_name}` : ""
+          }`,
+        fileName: doc.file_name,
+        documentType: doc.document_type,
+      }));
+    } catch {
+      vaultOptions = [];
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -80,7 +92,7 @@ export default async function VisaWizardPage({
 
       <VisaTypeBanner visaType={visaType} />
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[270px_1fr] xl:grid-cols-[270px_1fr_310px]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[270px_1fr]">
         <WizardStepper applicationId={application.id} currentStep={step} maxStep={maxStep} />
 
         <main className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7">
@@ -96,10 +108,6 @@ export default async function VisaWizardPage({
             <StepReview application={application} />
           )}
         </main>
-
-        <div className="hidden xl:block">
-          <ApplicationSummary application={application} priceLabel="Price From" />
-        </div>
       </div>
     </div>
   );

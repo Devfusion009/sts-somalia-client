@@ -11,7 +11,6 @@ import {
   getActiveAgencyId,
   deskOrderPath,
 } from "@/modules/orders/helpers";
-import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
 import {
   APPLICANT_TYPES,
   memberSchema,
@@ -112,12 +111,6 @@ export async function startVisaApplication(formData: FormData): Promise<void> {
     .maybeSingle();
   if (!visaType) redirect("/visa");
 
-  const agencyId = await getActiveAgencyId(supabase, user.id);
-  const access = await assertAgencyCanBookProduct(supabase, agencyId, "visa");
-  if (!access.ok) redirect(`/visa/${visaTypeId}?blocked=1`);
-
-  const agencyCustomerId = await resolveBookedForCustomer(supabase, agencyId, formData);
-
   // A nationality chosen on the detail page before "Apply Now" seeds both
   // the field itself and its resolved quote, so step 2 opens already
   // agreeing with what the customer was just shown — not a separate value
@@ -133,8 +126,6 @@ export async function startVisaApplication(formData: FormData): Promise<void> {
       visa_type_id: visaType.id,
       applicant_profile_id: user.id,
       submitted_by: user.id,
-      agency_id: agencyId,
-      agency_customer_id: agencyCustomerId,
       status: "draft",
       price: visaType.price,
       currency: visaType.currency,
@@ -342,12 +333,8 @@ export async function savePersonalInfo(
     nationality: formData.get("nationality"),
     passportNumber: formData.get("passportNumber"),
     passportExpiry: formData.get("passportExpiry"),
-    placeOfBirth: formData.get("placeOfBirth"),
-    countryOfBirth: formData.get("countryOfBirth"),
-    maritalStatus: formData.get("maritalStatus"),
     email: formData.get("email"),
     mobile: formData.get("mobile"),
-    occupation: formData.get("occupation"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message, values: formValues(formData) };
@@ -382,10 +369,6 @@ export async function savePersonalInfo(
         nationality: d.nationality,
         passport_number: d.passportNumber,
         passport_expiry: d.passportExpiry,
-        place_of_birth: d.placeOfBirth,
-        country_of_birth: d.countryOfBirth,
-        marital_status: d.maritalStatus,
-        occupation: d.occupation,
       },
       contact_details: { email: d.email, mobile: d.mobile },
       current_step: Math.max(application.current_step, 3),
@@ -433,16 +416,8 @@ export async function saveTravelInfo(
   const parsed = travelInfoSchema.safeParse({
     arrivalDate: formData.get("arrivalDate"),
     departureDate: formData.get("departureDate"),
-    portOfEntry: formData.get("portOfEntry"),
-    portOfExit: formData.get("portOfExit")?.toString() || undefined,
-    flightNumber: formData.get("flightNumber")?.toString() || undefined,
-    returnFlightNumber: formData.get("returnFlightNumber")?.toString() || undefined,
     purposeOfVisit: formData.get("purposeOfVisit"),
-    payer: formData.get("payer"),
-    sponsorName: formData.get("sponsorName")?.toString() || undefined,
     addressAtDestination: formData.get("addressAtDestination"),
-    hasRelatives: formData.get("hasRelatives") ?? "no",
-    visitedBefore: formData.get("visitedBefore") ?? "no",
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message, values: formValues(formData) };
@@ -473,16 +448,8 @@ export async function saveTravelInfo(
       travel_details: {
         arrival_date: d.arrivalDate,
         departure_date: d.departureDate,
-        port_of_entry: d.portOfEntry,
-        port_of_exit: d.portOfExit ?? null,
-        flight_number: d.flightNumber ?? null,
-        return_flight_number: d.returnFlightNumber ?? null,
         purpose: d.purposeOfVisit,
-        payer: d.payer,
-        sponsor_name: d.sponsorName ?? null,
         address: d.addressAtDestination,
-        has_relatives: d.hasRelatives === "yes",
-        visited_before: d.visitedBefore === "yes",
       },
       custom_answers: customAnswers,
       current_step: Math.max(application.current_step, 4),

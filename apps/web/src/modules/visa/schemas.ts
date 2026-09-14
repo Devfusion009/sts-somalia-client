@@ -19,6 +19,12 @@ export type ApplicantType = (typeof APPLICANT_TYPES)[number];
  */
 export { RELATIONSHIPS };
 
+/**
+ * Only what the passport, the consulate contact chain, and payment actually
+ * need. Anything a specific destination additionally requires goes through
+ * visa_types.application_questions (per-country, admin-configured) instead
+ * of being asked of every applicant regardless of destination.
+ */
 export const personalInfoSchema = z.object({
   fullName: z.string().min(2, "Enter the full name as shown in the passport."),
   dateOfBirth: z.string().min(1, "Enter the date of birth."),
@@ -26,35 +32,19 @@ export const personalInfoSchema = z.object({
   nationality: z.string().length(2, "Select a nationality."),
   passportNumber: z.string().min(3, "Enter the passport number."),
   passportExpiry: z.string().min(1, "Enter the passport expiry date."),
-  placeOfBirth: z.string().min(1, "Enter the place of birth."),
-  countryOfBirth: z.string().length(2, "Select the country of birth."),
-  maritalStatus: z.enum(["single", "married", "divorced", "widowed"], {
-    error: "Select a marital status.",
-  }),
   email: z.string().email("Enter a valid email address."),
   mobile: z.string().min(7, "Enter a valid mobile number."),
-  occupation: z.string().min(2, "Enter an occupation."),
 });
 export type PersonalInfo = z.infer<typeof personalInfoSchema>;
 
 export const travelInfoSchema = z.object({
   arrivalDate: z.string().min(1, "Enter the arrival date."),
   departureDate: z.string().min(1, "Enter the departure date."),
-  portOfEntry: z.string().min(2, "Enter the port of entry."),
-  portOfExit: z.string().optional(),
-  flightNumber: z.string().optional(),
-  returnFlightNumber: z.string().optional(),
   purposeOfVisit: z.enum(
     ["tourism", "business", "family_visit", "medical", "transit", "umrah", "other"],
     { error: "Select the purpose of visit." }
   ),
-  payer: z.enum(["self", "sponsor", "company", "relative"], {
-    error: "Select who will pay for the trip.",
-  }),
-  sponsorName: z.string().optional(),
   addressAtDestination: z.string().min(3, "Enter a hotel name or contact address."),
-  hasRelatives: z.enum(["yes", "no"]),
-  visitedBefore: z.enum(["yes", "no"]),
 });
 export type TravelInfo = z.infer<typeof travelInfoSchema>;
 
@@ -139,4 +129,23 @@ export const VISA_STATUS_LABELS: Record<string, string> = {
   rejected: "Rejected",
   issued: "Visa Issued",
   cancelled: "Cancelled",
+};
+
+/**
+ * Legal next statuses per current status — mirrors the transition graph
+ * enforced in apply_visa_status_transition_internal (supabase migration
+ * 20260909000001_visa_review_fixes.sql). Keep the two in sync: this list is
+ * what the admin UI offers, the SQL function is what actually enforces it.
+ */
+export const VISA_STATUS_TRANSITIONS: Record<string, string[]> = {
+  draft: ["submitted"],
+  submitted: ["in_review", "additional_info_required", "cancelled"],
+  in_review: ["additional_info_required", "ready_for_processing", "rejected", "cancelled"],
+  additional_info_required: ["in_review", "cancelled"],
+  ready_for_processing: ["additional_info_required", "processing", "cancelled"],
+  processing: ["additional_info_required", "approved", "rejected", "cancelled"],
+  approved: ["issued"],
+  rejected: [],
+  issued: [],
+  cancelled: [],
 };

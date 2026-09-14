@@ -4,9 +4,29 @@ import * as React from "react"
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox"
 
 import { cn } from "@/lib/utils"
-import { CheckIcon } from "lucide-react"
+import { CheckIcon, ChevronDownIcon } from "lucide-react"
 
 const Combobox = ComboboxPrimitive.Root
+
+function ComboboxValue(props: ComboboxPrimitive.Value.Props) {
+  return <ComboboxPrimitive.Value {...props} />
+}
+
+function ComboboxTrigger({ className, children, ...props }: ComboboxPrimitive.Trigger.Props) {
+  return (
+    <ComboboxPrimitive.Trigger
+      data-slot="combobox-trigger"
+      className={cn(
+        "flex h-8 w-full items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent px-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
+    </ComboboxPrimitive.Trigger>
+  )
+}
 
 function ComboboxInputGroup({
   className,
@@ -148,6 +168,8 @@ function ComboboxEmpty({ className, ...props }: ComboboxPrimitive.Empty.Props) {
 
 export {
   Combobox,
+  ComboboxValue,
+  ComboboxTrigger,
   ComboboxInputGroup,
   ComboboxInput,
   ComboboxIcon,

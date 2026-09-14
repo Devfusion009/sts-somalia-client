@@ -4,13 +4,13 @@ import { cn } from "@/lib/utils";
 import { SecureDataNote } from "./visa-shared";
 
 export const WIZARD_STEPS = [
-  { step: 1, label: "Applicant & Family Type", hint: "Who is applying" },
-  { step: 2, label: "Personal Information", hint: "Enter your personal details" },
-  { step: 3, label: "Travel Information", hint: "Enter your travel details" },
-  { step: 4, label: "Document Upload", hint: "Upload required documents" },
-  { step: 5, label: "Review Application", hint: "Review your application" },
-  { step: 6, label: "Payment", hint: "Make payment securely" },
-  { step: 7, label: "Result & Tracking", hint: "Track your application" },
+  { step: 1, label: "Applicant type" },
+  { step: 2, label: "Personal information" },
+  { step: 3, label: "Travel information" },
+  { step: 4, label: "Documents" },
+  { step: 5, label: "Review" },
+  { step: 6, label: "Payment" },
+  { step: 7, label: "Tracking" },
 ] as const;
 
 /**
@@ -33,11 +33,8 @@ export function WizardStepper({
   return (
     <aside className="space-y-4">
       <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-        <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
-          Visa Application Steps
-        </p>
-        <ol className="mt-4 space-y-1">
-          {WIZARD_STEPS.map(({ step, label, hint }) => {
+        <ol className="space-y-1">
+          {WIZARD_STEPS.map(({ step, label }) => {
             const isCurrent = step === currentStep;
             const isDone = step < currentStep || (step <= maxStep && step < 6 && !isCurrent);
             const isLocked = step > maxStep || step >= 6;
@@ -50,10 +47,10 @@ export function WizardStepper({
             );
 
             const content = (
-              <span className="flex items-start gap-3">
+              <span className="flex items-center gap-3">
                 <span
                   className={cn(
-                    "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                    "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold",
                     isCurrent
                       ? "bg-primary text-primary-foreground"
                       : isDone
@@ -63,18 +60,13 @@ export function WizardStepper({
                 >
                   {marker}
                 </span>
-                <span className="min-w-0">
-                  <span
-                    className={cn(
-                      "block text-sm font-semibold",
-                      isCurrent ? "text-primary" : isLocked ? "text-muted-foreground" : ""
-                    )}
-                  >
-                    {label}
-                  </span>
-                  <span className="block text-xs text-muted-foreground">
-                    {isCurrent ? "In Progress" : isDone ? "Completed" : hint}
-                  </span>
+                <span
+                  className={cn(
+                    "min-w-0 truncate text-sm font-semibold",
+                    isCurrent ? "text-primary" : isLocked ? "text-muted-foreground" : ""
+                  )}
+                >
+                  {label}
                 </span>
               </span>
             );
@@ -82,10 +74,7 @@ export function WizardStepper({
             return (
               <li key={step} className="relative">
                 {step < WIZARD_STEPS.length ? (
-                  <span
-                    aria-hidden
-                    className="absolute top-8 left-3 h-[calc(100%-1.25rem)] w-px bg-border"
-                  />
+                  <span aria-hidden className="absolute top-[1.875rem] left-[1.15rem] h-4 w-px bg-border" />
                 ) : null}
                 {isLocked ? (
                   <span className="block rounded-lg px-2 py-2">{content}</span>
