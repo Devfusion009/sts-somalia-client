@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { countryName } from "@/lib/countries";
+import { countrySearchText, normalizeSearchTerm } from "@/lib/countries";
 
 export async function getVisaTypes(filters: { country?: string; category?: string } = {}) {
   const supabase = await createClient();
@@ -16,12 +16,8 @@ export async function getVisaTypes(filters: { country?: string; category?: strin
   const visaTypes = data ?? [];
   if (!filters.country) return visaTypes;
 
-  const needle = filters.country.trim().toLowerCase();
-  return visaTypes.filter(
-    (v) =>
-      v.destination_country_code.toLowerCase().includes(needle) ||
-      countryName(v.destination_country_code).toLowerCase().includes(needle)
-  );
+  const needle = normalizeSearchTerm(filters.country);
+  return visaTypes.filter((v) => countrySearchText(v.destination_country_code).includes(needle));
 }
 
 export async function getVisaTypeById(id: string) {
@@ -59,6 +55,21 @@ export async function getMyVisaApplications() {
     .select("*, visa_type:visa_type_id (name, destination_country_code)")
     .order("created_at", { ascending: false });
   return data ?? [];
+}
+
+/**
+ * Count of the current user's applications waiting on a document from them —
+ * the source for the "Visa Applications" nav badge. Reads straight from
+ * Postgres (RLS-scoped), not through the notifications table, so a customer
+ * still sees it if the notification never arrived or was already dismissed.
+ */
+export async function getMyVisaActionRequiredCount() {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("visa_applications")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "additional_info_required");
+  return count ?? 0;
 }
 
 /** Existing draft for this visa type by the current user, if any (resume). */
