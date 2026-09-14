@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireUser, deniedDestination } from "@/lib/auth/session";
 import { roleLabel } from "@/lib/auth/roles";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
+import { getMyVisaActionRequiredCount } from "@/modules/visa/queries";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { CustomerNotificationBell } from "@/components/portal/customer-notification-bell";
 import { ACTIONABLE_TYPES } from "@/lib/notifications/actionable-types";
@@ -51,13 +52,18 @@ export default async function AccountLayout({ children }: { children: React.Reac
   // directly, since nothing links here for a manager anymore.
   if (profile.role === "hotel_manager") redirect(deniedDestination());
   const trpc = await getServerTrpc();
-  const [notifications, contexts] = await Promise.all([
+  const [notifications, contexts, visaActionRequired] = await Promise.all([
     // apps/api is a separate deployment (not yet reachable from every
     // environment) — the rest of the account portal has nothing to do with
     // notifications, so it shouldn't 500 just because that one dependency
     // is down.
     trpc.notifications.unread.query({ limit: 10 }).catch(() => []),
     getMyPartnerContexts(profile.id, profile.full_name),
+    // Read straight from Postgres rather than the notifications list above,
+    // so a customer still sees "documents needed" on the nav even when the
+    // apps/api hop that feeds the bell is unreachable or the alert was
+    // already dismissed.
+    getMyVisaActionRequiredCount().catch(() => 0),
   ]);
 
   // Same actionable set the notification bell alerts on — a rejected
@@ -66,9 +72,11 @@ export default async function AccountLayout({ children }: { children: React.Reac
   const partnerApplicationBadge = notifications.filter((n) => ACTIONABLE_TYPES.has(n.type)).length || undefined;
   const navGroups: PortalNavGroup[] = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.map((item) =>
-      item.href === "/account/become" ? { ...item, badge: partnerApplicationBadge } : item
-    ),
+    items: group.items.map((item) => {
+      if (item.href === "/account/become") return { ...item, badge: partnerApplicationBadge };
+      if (item.href === "/account/visa") return { ...item, badge: visaActionRequired || undefined };
+      return item;
+    }),
   }));
 
   return (
