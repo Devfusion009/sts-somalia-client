@@ -31,19 +31,7 @@ import {
   adminSubmitToPartner,
   adminSyncPartnerStatus,
 } from "@/modules/visa/admin-actions";
-import { VISA_STATUS_LABELS } from "@/modules/visa/schemas";
-
-const TRANSITIONS = [
-  "submitted",
-  "in_review",
-  "additional_info_required",
-  "ready_for_processing",
-  "processing",
-  "approved",
-  "rejected",
-  "issued",
-  "cancelled",
-] as const;
+import { VISA_STATUS_LABELS, VISA_STATUS_TRANSITIONS } from "@/modules/visa/schemas";
 
 /** Status transition control: pick a status, add an optional customer-visible note. */
 export function StatusControl({
@@ -54,7 +42,14 @@ export function StatusControl({
   currentStatus: string;
 }) {
   const [state, formAction] = useActionState(adminSetVisaStatus, null);
-  const [status, setStatus] = useState(currentStatus);
+  // Only what apply_visa_status_transition_internal actually allows from here —
+  // offering the rest just to have the RPC reject them isn't a workflow.
+  const nextStatuses = VISA_STATUS_TRANSITIONS[currentStatus] ?? [];
+  const [status, setStatus] = useState(nextStatuses[0] ?? "");
+
+  if (nextStatuses.length === 0) {
+    return <p className="text-sm text-muted-foreground">No further status changes from here.</p>;
+  }
 
   return (
     <form action={formAction} className="space-y-3">
@@ -65,13 +60,13 @@ export function StatusControl({
         <Select
           value={status}
           onValueChange={(v) => setStatus(v as string)}
-          items={TRANSITIONS.map((s) => ({ value: s, label: VISA_STATUS_LABELS[s] ?? s }))}
+          items={nextStatuses.map((s) => ({ value: s, label: VISA_STATUS_LABELS[s] ?? s }))}
         >
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {TRANSITIONS.map((s) => (
+            {nextStatuses.map((s) => (
               <SelectItem key={s} value={s}>
                 {VISA_STATUS_LABELS[s] ?? s}
               </SelectItem>
@@ -93,7 +88,7 @@ export function StatusControl({
           <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       ) : null}
-      <SubmitButton pendingText="Updating…" disabled={status === currentStatus} className="w-full">
+      <SubmitButton pendingText="Updating…" className="w-full">
         Update Status
       </SubmitButton>
     </form>

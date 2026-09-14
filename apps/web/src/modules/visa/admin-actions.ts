@@ -7,6 +7,7 @@ import { requirePlatformAdmin } from "@/lib/auth/session";
 import { getApplicationDetail } from "./queries";
 import { submitToPartner, syncPartnerStatus, mapPartnerStatus } from "./partner/registry";
 import { parkForUnmappedPartnerStatus, parkForRefusedPartnerTransition } from "./partner/sync";
+import { VISA_STATUS_LABELS } from "./schemas";
 import type { Json } from "@/lib/types/database.types";
 
 export type ActionState = { error: string | null } | null;
@@ -59,7 +60,20 @@ export async function adminSetVisaStatus(
     p_status: parsed.data.status,
     p_note: parsed.data.note,
   });
-  if (error) return { error: error.message };
+  if (error) {
+    // The status control only ever offers legal next states, so this should
+    // be unreachable in normal use — but if two admins race on the same
+    // application, translate the RPC's raw exception into the same wording
+    // rather than leaking Postgres error text into the console UI.
+    const transitionError = error.message.match(/cannot move from (\w+) to (\w+)/);
+    if (transitionError) {
+      const [, from, to] = transitionError;
+      return {
+        error: `This application moved to "${VISA_STATUS_LABELS[from] ?? from}" while you were viewing it — refresh to see valid next steps for "${VISA_STATUS_LABELS[to] ?? to}".`,
+      };
+    }
+    return { error: error.message };
+  }
 
   revalidateVisaViews(parsed.data.applicationId);
   return { error: null };
@@ -140,6 +154,20 @@ export async function adminReviewDocument(
   const rejecting = parsed.data.decision === "reject";
   if (rejecting && !parsed.data.reason) {
     return { error: "Enter what is wrong with this document." };
+  }
+
+  // Accepting a rejected document without a new upload would clear the
+  // rejection with nothing behind it — the applicant has to replace the file
+  // (which resets review_status to 'pending') before it can go to 'accepted'.
+  if (!rejecting) {
+    const { data: document } = await supabase
+      .from("visa_documents")
+      .select("review_status")
+      .eq("id", parsed.data.documentId)
+      .maybeSingle();
+    if (document?.review_status === "rejected") {
+      return { error: "This document was rejected. The applicant must upload a replacement first." };
+    }
   }
 
   // A rejection that cannot move the application is a half-write: the document

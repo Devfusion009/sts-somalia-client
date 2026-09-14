@@ -34,7 +34,7 @@ export function DocumentReviewControls({
 
   return (
     <div className="flex items-center gap-1">
-      {reviewStatus !== "accepted" ? (
+      {reviewStatus === "pending" ? (
         <form action={acceptAction}>
           <input type="hidden" name="documentId" value={documentId} />
           <input type="hidden" name="applicationId" value={applicationId} />

@@ -10,6 +10,7 @@ import {
   CloudUpload,
   FileText,
   Info,
+  MapPin,
   Pencil,
   Plus,
   Trash2,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -87,14 +89,13 @@ function wizardBasePath(desk: boolean) {
   return desk ? "/agent/book/visa/apply" : "/visa/apply";
 }
 
-function StepHeading({ index, title, subtitle }: { index?: number; title: string; subtitle: string }) {
+function StepHeading({ index, title }: { index?: number; title: string }) {
   return (
     <div>
-      <h2 className="font-heading text-xl font-bold">
-        {index ? `${index}. ` : ""}
-        {title}
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+      {index ? (
+        <p className="text-xs font-bold tracking-widest text-primary uppercase">Step {index} of 5</p>
+      ) : null}
+      <h2 className="mt-1 font-heading text-xl font-bold sm:text-2xl">{title}</h2>
     </div>
   );
 }
@@ -106,15 +107,6 @@ function ErrorAlert({ state }: { state: ActionState }) {
       <AlertCircle />
       <AlertDescription>{state.error}</AlertDescription>
     </Alert>
-  );
-}
-
-function InfoBanner({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-2 rounded-lg bg-chart-3/10 px-4 py-3 text-sm text-foreground">
-      <Info className="mt-0.5 size-4 shrink-0 text-chart-3" />
-      <div>{children}</div>
-    </div>
   );
 }
 
@@ -373,7 +365,7 @@ export function StepApplicantType({
   return (
     <div className="space-y-8">
       <section className="space-y-4">
-        <StepHeading index={1} title="Applicant Type" subtitle="Please select who is applying for the visa." />
+        <StepHeading index={1} title="Applicant type" />
         <div className="grid gap-4 sm:grid-cols-3">
           {APPLICANT_TYPE_CARDS.map((card) => {
             const active = applicantType === card.value;
@@ -415,23 +407,14 @@ export function StepApplicantType({
 
       {applicantType !== "single" ? (
         <section className="space-y-4">
-          <StepHeading
-            index={2}
-            title={applicantType === "family" ? "Family Details" : "Group Details"}
-            subtitle={
-              applicantType === "family"
-                ? "Please add all family members who will be included in this application."
-                : "Please add all group members who will be included in this application."
-            }
-          />
+          <StepHeading title={applicantType === "family" ? "Family details" : "Group details"} />
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-chart-3/10 px-4 py-3">
             <p className="flex items-start gap-2 text-sm">
               <Info className="mt-0.5 size-4 shrink-0 text-chart-3" />
               <span>
-                Add all members who will travel on this application.
                 {applicantType === "family"
-                  ? " You can add spouse, children, parents and other dependents."
-                  : " Each member needs their own passport details."}
+                  ? "Spouse, children, parents and other dependents."
+                  : "Each member needs their own passport details."}
               </span>
             </p>
             <MemberDialog
@@ -530,13 +513,6 @@ export function StepApplicantType({
               above.
             </p>
           )}
-
-          {others.length > 0 ? (
-            <p className="flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2.5 text-sm text-primary">
-              <CheckCircle2 className="size-4 shrink-0" />
-              Make sure all names match the passports and all information is correct.
-            </p>
-          ) : null}
         </section>
       ) : null}
 
@@ -548,7 +524,7 @@ export function StepApplicantType({
         <div className="flex items-center justify-between">
           <BackButton href={backHref} />
           <SubmitButton pendingText="Saving…" className="gap-2">
-            Save &amp; Next <ArrowRight className="size-4" />
+            Continue <ArrowRight className="size-4" />
           </SubmitButton>
         </div>
       </form>
@@ -576,19 +552,16 @@ export function StepPersonalInfo({
   const v = state?.values ?? {};
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} className="space-y-7">
       <input type="hidden" name="applicationId" value={application.id} />
       {desk ? <input type="hidden" name="desk" value="1" /> : null}
-      <StepHeading
-        title="Personal Information"
-        subtitle="Please enter your personal details as shown in your passport."
-      />
+      <StepHeading index={2} title="Personal information" />
 
-      <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-        <Field label="Full Name (as in passport)" htmlFor="fullName" required>
+      <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+        <Field label="Full name (as in passport)" htmlFor="fullName" required className="sm:col-span-2">
           <Input id="fullName" name="fullName" defaultValue={v.fullName ?? t.full_name ?? ""} placeholder="Enter full name" required />
         </Field>
-        <Field label="Date of Birth" htmlFor="dateOfBirth" required>
+        <Field label="Date of birth" htmlFor="dateOfBirth" required>
           <Input id="dateOfBirth" name="dateOfBirth" type="date" defaultValue={v.dateOfBirth ?? t.date_of_birth ?? ""} required />
         </Field>
         <Field label="Gender" required>
@@ -605,39 +578,24 @@ export function StepPersonalInfo({
         <Field label="Nationality" required>
           <CountrySelect name="nationality" defaultValue={v.nationality ?? t.nationality ?? "SO"} placeholder="Select nationality" />
         </Field>
-        <Field label="Passport Number" htmlFor="passportNumber" required>
+        <Field label="Passport number" htmlFor="passportNumber" required>
           <Input id="passportNumber" name="passportNumber" defaultValue={v.passportNumber ?? t.passport_number ?? ""} placeholder="Enter passport number" required />
         </Field>
-        <Field label="Passport Expiry Date" htmlFor="passportExpiry" required>
+        <Field label="Passport expiry date" htmlFor="passportExpiry" required>
           <Input id="passportExpiry" name="passportExpiry" type="date" defaultValue={v.passportExpiry ?? t.passport_expiry ?? ""} required />
         </Field>
-        <Field label="Place of Birth" htmlFor="placeOfBirth" required>
-          <Input id="placeOfBirth" name="placeOfBirth" defaultValue={v.placeOfBirth ?? t.place_of_birth ?? ""} placeholder="Enter place of birth" required />
-        </Field>
-        <Field label="Country of Birth" required>
-          <CountrySelect name="countryOfBirth" defaultValue={v.countryOfBirth ?? t.country_of_birth ?? "SO"} placeholder="Select country" />
-        </Field>
-        <Field label="Marital Status" required>
-          <LabeledSelect
-            name="maritalStatus"
-            defaultValue={v.maritalStatus ?? t.marital_status}
-            placeholder="Select status"
-            options={[
-              { value: "single", label: "Single" },
-              { value: "married", label: "Married" },
-              { value: "divorced", label: "Divorced" },
-              { value: "widowed", label: "Widowed" },
-            ]}
-          />
-        </Field>
-        <Field label="Email Address" htmlFor="email" required>
+        <Field label="Email address" htmlFor="email" required>
           <Input id="email" name="email" type="email" defaultValue={v.email ?? c.email ?? ""} placeholder="Enter email address" required />
         </Field>
-        <Field label="Mobile Number" htmlFor="mobile" required>
-          <Input id="mobile" name="mobile" type="tel" defaultValue={v.mobile ?? c.mobile ?? ""} placeholder="+252 61 XXXXXXX" required />
-        </Field>
-        <Field label="Occupation" htmlFor="occupation" required>
-          <Input id="occupation" name="occupation" defaultValue={v.occupation ?? t.occupation ?? ""} placeholder="Enter occupation" required />
+        <Field label="Mobile number" htmlFor="mobile" required className="sm:col-span-2">
+          <PhoneInput
+            id="mobile"
+            name="mobile"
+            defaultValue={v.mobile ?? c.mobile ?? ""}
+            defaultCountry={v.nationality ?? t.nationality ?? "SO"}
+            placeholder="61 XXXXXXX"
+            required
+          />
         </Field>
       </div>
 
@@ -646,13 +604,9 @@ export function StepPersonalInfo({
       <div className="flex items-center justify-between">
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=1`} />
         <SubmitButton pendingText="Saving…" className="gap-2">
-          Save &amp; Continue <ArrowRight className="size-4" />
+          Continue <ArrowRight className="size-4" />
         </SubmitButton>
       </div>
-
-      <InfoBanner>
-        Please ensure all information matches your passport and travel documents to avoid delays.
-      </InfoBanner>
     </form>
   );
 }
@@ -710,34 +664,19 @@ export function StepTravelInfo({
   const answers = (application.custom_answers ?? {}) as Record<string, string>;
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} className="space-y-7">
       <input type="hidden" name="applicationId" value={application.id} />
       {desk ? <input type="hidden" name="desk" value="1" /> : null}
-      <StepHeading
-        title="Travel Information"
-        subtitle="Please enter your travel details for your visa application."
-      />
+      <StepHeading index={3} title="Travel information" />
 
-      <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-        <Field label={`Date of Arrival in ${destination}`} htmlFor="arrivalDate" required>
+      <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+        <Field label={`Arrival in ${destination}`} htmlFor="arrivalDate" required>
           <Input id="arrivalDate" name="arrivalDate" type="date" defaultValue={v.arrivalDate ?? str("arrival_date")} required />
         </Field>
-        <Field label="Port of Entry" htmlFor="portOfEntry" required>
-          <Input id="portOfEntry" name="portOfEntry" defaultValue={v.portOfEntry ?? str("port_of_entry")} placeholder="e.g. Dubai International Airport" required />
-        </Field>
-        <Field label="Flight Number (if available)" htmlFor="flightNumber">
-          <Input id="flightNumber" name="flightNumber" defaultValue={v.flightNumber ?? str("flight_number")} placeholder="Enter flight number" />
-        </Field>
-        <Field label={`Date of Departure from ${destination}`} htmlFor="departureDate" required>
+        <Field label={`Departure from ${destination}`} htmlFor="departureDate" required>
           <Input id="departureDate" name="departureDate" type="date" defaultValue={v.departureDate ?? str("departure_date")} required />
         </Field>
-        <Field label="Port of Exit" htmlFor="portOfExit">
-          <Input id="portOfExit" name="portOfExit" defaultValue={v.portOfExit ?? str("port_of_exit")} placeholder="e.g. Dubai International Airport" />
-        </Field>
-        <Field label="Return Flight Number (if available)" htmlFor="returnFlightNumber">
-          <Input id="returnFlightNumber" name="returnFlightNumber" defaultValue={v.returnFlightNumber ?? str("return_flight_number")} placeholder="Enter return flight number" />
-        </Field>
-        <Field label="Purpose of Visit" required>
+        <Field label="Purpose of visit" required className="sm:col-span-2">
           <LabeledSelect
             name="purposeOfVisit"
             defaultValue={v.purposeOfVisit ?? str("purpose")}
@@ -745,7 +684,7 @@ export function StepTravelInfo({
             options={[
               { value: "tourism", label: "Tourism" },
               { value: "business", label: "Business" },
-              { value: "family_visit", label: "Family Visit" },
+              { value: "family_visit", label: "Family visit" },
               { value: "medical", label: "Medical" },
               { value: "transit", label: "Transit" },
               { value: "umrah", label: "Umrah" },
@@ -753,47 +692,18 @@ export function StepTravelInfo({
             ]}
           />
         </Field>
-        <Field label="Who will pay for your trip?" required>
-          <LabeledSelect
-            name="payer"
-            defaultValue={v.payer ?? str("payer")}
-            placeholder="Select sponsor type"
-            options={[
-              { value: "self", label: "Self" },
-              { value: "sponsor", label: "Sponsor" },
-              { value: "company", label: "Company" },
-              { value: "relative", label: "Relative" },
-            ]}
-          />
-        </Field>
-        <Field label="Sponsor / Company Name" htmlFor="sponsorName">
-          <Input id="sponsorName" name="sponsorName" defaultValue={v.sponsorName ?? str("sponsor_name")} placeholder="Enter sponsor or company name" />
-        </Field>
       </div>
 
-      <Field label={`Address in ${destination} (Hotel or Contact Address)`} htmlFor="addressAtDestination" required>
+      <Field label={`Address in ${destination} (hotel or contact)`} htmlFor="addressAtDestination" required>
         <Textarea
           id="addressAtDestination"
           name="addressAtDestination"
           rows={2}
           defaultValue={v.addressAtDestination ?? str("address")}
-          placeholder={`Enter hotel name or contact address in ${destination}`}
+          placeholder={`Hotel name or contact address in ${destination}`}
           required
         />
       </Field>
-
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <YesNo
-          name="hasRelatives"
-          label={`Do you have any relatives or friends in ${destination}?`}
-          defaultValue={t.has_relatives === true ? "yes" : "no"}
-        />
-        <YesNo
-          name="visitedBefore"
-          label={`Have you visited ${destination} before?`}
-          defaultValue={t.visited_before === true ? "yes" : "no"}
-        />
-      </div>
 
       {questions.length > 0 ? (
         <div className="space-y-5 border-t border-border pt-5">
@@ -839,14 +749,9 @@ export function StepTravelInfo({
       <div className="flex items-center justify-between">
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=2`} />
         <SubmitButton pendingText="Saving…" className="gap-2">
-          Save &amp; Continue <ArrowRight className="size-4" />
+          Continue <ArrowRight className="size-4" />
         </SubmitButton>
       </div>
-
-      <InfoBanner>
-        Please ensure all travel details are accurate. Incorrect information may cause delays or
-        rejection of your visa.
-      </InfoBanner>
     </form>
   );
 }
@@ -1014,11 +919,8 @@ export function StepDocuments({
   const byKey = new Map(application.documents.map((d) => [d.document_type, d]));
 
   return (
-    <div className="space-y-6">
-      <StepHeading
-        title="Document Upload"
-        subtitle="Please upload clear scanned copies or photos of the required documents."
-      />
+    <div className="space-y-7">
+      <StepHeading index={4} title="Documents" />
 
       <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
         {slots.map((slot) => (
@@ -1039,14 +941,9 @@ export function StepDocuments({
         {desk ? <input type="hidden" name="desk" value="1" /> : null}
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=3`} />
         <SubmitButton pendingText="Checking…" className="gap-2">
-          Save &amp; Continue <ArrowRight className="size-4" />
+          Continue <ArrowRight className="size-4" />
         </SubmitButton>
       </form>
-
-      <InfoBanner>
-        Make sure all documents are clear, valid and match the information provided in the
-        application.
-      </InfoBanner>
     </div>
   );
 }
@@ -1121,25 +1018,19 @@ export function StepReview({
 
   return (
     <div className="space-y-6">
-      <StepHeading
-        title="Review Your Application"
-        subtitle="Please review all the information below before proceeding to payment."
-      />
+      <StepHeading index={5} title="Review your application" />
 
-      <ReviewSection icon={User} title="Personal Information" editHref={`${editBase}2`}>
+      <ReviewSection icon={User} title="Personal information" editHref={`${editBase}2`}>
         <ReviewGrid
           rows={[
             ["Full Name", t.full_name],
             ["Date of Birth", t.date_of_birth],
+            ["Gender", t.gender],
             ["Nationality", t.nationality ? countryName(t.nationality) : ""],
             ["Passport Number", t.passport_number],
             ["Passport Expiry Date", t.passport_expiry],
-            ["Place of Birth", t.place_of_birth],
-            ["Gender", t.gender],
-            ["Marital Status", t.marital_status],
             ["Email", c.email],
             ["Mobile", c.mobile],
-            ["Occupation", t.occupation],
           ]}
         />
       </ReviewSection>
@@ -1164,16 +1055,12 @@ export function StepReview({
         </ReviewSection>
       ) : null}
 
-      <ReviewSection icon={ArrowRight} title="Travel Information" editHref={`${editBase}3`}>
+      <ReviewSection icon={MapPin} title="Travel information" editHref={`${editBase}3`}>
         <ReviewGrid
           rows={[
             ["Date of Arrival", str(travel.arrival_date)],
-            ["Port of Entry", str(travel.port_of_entry)],
             ["Date of Departure", str(travel.departure_date)],
-            ["Port of Exit", str(travel.port_of_exit)],
             ["Purpose of Visit", str(travel.purpose).replace("_", " ")],
-            ["Who will pay?", str(travel.payer)],
-            ["Sponsor / Company", str(travel.sponsor_name)],
             ["Address / Hotel", str(travel.address)],
           ]}
         />
@@ -1238,10 +1125,6 @@ export function StepReview({
           </SubmitButton>
         </div>
       </form>
-
-      <InfoBanner>
-        Please ensure all information is correct. Once submitted, changes may not be possible.
-      </InfoBanner>
     </div>
   );
 }
