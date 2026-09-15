@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { Check, Download, ExternalLink, X } from "lucide-react";
@@ -434,7 +435,14 @@ export default async function AdminVisaDetailPage({
             </CardHeader>
             <CardContent>
               {application.status === "submitted" && !isVisaOrderPaid(order?.status) ? (
-                <p className="text-sm text-muted-foreground">Awaiting payment.</p>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Review opens once this order is paid.
+                  </p>
+                  <Button size="sm" variant="outline" className="w-full" render={<Link href="/admin/orders?filter=action" />}>
+                    Go to Orders &amp; Payments
+                  </Button>
+                </div>
               ) : (
                 // Keyed on status: the lodge form and document review forms move the
                 // application from beside this control, and its local selection must

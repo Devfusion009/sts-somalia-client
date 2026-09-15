@@ -456,7 +456,7 @@ export async function getVisaApplicationsAdmin(status?: string) {
   let query = supabase
     .from("visa_applications")
     .select(
-      "id, application_ref, applicant_type, status, price, currency, created_at, traveler_details, visa_type:visa_type_id(name, destination_country_code), order_items(order:order_id(status))"
+      "id, application_ref, applicant_type, status, price, currency, created_at, traveler_details, contact_details, visa_type:visa_type_id(name, destination_country_code), order_items(order:order_id(status))"
     )
     .neq("status", "draft")
     .order("created_at", { ascending: false })
