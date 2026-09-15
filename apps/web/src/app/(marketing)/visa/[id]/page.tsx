@@ -221,66 +221,57 @@ export default async function VisaDetailPage({
 
         <div className="space-y-4">
           <div className="sticky top-24 space-y-4">
-            <div className="overflow-hidden rounded-2xl border border-border shadow-sm">
-              <div className="bg-primary px-5 py-4 text-primary-foreground">
-                <p className="text-[10px] font-bold tracking-widest uppercase opacity-75">Selected visa</p>
-                <p className="mt-0.5 flex items-center gap-2 font-heading text-base font-bold">
-                  <span className="text-xl leading-none">{countryFlag(visa.destination_country_code)}</span>
-                  {visa.name}
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl leading-none">{countryFlag(visa.destination_country_code)}</span>
+                <p className="font-heading text-base font-bold">{visa.name}</p>
+              </div>
+
+              <div className="mt-4 space-y-2.5 border-t border-border pt-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Government &amp; service fee</span>
+                  <span className="font-semibold">{fmtMoney(price, visa.currency)}</span>
+                </div>
+                {Number(processingFee) > 0 ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Processing fee</span>
+                    <span className="font-semibold">{fmtMoney(processingFee!, visa.currency)}</span>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-4 flex items-baseline justify-between border-t border-border pt-4">
+                <span className="text-sm text-muted-foreground">
+                  {nationality ? "Total for you" : "Total from"}
+                </span>
+                <span className="font-heading text-3xl font-bold text-primary">
+                  {fmtMoney(total, visa.currency)}
+                </span>
+              </div>
+
+              <form action={startVisaApplication} className="mt-4 space-y-3">
+                <input type="hidden" name="visaTypeId" value={visa.id} />
+                {nationality ? <input type="hidden" name="nationality" value={nationality} /> : null}
+                <SubmitButton size="lg" className="w-full gap-2" pendingText="Starting application…">
+                  Apply Now <ArrowRight className="size-4" />
+                </SubmitButton>
+                <p className="text-center text-xs text-muted-foreground">
+                  Sign in required — your progress is saved automatically.
                 </p>
-              </div>
+              </form>
 
-              <div className="space-y-4 bg-card p-5 text-sm">
-                <div className="space-y-2.5">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Government &amp; service fee</span>
-                    <span className="font-semibold">{fmtMoney(price, visa.currency)}</span>
-                  </div>
-                  {Number(processingFee) > 0 ? (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Processing fee</span>
-                      <span className="font-semibold">{fmtMoney(processingFee!, visa.currency)}</span>
-                    </div>
-                  ) : null}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Per applicant</span>
-                    <span className="font-semibold">Yes</span>
-                  </div>
-                </div>
+              <Separator className="my-4" />
 
-                <div className="space-y-1 rounded-xl bg-primary/5 p-4 text-center">
-                  <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                    {nationality ? "Total for you" : "Total from"}
-                  </p>
-                  <p className="font-heading text-3xl font-bold text-primary">
-                    {fmtMoney(total, visa.currency)}
-                  </p>
-                </div>
-
-                <form action={startVisaApplication} className="space-y-3">
-                  <input type="hidden" name="visaTypeId" value={visa.id} />
-                  {nationality ? <input type="hidden" name="nationality" value={nationality} /> : null}
-                  <SubmitButton size="lg" className="w-full gap-2" pendingText="Starting application…">
-                    Apply Now <ArrowRight className="size-4" />
-                  </SubmitButton>
-                  <p className="text-center text-xs text-muted-foreground">
-                    Sign in required — your progress is saved automatically.
-                  </p>
-                </form>
-
-                <Separator />
-
-                <ul className="space-y-3">
-                  {SIDEBAR_ASSURANCES.map((item) => (
-                    <li key={item.text} className="flex items-center gap-2.5 text-xs text-muted-foreground">
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-primary">
-                        <item.icon className="size-3.5" />
-                      </span>
-                      {item.text}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <ul className="space-y-3">
+                {SIDEBAR_ASSURANCES.map((item) => (
+                  <li key={item.text} className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-primary">
+                      <item.icon className="size-3.5" />
+                    </span>
+                    {item.text}
+                  </li>
+                ))}
+              </ul>
             </div>
 
             <a

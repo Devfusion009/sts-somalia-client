@@ -77,9 +77,8 @@ export default async function VisaListPage({
             Visas without the guesswork,{" "}
             <span className="text-brand-accent">wherever you&apos;re going</span>
           </h1>
-          <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 drop-shadow">
-            Our visa desk handles hundreds of applications a month. We know what each consulate
-            actually wants — and we check it twice before it goes anywhere near them.
+          <p className="mt-4 max-w-lg text-base leading-relaxed text-white/85 drop-shadow">
+            We check every document against what the consulate actually requires — before it&apos;s submitted.
           </p>
 
           <form className="mt-8 flex max-w-lg items-center gap-1.5 rounded-full bg-white p-1.5 pl-5 shadow-2xl">

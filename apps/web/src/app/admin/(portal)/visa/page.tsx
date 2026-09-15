@@ -98,10 +98,16 @@ export default async function AdminVisaPage({
             ) : (
               applications.map((app) => {
                 const traveler = (app.traveler_details ?? {}) as Record<string, string>;
+                const contact = (app.contact_details ?? {}) as Record<string, string>;
                 return (
                   <TableRow key={app.id}>
                     <TableCell className="font-mono text-xs">{app.application_ref}</TableCell>
-                    <TableCell className="font-medium">{traveler.full_name ?? "—"}</TableCell>
+                    <TableCell>
+                      <p className="font-medium">{traveler.full_name ?? "—"}</p>
+                      {contact.email ? (
+                        <p className="text-xs text-muted-foreground">{contact.email}</p>
+                      ) : null}
+                    </TableCell>
                     <TableCell>
                       {app.visa_type ? (
                         <span className="flex items-center gap-1.5">

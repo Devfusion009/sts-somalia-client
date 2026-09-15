@@ -87,7 +87,7 @@ export function VisaHeroBanner({ children }: { children: React.ReactNode }) {
 
         {/* Floating ribbon, top right — true and short, not a manufactured stat. */}
         <div className="absolute top-4 right-0 z-20">
-          <div className="flex items-center gap-2 rounded-l-full bg-gradient-to-r from-rose-600 via-rose-600/95 to-indigo-950 py-2 pr-8 pl-6 text-xs font-semibold tracking-wide text-white shadow-md sm:py-2.5 sm:pr-12 sm:text-sm">
+          <div className="flex items-center gap-2 rounded-l-full bg-primary py-2 pr-8 pl-6 text-xs font-semibold tracking-wide text-primary-foreground shadow-md sm:py-2.5 sm:pr-12 sm:text-sm">
             <ShieldCheck className="size-4 shrink-0" />
             <span>Licensed Somali travel agency</span>
           </div>
