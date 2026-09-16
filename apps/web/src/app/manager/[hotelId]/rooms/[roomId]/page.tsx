@@ -4,7 +4,7 @@ import { AlertCircle, Pencil } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
-import { getRoomForInventory, getRoomUnits } from "@/modules/hotels/partner-queries";
+import { getRoomForInventory, getRoomUnits, getRoomBookings } from "@/modules/hotels/partner-queries";
 import { getHotelAvailability } from "@/modules/hotels/availability";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RoomNightsTable } from "@/modules/hotels/components/room-nights-table";
 import { RoomUnitsManager } from "@/modules/hotels/components/room-units-manager";
+import { OfflineBookingPanel } from "@/modules/hotels/components/offline-booking-panel";
 import { InventoryRangeForm, ClearInventoryForm } from "@/app/partner/(portal)/hotels/[id]/rooms/[roomId]/inventory-form";
 
 export const metadata = { title: "Room Availability" };
@@ -29,12 +30,14 @@ export default async function ManagerRoomInventoryPage({
   const room = await getRoomForInventory(roomId, hotelId, [hotelId]);
   if (!room) notFound();
 
-  const [availability, roomUnits] = await Promise.all([
+  const [availability, roomUnits, bookings] = await Promise.all([
     getHotelAvailability(hotelId, { roomId: room.id, days: 60 }),
     getRoomUnits(room.id, hotelId, [hotelId]),
+    getRoomBookings(room.id, hotelId, [hotelId]),
   ]);
   const nights = availability[0]?.nights ?? [];
   const canEditRooms = hasPermission(managed, "rooms");
+  const canEditBookings = hasPermission(managed, "bookings");
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -71,6 +74,15 @@ export default async function ManagerRoomInventoryPage({
         <div className="overflow-x-auto">
           <RoomNightsTable nights={nights} currency={room.currency} />
         </div>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Bookings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <OfflineBookingPanel hotelId={hotelId} roomTypeId={room.id} bookings={bookings} canEdit={canEditBookings} />
+        </CardContent>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">

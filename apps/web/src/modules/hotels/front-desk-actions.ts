@@ -15,6 +15,9 @@ const bookingSchema = z
     checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a check-in date."),
     checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a check-out date."),
     numRooms: z.coerce.number().int().min(1).max(20),
+    guestName: z.string().trim().max(120).optional(),
+    guestPhone: z.string().trim().max(30).optional(),
+    notes: z.string().trim().max(500).optional(),
   })
   .refine((d) => d.checkOut > d.checkIn, {
     message: "Check-out date must be after check-in date.",
@@ -22,14 +25,19 @@ const bookingSchema = z
   });
 
 /**
- * "Add Booking" from the Front Desk grid — a manager creating a walk-in or
- * phone reservation directly, room-type + quantity only (no guest name yet;
- * the reference flow captures that later, in Edit). Room-unit assignment
- * isn't part of this: like createHotelBooking, this inserts straight into
- * hotel_bookings and the existing capacity-allocator trigger on that table
- * decides seated vs waitlisted — no separate RPC to call, no reimplementing
- * that logic here. Assigning a specific physical room is the front desk's
- * Reallocate/Swap action (phase C), same as the customer-facing flow.
+ * A manager recording a booking directly — a phone call, a walk-in, a guest
+ * who booked at the front counter. This is the offline-booking half of the
+ * sync the online booking engine depends on: it inserts into the exact same
+ * hotel_bookings table and goes through the exact same capacity-allocator
+ * trigger as a customer booking online, so a room taken offline is
+ * immediately unavailable to an online search for the same dates — one
+ * ledger, not two. 'source' is purely descriptive (see its migration) and
+ * never affects that allocation. Room-unit assignment isn't part of this;
+ * that's the front desk's separate Reallocate/Swap action.
+ *
+ * Used from two places: the Front Desk grid's "Add Booking" (room type
+ * picked from a dropdown there) and the Rooms & Availability page's
+ * "Record offline booking" (room type is already the page's context).
  */
 export async function createFrontDeskBooking(
   _prev: FrontDeskActionState,
@@ -41,9 +49,12 @@ export async function createFrontDeskBooking(
     checkIn: formData.get("checkIn"),
     checkOut: formData.get("checkOut"),
     numRooms: formData.get("numRooms"),
+    guestName: formData.get("guestName")?.toString().trim() || undefined,
+    guestPhone: formData.get("guestPhone")?.toString().trim() || undefined,
+    notes: formData.get("notes")?.toString().trim() || undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-  const { hotelId, roomTypeId, checkIn, checkOut, numRooms } = parsed.data;
+  const { hotelId, roomTypeId, checkIn, checkOut, numRooms, guestName, guestPhone, notes } = parsed.data;
 
   const profile = await requireUser();
   const managed = await getMyManagedHotel(profile.id, hotelId);
@@ -90,18 +101,22 @@ export async function createFrontDeskBooking(
     booked_by: profile.id,
     agency_id: null,
     channel: "b2c",
+    source: "offline",
     check_in: checkIn,
     check_out: checkOut,
     num_rooms: numRooms,
     num_adults: 1,
     num_children: 0,
-    guest_details: [],
+    guest_details: guestName ? [{ full_name: guestName, phone: guestPhone ?? null }] : [],
+    special_requests: notes ?? null,
     total_price: totalPrice,
     currency: roomType.currency,
   });
   if (insertError) return { error: insertError.message };
 
   revalidatePath(`/manager/${hotelId}/front-desk`);
+  revalidatePath(`/manager/${hotelId}/rooms/${roomTypeId}`);
+  revalidatePath(`/partner/hotels/${hotelId}/rooms/${roomTypeId}`);
   return { error: null };
 }
 

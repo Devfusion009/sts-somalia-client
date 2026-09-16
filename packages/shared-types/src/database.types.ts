@@ -2114,6 +2114,7 @@ export type Database = {
           num_rooms: number
           priority: number
           room_id: string
+          source: string
           special_requests: string | null
           status: Database["public"]["Enums"]["booking_status"]
           total_price: number
@@ -2141,6 +2142,7 @@ export type Database = {
           num_rooms?: number
           priority?: number
           room_id: string
+          source?: string
           special_requests?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
           total_price: number
@@ -2168,6 +2170,7 @@ export type Database = {
           num_rooms?: number
           priority?: number
           room_id?: string
+          source?: string
           special_requests?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
           total_price?: number
