@@ -63,6 +63,7 @@ export function PhoneField({
         onChange={(e) => handleNumberChange(e.target.value)}
         required={required}
         aria-invalid={invalid}
+        className="flex-1"
       />
     </div>
   );

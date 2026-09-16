@@ -4,13 +4,14 @@ import { AlertCircle, Pencil } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
-import { getRoomForInventory } from "@/modules/hotels/partner-queries";
+import { getRoomForInventory, getRoomUnits } from "@/modules/hotels/partner-queries";
 import { getHotelAvailability } from "@/modules/hotels/availability";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RoomNightsTable } from "@/modules/hotels/components/room-nights-table";
+import { RoomUnitsManager } from "@/modules/hotels/components/room-units-manager";
 import { InventoryRangeForm, ClearInventoryForm } from "@/app/partner/(portal)/hotels/[id]/rooms/[roomId]/inventory-form";
 
 export const metadata = { title: "Room Availability" };
@@ -28,8 +29,11 @@ export default async function ManagerRoomInventoryPage({
   const room = await getRoomForInventory(roomId, hotelId, [hotelId]);
   if (!room) notFound();
 
-  const [availability] = await getHotelAvailability(hotelId, { roomId: room.id, days: 60 });
-  const nights = availability?.nights ?? [];
+  const [availability, roomUnits] = await Promise.all([
+    getHotelAvailability(hotelId, { roomId: room.id, days: 60 }),
+    getRoomUnits(room.id, hotelId, [hotelId]),
+  ]);
+  const nights = availability[0]?.nights ?? [];
   const canEditRooms = hasPermission(managed, "rooms");
 
   return (
@@ -87,6 +91,15 @@ export default async function ManagerRoomInventoryPage({
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Rooms</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RoomUnitsManager hotelId={hotelId} roomTypeId={room.id} units={roomUnits} canEdit={canEditRooms} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

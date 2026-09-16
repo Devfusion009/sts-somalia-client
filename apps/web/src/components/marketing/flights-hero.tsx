@@ -73,8 +73,10 @@ export function FlightsHero({ children }: { children: React.ReactNode }) {
             Where do you want to go?
           </h1>
 
-          {/* Mode tiles */}
-          <div className="mt-7 flex gap-2.5">
+          {/* Mode switcher — one segmented pill, not disconnected tiles, so the
+              active mode reads as a state change within one control rather
+              than three separate buttons competing for weight. */}
+          <div className="mt-7 inline-flex items-center gap-1 rounded-full bg-white/10 p-1 ring-1 ring-white/15 backdrop-blur-sm">
             {MODES.map((mode) => {
               const active = pathname.startsWith(mode.href);
               return (
@@ -83,14 +85,14 @@ export function FlightsHero({ children }: { children: React.ReactNode }) {
                   href={mode.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex w-20 flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-xs font-semibold transition-colors duration-200",
+                    "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold whitespace-nowrap transition-colors duration-200",
                     "focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar focus-visible:outline-none",
                     active
-                      ? "bg-brand-accent text-brand-accent-foreground"
-                      : "bg-white/10 text-white/80 hover:bg-white/20 hover:text-white"
+                      ? "bg-white text-sidebar shadow-sm"
+                      : "text-white/75 hover:bg-white/10 hover:text-white"
                   )}
                 >
-                  <mode.icon sx={{ fontSize: 22 }} />
+                  <mode.icon sx={{ fontSize: 18 }} />
                   {mode.label}
                 </Link>
               );

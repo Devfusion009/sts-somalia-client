@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { CountrySearchSelect } from "@/components/ui/country-select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -50,7 +51,7 @@ import {
 } from "@/components/ui/table";
 import { SubmitButton } from "@/components/submit-button";
 import { cn } from "@/lib/utils";
-import { COUNTRY_OPTIONS, countryFlag, countryName } from "@/lib/countries";
+import { countryName } from "@/lib/countries";
 import {
   saveApplicantType,
   saveVisaMember,
@@ -139,38 +140,6 @@ function Field({
       </Label>
       {children}
     </div>
-  );
-}
-
-const COUNTRY_SELECT_ITEMS = COUNTRY_OPTIONS.map(([code, label]) => ({
-  value: code,
-  label: `${countryFlag(code)} ${label}`,
-}));
-
-function CountrySelect({
-  name,
-  id,
-  defaultValue,
-  placeholder,
-}: {
-  name: string;
-  id?: string;
-  defaultValue?: string | null;
-  placeholder: string;
-}) {
-  return (
-    <Select name={name} defaultValue={defaultValue ?? undefined} items={COUNTRY_SELECT_ITEMS}>
-      <SelectTrigger id={id} className="w-full">
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {COUNTRY_SELECT_ITEMS.map((item) => (
-          <SelectItem key={item.value} value={item.value}>
-            {item.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }
 
@@ -308,7 +277,7 @@ function MemberDialog({
             />
           </Field>
           <Field label="Nationality" required>
-            <CountrySelect
+            <CountrySearchSelect
               name="nationality"
               defaultValue={member?.nationality ?? "SO"}
               placeholder="Select nationality"
@@ -576,7 +545,7 @@ export function StepPersonalInfo({
           />
         </Field>
         <Field label="Nationality" required>
-          <CountrySelect name="nationality" defaultValue={v.nationality ?? t.nationality ?? "SO"} placeholder="Select nationality" />
+          <CountrySearchSelect name="nationality" defaultValue={v.nationality ?? t.nationality ?? "SO"} placeholder="Select nationality" />
         </Field>
         <Field label="Passport number" htmlFor="passportNumber" required>
           <Input id="passportNumber" name="passportNumber" defaultValue={v.passportNumber ?? t.passport_number ?? ""} placeholder="Enter passport number" required />

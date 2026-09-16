@@ -21,7 +21,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { CountrySearchSelect } from "@/components/marketing/country-search-select";
+import { CountrySearchSelect } from "@/components/ui/country-select";
 import { getVisaTypeById, getResolvedVisaPricing } from "@/modules/visa/queries";
 import { startVisaApplication } from "@/modules/visa/actions";
 import { parseDocumentSlots } from "@/modules/visa/schemas";
