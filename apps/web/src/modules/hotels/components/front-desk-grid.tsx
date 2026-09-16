@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Plus, Search, Users, DollarSign, Lock, LogIn, LogOut, Pencil, ArrowLeftRight, X } from "lucide-react";
+import { Plus, Search, Users, DollarSign, Lock, LogIn, LogOut, Pencil, ArrowLeftRight, Ban, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,8 @@ import {
   setBookingRoomLock,
   assignRoomUnit,
   updateBookingDetails,
+  disableRoomUnit,
+  rescheduleBooking,
   type FrontDeskActionState,
 } from "@/modules/hotels/front-desk-actions";
 import type { FrontDeskBar, FrontDeskDisabledRange, FrontDeskRoomType, FrontDeskStatus } from "@/modules/hotels/front-desk-queries";
@@ -70,9 +72,9 @@ const STATUS_DOT: Record<FrontDeskStatus, string> = {
 };
 
 type Cell =
-  | { type: "empty"; span: 1 }
-  | { type: "disabled"; span: number; reason: string | null }
-  | { type: "bar"; span: number; bar: FrontDeskBar };
+  | { type: "empty"; span: 1; startIdx: number }
+  | { type: "disabled"; span: number; reason: string | null; startIdx: number }
+  | { type: "bar"; span: number; bar: FrontDeskBar; startIdx: number };
 
 /** Turn a unit's bookings + disabled ranges into ordered, non-overlapping table cells across the visible dateList. */
 function buildRowCells(dateList: string[], bars: FrontDeskBar[], disabled: FrontDeskDisabledRange[]): Cell[] {
@@ -95,20 +97,34 @@ function buildRowCells(dateList: string[], bars: FrontDeskBar[], disabled: Front
     if (endIdx <= startIdx) continue;
 
     while (i < startIdx) {
-      cells.push({ type: "empty", span: 1 });
+      cells.push({ type: "empty", span: 1, startIdx: i });
       i++;
     }
     const span = endIdx - startIdx;
-    if (range.kind === "bar") cells.push({ type: "bar", span, bar: range.bar! });
-    else cells.push({ type: "disabled", span, reason: range.reason ?? null });
+    if (range.kind === "bar") cells.push({ type: "bar", span, bar: range.bar!, startIdx });
+    else cells.push({ type: "disabled", span, reason: range.reason ?? null, startIdx });
     i = endIdx;
   }
   while (i < dateList.length) {
-    cells.push({ type: "empty", span: 1 });
+    cells.push({ type: "empty", span: 1, startIdx: i });
     i++;
   }
   return cells;
 }
+
+type DragMode = "create" | "move" | "resize-start" | "resize-end";
+
+type DragState = {
+  mode: DragMode;
+  roomUnitId: string;
+  roomTypeId: string;
+  bookingId?: string;
+  originStartIdx: number;
+  originSpan: number;
+  startClientX: number;
+  columnWidth: number;
+  deltaDays: number;
+};
 
 export function FrontDeskGrid({
   hotelId,
@@ -130,6 +146,19 @@ export function FrontDeskGrid({
   const [statusFilter, setStatusFilter] = useState<Set<FrontDeskStatus>>(new Set());
   const [active, setActive] = useState<{ roomNumber: string; bar: FrontDeskBar; roomType: FrontDeskRoomType } | null>(null);
   const [editing, setEditing] = useState(false);
+  const [addBooking, setAddBooking] = useState<{ open: boolean; prefill: { roomTypeId: string; checkIn: string; checkOut: string } | null }>({
+    open: false,
+    prefill: null,
+  });
+
+  // Drag-and-drop: create by dragging across empty cells, move an existing
+  // bar, or resize it from either edge. dragRef holds the live state (mouse
+  // events fire fast — a ref avoids a re-render per pixel); dragPreview is
+  // the small, cheap-to-update piece that drives the floating tooltip.
+  const dragRef = useRef<DragState | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ clientX: number; clientY: number; label: string } | null>(null);
+  const [dragError, setDragError] = useState<string | null>(null);
+  const [reschedulePending, setReschedulePending] = useState(false);
 
   const disabledByUnit = useMemo(() => {
     const map = new Map<string, FrontDeskDisabledRange[]>();
@@ -140,12 +169,136 @@ export function FrontDeskGrid({
     return map;
   }, [disabledRanges]);
 
+  const tableRef = useRef<HTMLTableElement>(null);
+  const firstColRef = useRef<HTMLTableCellElement>(null);
+
+  function columnWidthPx() {
+    const table = tableRef.current;
+    const firstCol = firstColRef.current;
+    if (!table || !firstCol || dateList.length === 0) return 112; // matches min-w-28
+    return (table.getBoundingClientRect().width - firstCol.getBoundingClientRect().width) / dateList.length;
+  }
+
+  function addDaysToDate(iso: string, n: number) {
+    const d = new Date(`${iso}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  const beginDrag = useCallback(
+    (mode: DragMode, roomUnitId: string, roomTypeId: string, originStartIdx: number, originSpan: number, clientX: number, bookingId?: string) => {
+      dragRef.current = {
+        mode,
+        roomUnitId,
+        roomTypeId,
+        bookingId,
+        originStartIdx,
+        originSpan,
+        startClientX: clientX,
+        columnWidth: columnWidthPx(),
+        deltaDays: 0,
+      };
+      setDragError(null);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dateList.length]
+  );
+
+  const finalizeDrag = useCallback(
+    (drag: DragState) => {
+      if (drag.mode === "create") {
+        const lo = Math.min(drag.originStartIdx, drag.originStartIdx + drag.deltaDays);
+        const hi = Math.max(drag.originStartIdx, drag.originStartIdx + drag.deltaDays) + 1;
+        const clampedLo = Math.max(0, lo);
+        const clampedHi = Math.min(dateList.length, Math.max(hi, clampedLo + 1));
+        setAddBooking({
+          open: true,
+          prefill: { roomTypeId: drag.roomTypeId, checkIn: dateList[clampedLo], checkOut: addDaysToDate(dateList[clampedHi - 1], 1) },
+        });
+        return;
+      }
+
+      if (!drag.bookingId) return;
+      let newStartIdx = drag.originStartIdx;
+      let newSpan = drag.originSpan;
+      if (drag.mode === "move") {
+        newStartIdx = Math.max(0, Math.min(dateList.length - drag.originSpan, drag.originStartIdx + drag.deltaDays));
+      } else if (drag.mode === "resize-end") {
+        newSpan = Math.max(1, Math.min(dateList.length - drag.originStartIdx, drag.originSpan + drag.deltaDays));
+      } else if (drag.mode === "resize-start") {
+        const proposedStart = Math.max(0, Math.min(drag.originStartIdx + drag.originSpan - 1, drag.originStartIdx + drag.deltaDays));
+        newSpan = drag.originStartIdx + drag.originSpan - proposedStart;
+        newStartIdx = proposedStart;
+      }
+      if (newStartIdx === drag.originStartIdx && newSpan === drag.originSpan) return;
+
+      const newCheckIn = dateList[newStartIdx];
+      const newCheckOut = addDaysToDate(dateList[newStartIdx + newSpan - 1], 1);
+      const fd = new FormData();
+      fd.set("bookingId", drag.bookingId);
+      fd.set("checkIn", newCheckIn);
+      fd.set("checkOut", newCheckOut);
+      setReschedulePending(true);
+      rescheduleBooking(null, fd)
+        .then((result) => {
+          if (result?.error) setDragError(result.error);
+        })
+        .finally(() => setReschedulePending(false));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dateList]
+  );
+
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const deltaDays = Math.round((e.clientX - drag.startClientX) / (drag.columnWidth || 1));
+      drag.deltaDays = deltaDays;
+
+      let label = "";
+      if (drag.mode === "create") {
+        const lo = Math.max(0, Math.min(drag.originStartIdx, drag.originStartIdx + deltaDays));
+        const hi = Math.min(dateList.length - 1, Math.max(drag.originStartIdx, drag.originStartIdx + deltaDays));
+        label = `${dateList[lo]} → ${addDaysToDate(dateList[hi], 1)}`;
+      } else if (drag.mode === "move") {
+        const newStart = Math.max(0, Math.min(dateList.length - drag.originSpan, drag.originStartIdx + deltaDays));
+        label = `${dateList[newStart]} → ${addDaysToDate(dateList[newStart + drag.originSpan - 1], 1)}`;
+      } else if (drag.mode === "resize-end") {
+        const newSpan = Math.max(1, Math.min(dateList.length - drag.originStartIdx, drag.originSpan + deltaDays));
+        label = `Check-out → ${addDaysToDate(dateList[drag.originStartIdx + newSpan - 1], 1)}`;
+      } else {
+        const proposedStart = Math.max(0, Math.min(drag.originStartIdx + drag.originSpan - 1, drag.originStartIdx + deltaDays));
+        label = `Check-in → ${dateList[proposedStart]}`;
+      }
+      setDragPreview({ clientX: e.clientX, clientY: e.clientY, label });
+    }
+    function onMouseUp() {
+      const drag = dragRef.current;
+      if (!drag) return;
+      dragRef.current = null;
+      setDragPreview(null);
+      finalizeDrag(drag);
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [dateList, finalizeDrag]);
+
   const needle = search.trim().toLowerCase();
 
   function unitMatchesFilters(unitBars: FrontDeskBar[]) {
     if (!needle && roomTypeFilter.size === 0 && statusFilter.size === 0) return true;
     return unitBars.some((b) => {
-      const matchesSearch = !needle || b.guestName.toLowerCase().includes(needle) || b.bookingId.toLowerCase().includes(needle);
+      const matchesSearch =
+        !needle ||
+        b.guestName.toLowerCase().includes(needle) ||
+        b.bookingId.toLowerCase().includes(needle) ||
+        (b.bookingReference?.toLowerCase().includes(needle) ?? false) ||
+        (b.guestEmail?.toLowerCase().includes(needle) ?? false);
       const matchesStatus = statusFilter.size === 0 || (b.status && statusFilter.has(b.status));
       return matchesSearch && matchesStatus;
     });
@@ -161,7 +314,7 @@ export function FrontDeskGrid({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Booking ID, guest name…"
+            placeholder="Booking ID, reference, guest name or email…"
             className="h-8 pl-8 text-sm"
           />
         </div>
@@ -228,17 +381,26 @@ export function FrontDeskGrid({
         </div>
 
         {canEdit ? (
-          <div className="ml-auto">
-            <AddBookingButton hotelId={hotelId} roomTypes={roomTypes} />
+          <div className="ml-auto flex items-center gap-2">
+            {reschedulePending ? <span className="text-xs text-muted-foreground">Moving…</span> : null}
+            <Button size="sm" className="gap-1.5" onClick={() => setAddBooking({ open: true, prefill: null })}>
+              <Plus className="size-4" /> Add Booking
+            </Button>
           </div>
         ) : null}
       </div>
 
+      {dragError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{dragError}</AlertDescription>
+        </Alert>
+      ) : null}
+
       <div className="overflow-x-auto rounded-xl border border-border">
-        <table className="w-full border-collapse text-xs">
+        <table ref={tableRef} className="w-full border-collapse text-xs">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 min-w-28 border-b border-border bg-card px-3 py-2 text-left font-semibold">
+              <th ref={firstColRef} className="sticky left-0 z-10 min-w-28 border-b border-border bg-card px-3 py-2 text-left font-semibold">
                 Room Num
               </th>
               {dateList.map((date) => (
@@ -253,12 +415,15 @@ export function FrontDeskGrid({
             {visibleRoomTypes.map((rt) => (
               <RoomTypeSection
                 key={rt.id}
+                hotelId={hotelId}
                 roomType={rt}
                 dateList={dateList}
                 bars={bars}
                 disabledByUnit={disabledByUnit}
                 unitMatchesFilters={unitMatchesFilters}
                 onSelectBar={(roomNumber, bar) => setActive({ roomNumber, bar, roomType: rt })}
+                canEdit={canEdit}
+                onBeginDrag={beginDrag}
               />
             ))}
             {visibleRoomTypes.every((rt) => rt.units.length === 0) ? (
@@ -271,6 +436,23 @@ export function FrontDeskGrid({
           </tbody>
         </table>
       </div>
+
+      {dragPreview ? (
+        <div
+          className="pointer-events-none fixed z-50 rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background shadow-lg"
+          style={{ left: dragPreview.clientX + 12, top: dragPreview.clientY + 12 }}
+        >
+          {dragPreview.label}
+        </div>
+      ) : null}
+
+      <AddBookingDialog
+        hotelId={hotelId}
+        roomTypes={roomTypes}
+        open={addBooking.open}
+        prefill={addBooking.prefill}
+        onOpenChange={(open) => setAddBooking((s) => ({ ...s, open }))}
+      />
 
       <Dialog open={active !== null} onOpenChange={(open) => !open && setActive(null)}>
         <DialogContent className="sm:max-w-md">
@@ -303,11 +485,30 @@ export function FrontDeskGrid({
                 <div>
                   <dt className="text-xs text-muted-foreground">Guest</dt>
                   <dd className="font-semibold">{active.bar.guestName}</dd>
+                  {active.bar.guestEmail ? <dd className="text-xs text-muted-foreground">{active.bar.guestEmail}</dd> : null}
                 </div>
                 <div>
                   <dt className="text-xs text-muted-foreground">Booking ID</dt>
                   <dd className="font-mono text-xs font-semibold">{active.bar.bookingId}</dd>
                 </div>
+                {active.bar.bookingReference ? (
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Reference</dt>
+                    <dd className="font-mono text-xs font-semibold">{active.bar.bookingReference}</dd>
+                  </div>
+                ) : null}
+                {active.bar.paymentMethod ? (
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Payment Type</dt>
+                    <dd className="font-semibold">{active.bar.paymentMethod}</dd>
+                  </div>
+                ) : null}
+                {active.bar.notes ? (
+                  <div className="col-span-2">
+                    <dt className="text-xs text-muted-foreground">Notes</dt>
+                    <dd className="text-sm">{active.bar.notes}</dd>
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap gap-1.5">
                   {active.bar.isGroupBooking ? (
                     <Badge variant="outline" className="gap-1">
@@ -376,19 +577,25 @@ export function FrontDeskGrid({
 }
 
 function RoomTypeSection({
+  hotelId,
   roomType,
   dateList,
   bars,
   disabledByUnit,
   unitMatchesFilters,
   onSelectBar,
+  canEdit,
+  onBeginDrag,
 }: {
+  hotelId: string;
   roomType: FrontDeskRoomType;
   dateList: string[];
   bars: Record<string, FrontDeskBar[]>;
   disabledByUnit: Map<string, FrontDeskDisabledRange[]>;
   unitMatchesFilters: (unitBars: FrontDeskBar[]) => boolean;
   onSelectBar: (roomNumber: string, bar: FrontDeskBar) => void;
+  canEdit: boolean;
+  onBeginDrag: (mode: DragMode, roomUnitId: string, roomTypeId: string, originStartIdx: number, originSpan: number, clientX: number, bookingId?: string) => void;
 }) {
   const visibleUnits = roomType.units.filter((u) => unitMatchesFilters(bars[u.id] ?? []));
 
@@ -409,24 +616,44 @@ function RoomTypeSection({
         const cells = buildRowCells(dateList, bars[unit.id] ?? [], disabledByUnit.get(unit.id) ?? []);
         return (
           <tr key={unit.id}>
-            <td className="sticky left-0 z-10 border-t border-border bg-card px-3 py-1.5 font-medium">
-              {unit.roomNumber}
-              {unit.floor ? <span className="text-muted-foreground"> · F{unit.floor}</span> : null}
+            <td className="sticky left-0 z-10 flex items-center justify-between gap-1 border-t border-border bg-card px-3 py-1.5 font-medium">
+              <span>
+                {unit.roomNumber}
+                {unit.floor ? <span className="text-muted-foreground"> · F{unit.floor}</span> : null}
+              </span>
+              {canEdit ? <DisableRoomButton hotelId={hotelId} roomUnitId={unit.id} roomNumber={unit.roomNumber} /> : null}
             </td>
             {cells.map((cell, idx) =>
               cell.type === "empty" ? (
-                <td key={idx} className="border-t border-l border-border" />
+                <td
+                  key={idx}
+                  className={cn("border-t border-l border-border", canEdit && "cursor-crosshair")}
+                  onMouseDown={
+                    canEdit
+                      ? (e) => onBeginDrag("create", unit.id, roomType.id, cell.startIdx, 1, e.clientX)
+                      : undefined
+                  }
+                />
               ) : cell.type === "disabled" ? (
                 <td key={idx} colSpan={cell.span} className="border-t border-l border-border bg-muted px-2 py-1.5 text-center text-muted-foreground">
                   Out of order
                 </td>
               ) : (
-                <td key={idx} colSpan={cell.span} className="border-t border-l border-border p-0.5">
+                <td key={idx} colSpan={cell.span} className="relative border-t border-l border-border p-0.5">
                   <button
                     type="button"
                     onClick={() => onSelectBar(unit.roomNumber, cell.bar)}
+                    onMouseDown={
+                      canEdit && !cell.bar.locked
+                        ? (e) => {
+                            e.preventDefault();
+                            onBeginDrag("move", unit.id, roomType.id, cell.startIdx, cell.span, e.clientX, cell.bar.bookingId);
+                          }
+                        : undefined
+                    }
                     className={cn(
                       "flex w-full items-center gap-1 rounded px-1.5 py-1 text-left font-medium",
+                      canEdit && !cell.bar.locked && "cursor-grab active:cursor-grabbing",
                       cell.bar.status ? STATUS_COLOR[cell.bar.status] : "bg-muted text-muted-foreground"
                     )}
                   >
@@ -435,6 +662,26 @@ function RoomTypeSection({
                     {cell.bar.paymentPending ? <DollarSign className="size-3 shrink-0" /> : null}
                     {cell.bar.locked ? <Lock className="size-3 shrink-0" /> : null}
                   </button>
+                  {canEdit && !cell.bar.locked ? (
+                    <>
+                      <div
+                        className="absolute top-0 left-0.5 h-full w-2 cursor-ew-resize"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onBeginDrag("resize-start", unit.id, roomType.id, cell.startIdx, cell.span, e.clientX, cell.bar.bookingId);
+                        }}
+                      />
+                      <div
+                        className="absolute top-0 right-0.5 h-full w-2 cursor-ew-resize"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onBeginDrag("resize-end", unit.id, roomType.id, cell.startIdx, cell.span, e.clientX, cell.bar.bookingId);
+                        }}
+                      />
+                    </>
+                  ) : null}
                 </td>
               )
             )}
@@ -445,31 +692,52 @@ function RoomTypeSection({
   );
 }
 
-/** "Add Booking" — room type + quantity only; reserves capacity via the same allocator every other booking path uses. */
-function AddBookingButton({ hotelId, roomTypes }: { hotelId: string; roomTypes: FrontDeskRoomType[] }) {
-  const [open, setOpen] = useState(false);
+/**
+ * Book Rooms — room type + quantity, reserved via the same allocator every
+ * other booking path uses. Controlled (not self-triggered): the toolbar's
+ * Add Booking button and a drag-to-create gesture on an empty row both open
+ * this, the second one pre-filled with the dragged room type and dates.
+ */
+function AddBookingDialog({
+  hotelId,
+  roomTypes,
+  open,
+  prefill,
+  onOpenChange,
+}: {
+  hotelId: string;
+  roomTypes: FrontDeskRoomType[];
+  open: boolean;
+  prefill: { roomTypeId: string; checkIn: string; checkOut: string } | null;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [state, formAction] = useActionState<FrontDeskActionState, FormData>(createFrontDeskBooking, null);
-  const [roomTypeId, setRoomTypeId] = useState(roomTypes[0]?.id ?? "");
-  const [checkIn, setCheckIn] = useState("");
+  const [roomTypeId, setRoomTypeId] = useState(prefill?.roomTypeId ?? roomTypes[0]?.id ?? "");
+  const [checkIn, setCheckIn] = useState(prefill?.checkIn ?? "");
+  const [checkOut, setCheckOut] = useState(prefill?.checkOut ?? "");
   const today = new Date().toISOString().slice(0, 10);
+
+  // Re-seed the form fields whenever a new prefill arrives (a fresh drag,
+  // or the toolbar button clearing it) — not on every render.
+  const lastPrefill = useRef(prefill);
+  if (prefill !== lastPrefill.current) {
+    lastPrefill.current = prefill;
+    setRoomTypeId(prefill?.roomTypeId ?? roomTypes[0]?.id ?? "");
+    setCheckIn(prefill?.checkIn ?? "");
+    setCheckOut(prefill?.checkOut ?? "");
+  }
 
   const selectedRoomType = roomTypes.find((rt) => rt.id === roomTypeId);
   const availableForCheckIn = selectedRoomType?.dates.find((d) => d.date === checkIn)?.available;
 
-  // Derived during render (not an effect), same pattern as the other
-  // dialog-closes-on-success forms in this codebase — refs can't be
-  // read/written during render.
   const [lastState, setLastState] = useState(state);
   if (state !== lastState) {
     setLastState(state);
-    if (state && !state.error) setOpen(false);
+    if (state && !state.error) onOpenChange(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" className="gap-1.5" />}>
-        <Plus className="size-4" /> Add Booking
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Book Rooms</DialogTitle>
@@ -488,7 +756,7 @@ function AddBookingButton({ hotelId, roomTypes }: { hotelId: string; roomTypes: 
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="checkOut">Check Out Date</Label>
-              <Input id="checkOut" name="checkOut" type="date" min={checkIn || today} required />
+              <Input id="checkOut" name="checkOut" type="date" min={checkIn || today} required value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
             </div>
           </div>
           <div className="space-y-1.5">
@@ -515,10 +783,60 @@ function AddBookingButton({ hotelId, roomTypes }: { hotelId: string; roomTypes: 
             <Input id="numRooms" name="numRooms" type="number" min={1} max={20} defaultValue={1} required />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Close
             </Button>
             <SubmitButton pendingText="Booking…">Book Rooms</SubmitButton>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Disable Room — block one physical room for a date range (maintenance etc.). */
+function DisableRoomButton({ hotelId, roomUnitId, roomNumber }: { hotelId: string; roomUnitId: string; roomNumber: string }) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction] = useActionState<FrontDeskActionState, FormData>(disableRoomUnit, null);
+  const [lastState, setLastState] = useState(state);
+  if (state !== lastState) {
+    setLastState(state);
+    if (state && !state.error) setOpen(false);
+  }
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size="icon" variant="ghost" className="size-6 shrink-0 text-muted-foreground" />}>
+        <Ban className="size-3.5" />
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-xs">
+        <DialogHeader>
+          <DialogTitle>Disable Room {roomNumber}</DialogTitle>
+        </DialogHeader>
+        <form action={formAction} className="space-y-4">
+          <input type="hidden" name="hotelId" value={hotelId} />
+          <input type="hidden" name="roomUnitId" value={roomUnitId} />
+          {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="dateStart">From</Label>
+              <Input id="dateStart" name="dateStart" type="date" min={today} required />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="dateEnd">To</Label>
+              <Input id="dateEnd" name="dateEnd" type="date" min={today} required />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="reason">Reason</Label>
+            <Input id="reason" name="reason" placeholder="Maintenance…" />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Close
+            </Button>
+            <SubmitButton pendingText="Disabling…">Disable Room</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -601,12 +919,12 @@ function EditBookingDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Check-In</Label>
-              <Input value={bar.checkIn} disabled className="bg-muted text-muted-foreground" />
+              <Label htmlFor="checkIn">Check-In</Label>
+              <Input id="checkIn" name="checkIn" type="date" defaultValue={bar.checkIn} required />
             </div>
             <div className="space-y-1.5">
-              <Label>Check-Out</Label>
-              <Input value={bar.checkOut} disabled className="bg-muted text-muted-foreground" />
+              <Label htmlFor="checkOut">Check-Out</Label>
+              <Input id="checkOut" name="checkOut" type="date" defaultValue={bar.checkOut} required />
             </div>
           </div>
 

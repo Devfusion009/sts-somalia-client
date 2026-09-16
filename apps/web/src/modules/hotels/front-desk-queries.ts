@@ -13,17 +13,21 @@ export type FrontDeskStatus =
 
 export type FrontDeskBar = {
   bookingId: string;
+  bookingReference: string | null;
   roomUnitId: string;
   guestName: string;
+  guestEmail: string | null;
   checkIn: string;
   checkOut: string;
   status: FrontDeskStatus | null;
   isGroupBooking: boolean;
   paymentPending: boolean;
+  paymentMethod: string | null;
   locked: boolean;
   totalPrice: number;
   numAdults: number;
   numChildren: number;
+  notes: string | null;
 };
 
 export type FrontDeskRoomType = {
@@ -79,10 +83,14 @@ type AssignmentRow = {
     num_adults: number;
     num_children: number;
     total_price: number;
+    special_requests: string | null;
     guest_details: unknown;
     checked_in_at: string | null;
     checked_out_at: string | null;
-    order_items: Array<{ order: { status: string } | null }>;
+    customer: { email: string | null } | null;
+    order_items: Array<{
+      order: { status: string; order_number: string; payments: Array<{ method_label: string | null; status: string }> } | null;
+    }>;
   };
 };
 
@@ -115,8 +123,9 @@ export async function getFrontDeskBoard(hotelId: string, startDate: string, days
         .from("hotel_booking_room_units")
         .select(
           `room_unit_id, locked,
-           booking:hotel_bookings!inner(id, hotel_id, check_in, check_out, status, num_rooms, num_adults, num_children, total_price, guest_details, checked_in_at, checked_out_at,
-             order_items(order:orders(status)))`
+           booking:hotel_bookings!inner(id, hotel_id, check_in, check_out, status, num_rooms, num_adults, num_children, total_price, special_requests, guest_details, checked_in_at, checked_out_at,
+             customer:profiles!hotel_bookings_customer_id_fkey(email),
+             order_items(order:orders(status, order_number, payments(method_label, status))))`
         )
         .eq("booking.hotel_id", hotelId)
         .lt("booking.check_in", endDateExclusive)
@@ -144,11 +153,14 @@ export async function getFrontDeskBoard(hotelId: string, startDate: string, days
   const barsByUnit = new Map<string, FrontDeskBar[]>();
   for (const row of (assignments ?? []) as unknown as AssignmentRow[]) {
     const b = row.booking;
-    const orderStatus = b.order_items?.[0]?.order?.status;
+    const order = b.order_items?.[0]?.order;
+    const succeededPayment = order?.payments?.find((p) => p.status === "succeeded");
     const bar: FrontDeskBar = {
       bookingId: b.id,
+      bookingReference: order?.order_number ?? null,
       roomUnitId: row.room_unit_id,
       guestName: hotelGuestNames(b.guest_details)[0] ?? "Guest",
+      guestEmail: b.customer?.email ?? null,
       checkIn: b.check_in,
       checkOut: b.check_out,
       status:
@@ -156,11 +168,13 @@ export async function getFrontDeskBoard(hotelId: string, startDate: string, days
           ? resolveFrontDeskStatus(b.status, b.check_in, b.check_out, b.checked_in_at, b.checked_out_at, today)
           : null,
       isGroupBooking: b.num_rooms > 1,
-      paymentPending: orderStatus ? ["pending_payment", "held", "partially_paid"].includes(orderStatus) : false,
+      paymentPending: order ? ["pending_payment", "held", "partially_paid"].includes(order.status) : false,
+      paymentMethod: succeededPayment?.method_label ?? null,
       locked: row.locked,
       totalPrice: Number(b.total_price),
       numAdults: b.num_adults,
       numChildren: b.num_children,
+      notes: b.special_requests,
     };
     if (!barsByUnit.has(row.room_unit_id)) barsByUnit.set(row.room_unit_id, []);
     barsByUnit.get(row.room_unit_id)!.push(bar);
@@ -214,19 +228,34 @@ export async function getFrontDeskBoard(hotelId: string, startDate: string, days
 /** Global stats strip for one date: arrivals, departures, occupied, total booked. */
 export async function getFrontDeskDayStats(hotelId: string, date: string) {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("hotel_bookings")
-    .select("id, check_in, check_out, checked_in_at, checked_out_at, status")
-    .eq("hotel_id", hotelId)
-    .in("status", ["pending", "confirmed"])
-    .lte("check_in", date)
-    .gte("check_out", date);
+  const [{ data: bookingRows }, { data: unitRows }, { data: disabledRows }] = await Promise.all([
+    supabase
+      .from("hotel_bookings")
+      .select("id, check_in, check_out, checked_in_at, checked_out_at, status")
+      .eq("hotel_id", hotelId)
+      .in("status", ["pending", "confirmed"])
+      .lte("check_in", date)
+      .gte("check_out", date),
+    supabase.from("hotel_room_units").select("id, status").eq("hotel_id", hotelId),
+    supabase
+      .from("hotel_room_disable_dates")
+      .select("room_unit_id, hotel_room_units!inner(hotel_id)")
+      .eq("hotel_room_units.hotel_id", hotelId)
+      .lte("date_start", date)
+      .gt("date_end", date),
+  ]);
 
-  const bookings = data ?? [];
+  const bookings = bookingRows ?? [];
+  const units = unitRows ?? [];
+  const standingOutOfOrder = new Set(units.filter((u) => u.status === "out_of_order").map((u) => u.id));
+  const scheduledOutOfOrder = new Set((disabledRows ?? []).map((d) => d.room_unit_id));
+
   return {
     arrivals: bookings.filter((b) => b.check_in === date).length,
     departures: bookings.filter((b) => b.check_out === date).length,
     occupied: bookings.filter((b) => b.checked_in_at && !b.checked_out_at).length,
     totalBooked: bookings.length,
+    totalRooms: units.length,
+    outOfOrder: new Set([...standingOutOfOrder, ...scheduledOutOfOrder]).size,
   };
 }
