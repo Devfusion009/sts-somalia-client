@@ -84,6 +84,20 @@ export async function getRoomForInventory(roomId: string, hotelId: string, hotel
   return data;
 }
 
+/** Physical rooms (number, floor, status) under one room type — the front desk board's row list. */
+export async function getRoomUnits(roomTypeId: string, hotelId: string, hotelIds: string[]) {
+  if (!hotelIds.includes(hotelId)) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("hotel_room_units")
+    .select("*")
+    .eq("room_type_id", roomTypeId)
+    .eq("hotel_id", hotelId)
+    .order("floor")
+    .order("room_number");
+  return data ?? [];
+}
+
 /**
  * The front-desk snapshot for one hotel: who's actually staying right now,
  * arriving today, and leaving today — read straight off hotel_bookings

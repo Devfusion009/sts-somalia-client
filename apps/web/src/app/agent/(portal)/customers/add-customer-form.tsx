@@ -62,15 +62,13 @@ export function AddCustomerForm() {
             </Label>
             <Input id="fullName" name="fullName" required />
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Phone</Label>
-              <PhoneField name="phone" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" />
-            </div>
+          <div className="space-y-1.5">
+            <Label>Phone</Label>
+            <PhoneField name="phone" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" name="email" type="email" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="notes">Notes</Label>

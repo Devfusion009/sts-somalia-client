@@ -38,9 +38,13 @@ const CABINS = [
 ];
 
 /** Bare cell inside the white pill — no borders of its own, just padding. */
-const CELL = "relative min-w-0 px-3 py-2.5";
+const CELL = "relative min-w-0 px-4 py-3.5";
 const RESET_INPUT =
-  "h-8 w-full border-0 bg-transparent p-0 text-sm font-semibold text-neutral-900 shadow-none outline-none placeholder:font-normal placeholder:text-neutral-400 focus-visible:ring-0";
+  "h-8 w-full border-0 bg-transparent p-0 text-sm font-semibold text-neutral-900 shadow-none outline-none placeholder:font-normal placeholder:text-neutral-400 focus-visible:ring-0 cursor-pointer " +
+  // The native calendar-picker icon stays clickable but invisible, stretched
+  // over the whole field — one visible icon (ours) instead of two competing
+  // ones, and the field is clickable anywhere, not just on a tiny glyph.
+  "[&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0";
 
 function AirportPicker({
   id,
@@ -147,7 +151,7 @@ export function FlightSearchForm({
       </div>
 
       {/* The pill */}
-      <div className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl shadow-black/30 lg:flex-row lg:items-stretch lg:rounded-full">
+      <div className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl shadow-black/30 ring-1 ring-black/[0.04] lg:flex-row lg:items-stretch lg:rounded-full">
         <div className={cn(CELL, "lg:flex-[1.35] lg:pl-5")}>
           <label htmlFor="origin" className="mb-0.5 block text-[11px] font-semibold tracking-wide text-neutral-500 uppercase">
             From
@@ -164,7 +168,7 @@ export function FlightSearchForm({
 
         {/* Swap straddles the divider between From and To */}
         <div className="relative flex items-center justify-center lg:w-0">
-          <span className="hidden h-9 w-px bg-neutral-200 lg:block" aria-hidden />
+          <span className="hidden h-11 w-px bg-neutral-200 lg:block" aria-hidden />
           <button
             type="button"
             onClick={() => {
@@ -192,7 +196,7 @@ export function FlightSearchForm({
           />
         </div>
 
-        <span className="hidden w-px self-center bg-neutral-200 lg:block lg:h-9" aria-hidden />
+        <span className="hidden w-px self-center bg-neutral-200 lg:block lg:h-11" aria-hidden />
 
         <div className={cn(CELL, "lg:flex-[1.05]")}>
           <label htmlFor="depart_date" className="mb-0.5 block text-[11px] font-semibold tracking-wide text-neutral-500 uppercase">
@@ -212,7 +216,7 @@ export function FlightSearchForm({
           </div>
         </div>
 
-        <span className="hidden w-px self-center bg-neutral-200 lg:block lg:h-9" aria-hidden />
+        <span className="hidden w-px self-center bg-neutral-200 lg:block lg:h-11" aria-hidden />
 
         <div className={cn(CELL, "lg:flex-[1.05]", !roundTrip && "opacity-40")}>
           <label htmlFor="return_date" className="mb-0.5 block text-[11px] font-semibold tracking-wide text-neutral-500 uppercase">
@@ -232,7 +236,7 @@ export function FlightSearchForm({
           </div>
         </div>
 
-        <span className="hidden w-px self-center bg-neutral-200 lg:block lg:h-9" aria-hidden />
+        <span className="hidden w-px self-center bg-neutral-200 lg:block lg:h-11" aria-hidden />
 
         {/* Travellers + cabin, combined into one cell as in the reference */}
         <div className={cn(CELL, "lg:flex-[1.5]")}>
@@ -281,10 +285,10 @@ export function FlightSearchForm({
           </div>
         </div>
 
-        <div className="p-2 lg:flex lg:items-center lg:p-1.5">
+        <div className="p-2 lg:flex lg:items-center lg:p-2">
           <button
             type="submit"
-            className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-brand-accent px-8 font-heading text-base font-bold text-brand-accent-foreground transition-colors hover:bg-brand-accent/90 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none lg:h-11 lg:rounded-full"
+            className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-brand-accent px-8 font-heading text-base font-bold text-brand-accent-foreground shadow-md shadow-brand-accent/30 transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-accent/90 hover:shadow-lg hover:shadow-brand-accent/40 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none lg:h-[3.25rem] lg:rounded-full"
           >
             <SearchIcon sx={{ fontSize: 20 }} />
             Search

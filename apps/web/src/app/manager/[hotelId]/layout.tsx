@@ -40,6 +40,9 @@ export default async function ManagerHotelLayout({
     items: [
       { href: base, label: "Dashboard", icon: "overview" },
       { href: `${base}/bookings`, label: "Bookings", icon: "bookings", badge: pendingBookings || undefined },
+      ...(managed.permissions.includes("bookings")
+        ? [{ href: `${base}/front-desk`, label: "Front Desk", icon: "calendar" as const }]
+        : []),
       ...(managed.permissions.includes("rooms") || managed.permissions.includes("availability")
         ? [{ href: `${base}/rooms`, label: "Rooms & Availability", icon: "rooms" as const }]
         : []),
