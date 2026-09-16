@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertCircle, Pencil } from "lucide-react";
+import { AlertCircle, CalendarPlus, Pencil } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { requireUser } from "@/lib/auth/session";
 import { getMyHotelScope, getRoomForInventory, getRoomUnits, getRoomBookings } from "@/modules/hotels/partner-queries";
@@ -58,6 +58,20 @@ export default async function RoomInventoryPage({
         </Alert>
       ) : null}
 
+      <Card className="border-l-4 border-l-primary">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
+              <CalendarPlus className="size-4" />
+            </span>
+            Bookings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <OfflineBookingPanel hotelId={id} roomTypeId={room.id} bookings={bookings} canEdit />
+        </CardContent>
+      </Card>
+
       <Card className="overflow-hidden py-0">
         <CardHeader className="border-b border-border !py-4">
           <CardTitle className="text-base">Next 60 nights</CardTitle>
@@ -65,15 +79,6 @@ export default async function RoomInventoryPage({
         <div className="overflow-x-auto">
           <RoomNightsTable nights={nights} currency={room.currency} />
         </div>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Bookings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <OfflineBookingPanel hotelId={id} roomTypeId={room.id} bookings={bookings} canEdit />
-        </CardContent>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">

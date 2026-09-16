@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CalendarPlus } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import { getMyManagedHotel } from "@/modules/hotels/manager-queries";
+import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
 import { getHotelFrontDesk, getPartnerStats, getRecentPartnerBookings } from "@/modules/hotels/partner-queries";
 import { hotelGuestNames } from "@/modules/payments/queries";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +93,19 @@ export default async function ManagerDashboardPage({ params }: { params: Promise
           {managed.hotel.city}, {managed.hotel.country_code}
         </p>
       </div>
+
+      {hasPermission(managed, "bookings") ? (
+        <Link
+          href={`/manager/${hotelId}/rooms`}
+          className="flex items-center gap-3 rounded-xl bg-primary px-5 py-4 text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary-foreground/15">
+            <CalendarPlus className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1 text-sm font-bold">Record an offline booking</span>
+          <ArrowRight className="size-4.5 shrink-0" />
+        </Link>
+      ) : null}
 
       <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border sm:grid-cols-4">
         {[
