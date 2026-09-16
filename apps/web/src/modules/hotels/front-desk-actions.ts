@@ -183,18 +183,23 @@ export async function assignRoomUnit(_prev: FrontDeskActionState, formData: Form
   return { error: null };
 }
 
-const detailsSchema = z.object({
-  bookingId: z.string().uuid(),
-  totalPrice: z.coerce.number().min(0),
-  numAdults: z.coerce.number().int().min(1).max(30),
-  numChildren: z.coerce.number().int().min(0).max(30),
-});
+const detailsSchema = z
+  .object({
+    bookingId: z.string().uuid(),
+    checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a check-in date."),
+    checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a check-out date."),
+    totalPrice: z.coerce.number().min(0),
+    numAdults: z.coerce.number().int().min(1).max(30),
+    numChildren: z.coerce.number().int().min(0).max(30),
+  })
+  .refine((d) => d.checkOut > d.checkIn, { message: "Check-out date must be after check-in date.", path: ["checkOut"] });
 
 /**
- * Edit modal — price and occupancy only. Check-in/check-out dates are
- * deliberately not editable here: see the note on
- * assign_hotel_booking_room_unit's migration for why a raw date UPDATE on
- * hotel_bookings is unsafe (bypasses the capacity allocator entirely).
+ * Edit modal — dates, price, and occupancy. A date change goes through
+ * reschedule_hotel_booking() (the real capacity allocator, re-run for the
+ * new dates, excluding this booking's own current hold) before anything
+ * else is touched — if it can't fit, nothing about the booking changes,
+ * not even price/occupancy, so this never leaves a booking half-updated.
  */
 export async function updateBookingDetails(
   _prev: FrontDeskActionState,
@@ -202,6 +207,8 @@ export async function updateBookingDetails(
 ): Promise<FrontDeskActionState> {
   const parsed = detailsSchema.safeParse({
     bookingId: formData.get("bookingId"),
+    checkIn: formData.get("checkIn"),
+    checkOut: formData.get("checkOut"),
     totalPrice: formData.get("totalPrice"),
     numAdults: formData.get("numAdults"),
     numChildren: formData.get("numChildren"),
@@ -210,6 +217,14 @@ export async function updateBookingDetails(
 
   try {
     const { supabase, hotelId } = await requireBookingAccess(parsed.data.bookingId);
+
+    const { error: rescheduleError } = await supabase.rpc("reschedule_hotel_booking", {
+      p_booking_id: parsed.data.bookingId,
+      p_new_check_in: parsed.data.checkIn,
+      p_new_check_out: parsed.data.checkOut,
+    });
+    if (rescheduleError) return { error: rescheduleError.message };
+
     const { error } = await supabase
       .from("hotel_bookings")
       .update({
@@ -223,5 +238,76 @@ export async function updateBookingDetails(
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not update booking." };
   }
+  return { error: null };
+}
+
+const rescheduleSchema = z
+  .object({
+    bookingId: z.string().uuid(),
+    checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  })
+  .refine((d) => d.checkOut > d.checkIn, { message: "Check-out date must be after check-in date." });
+
+/** Drag-to-reschedule / drag-corner-to-extend — same safe path as the Edit dialog's date fields, just triggered by a drag instead of a form submit. */
+export async function rescheduleBooking(_prev: FrontDeskActionState, formData: FormData): Promise<FrontDeskActionState> {
+  const parsed = rescheduleSchema.safeParse({
+    bookingId: formData.get("bookingId"),
+    checkIn: formData.get("checkIn"),
+    checkOut: formData.get("checkOut"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid dates." };
+
+  try {
+    const { supabase, hotelId } = await requireBookingAccess(parsed.data.bookingId);
+    const { error } = await supabase.rpc("reschedule_hotel_booking", {
+      p_booking_id: parsed.data.bookingId,
+      p_new_check_in: parsed.data.checkIn,
+      p_new_check_out: parsed.data.checkOut,
+    });
+    if (error) return { error: error.message };
+    revalidatePath(`/manager/${hotelId}/front-desk`);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not reschedule booking." };
+  }
+  return { error: null };
+}
+
+const disableRoomSchema = z
+  .object({
+    hotelId: z.string().uuid(),
+    roomUnitId: z.string().uuid(),
+    dateStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a start date."),
+    dateEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick an end date."),
+    reason: z.string().trim().max(300).optional(),
+  })
+  .refine((d) => d.dateEnd >= d.dateStart, { message: "End date must be on or after the start date.", path: ["dateEnd"] });
+
+/** Disable Room — a date-ranged block on one physical room (hotel_room_disable_dates), not a standing toggle. */
+export async function disableRoomUnit(_prev: FrontDeskActionState, formData: FormData): Promise<FrontDeskActionState> {
+  const parsed = disableRoomSchema.safeParse({
+    hotelId: formData.get("hotelId"),
+    roomUnitId: formData.get("roomUnitId"),
+    dateStart: formData.get("dateStart"),
+    dateEnd: formData.get("dateEnd"),
+    reason: formData.get("reason")?.toString().trim() || undefined,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const profile = await requireUser();
+  const managed = await getMyManagedHotel(profile.id, parsed.data.hotelId);
+  if (!managed || !hasPermission(managed, "rooms")) return { error: "You don't have permission to manage rooms for this hotel." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("hotel_room_disable_dates").insert({
+    room_unit_id: parsed.data.roomUnitId,
+    date_start: parsed.data.dateStart,
+    date_end: parsed.data.dateEnd,
+    reason: parsed.data.reason ?? null,
+    created_by: profile.id,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath(`/manager/${parsed.data.hotelId}/front-desk`);
   return { error: null };
 }

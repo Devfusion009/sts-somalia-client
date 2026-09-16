@@ -82,7 +82,9 @@ export default async function ManagerFrontDeskPage({
             { label: "Arrivals", value: stats.arrivals, tone: "text-primary" },
             { label: "Departures", value: stats.departures, tone: "text-destructive" },
             { label: "Occupied", value: stats.occupied, tone: "text-chart-4" },
-            { label: "Total Booked", value: stats.totalBooked, tone: "text-foreground" },
+            { label: "Total Rooms", value: stats.totalRooms, tone: "text-foreground" },
+            { label: "Booked Rooms", value: stats.totalBooked, tone: "text-foreground" },
+            { label: "Out of Order", value: stats.outOfOrder, tone: "text-muted-foreground" },
           ].map((s) => (
             <span key={s.label} className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium">
               {s.label} <span className={`font-heading text-sm font-bold ${s.tone}`}>{s.value}</span>

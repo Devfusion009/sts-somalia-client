@@ -5524,6 +5524,14 @@ export type Database = {
         }
         Returns: string
       }
+      reschedule_hotel_booking: {
+        Args: {
+          p_booking_id: string
+          p_new_check_in: string
+          p_new_check_out: string
+        }
+        Returns: string
+      }
       resolve_visa_pricing: {
         Args: { p_nationality_code: string; p_visa_type_id: string }
         Returns: {
