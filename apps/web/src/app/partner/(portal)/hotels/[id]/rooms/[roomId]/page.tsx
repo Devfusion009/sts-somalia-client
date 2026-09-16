@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AlertCircle, Pencil } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { requireUser } from "@/lib/auth/session";
-import { getMyHotelScope, getRoomForInventory, getRoomUnits } from "@/modules/hotels/partner-queries";
+import { getMyHotelScope, getRoomForInventory, getRoomUnits, getRoomBookings } from "@/modules/hotels/partner-queries";
 import { getHotelAvailability } from "@/modules/hotels/availability";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RoomNightsTable } from "@/modules/hotels/components/room-nights-table";
 import { RoomUnitsManager } from "@/modules/hotels/components/room-units-manager";
+import { OfflineBookingPanel } from "@/modules/hotels/components/offline-booking-panel";
 import { InventoryRangeForm, ClearInventoryForm } from "./inventory-form";
 
 export default async function RoomInventoryPage({
@@ -24,9 +25,10 @@ export default async function RoomInventoryPage({
   const room = await getRoomForInventory(roomId, id, scope.hotelIds);
   if (!room) notFound();
 
-  const [availability, roomUnits] = await Promise.all([
+  const [availability, roomUnits, bookings] = await Promise.all([
     getHotelAvailability(id, { roomId: room.id, days: 60 }),
     getRoomUnits(room.id, id, scope.hotelIds),
+    getRoomBookings(room.id, id, scope.hotelIds),
   ]);
   const nights = availability[0]?.nights ?? [];
 
@@ -63,6 +65,15 @@ export default async function RoomInventoryPage({
         <div className="overflow-x-auto">
           <RoomNightsTable nights={nights} currency={room.currency} />
         </div>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Bookings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <OfflineBookingPanel hotelId={id} roomTypeId={room.id} bookings={bookings} canEdit />
+        </CardContent>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">

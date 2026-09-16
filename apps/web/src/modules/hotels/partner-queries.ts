@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { hotelGuestNames } from "@/modules/payments/queries";
 
 export async function getMyPartnerId(profileId: string) {
   const supabase = await createClient();
@@ -96,6 +97,39 @@ export async function getRoomUnits(roomTypeId: string, hotelId: string, hotelIds
     .order("floor")
     .order("room_number");
   return data ?? [];
+}
+
+/**
+ * Every live (not cancelled/failed/refunded) booking against one room type,
+ * newest stay first — what actually occupies its nights, online or offline,
+ * so "is this date free" is answered by reading the real ledger instead of
+ * trusting a capacity number in isolation.
+ */
+export async function getRoomBookings(roomTypeId: string, hotelId: string, hotelIds: string[]) {
+  if (!hotelIds.includes(hotelId)) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("hotel_bookings")
+    .select("id, check_in, check_out, num_rooms, num_adults, num_children, status, source, guest_details, special_requests, created_at")
+    .eq("room_id", roomTypeId)
+    .eq("hotel_id", hotelId)
+    .in("status", ["pending", "confirmed", "waitlisted"])
+    .order("check_in", { ascending: true });
+  // Resolved to a plain string here (server-only helper) so the client
+  // component below never needs to import anything server-only itself.
+  return (data ?? []).map((b) => ({
+    id: b.id,
+    check_in: b.check_in,
+    check_out: b.check_out,
+    num_rooms: b.num_rooms,
+    num_adults: b.num_adults,
+    num_children: b.num_children,
+    status: b.status,
+    source: b.source,
+    guestName: hotelGuestNames(b.guest_details)[0] ?? null,
+    special_requests: b.special_requests,
+    created_at: b.created_at,
+  }));
 }
 
 /**
