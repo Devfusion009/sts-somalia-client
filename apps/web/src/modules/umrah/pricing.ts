@@ -1,5 +1,6 @@
 import {
   UMRAH_CATEGORY_BY_VALUE,
+  type RoomSharing,
   type UmrahPriceUnit,
   type UmrahService,
   type UmrahServiceCategory,
@@ -66,19 +67,74 @@ export type PricedLine = {
   lineTotal: number;
 };
 
-export function priceService(service: UmrahService, trip: TripShape): PricedLine {
+/**
+ * Per-occupancy hotel prices, keyed service id -> sharing (1-4) -> price per
+ * person per night. Built from umrah_service_sharing_prices rows.
+ */
+export type SharingPriceMap = Record<string, Partial<Record<RoomSharing, number>>>;
+
+/** The room type a request is priced at, plus the catalog's occupancy prices. */
+export type SharingContext = {
+  roomSharing: RoomSharing;
+  sharingPrices: SharingPriceMap;
+};
+
+export function toSharingPriceMap(
+  rows: { service_id: string; sharing: number; price: number | string }[]
+): SharingPriceMap {
+  const map: SharingPriceMap = {};
+  for (const row of rows) {
+    if (!isRoomSharing(row.sharing)) continue;
+    (map[row.service_id] ??= {})[row.sharing] = Number(row.price);
+  }
+  return map;
+}
+
+export function isRoomSharing(value: unknown): value is RoomSharing {
+  return value === 1 || value === 2 || value === 3 || value === 4;
+}
+
+/** Only hotels are priced by occupancy; every other category has one price. */
+export function isSharingPricedCategory(category: UmrahServiceCategory): boolean {
+  return category === "hotel_makkah" || category === "hotel_madinah";
+}
+
+/**
+ * The unit price a service is charged at for this room type: the occupancy
+ * price when the catalog has one for this sharing, otherwise the service's
+ * base price. The single place this rule lives — the builder's live total and
+ * the server's reprice both call it.
+ */
+export function unitPriceFor(
+  service: Pick<UmrahService, "id" | "category" | "price">,
+  sharing?: SharingContext
+): number {
+  const base = Number(service.price);
+  if (!sharing || !isSharingPricedCategory(service.category)) return base;
+  const occupancy = sharing.sharingPrices[service.id]?.[sharing.roomSharing];
+  return occupancy !== undefined && Number.isFinite(occupancy) && occupancy > 0
+    ? Number(occupancy)
+    : base;
+}
+
+export function priceService(
+  service: UmrahService,
+  trip: TripShape,
+  sharing?: SharingContext
+): PricedLine {
   const quantity = serviceQuantity(service.price_unit, service.category, trip);
+  const unitPrice = unitPriceFor(service, sharing);
   return {
     serviceId: service.id,
     category: service.category,
     name: service.name,
     priceUnit: service.price_unit,
-    unitPrice: Number(service.price),
+    unitPrice,
     quantity,
     // Rounded to cents at the line, not at the end: the stored line_total and
     // the displayed line have to be the same number, and the order total is
     // the sum of what the customer saw.
-    lineTotal: round2(Number(service.price) * quantity),
+    lineTotal: round2(unitPrice * quantity),
   };
 }
 
@@ -87,8 +143,14 @@ export function priceService(service: UmrahService, trip: TripShape): PricedLine
  * chosen and then reduced to 0 nights costs nothing and must not appear on
  * the summary as a free line item.
  */
-export function priceSelection(services: UmrahService[], trip: TripShape) {
-  const lines = services.map((s) => priceService(s, trip)).filter((l) => l.quantity > 0);
+export function priceSelection(
+  services: UmrahService[],
+  trip: TripShape,
+  sharing?: SharingContext
+) {
+  const lines = services
+    .map((s) => priceService(s, trip, sharing))
+    .filter((l) => l.quantity > 0);
   const total = round2(lines.reduce((sum, l) => sum + l.lineTotal, 0));
   return { lines, total };
 }

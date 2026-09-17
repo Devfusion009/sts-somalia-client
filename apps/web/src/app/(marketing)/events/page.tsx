@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { MediaPlaceholder } from "@/components/media-placeholder";
-import { getVenues, getVenueEventTypes } from "@/modules/events/queries";
+import { UnavailableNotice } from "@/components/portal/unavailable-notice";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { venueImageUrls } from "@/modules/events/images";
 import { amenityInfo, eventTypeLabel, priceUnitLabel } from "@/modules/events/components/amenities";
 
@@ -19,10 +20,16 @@ export default async function EventsPage({
   searchParams: Promise<{ city?: string; type?: string }>;
 }) {
   const { city, type } = await searchParams;
-  const [venues, eventTypes] = await Promise.all([
-    getVenues({ city, eventType: type }),
-    getVenueEventTypes(),
-  ]);
+  const trpc = await getServerTrpc();
+  let venues, eventTypes;
+  try {
+    [venues, eventTypes] = await Promise.all([
+      trpc.events.venues.query({ city, eventType: type }),
+      trpc.events.venueEventTypes.query(),
+    ]);
+  } catch {
+    return <UnavailableNotice label="Events & Halls" />;
+  }
 
   return (
     <div>

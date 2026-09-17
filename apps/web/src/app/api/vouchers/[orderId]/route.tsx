@@ -2,7 +2,8 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { getOrderForCheckout } from "@/modules/payments/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
+import type { CheckoutOrderRow } from "api/dist/modules/payments/checkout.service";
 import { VoucherDocument } from "@/modules/bookings/pdf/VoucherDocument";
 
 /**
@@ -14,8 +15,8 @@ import { VoucherDocument } from "@/modules/bookings/pdf/VoucherDocument";
  * copy would go stale and the customer would turn up at a hotel holding a
  * document that no longer matches the reservation.
  *
- * The order is fetched through the RLS-scoped client, so access control is the
- * same as everywhere else that reads an order.
+ * The order is fetched through apps/api's RLS-scoped payments router, so
+ * access control is the same as everywhere else that reads an order.
  */
 export async function GET(
   _request: Request,
@@ -24,7 +25,16 @@ export async function GET(
   await requireUser();
   const { orderId } = await params;
 
-  const order = await getOrderForCheckout(orderId);
+  const trpc = await getServerTrpc();
+  let order: CheckoutOrderRow | null;
+  try {
+    // Cast, not inferred — see the comment on the same call in
+    // checkout/[orderId]/page.tsx: this procedure's output is deep enough to
+    // trip TS2589 when re-walked through tRPC's client-side inference.
+    order = (await trpc.payments.orderForCheckout.query({ orderId })) as unknown as CheckoutOrderRow | null;
+  } catch {
+    return NextResponse.json({ error: "Voucher is temporarily unavailable." }, { status: 503 });
+  }
   if (!order) {
     return NextResponse.json({ error: "Booking not found." }, { status: 404 });
   }

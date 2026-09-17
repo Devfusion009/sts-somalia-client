@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { countryFlag } from "@/lib/countries";
-import type { Airport } from "@/modules/flights/queries";
+import type { Airport } from "@sts/shared-types";
 
 export type FlightSearchDefaults = {
   origin?: string;

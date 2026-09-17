@@ -14,6 +14,15 @@ function revalidateCatalog() {
 const optionalNumber = (max: number) =>
   z.union([z.literal(""), z.coerce.number().int().min(0).max(max)]).optional();
 
+const SHARINGS = [1, 2, 3, 4] as const;
+const HOTEL_CATEGORIES = new Set(["hotel_makkah", "hotel_madinah"]);
+
+// "" clears that occupancy's price, so the hotel falls back to its base price.
+const sharingPriceSchema = z.union([
+  z.literal(""),
+  z.coerce.number().positive("Room type prices must be greater than zero."),
+]);
+
 const serviceSchema = z.object({
   serviceId: z.union([z.string().uuid(), z.literal("")]).optional(),
   category: z.enum([
@@ -59,6 +68,16 @@ export async function saveUmrahService(_prev: ActionState, formData: FormData): 
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const d = parsed.data;
 
+  const sharingPrices: { sharing: (typeof SHARINGS)[number]; price: number | null }[] = [];
+  for (const sharing of SHARINGS) {
+    const value = HOTEL_CATEGORIES.has(d.category)
+      ? String(formData.get(`sharingPrice${sharing}`) ?? "").trim()
+      : "";
+    const price = sharingPriceSchema.safeParse(value);
+    if (!price.success) return { error: price.error.issues[0].message };
+    sharingPrices.push({ sharing, price: price.data === "" ? null : price.data });
+  }
+
   const supabase = await createClient();
   const row = {
     category: d.category,
@@ -75,9 +94,9 @@ export async function saveUmrahService(_prev: ActionState, formData: FormData): 
     status: d.status,
   };
 
-  const { error } = d.serviceId
-    ? await supabase.from("umrah_services").update(row).eq("id", d.serviceId)
-    : await supabase.from("umrah_services").insert(row);
+  const { data: saved, error } = d.serviceId
+    ? await supabase.from("umrah_services").update(row).eq("id", d.serviceId).select("id").single()
+    : await supabase.from("umrah_services").insert(row).select("id").single();
 
   if (error) {
     // The one-default-per-(category, tier) partial unique index is the most
@@ -92,8 +111,43 @@ export async function saveUmrahService(_prev: ActionState, formData: FormData): 
     return { error: error.message };
   }
 
+  const sharingError = await saveUmrahSharingPrices(supabase, saved.id, sharingPrices);
+  if (sharingError) return { error: sharingError };
+
   revalidateCatalog();
   return { error: null };
+}
+
+/**
+ * Upserts the occupancy prices that are set and deletes the ones that were
+ * cleared. A non-hotel service arrives with every price null, so switching a
+ * hotel to another category removes its occupancy prices too.
+ */
+async function saveUmrahSharingPrices(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  serviceId: string,
+  prices: { sharing: number; price: number | null }[]
+): Promise<string | null> {
+  const upserts = prices
+    .filter((p): p is { sharing: number; price: number } => p.price !== null)
+    .map((p) => ({ service_id: serviceId, sharing: p.sharing, price: p.price }));
+  const cleared = prices.filter((p) => p.price === null).map((p) => p.sharing);
+
+  if (upserts.length) {
+    const { error } = await supabase
+      .from("umrah_service_sharing_prices")
+      .upsert(upserts, { onConflict: "service_id,sharing" });
+    if (error) return error.message;
+  }
+  if (cleared.length) {
+    const { error } = await supabase
+      .from("umrah_service_sharing_prices")
+      .delete()
+      .eq("service_id", serviceId)
+      .in("sharing", cleared);
+    if (error) return error.message;
+  }
+  return null;
 }
 
 export async function deleteUmrahService(formData: FormData): Promise<void> {
@@ -167,10 +221,15 @@ export async function updateUmrahBookingStatus(
   if (!["confirmed", "cancelled"].includes(status)) return { error: "Unknown status." };
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("umrah_bookings")
-    .update({ status: status as "confirmed" | "cancelled" })
-    .eq("id", bookingId);
+  // Confirming goes through the stage machine so it writes the timeline and
+  // notifies the customer; it also moves status to confirmed.
+  const { error } =
+    status === "confirmed"
+      ? await supabase.rpc("set_umrah_booking_stage", {
+          p_booking_id: bookingId,
+          p_stage: "confirmed",
+        })
+      : await supabase.from("umrah_bookings").update({ status: "cancelled" }).eq("id", bookingId);
   if (error) return { error: error.message };
 
   if (status === "cancelled") {

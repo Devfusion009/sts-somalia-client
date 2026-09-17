@@ -138,6 +138,20 @@ export const UMRAH_TIER_CHIP_CLASS: Record<string, string> = Object.fromEntries(
   UMRAH_TIERS.map((t) => [t.value, t.className])
 );
 
+/** Hotel occupancy: how many travellers share one room. */
+export type RoomSharing = 1 | 2 | 3 | 4;
+
+export const ROOM_SHARING_OPTIONS: { value: RoomSharing; label: string }[] = [
+  { value: 1, label: "Single" },
+  { value: 2, label: "Double" },
+  { value: 3, label: "Triple" },
+  { value: 4, label: "Quad" },
+];
+
+export const ROOM_SHARING_LABELS: Record<number, string> = Object.fromEntries(
+  ROOM_SHARING_OPTIONS.map((o) => [o.value, o.label])
+);
+
 export const PRICE_UNIT_LABELS: Record<UmrahPriceUnit, string> = {
   per_person: "per person",
   per_person_per_night: "per person, per night",

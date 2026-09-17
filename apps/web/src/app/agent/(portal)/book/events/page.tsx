@@ -3,10 +3,11 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, Search } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { getBookingCustomer } from "@/modules/agencies/booking-context";
-import { getVenues } from "@/modules/events/queries";
 import { Button } from "@/components/ui/button";
+import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,7 +33,13 @@ export default async function AgentEventDeskPage({
   const customer = await getBookingCustomer(supabase, membership.agency.id);
   if (!customer) redirect("/agent/book");
 
-  const venues = await getVenues({ city: city || undefined });
+  const trpc = await getServerTrpc();
+  let venues;
+  try {
+    venues = await trpc.events.venues.query({ city: city || undefined });
+  } catch {
+    return <UnavailableNotice label="Event halls" />;
+  }
 
   return (
     <div className="space-y-4">

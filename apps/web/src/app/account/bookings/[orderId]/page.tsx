@@ -16,8 +16,10 @@ import {
 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { getOrderForCheckout, describeOrderItem, hotelGuestNames } from "@/modules/payments/queries";
+import { describeOrderItem, hotelGuestNames } from "@/modules/orders/format";
 import { getServerTrpc } from "@/lib/trpc/server";
+import type { CheckoutOrderRow } from "api/dist/modules/payments/checkout.service";
+import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 import { StatusTimeline, type TimelineStage } from "@/modules/bookings/components/status-timeline";
 import { BookingRequestDialog } from "@/modules/bookings/components/booking-request-dialog";
 import { WithdrawRequestButton } from "@/modules/bookings/components/withdraw-request-button";
@@ -34,43 +36,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import { FlightDetails, hasFlightDetails } from "@/app/(marketing)/umrah/[slug]/flight-details";
+import { umrahTimeline, UMRAH_STAGE_LABEL, UMRAH_DOC_TYPE_LABEL, formatFileSize } from "@/modules/umrah/timeline";
 import type { BookingType } from "@/modules/bookings/types";
 
 export const metadata: Metadata = { title: "Booking Details" };
-
-/**
- * Umrah progresses through operational stages that mirror what actually happens
- * to a pilgrim's file: the booking is taken, the seat is confirmed against a
- * departure, the visa is issued, and the group travels.
- */
-const UMRAH_STAGES: TimelineStage[] = [
-  { key: "booked", label: "Booking received", icon: Send },
-  { key: "confirmed", label: "Seats confirmed", icon: Users },
-  { key: "visa", label: "Visa & documents", icon: FileText },
-  { key: "travel", label: "Departure", icon: Plane },
-  { key: "completed", label: "Completed", icon: Landmark },
-];
-
-function umrahStageIndex(status: string): { index: number; outcome: "pending" | "success" | "failed" } {
-  switch (status) {
-    case "pending":
-      return { index: 0, outcome: "pending" };
-    case "confirmed":
-      return { index: 1, outcome: "pending" };
-    case "completed":
-      return { index: 4, outcome: "success" };
-    case "cancelled":
-    case "refunded":
-    case "no_show":
-    case "failed":
-      // Parked at the final marker with a failed outcome rather than reset to
-      // zero — the booking did progress, it just ended badly, and showing it at
-      // stage one would misrepresent the history.
-      return { index: 4, outcome: "failed" };
-    default:
-      return { index: 0, outcome: "pending" };
-  }
-}
 
 const REQUEST_KIND_LABEL: Record<string, string> = {
   cancellation: "Cancellation request",
@@ -86,15 +56,15 @@ const REQUEST_KIND_LABEL: Record<string, string> = {
  * until a slot frees up.
  */
 const HOTEL_STAGES: TimelineStage[] = [
-  { key: "requested", label: "Request received", description: "Waiting in the booking queue", icon: Send },
-  { key: "confirmed", label: "Booking confirmed", description: "Room allocated by the hotel", icon: Ticket },
+  { key: "requested", label: "Request received", icon: Send },
+  { key: "confirmed", label: "Booking confirmed", icon: Ticket },
   { key: "stay", label: "Your stay", icon: Landmark },
   { key: "completed", label: "Completed", icon: Users },
 ];
 
 const HALL_STAGES: TimelineStage[] = [
-  { key: "requested", label: "Request received", description: "Waiting in the booking queue", icon: Send },
-  { key: "confirmed", label: "Booking confirmed", description: "Venue reserved for your event", icon: Ticket },
+  { key: "requested", label: "Request received", icon: Send },
+  { key: "confirmed", label: "Booking confirmed", icon: Ticket },
   { key: "event", label: "Event day", icon: Landmark },
   { key: "completed", label: "Completed", icon: Users },
 ];
@@ -126,16 +96,24 @@ export default async function BookingDetailPage({
   const { orderId } = await params;
   const profile = await requireUser();
 
-  const order = await getOrderForCheckout(orderId);
-  // getOrderForCheckout is RLS-scoped, so a missing row means "not yours or not
+  const trpc = await getServerTrpc();
+  let order: CheckoutOrderRow | null;
+  try {
+    // Cast, not inferred — see the comment on the same call in
+    // checkout/[orderId]/page.tsx: this procedure's output is deep enough to
+    // trip TS2589 when re-walked through tRPC's client-side inference.
+    order = (await trpc.payments.orderForCheckout.query({ orderId })) as unknown as CheckoutOrderRow | null;
+  } catch {
+    return <UnavailableNotice label="Booking Details" />;
+  }
+  // orderForCheckout is RLS-scoped, so a missing row means "not yours or not
   // there" — both are a 404 to the customer.
   if (!order) notFound();
 
-  const trpc = await getServerTrpc();
   // apps/api is a separate deployment (not yet reachable from every
   // environment) — this order's own status/timeline/payment all come from
-  // Supabase directly, so a failure here degrades only the modification/
-  // cancellation/refund request history rather than the whole page.
+  // apps/api/Supabase directly, so a failure here degrades only the
+  // modification/cancellation/refund request history rather than the whole page.
   const [requests, supabase] = await Promise.all([
     trpc.bookings.requestsForOrder.query({ orderId }).catch(() => []),
     createClient(),
@@ -156,9 +134,7 @@ export default async function BookingDetailPage({
   const voucherAvailable = isPaid;
 
   const umrahItem = order.order_items.find((i) => i.item_type === "umrah");
-  const umrahBooking = umrahItem?.umrah_booking as
-    | { status?: string; booking_kind?: string; custom_request?: { reference: string } | null }
-    | null;
+  const umrahBooking = umrahItem?.umrah_booking ?? null;
   // The booking's own status now comes back on the checkout query, and for a
   // private trip it is the ONLY accurate source: that booking sits at
   // 'pending' until staff confirm availability, which is exactly the state
@@ -175,6 +151,49 @@ export default async function BookingDetailPage({
             : "pending"))
     : null;
   const umrahIsPrivate = umrahBooking?.booking_kind === "private";
+  const umrahTrack = umrahBookingStatus
+    ? umrahTimeline(umrahBooking?.fulfillment_stage, umrahBookingStatus)
+    : null;
+
+  const [umrahPilgrims, umrahHistory, umrahDocumentRows] = umrahBooking
+    ? await Promise.all([
+        supabase
+          .from("umrah_pilgrims")
+          .select("id, full_name, gender, passport_number")
+          .eq("booking_id", umrahBooking.id)
+          .order("full_name")
+          .then(({ data }) => data ?? []),
+        supabase
+          .from("umrah_booking_stage_history")
+          .select("id, stage, note, created_at")
+          .eq("booking_id", umrahBooking.id)
+          .order("created_at", { ascending: false })
+          .then(({ data }) => data ?? []),
+        supabase
+          .from("umrah_booking_documents")
+          .select("id, pilgrim_id, doc_type, title, storage_path, file_name, file_size, created_at")
+          .eq("booking_id", umrahBooking.id)
+          .order("created_at", { ascending: false })
+          .then(({ data }) => data ?? []),
+      ])
+    : [[], [], []];
+
+  // Private bucket: links are signed per render and expire after an hour.
+  const signedUrls = new Map<string, string>();
+  if (umrahDocumentRows.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from("umrah-documents")
+      .createSignedUrls(
+        umrahDocumentRows.map((doc) => doc.storage_path),
+        60 * 60
+      );
+    for (const entry of signed ?? []) {
+      if (entry.path && entry.signedUrl) signedUrls.set(entry.path, entry.signedUrl);
+    }
+  }
+  const pilgrimNames = new Map(umrahPilgrims.map((pilgrim) => [pilgrim.id, pilgrim.full_name]));
+  const umrahDocuments = umrahDocumentRows.filter((doc) => signedUrls.has(doc.storage_path));
+  const umrahDeparture = umrahBooking?.departure ?? null;
 
   const openRequests = requests.filter((r) => r.status === "requested" || r.status === "in_review");
 
@@ -242,11 +261,6 @@ export default async function BookingDetailPage({
             <ReceiptText className="size-3.5" /> Invoice
             {invoice ? ` ${invoice.invoice_number}` : ""}
           </Button>
-          {!voucherAvailable ? (
-            <p className="w-full text-xs text-muted-foreground">
-              Your voucher becomes available once this booking is paid and confirmed.
-            </p>
-          ) : null}
         </CardContent>
       </Card>
 
@@ -315,21 +329,6 @@ export default async function BookingDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {hotelStatus === "waitlisted" ? (
-              <Alert>
-                <AlertDescription>
-                  Your dates are currently full, so your request is in the queue. Our team will confirm
-                  as soon as a room frees up — you won&apos;t be charged until then.
-                </AlertDescription>
-              </Alert>
-            ) : hotelStatus === "pending" && awaitingPayment ? (
-              <Alert>
-                <AlertDescription>
-                  Your request is with our team — we&apos;re checking with the hotel and will confirm
-                  your booking and final price. You won&apos;t pay anything until it&apos;s confirmed.
-                </AlertDescription>
-              </Alert>
-            ) : null}
             <StatusTimeline
               stages={HOTEL_STAGES}
               currentIndex={manualBookingStageIndex(hotelStatus).index}
@@ -352,15 +351,6 @@ export default async function BookingDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {hallStatus === "pending" && awaitingPayment ? (
-              <Alert>
-                <AlertDescription>
-                  Your request is with the venue — they confirm availability and your final price
-                  (based on your guest count) before the booking is completed. You won&apos;t pay
-                  anything until then.
-                </AlertDescription>
-              </Alert>
-            ) : null}
             <StatusTimeline
               stages={HALL_STAGES}
               currentIndex={manualBookingStageIndex(hallStatus).index}
@@ -372,7 +362,7 @@ export default async function BookingDetailPage({
       ) : null}
 
       {/* Umrah progress */}
-      {umrahBookingStatus ? (
+      {umrahBookingStatus && umrahTrack ? (
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="flex flex-wrap items-center gap-2 text-base">
@@ -390,19 +380,10 @@ export default async function BookingDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {umrahIsPrivate && umrahBookingStatus === "pending" && awaitingPayment ? (
-              <Alert>
-                <AlertDescription>
-                  Your trip is with our Umrah team — we&apos;re confirming your hotels, seats and
-                  visa slots for these dates. You won&apos;t pay anything until it&apos;s confirmed,
-                  and the price you agreed is what you&apos;ll be charged unless we tell you first.
-                </AlertDescription>
-              </Alert>
-            ) : null}
             <StatusTimeline
-              stages={UMRAH_STAGES}
-              currentIndex={umrahStageIndex(umrahBookingStatus).index}
-              outcome={umrahStageIndex(umrahBookingStatus).outcome}
+              stages={umrahTrack.stages}
+              currentIndex={umrahTrack.index}
+              outcome={umrahTrack.outcome}
             />
             <PayAfterConfirmation
               show={umrahBookingStatus === "confirmed" && awaitingPayment}
@@ -410,6 +391,114 @@ export default async function BookingDetailPage({
               total={order.total}
               currency={order.currency}
             />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {umrahDeparture && hasFlightDetails(umrahDeparture) ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Plane className="size-4 text-muted-foreground" /> Flights
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FlightDetails departure={umrahDeparture} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {umrahPilgrims.length > 0 ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Users className="size-4 text-muted-foreground" /> Pilgrims
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ul className="divide-y divide-border border-t border-border">
+              {umrahPilgrims.map((pilgrim) => (
+                <li key={pilgrim.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                  <span className="min-w-0 flex-1 text-sm font-medium">{pilgrim.full_name}</span>
+                  <span className="text-xs capitalize text-muted-foreground">{pilgrim.gender}</span>
+                  {pilgrim.passport_number ? (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {pilgrim.passport_number}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {umrahDocuments.length > 0 ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileText className="size-4 text-muted-foreground" /> Travel documents
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ul className="divide-y divide-border border-t border-border">
+              {umrahDocuments.map((doc) => {
+                const pilgrimName = doc.pilgrim_id ? pilgrimNames.get(doc.pilgrim_id) : null;
+                const meta = [
+                  UMRAH_DOC_TYPE_LABEL[doc.doc_type] ?? doc.doc_type,
+                  pilgrimName,
+                  formatFileSize(doc.file_size),
+                  format(new Date(doc.created_at), "d MMM yyyy"),
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
+                return (
+                  <li key={doc.id} className="flex items-center gap-3 px-5 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{doc.title}</p>
+                      <p className="text-xs text-muted-foreground">{meta}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label={`Download ${doc.title}`}
+                      render={
+                        <a
+                          href={signedUrls.get(doc.storage_path)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        />
+                      }
+                    >
+                      <Download className="size-4" />
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {umrahHistory.length > 0 ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Umrah updates</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ul className="divide-y divide-border border-t border-border">
+              {umrahHistory.map((entry) => (
+                <li key={entry.id} className="flex flex-wrap items-start gap-x-4 gap-y-1 px-5 py-3">
+                  <span className="w-36 shrink-0 text-xs text-muted-foreground tabular-nums">
+                    {format(new Date(entry.created_at), "d MMM yyyy, HH:mm")}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{UMRAH_STAGE_LABEL[entry.stage]}</p>
+                    {entry.note ? <p className="text-sm text-muted-foreground">{entry.note}</p> : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       ) : null}
@@ -489,10 +578,6 @@ export default async function BookingDetailPage({
             </Alert>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                This booking is paid, so changes go through our team — supplier fare rules decide
-                what&apos;s possible and what it costs. We&apos;ll confirm before anything changes.
-              </p>
               <div className="flex flex-wrap gap-2">
                 <BookingRequestDialog
                   orderId={orderId}
@@ -513,12 +598,6 @@ export default async function BookingDetailPage({
                   disabled={openRequests.some((r) => r.kind === "refund")}
                 />
               </div>
-              {openRequests.length > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Options you already have an open request for are disabled until that request is
-                  resolved or withdrawn.
-                </p>
-              ) : null}
             </div>
           )}
         </CardContent>
@@ -551,10 +630,8 @@ function PayAfterConfirmation({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
       <div>
-        <p className="text-sm font-medium">Your booking is confirmed — complete payment to lock it in.</p>
-        <p className="text-xs text-muted-foreground">
-          Final confirmed price: {formatMoney(Number(total), currency)}
-        </p>
+        <p className="text-xs text-muted-foreground">Confirmed price</p>
+        <p className="font-heading text-lg font-bold">{formatMoney(Number(total), currency)}</p>
       </div>
       <Button className="gap-1.5" render={<Link href={`/checkout/${orderId}`} />}>
         <CreditCard className="size-4" /> Complete payment

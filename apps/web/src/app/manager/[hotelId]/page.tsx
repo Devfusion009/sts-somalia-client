@@ -5,7 +5,7 @@ import { ArrowRight, CalendarPlus } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
 import { getHotelFrontDesk, getPartnerStats, getRecentPartnerBookings } from "@/modules/hotels/partner-queries";
-import { hotelGuestNames } from "@/modules/payments/queries";
+import { hotelGuestNames } from "@/modules/orders/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

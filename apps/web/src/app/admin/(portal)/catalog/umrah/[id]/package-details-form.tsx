@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SubmitButton } from "@/components/submit-button";
 import { updateUmrahPackageDetails } from "@/modules/umrah/admin-actions";
 import { countryFlag } from "@/lib/countries";
-import type { Airport } from "@/modules/flights/queries";
+import type { Airport } from "@sts/shared-types";
 
 const selectClass =
   "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";

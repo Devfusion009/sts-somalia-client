@@ -11,8 +11,12 @@ import {
   Stamp,
 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
 import { getMyAgency, getAgencyOrder } from "@/modules/agencies/queries";
-import { describeOrderItem, hotelGuestNames } from "@/modules/payments/queries";
+import { describeOrderItem, hotelGuestNames } from "@/modules/orders/format";
+import { StatusTimeline } from "@/modules/bookings/components/status-timeline";
+import { FlightDetails, hasFlightDetails } from "@/app/(marketing)/umrah/[slug]/flight-details";
+import { umrahTimeline, UMRAH_STAGE_LABEL, UMRAH_DOC_TYPE_LABEL, formatFileSize } from "@/modules/umrah/timeline";
 import { BackLink } from "@/components/back-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,6 +84,53 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
   const awaitingPrice = total === 0 && PAYABLE.includes(order.status);
   const payable = PAYABLE.includes(order.status) && balance > 0 && !awaitingPrice;
   const cancellable = order.status === "pending_payment" || order.status === "held" || awaitingPrice;
+  const isPaid = ["paid", "processing", "completed"].includes(order.status);
+  const voucherAvailable = isPaid;
+
+  const umrahItem = order.order_items.find((item) => item.item_type === "umrah");
+  const umrahBooking = umrahItem?.umrah_booking ?? null;
+  const umrahTrack = umrahBooking ? umrahTimeline(umrahBooking.fulfillment_stage, umrahBooking.status) : null;
+  const umrahDeparture = umrahBooking?.departure ?? null;
+
+  const supabase = await createClient();
+  const [umrahPilgrims, umrahHistory, umrahDocumentRows] = umrahBooking
+    ? await Promise.all([
+        supabase
+          .from("umrah_pilgrims")
+          .select("id, full_name, gender, passport_number")
+          .eq("booking_id", umrahBooking.id)
+          .order("full_name")
+          .then(({ data }) => data ?? []),
+        supabase
+          .from("umrah_booking_stage_history")
+          .select("id, stage, note, created_at")
+          .eq("booking_id", umrahBooking.id)
+          .order("created_at", { ascending: false })
+          .then(({ data }) => data ?? []),
+        supabase
+          .from("umrah_booking_documents")
+          .select("id, pilgrim_id, doc_type, title, storage_path, file_name, file_size, created_at")
+          .eq("booking_id", umrahBooking.id)
+          .order("created_at", { ascending: false })
+          .then(({ data }) => data ?? []),
+      ])
+    : [[], [], []];
+
+  // Private bucket: links are signed per render and expire after an hour.
+  const signedUrls = new Map<string, string>();
+  if (umrahDocumentRows.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from("umrah-documents")
+      .createSignedUrls(
+        umrahDocumentRows.map((doc) => doc.storage_path),
+        60 * 60
+      );
+    for (const entry of signed ?? []) {
+      if (entry.path && entry.signedUrl) signedUrls.set(entry.path, entry.signedUrl);
+    }
+  }
+  const pilgrimNames = new Map(umrahPilgrims.map((pilgrim) => [pilgrim.id, pilgrim.full_name]));
+  const umrahDocuments = umrahDocumentRows.filter((doc) => signedUrls.has(doc.storage_path));
 
   return (
     <div className="space-y-6">
@@ -183,6 +234,124 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
         </Card>
       </section>
 
+      {umrahBooking && umrahTrack ? (
+        <section className="space-y-3">
+          <h2 className="flex flex-wrap items-center gap-2 font-heading text-base font-semibold">
+            Umrah progress
+            {umrahBooking.custom_request ? (
+              <span className="font-mono text-xs font-normal text-muted-foreground">
+                {umrahBooking.custom_request.reference}
+              </span>
+            ) : null}
+          </h2>
+          <Card>
+            <CardContent>
+              <StatusTimeline
+                stages={umrahTrack.stages}
+                currentIndex={umrahTrack.index}
+                outcome={umrahTrack.outcome}
+              />
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
+
+      {umrahDeparture && hasFlightDetails(umrahDeparture) ? (
+        <section className="space-y-3">
+          <h2 className="font-heading text-base font-semibold">Flights</h2>
+          <Card>
+            <CardContent>
+              <FlightDetails departure={umrahDeparture} />
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
+
+      {umrahPilgrims.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="font-heading text-base font-semibold">Pilgrims</h2>
+          <Card className="overflow-hidden py-0">
+            <CardContent className="divide-y divide-border px-4 py-0">
+              {umrahPilgrims.map((pilgrim) => (
+                <div key={pilgrim.id} className="flex flex-wrap items-center gap-3 py-3">
+                  <span className="min-w-0 flex-1 text-sm font-medium">{pilgrim.full_name}</span>
+                  <span className="text-xs capitalize text-muted-foreground">{pilgrim.gender}</span>
+                  {pilgrim.passport_number ? (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {pilgrim.passport_number}
+                    </span>
+                  ) : null}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
+
+      {umrahDocuments.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="font-heading text-base font-semibold">Travel documents</h2>
+          <Card className="overflow-hidden py-0">
+            <CardContent className="divide-y divide-border px-4 py-0">
+              {umrahDocuments.map((doc) => {
+                const pilgrimName = doc.pilgrim_id ? pilgrimNames.get(doc.pilgrim_id) : null;
+                const meta = [
+                  UMRAH_DOC_TYPE_LABEL[doc.doc_type] ?? doc.doc_type,
+                  pilgrimName,
+                  formatFileSize(doc.file_size),
+                  format(new Date(doc.created_at), "d MMM yyyy"),
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
+                return (
+                  <div key={doc.id} className="flex items-center gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{doc.title}</p>
+                      <p className="text-xs text-muted-foreground">{meta}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label={`Download ${doc.title}`}
+                      render={
+                        <a
+                          href={signedUrls.get(doc.storage_path)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        />
+                      }
+                    >
+                      <Download className="size-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
+
+      {umrahHistory.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="font-heading text-base font-semibold">Umrah updates</h2>
+          <Card className="overflow-hidden py-0">
+            <CardContent className="divide-y divide-border px-4 py-0">
+              {umrahHistory.map((entry) => (
+                <div key={entry.id} className="flex flex-wrap items-start gap-x-4 gap-y-1 py-3">
+                  <span className="w-36 shrink-0 text-xs text-muted-foreground tabular-nums">
+                    {format(new Date(entry.created_at), "d MMM yyyy, HH:mm")}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{UMRAH_STAGE_LABEL[entry.stage]}</p>
+                    {entry.note ? <p className="text-sm text-muted-foreground">{entry.note}</p> : null}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
+
       <section className="space-y-3">
         <h2 className="font-heading text-base font-semibold">Payments</h2>
         {order.payments.length === 0 ? (
@@ -242,6 +411,20 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
         {payable ? (
           <Button className="gap-1.5" render={<Link href={`/agent/book/order/${order.id}`} />}>
             Pay now <ArrowRight className="size-3.5" />
+          </Button>
+        ) : null}
+        {umrahBooking ? (
+          <Button
+            variant="outline"
+            className="gap-1.5"
+            disabled={!voucherAvailable}
+            render={
+              voucherAvailable ? (
+                <a href={`/api/vouchers/${order.id}`} target="_blank" rel="noopener noreferrer" />
+              ) : undefined
+            }
+          >
+            <Download className="size-3.5" /> Travel voucher
           </Button>
         ) : null}
         {order.status === "paid" || order.status === "completed" ? (

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, CalendarDays, User, Users } from "lucide-react";
+import { AlertCircle, ArrowRight, BedDouble, CalendarDays, User, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
 import { createUmrahBooking } from "@/modules/umrah/actions";
+import { sharingLabel } from "@/modules/umrah/images";
 import { cn } from "@/lib/utils";
 
 type Departure = {
@@ -25,8 +26,15 @@ type Departure = {
   return_date: string;
   total_seats: number;
   booked_seats: number;
+  offline_seats: number;
   price_override: number | null;
 };
+
+type SharingRate = { sharing: number; price: number | string };
+
+function seatsLeftOn(d: Departure) {
+  return d.total_seats - d.booked_seats - d.offline_seats;
+}
 
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString(undefined, {
@@ -36,14 +44,11 @@ function formatDate(date: string) {
   });
 }
 
-function SectionHeading({ index, title, subtitle }: { index: number; title: string; subtitle: string }) {
+function SectionHeading({ index, title }: { index: number; title: string }) {
   return (
-    <div>
-      <h2 className="font-heading text-lg font-bold">
-        {index}. {title}
-      </h2>
-      <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
-    </div>
+    <h2 className="font-heading text-lg font-bold">
+      {index}. {title}
+    </h2>
   );
 }
 
@@ -75,6 +80,7 @@ export function BookingForm({
   currency,
   basePrice,
   departures,
+  pricing = [],
   bookedForSlot,
   action,
 }: {
@@ -82,6 +88,8 @@ export function BookingForm({
   currency: string;
   basePrice: number;
   departures: Departure[];
+  /** Per-pilgrim rate by room sharing. When present, the customer must pick one. */
+  pricing?: SharingRate[];
   bookedForSlot?: React.ReactNode;
   /** The agent desk swaps in its group action, which books for every selected customer. */
   action?: typeof createUmrahBooking;
@@ -89,6 +97,16 @@ export function BookingForm({
   const [state, formAction] = useActionState(action ?? createUmrahBooking, null);
   const [selectedId, setSelectedId] = useState<string | null>(departures[0]?.id ?? null);
   const [numPilgrims, setNumPilgrims] = useState(1);
+  const rates = useMemo(
+    () =>
+      [...pricing]
+        .map((r) => ({ sharing: r.sharing, price: Number(r.price) }))
+        .sort((a, b) => a.sharing - b.sharing),
+    [pricing]
+  );
+  const [sharing, setSharing] = useState<number | null>(
+    rates.length > 0 ? rates[rates.length - 1].sharing : null
+  );
   const router = useRouter();
 
   // Desk submissions get a path back instead of a redirect, because a Server
@@ -103,15 +121,19 @@ export function BookingForm({
     () => departures.find((d) => d.id === selectedId) ?? null,
     [departures, selectedId]
   );
-  const seatsLeft = selected ? selected.total_seats - selected.booked_seats : 0;
-  const unitPrice = selected?.price_override ?? basePrice;
+  const seatsLeft = selected ? seatsLeftOn(selected) : 0;
+  const selectedRate = rates.find((r) => r.sharing === sharing) ?? null;
+  const priceFor = (d: Departure | null) =>
+    rates.length > 0 ? (selectedRate?.price ?? 0) : Number(d?.price_override ?? basePrice);
+  const unitPrice = priceFor(selected);
   const totalPrice = unitPrice * numPilgrims;
+  const needsSharing = rates.length > 0 && !selectedRate;
+  const pilgrimStep = rates.length > 0 ? 3 : 2;
 
   if (departures.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-        There are no upcoming departures for this package right now. Check back soon, or contact us
-        to be notified when new dates are announced.
+        No upcoming departures.
       </p>
     );
   }
@@ -120,14 +142,10 @@ export function BookingForm({
     <form action={formAction} className="space-y-8">
       {bookedForSlot}
       <section className="space-y-4">
-        <SectionHeading
-          index={1}
-          title="Choose a departure"
-          subtitle="Pick the travel dates that suit your group."
-        />
+        <SectionHeading index={1} title="Choose a departure" />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {departures.map((d) => {
-            const left = d.total_seats - d.booked_seats;
+            const left = seatsLeftOn(d);
             const full = left <= 0;
             const active = selectedId === d.id;
             return (
@@ -148,7 +166,7 @@ export function BookingForm({
                   {formatDate(d.departure_date)} – {formatDate(d.return_date)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {currency} {(d.price_override ?? basePrice).toFixed(0)} / pilgrim
+                  {currency} {priceFor(d).toFixed(0)} / pilgrim
                 </p>
                 <Badge
                   className={cn(
@@ -170,12 +188,43 @@ export function BookingForm({
         <input type="hidden" name="departure_id" value={selectedId ?? ""} />
       </section>
 
+      {rates.length > 0 ? (
+        <section className="space-y-4">
+          <SectionHeading index={2} title="Room sharing" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {rates.map((rate) => {
+              const active = sharing === rate.sharing;
+              return (
+                <button
+                  key={rate.sharing}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setSharing(rate.sharing)}
+                  className={cn(
+                    "rounded-xl border bg-card p-4 text-left transition-all",
+                    active
+                      ? "border-primary shadow-sm ring-2 ring-primary/20"
+                      : "border-border hover:border-primary/40"
+                  )}
+                >
+                  <p className="flex items-center gap-1.5 text-sm font-semibold">
+                    <BedDouble className="size-4 text-primary" />
+                    {sharingLabel(rate.sharing)}
+                  </p>
+                  <p className="mt-1 font-heading text-base font-bold text-primary">
+                    {currency} {rate.price.toFixed(0)}
+                    <span className="text-xs font-normal text-muted-foreground"> / pilgrim</span>
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+          <input type="hidden" name="room_sharing" value={sharing ?? ""} />
+        </section>
+      ) : null}
+
       <section className="space-y-4">
-        <SectionHeading
-          index={2}
-          title="Pilgrim details"
-          subtitle="Enter each pilgrim's details as shown in their passport."
-        />
+        <SectionHeading index={pilgrimStep} title="Pilgrim details" />
         <Field label="Number of pilgrims" htmlFor="num_pilgrims" required className="max-w-xs">
           <Input
             id="num_pilgrims"
@@ -242,12 +291,13 @@ export function BookingForm({
       </section>
 
       <section className="space-y-4">
-        <SectionHeading
-          index={3}
-          title="Special requests"
-          subtitle="Wheelchair access, dietary needs, room preferences — anything we should know."
+        <SectionHeading index={pilgrimStep + 1} title="Special requests" />
+        <Textarea
+          id="special_requests"
+          name="special_requests"
+          rows={3}
+          placeholder="Wheelchair access, dietary needs, room preferences"
         />
-        <Textarea id="special_requests" name="special_requests" rows={3} placeholder="Optional" />
       </section>
 
       {state?.error ? (
@@ -266,10 +316,11 @@ export function BookingForm({
             {currency} {totalPrice.toFixed(0)}
           </p>
           <p className="text-xs text-muted-foreground">
-            {currency} {unitPrice.toFixed(0)} × {numPilgrims} · pay securely in the next step
+            {currency} {unitPrice.toFixed(0)} × {numPilgrims}
+            {selectedRate ? ` · ${sharingLabel(selectedRate.sharing)}` : ""}
           </p>
         </div>
-        <SubmitButton size="lg" disabled={!selectedId} pendingText="Creating booking…" className="gap-2">
+        <SubmitButton size="lg" disabled={!selectedId || needsSharing} pendingText="Creating booking…" className="gap-2">
           Continue to Payment <ArrowRight className="size-4" />
         </SubmitButton>
       </div>

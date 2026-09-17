@@ -1,33 +1,53 @@
-import "server-only";
-import { createClient } from "@/lib/supabase/server";
-import { countryName } from "@/lib/countries";
 import { format } from "date-fns";
+import { countryName } from "@/lib/countries";
+import { sharingLabel } from "@/modules/umrah/images";
+import type { Database } from "@/lib/types/database.types";
 
-/** Order + items (with human labels) + payment history for checkout/receipts. */
-export async function getOrderForCheckout(orderId: string) {
-  const supabase = await createClient();
-  const { data: order } = await supabase
-    .from("orders")
-    .select(
-      `*,
-       order_items (
-         *,
-         hotel_booking:hotel_booking_id (id, status, check_in, check_out, num_rooms, guest_details, hotel:hotel_id (name)),
-         flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at),
-         visa_application:visa_application_id (id, application_ref, applicant_type, visa_type:visa_type_id (name, destination_country_code)),
-         umrah_booking:umrah_booking_id (id, num_pilgrims, booking_kind, status, package:package_id (name), custom_request:custom_request_id (reference, departure_date)),
-         hall_booking:hall_booking_id (id, status, start_date, end_date, event_type, venue:venue_id (name))
-       ),
-       payments (*)`
-    )
-    .eq("id", orderId)
-    .maybeSingle();
-
-  return order;
-}
-
-export type CheckoutOrder = NonNullable<Awaited<ReturnType<typeof getOrderForCheckout>>>;
-export type CheckoutOrderItem = CheckoutOrder["order_items"][number];
+/**
+ * Deliberately hand-shaped to only the fields this file actually reads, not
+ * imported from apps/api's CheckoutOrderItem or the generated Tables Row
+ * types: both of those declare full-row embeds (checkout.service.ts hand-
+ * widens them to dodge a TS2589 depth trap — see its own comment), which is
+ * wider than what several callers actually select.
+ * modules/agencies/queries.ts in particular selects a narrower order-item
+ * embed for its own order pages/PDFs (batch orders drop the Umrah
+ * fulfillment fields entirely) — this is the shape both the full checkout
+ * embed and that narrower one satisfy without a cast.
+ */
+export type DescribableOrderItem = {
+  item_type: Database["public"]["Enums"]["order_item_type"];
+  visa_application: {
+    id: string;
+    application_ref: string;
+    visa_type: { name: string; destination_country_code: string } | null;
+  } | null;
+  hotel_booking: {
+    check_in: string;
+    check_out: string;
+    num_rooms: number;
+    hotel: { name: string | null } | null;
+  } | null;
+  flight_booking: {
+    origin_iata: string;
+    destination_iata: string;
+    depart_at: string;
+  } | null;
+  umrah_booking: {
+    booking_kind: string;
+    num_pilgrims: number;
+    package: { name: string | null } | null;
+    custom_request: { reference: string } | null;
+    // Absent entirely on the agencies module's narrower batch-order embed.
+    departure?: { departure_date: string; return_date: string } | null;
+    room_sharing?: number | null;
+  } | null;
+  hall_booking: {
+    venue: { name: string | null } | null;
+    event_type: string;
+    start_date: string;
+    end_date: string;
+  } | null;
+};
 
 /** Reads hotel_bookings.guest_details ({full_name}[] jsonb) into plain names. */
 export function hotelGuestNames(guestDetails: unknown): string[] {
@@ -38,7 +58,7 @@ export function hotelGuestNames(guestDetails: unknown): string[] {
 }
 
 /** Human title/subtitle + post-payment destination for one order item. */
-export function describeOrderItem(item: CheckoutOrderItem): {
+export function describeOrderItem(item: DescribableOrderItem): {
   title: string;
   subtitle: string;
   href: string;
@@ -72,6 +92,17 @@ export function describeOrderItem(item: CheckoutOrderItem): {
       const pilgrims = booking
         ? `${booking.num_pilgrims} pilgrim${booking.num_pilgrims > 1 ? "s" : ""}`
         : "";
+      const groupSubtitle = booking
+        ? [
+            booking.departure
+              ? `${format(new Date(booking.departure.departure_date), "d MMM yyyy")} → ${format(new Date(booking.departure.return_date), "d MMM yyyy")}`
+              : null,
+            pilgrims,
+            booking.room_sharing ? sharingLabel(booking.room_sharing) : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : "";
       return {
         title: isPrivate
           ? "Private Umrah"
@@ -79,7 +110,7 @@ export function describeOrderItem(item: CheckoutOrderItem): {
         subtitle:
           isPrivate && booking?.custom_request
             ? `${booking.custom_request.reference} · ${pilgrims}`
-            : pilgrims,
+            : groupSubtitle,
         href: "/account/bookings",
       };
     }

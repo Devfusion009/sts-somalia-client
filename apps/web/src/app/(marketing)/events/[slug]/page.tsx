@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MediaPlaceholder } from "@/components/media-placeholder";
 import { PropertyLinks } from "@/components/property-links";
 import { PropertyReviews } from "@/components/property-reviews";
+import { UnavailableNotice } from "@/components/portal/unavailable-notice";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { venueImageUrls } from "@/modules/events/images";
-import { getVenueBySlug } from "@/modules/events/queries";
 import {
   amenityInfo,
   eventTypeLabel,
@@ -23,8 +24,13 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const venue = await getVenueBySlug(slug);
-  return { title: venue?.name ?? "Venue" };
+  const trpc = await getServerTrpc();
+  try {
+    const venue = await trpc.events.venueBySlug.query({ slug });
+    return { title: venue?.name ?? "Venue" };
+  } catch {
+    return { title: "Venue" };
+  }
 }
 
 export default async function VenueDetailPage({
@@ -33,7 +39,13 @@ export default async function VenueDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const venue = await getVenueBySlug(slug);
+  const trpc = await getServerTrpc();
+  let venue;
+  try {
+    venue = await trpc.events.venueBySlug.query({ slug });
+  } catch {
+    return <UnavailableNotice label="Venue" />;
+  }
   if (!venue) notFound();
 
   const amenities = Array.isArray(venue.amenities) ? (venue.amenities as string[]) : [];

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyOrders } from "@/modules/agencies/queries";
-import { describeOrderItem } from "@/modules/payments/queries";
+import { describeOrderItem } from "@/modules/orders/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

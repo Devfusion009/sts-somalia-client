@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { SubmitButton } from "@/components/submit-button";
-import { adminRecordPayment, type RecordPaymentState } from "@/modules/payments/actions";
+import { trpc } from "@/lib/trpc/react";
 
 /** Logs a payment taken outside the online flow — cash at the office, a bank transfer that arrived without a prior "Pay at Office" attempt. */
 export function RecordPaymentDialog({
@@ -29,14 +30,27 @@ export function RecordPaymentDialog({
   currency: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useActionState<RecordPaymentState, FormData>(adminRecordPayment, null);
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const recordPayment = trpc.payments.admin.recordPayment.useMutation();
 
-  // Derived during render (not an effect) per React's guidance for reacting
-  // to a state change — refs can't be read/written during render.
-  const [lastState, setLastState] = useState(state);
-  if (state !== lastState) {
-    setLastState(state);
-    if (state && !state.error) setOpen(false);
+  async function handleSubmit(formData: FormData) {
+    setError(null);
+    try {
+      const result = await recordPayment.mutateAsync({
+        orderId,
+        amount: Number(formData.get("amount")),
+        methodLabel: String(formData.get("methodLabel") ?? ""),
+      });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setOpen(false);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not record the payment.");
+    }
   }
 
   return (
@@ -45,8 +59,7 @@ export function RecordPaymentDialog({
         <Wallet className="size-3.5" /> Record payment
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
-        <form action={formAction}>
-          <input type="hidden" name="orderId" value={orderId} />
+        <form action={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Record a payment</DialogTitle>
             <DialogDescription>
@@ -75,9 +88,9 @@ export function RecordPaymentDialog({
               <Label htmlFor="record-method">How did they pay?</Label>
               <Input id="record-method" name="methodLabel" placeholder="e.g. Cash — head office" required />
             </div>
-            {state?.error ? (
+            {error ? (
               <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
             ) : null}
           </div>

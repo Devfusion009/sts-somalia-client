@@ -3,12 +3,13 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { getBookingCustomers } from "@/modules/agencies/booking-context";
 import { createBatchBooking } from "@/modules/agencies/batch-booking-actions";
-import { getVenueBySlug } from "@/modules/events/queries";
 import { HallBookingForm } from "@/modules/events/components/booking-form";
 import { Card, CardContent } from "@/components/ui/card";
+import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 
 export default async function AgentVenueBookingPage({
   params,
@@ -25,7 +26,13 @@ export default async function AgentVenueBookingPage({
   if (customers.length === 0) redirect("/agent/book");
   const isGroup = customers.length > 1;
 
-  const venue = await getVenueBySlug(slug);
+  const trpc = await getServerTrpc();
+  let venue;
+  try {
+    venue = await trpc.events.venueBySlug.query({ slug });
+  } catch {
+    return <UnavailableNotice label="Venue" />;
+  }
   if (!venue) notFound();
 
   const eventTypes = Array.isArray(venue.event_types) ? (venue.event_types as string[]) : [];

@@ -18,12 +18,12 @@ type PackageRow = {
   currency: string;
   includes: unknown;
   images: unknown;
-  umrah_package_departures: { departure_date: string; total_seats: number; booked_seats: number }[];
+  umrah_package_departures: { departure_date: string; total_seats: number; booked_seats: number; offline_seats: number }[];
   umrah_package_hotels: { city: string; name: string; star_rating: number | null; distance_to_haram_m: number | null }[];
 };
 
 const CARD_SELECT =
-  "id, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
+  "id, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats, offline_seats), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
 
 function toCardData(pkg: PackageRow): PackageCardData {
   const upcoming = pkg.umrah_package_departures
@@ -97,7 +97,9 @@ export async function getPackageBySlug(slug: string) {
       `id, slug, name, description, tagline, tier, is_featured, origin_iata, destination_iata,
        duration_days, includes, images, base_price, original_price, currency, status,
        meal_plan, meals_note, contact_person_name, contact_person_phone, contact_person_email, contact_whatsapp,
-       umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, price_override),
+       umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, offline_seats, price_override,
+         outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at,
+         return_airline, return_flight_number, return_departs_at, return_arrives_at, baggage_note),
        umrah_package_hotels(id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order),
        umrah_itinerary_days(id, day_number, title, description),
        umrah_package_pricing(id, sharing, price)`

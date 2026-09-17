@@ -9,11 +9,29 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
-import { requestFlightQuote } from "@/modules/flights/actions";
+import { trpc } from "@/lib/trpc/react";
 import { createBatchFlightQuotes } from "@/modules/agencies/batch-booking-actions";
+import { requestFlightQuoteSchema } from "@sts/shared-types";
 
 const SELECT_CLASS =
   "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+
+type QuoteActionState = { error: string | null; success?: boolean } | null;
+
+function parseQuoteForm(formData: FormData) {
+  return requestFlightQuoteSchema.safeParse({
+    origin: formData.get("origin")?.toString().toUpperCase(),
+    destination: formData.get("destination")?.toString().toUpperCase(),
+    departDate: formData.get("departDate"),
+    returnDate: formData.get("returnDate")?.toString() || undefined,
+    tripType: formData.get("tripType") ?? "one_way",
+    cabinClass: formData.get("cabinClass") ?? "economy",
+    adults: formData.get("adults") ?? 1,
+    contactPhone: formData.get("contactPhone"),
+    notes: formData.get("notes")?.toString().trim() || undefined,
+    agencyCustomerId: formData.get("agencyCustomerId")?.toString() || undefined,
+  });
+}
 
 /**
  * Counter version of the flight RFQ: every field is entered here rather
@@ -32,8 +50,26 @@ export function FlightQuoteForm({
   /** Several customers on the counter — raise one request per customer. */
   isGroup?: boolean;
 }) {
+  const requestQuote = trpc.flights.requestQuote.useMutation();
+
+  async function submitQuote(
+    _prev: QuoteActionState,
+    formData: FormData
+  ): Promise<QuoteActionState> {
+    const parsed = parseQuoteForm(formData);
+    if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+    try {
+      const result = await requestQuote.mutateAsync(parsed.data);
+      if (result.error) return { error: result.error };
+      return { error: null, success: true };
+    } catch {
+      return { error: "Could not send the quote request. Try again." };
+    }
+  }
+
   const [state, formAction] = useActionState(
-    isGroup ? createBatchFlightQuotes : requestFlightQuote,
+    isGroup ? createBatchFlightQuotes : submitQuote,
     null
   );
   const [tripType, setTripType] = useState<"one_way" | "round_trip">("one_way");

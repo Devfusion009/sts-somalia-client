@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getMyHotelScope, getHotelForEdit, getHotelFrontDesk } from "@/modules/hotels/partner-queries";
 import { getHotelManagers } from "@/modules/hotels/manager-queries";
-import { hotelGuestNames } from "@/modules/payments/queries";
+import { hotelGuestNames } from "@/modules/orders/format";
 import { getRoomTypes } from "@/modules/hotels/room-types";
 import { getHotelAvailability } from "@/modules/hotels/availability";
 import { AvailabilityBoard } from "@/modules/hotels/components/availability-board";

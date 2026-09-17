@@ -5,6 +5,7 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  BedDouble,
   Check,
   MapPin,
   Receipt,
@@ -30,15 +31,26 @@ import { SubmitButton } from "@/components/submit-button";
 import { saveUmrahTripServices } from "@/modules/umrah/custom-actions";
 import {
   PRICE_UNIT_LABELS,
+  ROOM_SHARING_LABELS,
+  ROOM_SHARING_OPTIONS,
   UMRAH_CATEGORIES,
   UMRAH_TIER_LABELS,
   UMRAH_TIER_CHIP_CLASS,
+  type RoomSharing,
   type UmrahCategoryConfig,
   type UmrahService,
   type UmrahServiceCategory,
   type UmrahTier,
 } from "@/modules/umrah/services";
-import { formatMoney, priceService, priceSelection, type TripShape } from "@/modules/umrah/pricing";
+import {
+  formatMoney,
+  isSharingPricedCategory,
+  priceService,
+  priceSelection,
+  type SharingContext,
+  type SharingPriceMap,
+  type TripShape,
+} from "@/modules/umrah/pricing";
 import { TripNotFoundRecovery } from "./builder-shared";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +80,9 @@ export function StepServices({
   tier,
   currency,
   savedServiceIds,
+  initialRoomSharing,
+  sharingPrices,
+  desk,
 }: {
   requestId: string;
   services: UmrahService[];
@@ -75,8 +90,19 @@ export function StepServices({
   tier: UmrahTier;
   currency: string;
   savedServiceIds: string[];
+  initialRoomSharing: RoomSharing;
+  sharingPrices: SharingPriceMap;
+  /** True when this builder is hosted inside the agent portal — see
+   *  wizardBasePath() in custom-actions.ts. */
+  desk?: boolean;
 }) {
+  const basePath = desk ? "/agent/book/umrah/private" : "/umrah/private";
   const [state, formAction] = useActionState(saveUmrahTripServices, null);
+  const [roomSharing, setRoomSharing] = useState<RoomSharing>(initialRoomSharing);
+  const sharing = useMemo<SharingContext>(
+    () => ({ roomSharing, sharingPrices }),
+    [roomSharing, sharingPrices]
+  );
   const [selected, setSelected] = useState<Set<string>>(() =>
     initialSelection(services, tier, savedServiceIds)
   );
@@ -85,8 +111,8 @@ export function StepServices({
 
   const { lines, total } = useMemo(() => {
     const chosen = [...selected].map((id) => byId.get(id)).filter((s): s is UmrahService => !!s);
-    return priceSelection(chosen, trip);
-  }, [selected, byId, trip]);
+    return priceSelection(chosen, trip, sharing);
+  }, [selected, byId, trip, sharing]);
 
   function toggle(service: UmrahService, selection: "single" | "multi") {
     setSelected((prev) => {
@@ -132,6 +158,8 @@ export function StepServices({
           it's wanted. */}
       <form action={formAction} className="space-y-9" id="services-form">
         <input type="hidden" name="requestId" value={requestId} />
+        <input type="hidden" name="room_sharing" value={roomSharing} />
+        {desk ? <input type="hidden" name="desk" value="1" /> : null}
         {[...selected].map((id) => (
           <input key={id} type="hidden" name="service_id" value={id} />
         ))}
@@ -177,6 +205,46 @@ export function StepServices({
             );
           })}
         </nav>
+
+        <section aria-labelledby="room-type-heading">
+          <h3 id="room-type-heading" className="flex items-center gap-2.5 font-heading text-base font-bold">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-secondary text-primary">
+              <BedDouble className="size-4.5" />
+            </span>
+            Room type
+          </h3>
+          <div
+            role="radiogroup"
+            aria-labelledby="room-type-heading"
+            className="mt-3 ml-11.5 grid grid-cols-2 gap-3 sm:grid-cols-4"
+          >
+            {ROOM_SHARING_OPTIONS.map((option) => {
+              const active = roomSharing === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setRoomSharing(option.value)}
+                  className={cn(
+                    "flex flex-col rounded-2xl border-2 px-4 py-3 text-left transition-all",
+                    active
+                      ? "border-primary bg-primary/[0.04] shadow-sm"
+                      : "border-border bg-card hover:border-primary/40"
+                  )}
+                >
+                  <span className={cn("text-sm font-semibold", active && "text-primary")}>
+                    {option.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {option.value} {option.value === 1 ? "guest" : "guests"} per room
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         {UMRAH_CATEGORIES.map((category) => {
           const all = services.filter((s) => s.category === category.value);
@@ -242,6 +310,7 @@ export function StepServices({
                       key={service.id}
                       service={service}
                       trip={trip}
+                      sharing={sharing}
                       tier={tier}
                       active={selected.has(service.id)}
                       selection={category.selection}
@@ -259,13 +328,13 @@ export function StepServices({
             <AlertCircle />
             <AlertDescription className="space-y-2">
               <p>{state.error}</p>
-              <TripNotFoundRecovery error={state.error} />
+              <TripNotFoundRecovery error={state.error} basePath={basePath} />
             </AlertDescription>
           </Alert>
         ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6 pb-20">
-          <Button render={<Link href={`/umrah/private/${requestId}?step=1`} />} variant="ghost" className="gap-2">
+          <Button render={<Link href={`${basePath}/${requestId}?step=1`} />} variant="ghost" className="gap-2">
             <ArrowLeft className="size-4" /> Back
           </Button>
           <SubmitButton size="lg" pendingText="Saving your selection…" className="gap-2">
@@ -279,6 +348,7 @@ export function StepServices({
         total={total}
         currency={currency}
         trip={trip}
+        roomSharing={roomSharing}
         completedCount={completedCount}
         requiredCount={requiredCategories.length}
       />
@@ -295,6 +365,7 @@ export function StepServices({
 function ServiceOptionCard({
   service,
   trip,
+  sharing,
   tier,
   active,
   selection,
@@ -302,12 +373,14 @@ function ServiceOptionCard({
 }: {
   service: UmrahService;
   trip: TripShape;
+  sharing: SharingContext;
   tier: UmrahTier;
   active: boolean;
   selection: "single" | "multi";
   onToggle: () => void;
 }) {
-  const priced = priceService(service, trip);
+  const priced = priceService(service, trip, sharing);
+  const byOccupancy = isSharingPricedCategory(service.category);
   const recommended = service.is_default && service.tier === tier;
 
   return (
@@ -391,8 +464,9 @@ function ServiceOptionCard({
 
       <span className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-border pt-3">
         <span className="text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">{formatMoney(service.price, service.currency)}</span>{" "}
+          <span className="font-semibold text-foreground">{formatMoney(priced.unitPrice, service.currency)}</span>{" "}
           {PRICE_UNIT_LABELS[service.price_unit]}
+          {byOccupancy ? ` · ${ROOM_SHARING_LABELS[sharing.roomSharing]}` : null}
         </span>
         <span className="font-heading text-base font-bold text-primary tabular-nums">
           {formatMoney(priced.lineTotal, service.currency)}
@@ -422,6 +496,7 @@ function FloatingSummary({
   total,
   currency,
   trip,
+  roomSharing,
   completedCount,
   requiredCount,
 }: {
@@ -429,6 +504,7 @@ function FloatingSummary({
   total: number;
   currency: string;
   trip: TripShape;
+  roomSharing: RoomSharing;
   completedCount: number;
   requiredCount: number;
 }) {
@@ -466,7 +542,8 @@ function FloatingSummary({
           <SheetTitle>Your Umrah price</SheetTitle>
           <SheetDescription>
             {trip.numPilgrims} traveller{trip.numPilgrims > 1 ? "s" : ""} · {nights} night
-            {nights === 1 ? "" : "s"} ({trip.nightsMakkah} Makkah / {trip.nightsMadinah} Madinah)
+            {nights === 1 ? "" : "s"} ({trip.nightsMakkah} Makkah / {trip.nightsMadinah} Madinah) ·{" "}
+            {ROOM_SHARING_LABELS[roomSharing]} room
           </SheetDescription>
           <div className="flex items-center justify-between pt-1">
             <span className="text-[11px] font-semibold text-muted-foreground">Services chosen</span>

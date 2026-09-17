@@ -32,7 +32,7 @@ export type PackageCardData = {
   includes: string[];
   images: string[];
   hotels: PackageCardHotel[];
-  nextDeparture: { departure_date: string; total_seats: number; booked_seats: number } | null;
+  nextDeparture: { departure_date: string; total_seats: number; booked_seats: number; offline_seats: number } | null;
 };
 
 const TIER_STYLES: Record<string, string> = {
@@ -129,7 +129,9 @@ function HotelLine({ label, hotel }: { label: string; hotel: PackageCardHotel })
 }
 
 export function PackageCard({ pkg }: { pkg: PackageCardData }) {
-  const seatsLeft = pkg.nextDeparture ? pkg.nextDeparture.total_seats - pkg.nextDeparture.booked_seats : null;
+  const seatsLeft = pkg.nextDeparture
+    ? pkg.nextDeparture.total_seats - pkg.nextDeparture.booked_seats - pkg.nextDeparture.offline_seats
+    : null;
   const tier = packageTier(pkg);
   const cover = pkg.images[0] ?? null;
   const discount = discountPercent(pkg.base_price, pkg.originalPrice);

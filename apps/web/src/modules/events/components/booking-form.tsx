@@ -16,8 +16,28 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { SubmitButton } from "@/components/submit-button";
-import { createHallBooking } from "@/modules/events/actions";
+import { trpc } from "@/lib/trpc/react";
+import { createHallBookingSchema } from "@sts/shared-types";
 import { eventTypeLabel, priceUnitLabel } from "./amenities";
+
+export type ActionState = { error: string | null; destination?: string; orderId?: string } | null;
+
+function parseBookingForm(formData: FormData) {
+  return createHallBookingSchema.safeParse({
+    venueId: formData.get("venueId"),
+    eventType: formData.get("eventType"),
+    eventName: formData.get("eventName")?.toString().trim() || undefined,
+    startDate: formData.get("startDate"),
+    endDate: formData.get("endDate"),
+    startTime: formData.get("startTime")?.toString() || undefined,
+    endTime: formData.get("endTime")?.toString() || undefined,
+    expectedGuests: formData.get("expectedGuests"),
+    setupRequirements: formData.get("setupRequirements")?.toString().trim() || undefined,
+    agencyCustomerId: formData.get("agencyCustomerId")?.toString() || undefined,
+    newCustomerName: formData.get("newCustomerName")?.toString() || undefined,
+    newCustomerPhone: formData.get("newCustomerPhone")?.toString() || undefined,
+  });
+}
 
 export function HallBookingForm({
   venueId,
@@ -37,9 +57,38 @@ export function HallBookingForm({
   maxGuests: number | null;
   bookedForSlot?: React.ReactNode;
   /** The agent desk swaps in its group action, which books for every selected customer. */
-  action?: typeof createHallBooking;
+  action?: (prevState: ActionState, formData: FormData) => Promise<ActionState>;
 }) {
-  const [state, formAction] = useActionState(action ?? createHallBooking, null);
+  const createBooking = trpc.events.createHallBooking.useMutation();
+
+  async function submitBooking(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+    const parsed = parseBookingForm(formData);
+    if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+    try {
+      const result = await createBooking.mutateAsync(parsed.data);
+      // Per-person and price-on-request venues confirm the final price
+      // before the booking completes — the request lands in the admin
+      // queue and the customer pays from their booking page once the price
+      // is confirmed. Fixed-price venues go straight to checkout. Desk
+      // submissions always land on the desk order page instead, since a
+      // browser redirect into the agent portal from here would land on the
+      // wrong host.
+      const isDesk = formData.get("desk") === "1";
+      const destination = isDesk
+        ? `/agent/book/order/${result.orderId}`
+        : result.requiresPriceConfirmation
+          ? `/account/bookings/${result.orderId}?requested=1`
+          : `/checkout/${result.orderId}`;
+      return { error: null, destination, orderId: result.orderId };
+    } catch (err) {
+      return {
+        error: err instanceof Error ? err.message : "Could not create the booking. Please try again.",
+      };
+    }
+  }
+
+  const [state, formAction] = useActionState(action ?? submitBooking, null);
   const [guests, setGuests] = useState(100);
   const [startDate, setStartDate] = useState("");
   const router = useRouter();

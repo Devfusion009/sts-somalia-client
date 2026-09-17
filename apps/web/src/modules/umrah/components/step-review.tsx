@@ -17,7 +17,14 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SubmitButton } from "@/components/submit-button";
 import { submitUmrahCustomRequest, type PilgrimInput } from "@/modules/umrah/custom-actions";
-import { UMRAH_CATEGORIES, UMRAH_TIER_LABELS, type UmrahServiceCategory, type UmrahTier } from "@/modules/umrah/services";
+import {
+  ROOM_SHARING_LABELS,
+  UMRAH_CATEGORIES,
+  UMRAH_TIER_LABELS,
+  type RoomSharing,
+  type UmrahServiceCategory,
+  type UmrahTier,
+} from "@/modules/umrah/services";
 import { formatMoney, tripDurationDays, tripReturnDate, type TripShape } from "@/modules/umrah/pricing";
 import { TripNotFoundRecovery } from "./builder-shared";
 
@@ -39,9 +46,9 @@ function formatDate(value: string | null) {
   });
 }
 
-function EditLink({ requestId, step }: { requestId: string; step: number }) {
+function EditLink({ requestId, step, basePath }: { requestId: string; step: number; basePath: string }) {
   return (
-    <Button render={<Link href={`/umrah/private/${requestId}?step=${step}`} />} variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+    <Button render={<Link href={`${basePath}/${requestId}?step=${step}`} />} variant="ghost" size="sm" className="h-7 gap-1 text-xs">
       <Pencil className="size-3" /> Edit
     </Button>
   );
@@ -52,6 +59,7 @@ export function StepReview({
   reference,
   tier,
   trip,
+  roomSharing,
   departureDate,
   lines,
   total,
@@ -59,11 +67,13 @@ export function StepReview({
   pilgrims,
   notes,
   bookedForSlot,
+  desk,
 }: {
   requestId: string;
   reference: string;
   tier: UmrahTier;
   trip: TripShape;
+  roomSharing: RoomSharing;
   departureDate: string | null;
   lines: Line[];
   total: number;
@@ -71,7 +81,11 @@ export function StepReview({
   pilgrims: PilgrimInput[];
   notes: string | null;
   bookedForSlot?: React.ReactNode;
+  /** True when this builder is hosted inside the agent portal — see
+   *  wizardBasePath() in custom-actions.ts. */
+  desk?: boolean;
 }) {
+  const basePath = desk ? "/agent/book/umrah/private" : "/umrah/private";
   const [state, formAction] = useActionState(submitUmrahCustomRequest, null);
   const duration = tripDurationDays(trip);
   const returnDate = tripReturnDate(departureDate, trip);
@@ -79,6 +93,7 @@ export function StepReview({
   return (
     <form action={formAction} className="space-y-6">
       <input type="hidden" name="requestId" value={requestId} />
+      {desk ? <input type="hidden" name="desk" value="1" /> : null}
 
       <div>
         <h2 className="font-heading text-xl font-bold">Review your Umrah</h2>
@@ -94,7 +109,7 @@ export function StepReview({
           <h3 className="flex items-center gap-2 text-sm font-bold">
             <CalendarDays className="size-4 text-primary" /> Your trip
           </h3>
-          <EditLink requestId={requestId} step={1} />
+          <EditLink requestId={requestId} step={1} basePath={basePath} />
         </header>
         <dl className="grid grid-cols-2 gap-4 p-4 text-sm sm:grid-cols-4">
           <div>
@@ -127,6 +142,10 @@ export function StepReview({
             <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Standard</dt>
             <dd className="font-semibold text-foreground">{UMRAH_TIER_LABELS[tier]}</dd>
           </div>
+          <div>
+            <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Room type</dt>
+            <dd className="font-semibold text-foreground">{ROOM_SHARING_LABELS[roomSharing]}</dd>
+          </div>
         </dl>
       </section>
 
@@ -136,7 +155,7 @@ export function StepReview({
           <h3 className="flex items-center gap-2 text-sm font-bold">
             <Check className="size-4 text-primary" /> Your services
           </h3>
-          <EditLink requestId={requestId} step={2} />
+          <EditLink requestId={requestId} step={2} basePath={basePath} />
         </header>
         {lines.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">
@@ -197,7 +216,7 @@ export function StepReview({
           <h3 className="flex items-center gap-2 text-sm font-bold">
             <Users className="size-4 text-primary" /> Travellers
           </h3>
-          <EditLink requestId={requestId} step={3} />
+          <EditLink requestId={requestId} step={3} basePath={basePath} />
         </header>
         <ul className="divide-y divide-border">
           {pilgrims.map((p, i) => (
@@ -243,13 +262,13 @@ export function StepReview({
           <AlertCircle />
           <AlertDescription className="space-y-2">
             <p>{state.error}</p>
-            <TripNotFoundRecovery error={state.error} />
+            <TripNotFoundRecovery error={state.error} basePath={basePath} />
           </AlertDescription>
         </Alert>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
-        <Button render={<Link href={`/umrah/private/${requestId}?step=3`} />} variant="ghost" className="gap-2">
+        <Button render={<Link href={`${basePath}/${requestId}?step=3`} />} variant="ghost" className="gap-2">
           <ArrowLeft className="size-4" /> Back
         </Button>
         <SubmitButton size="lg" pendingText="Submitting…" className="gap-2" disabled={total <= 0}>

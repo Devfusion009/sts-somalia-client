@@ -3752,6 +3752,112 @@ export type Database = {
           },
         ]
       }
+      umrah_booking_documents: {
+        Row: {
+          booking_id: string
+          content_type: string | null
+          created_at: string
+          doc_type: string
+          file_name: string | null
+          file_size: number | null
+          id: string
+          pilgrim_id: string | null
+          storage_path: string
+          title: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          booking_id: string
+          content_type?: string | null
+          created_at?: string
+          doc_type: string
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          pilgrim_id?: string | null
+          storage_path: string
+          title: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          booking_id?: string
+          content_type?: string | null
+          created_at?: string
+          doc_type?: string
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          pilgrim_id?: string | null
+          storage_path?: string
+          title?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "umrah_booking_documents_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "umrah_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "umrah_booking_documents_pilgrim_id_fkey"
+            columns: ["pilgrim_id"]
+            isOneToOne: false
+            referencedRelation: "umrah_pilgrims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "umrah_booking_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      umrah_booking_stage_history: {
+        Row: {
+          actor: string | null
+          booking_id: string
+          created_at: string
+          id: string
+          note: string | null
+          stage: Database["public"]["Enums"]["umrah_fulfillment_stage"]
+        }
+        Insert: {
+          actor?: string | null
+          booking_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          stage: Database["public"]["Enums"]["umrah_fulfillment_stage"]
+        }
+        Update: {
+          actor?: string | null
+          booking_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          stage?: Database["public"]["Enums"]["umrah_fulfillment_stage"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "umrah_booking_stage_history_actor_fkey"
+            columns: ["actor"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "umrah_booking_stage_history_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "umrah_bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       umrah_bookings: {
         Row: {
           agency_id: string | null
@@ -3762,9 +3868,11 @@ export type Database = {
           custom_request_id: string | null
           customer_id: string
           departure_id: string | null
+          fulfillment_stage: Database["public"]["Enums"]["umrah_fulfillment_stage"]
           id: string
           num_pilgrims: number
           package_id: string | null
+          room_sharing: number | null
           special_requests: string | null
           status: Database["public"]["Enums"]["booking_status"]
           total_price: number
@@ -3779,9 +3887,11 @@ export type Database = {
           custom_request_id?: string | null
           customer_id: string
           departure_id?: string | null
+          fulfillment_stage?: Database["public"]["Enums"]["umrah_fulfillment_stage"]
           id?: string
           num_pilgrims: number
           package_id?: string | null
+          room_sharing?: number | null
           special_requests?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
           total_price: number
@@ -3796,9 +3906,11 @@ export type Database = {
           custom_request_id?: string | null
           customer_id?: string
           departure_id?: string | null
+          fulfillment_stage?: Database["public"]["Enums"]["umrah_fulfillment_stage"]
           id?: string
           num_pilgrims?: number
           package_id?: string | null
+          room_sharing?: number | null
           special_requests?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
           total_price?: number
@@ -3919,6 +4031,7 @@ export type Database = {
           num_pilgrims: number
           pilgrims: Json
           reference: string
+          room_sharing: number
           status: string
           subtotal: number
           tier: Database["public"]["Enums"]["umrah_tier"]
@@ -3939,6 +4052,7 @@ export type Database = {
           num_pilgrims?: number
           pilgrims?: Json
           reference?: string
+          room_sharing?: number
           status?: string
           subtotal?: number
           tier?: Database["public"]["Enums"]["umrah_tier"]
@@ -3959,6 +4073,7 @@ export type Database = {
           num_pilgrims?: number
           pilgrims?: Json
           reference?: string
+          room_sharing?: number
           status?: string
           subtotal?: number
           tier?: Database["public"]["Enums"]["umrah_tier"]
@@ -4061,33 +4176,63 @@ export type Database = {
       }
       umrah_package_departures: {
         Row: {
+          baggage_note: string | null
           booked_seats: number
           created_at: string
           departure_date: string
           id: string
+          offline_seats: number
+          outbound_airline: string | null
+          outbound_arrives_at: string | null
+          outbound_departs_at: string | null
+          outbound_flight_number: string | null
           package_id: string
           price_override: number | null
+          return_airline: string | null
+          return_arrives_at: string | null
           return_date: string
+          return_departs_at: string | null
+          return_flight_number: string | null
           total_seats: number
         }
         Insert: {
+          baggage_note?: string | null
           booked_seats?: number
           created_at?: string
           departure_date: string
           id?: string
+          offline_seats?: number
+          outbound_airline?: string | null
+          outbound_arrives_at?: string | null
+          outbound_departs_at?: string | null
+          outbound_flight_number?: string | null
           package_id: string
           price_override?: number | null
+          return_airline?: string | null
+          return_arrives_at?: string | null
           return_date: string
+          return_departs_at?: string | null
+          return_flight_number?: string | null
           total_seats: number
         }
         Update: {
+          baggage_note?: string | null
           booked_seats?: number
           created_at?: string
           departure_date?: string
           id?: string
+          offline_seats?: number
+          outbound_airline?: string | null
+          outbound_arrives_at?: string | null
+          outbound_departs_at?: string | null
+          outbound_flight_number?: string | null
           package_id?: string
           price_override?: number | null
+          return_airline?: string | null
+          return_arrives_at?: string | null
           return_date?: string
+          return_departs_at?: string | null
+          return_flight_number?: string | null
           total_seats?: number
         }
         Relationships: [
@@ -4313,6 +4458,32 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "umrah_bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      umrah_service_sharing_prices: {
+        Row: {
+          price: number
+          service_id: string
+          sharing: number
+        }
+        Insert: {
+          price: number
+          service_id: string
+          sharing: number
+        }
+        Update: {
+          price?: number
+          service_id?: string
+          sharing?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "umrah_service_sharing_prices_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "umrah_services"
             referencedColumns: ["id"]
           },
         ]
@@ -5174,6 +5345,14 @@ export type Database = {
         Args: { reason?: string; target_order_id: string }
         Returns: undefined
       }
+      _umrah_release_seats: {
+        Args: { p_departure_id: string; p_seats: number }
+        Returns: undefined
+      }
+      _umrah_reserve_seats: {
+        Args: { p_departure_id: string; p_seats: number }
+        Returns: undefined
+      }
       add_hotel_manager: {
         Args: { p_email: string; p_hotel_id: string; p_permissions?: string[] }
         Returns: {
@@ -5211,6 +5390,15 @@ export type Database = {
           tx_type: Database["public"]["Enums"]["wallet_tx_type"]
         }
         Returns: string
+      }
+      apply_umrah_stage_transition_internal: {
+        Args: {
+          p_actor?: string
+          p_booking_id: string
+          p_note?: string
+          p_stage: Database["public"]["Enums"]["umrah_fulfillment_stage"]
+        }
+        Returns: Database["public"]["Enums"]["umrah_fulfillment_stage"]
       }
       apply_visa_partner_status_update: {
         Args: {
@@ -5600,6 +5788,14 @@ export type Database = {
         Args: { new_is_platform_admin: boolean; target_user_id: string }
         Returns: undefined
       }
+      set_umrah_booking_stage: {
+        Args: {
+          p_booking_id: string
+          p_note?: string
+          p_stage: Database["public"]["Enums"]["umrah_fulfillment_stage"]
+        }
+        Returns: Database["public"]["Enums"]["umrah_fulfillment_stage"]
+      }
       set_visa_application_status: {
         Args: {
           p_application_id: string
@@ -5624,6 +5820,13 @@ export type Database = {
       }
       shares_active_org_with: {
         Args: { target_profile_id: string }
+        Returns: boolean
+      }
+      umrah_booking_holds_seats: {
+        Args: {
+          p_kind: string
+          p_status: Database["public"]["Enums"]["booking_status"]
+        }
         Returns: boolean
       }
       update_hotel_manager_permissions: {
@@ -5728,6 +5931,14 @@ export type Database = {
         | "travel_insurance"
         | "other"
       trip_type: "one_way" | "round_trip" | "multi_city"
+      umrah_fulfillment_stage:
+        | "booked"
+        | "confirmed"
+        | "visa_processing"
+        | "visa_issued"
+        | "travel_confirmed"
+        | "documents_ready"
+        | "completed"
       umrah_price_unit:
         | "per_person"
         | "per_person_per_night"
@@ -5992,6 +6203,15 @@ export const Constants = {
         "other",
       ],
       trip_type: ["one_way", "round_trip", "multi_city"],
+      umrah_fulfillment_stage: [
+        "booked",
+        "confirmed",
+        "visa_processing",
+        "visa_issued",
+        "travel_confirmed",
+        "documents_ready",
+        "completed",
+      ],
       umrah_price_unit: [
         "per_person",
         "per_person_per_night",

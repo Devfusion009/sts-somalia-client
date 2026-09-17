@@ -555,6 +555,13 @@ export type WithdrawBookingRequestInput = z.infer<typeof withdrawBookingRequestS
  * flights — phase 4c. Direct port of modules/flights/{provider,queries,actions}.ts.
  */
 
+export type Airport = {
+  iata_code: string;
+  name: string;
+  city: string;
+  country_code: string;
+};
+
 export const flightSearchParamsSchema = z.object({
   origin: z.string().length(3),
   destination: z.string().length(3),

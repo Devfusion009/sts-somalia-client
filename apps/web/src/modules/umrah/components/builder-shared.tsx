@@ -4,7 +4,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { REQUEST_NOT_EDITABLE_ERROR } from "@/modules/umrah/custom-errors";
 import { cn } from "@/lib/utils";
-import { UMRAH_CATEGORIES, type UmrahServiceCategory } from "@/modules/umrah/services";
+import {
+  ROOM_SHARING_LABELS,
+  UMRAH_CATEGORIES,
+  type RoomSharing,
+  type UmrahServiceCategory,
+} from "@/modules/umrah/services";
 import { formatMoney, type TripShape } from "@/modules/umrah/pricing";
 
 export const BUILDER_STEPS = [
@@ -24,10 +29,15 @@ export function BuilderStepper({
   requestId,
   currentStep,
   maxStep,
+  basePath = "/umrah/private",
 }: {
   requestId: string;
   currentStep: number;
   maxStep: number;
+  /** Set to "/agent/book/umrah/private" when this builder is hosted inside
+   *  the agent portal, so its step links stay inside that portal instead of
+   *  bouncing back out to the B2C marketing route. */
+  basePath?: string;
 }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
@@ -83,7 +93,7 @@ export function BuilderStepper({
                 <span className="block rounded-lg px-2 py-2">{content}</span>
               ) : (
                 <Link
-                  href={`/umrah/private/${requestId}?step=${step}`}
+                  href={`${basePath}/${requestId}?step=${step}`}
                   className={cn(
                     "block rounded-lg px-2 py-2 transition-colors hover:bg-accent/60",
                     isCurrent && "bg-secondary"
@@ -123,6 +133,7 @@ export function PriceSummary({
   total,
   currency,
   trip,
+  roomSharing,
   emptyText = "Pick your services and the total will appear here.",
   className,
 }: {
@@ -130,6 +141,7 @@ export function PriceSummary({
   total: number;
   currency: string;
   trip: TripShape;
+  roomSharing?: RoomSharing;
   emptyText?: string;
   className?: string;
 }) {
@@ -143,6 +155,7 @@ export function PriceSummary({
       <p className="mt-1 text-xs text-muted-foreground">
         {trip.numPilgrims} traveller{trip.numPilgrims > 1 ? "s" : ""} · {nights} night
         {nights === 1 ? "" : "s"} ({trip.nightsMakkah} Makkah / {trip.nightsMadinah} Madinah)
+        {roomSharing ? ` · ${ROOM_SHARING_LABELS[roomSharing]} room` : null}
       </p>
 
       {lines.length === 0 ? (
@@ -237,10 +250,16 @@ export function Field({
  * retrying the same form, since the request itself is gone. Every step
  * renders this the same way, so it lives once, here.
  */
-export function TripNotFoundRecovery({ error }: { error: string | null | undefined }) {
+export function TripNotFoundRecovery({
+  error,
+  basePath = "/umrah/private",
+}: {
+  error: string | null | undefined;
+  basePath?: string;
+}) {
   if (error !== REQUEST_NOT_EDITABLE_ERROR) return null;
   return (
-    <Button render={<Link href="/umrah/private" />} variant="outline" size="sm" className="gap-1.5">
+    <Button render={<Link href={basePath} />} variant="outline" size="sm" className="gap-1.5">
       Start a new private trip <ArrowRight className="size-3.5" />
     </Button>
   );

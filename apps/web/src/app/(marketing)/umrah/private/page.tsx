@@ -18,7 +18,11 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
 import { getCurrentProfile } from "@/lib/auth/session";
-import { getMyDraftUmrahRequest, getUmrahServices } from "@/modules/umrah/custom-queries";
+import {
+  getMyDraftUmrahRequest,
+  getUmrahServices,
+  getUmrahSharingPrices,
+} from "@/modules/umrah/custom-queries";
 import { startUmrahCustomRequest } from "@/modules/umrah/custom-actions";
 import { UMRAH_CATEGORIES, UMRAH_TIERS, UMRAH_TIER_LABELS, PRICE_UNIT_LABELS } from "@/modules/umrah/services";
 import { formatMoney, tripDurationDays } from "@/modules/umrah/pricing";
@@ -47,9 +51,10 @@ export default async function PrivateUmrahPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const [{ error }, services, profile] = await Promise.all([
+  const [{ error }, services, sharingPrices, profile] = await Promise.all([
     searchParams,
     getUmrahServices(),
+    getUmrahSharingPrices(),
     getCurrentProfile(),
   ]);
   // Only a signed-in visitor can have a draft at all (starting one requires
@@ -60,9 +65,11 @@ export default async function PrivateUmrahPage({
   const cheapestByCategory = new Map<string, { price: number; currency: string; unit: string }>();
   for (const service of services) {
     const current = cheapestByCategory.get(service.category);
-    if (!current || service.price < current.price) {
+    // A hotel's "from" price is its lowest occupancy price, when it has any.
+    const lowest = Math.min(service.price, ...Object.values(sharingPrices[service.id] ?? {}));
+    if (!current || lowest < current.price) {
       cheapestByCategory.set(service.category, {
-        price: service.price,
+        price: lowest,
         currency: service.currency,
         unit: PRICE_UNIT_LABELS[service.price_unit],
       });
