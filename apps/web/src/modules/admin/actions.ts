@@ -273,35 +273,163 @@ export async function updateUmrahPackage(_prev: ActionState, formData: FormData)
   return { error: null };
 }
 
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((v) => (v === "" ? null : v));
+
+/**
+ * datetime-local carries no zone; flight times are the airport's wall clock,
+ * so they are stored UTC-tagged as entered and always read back in UTC.
+ */
+const optionalFlightTime = z
+  .string()
+  .trim()
+  .refine((v) => v === "" || /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v), "Enter a valid flight time.")
+  .transform((v) => (v === "" ? null : `${v}:00Z`));
+
 const departureSchema = z.object({
   packageId: z.string().uuid(),
   departureDate: z.string().min(1, "Pick a departure date."),
   returnDate: z.string().min(1, "Pick a return date."),
-  totalSeats: z.coerce.number().int().min(1),
+  totalSeats: z.coerce.number().int().min(1, "Total seats must be at least 1."),
+  offlineSeats: z.coerce.number().int().min(0, "Offline seats cannot be negative."),
+  priceOverride: z
+    .string()
+    .trim()
+    .transform((v) => (v === "" ? null : Number(v)))
+    .refine((v) => v === null || (Number.isFinite(v) && v >= 0), "Enter a valid price."),
+  outboundAirline: optionalText(80),
+  outboundFlightNumber: optionalText(20),
+  outboundDepartsAt: optionalFlightTime,
+  outboundArrivesAt: optionalFlightTime,
+  returnAirline: optionalText(80),
+  returnFlightNumber: optionalText(20),
+  returnDepartsAt: optionalFlightTime,
+  returnArrivesAt: optionalFlightTime,
+  baggageNote: optionalText(200),
 });
 
-export async function createUmrahDeparture(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePlatformAdmin();
+type ParsedDeparture =
+  | { ok: false; error: string }
+  | { ok: true; packageId: string; row: Omit<Database["public"]["Tables"]["umrah_package_departures"]["Insert"], "package_id"> };
+
+function parseDeparture(formData: FormData): ParsedDeparture {
+  const text = (key: string) => String(formData.get(key) ?? "");
   const parsed = departureSchema.safeParse({
     packageId: formData.get("packageId"),
     departureDate: formData.get("departureDate"),
     returnDate: formData.get("returnDate"),
     totalSeats: formData.get("totalSeats"),
+    offlineSeats: text("offlineSeats") || "0",
+    priceOverride: text("priceOverride"),
+    outboundAirline: text("outboundAirline"),
+    outboundFlightNumber: text("outboundFlightNumber"),
+    outboundDepartsAt: text("outboundDepartsAt"),
+    outboundArrivesAt: text("outboundArrivesAt"),
+    returnAirline: text("returnAirline"),
+    returnFlightNumber: text("returnFlightNumber"),
+    returnDepartsAt: text("returnDepartsAt"),
+    returnArrivesAt: text("returnArrivesAt"),
+    baggageNote: text("baggageNote"),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-  if (parsed.data.returnDate <= parsed.data.departureDate) {
-    return { error: "Return date must be after the departure date." };
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const d = parsed.data;
+  if (d.returnDate <= d.departureDate) return { ok: false, error: "Return date must be after the departure date." };
+  if (d.offlineSeats > d.totalSeats) return { ok: false, error: "Seats sold exceed total seats." };
+  if (d.outboundDepartsAt && d.outboundArrivesAt && d.outboundArrivesAt <= d.outboundDepartsAt) {
+    return { ok: false, error: "Outbound arrival must be after departure." };
   }
+  if (d.returnDepartsAt && d.returnArrivesAt && d.returnArrivesAt <= d.returnDepartsAt) {
+    return { ok: false, error: "Return arrival must be after departure." };
+  }
+  return {
+    ok: true,
+    packageId: d.packageId,
+    row: {
+        departure_date: d.departureDate,
+        return_date: d.returnDate,
+        total_seats: d.totalSeats,
+        offline_seats: d.offlineSeats,
+        price_override: d.priceOverride,
+        outbound_airline: d.outboundAirline,
+        outbound_flight_number: d.outboundFlightNumber,
+        outbound_departs_at: d.outboundDepartsAt,
+        outbound_arrives_at: d.outboundArrivesAt,
+        return_airline: d.returnAirline,
+        return_flight_number: d.returnFlightNumber,
+        return_departs_at: d.returnDepartsAt,
+        return_arrives_at: d.returnArrivesAt,
+      baggage_note: d.baggageNote,
+    },
+  };
+}
+
+function departureErrorMessage(error: { message: string; code?: string }) {
+  if (error.message.includes("seats_within_total")) return "Seats sold exceed total seats.";
+  if (error.message.includes("umrah_package_departures_check")) return "Return date must be after the departure date.";
+  if (error.code === "23503") return "This departure has bookings and cannot be deleted.";
+  return error.message;
+}
+
+function revalidateUmrahPackage(packageId: string) {
+  revalidatePath("/admin/catalog/umrah");
+  revalidatePath(`/admin/catalog/umrah/${packageId}`);
+}
+
+export async function createUmrahDeparture(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requirePlatformAdmin();
+  const parsed = parseDeparture(formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("umrah_package_departures").insert({
-    package_id: parsed.data.packageId,
-    departure_date: parsed.data.departureDate,
-    return_date: parsed.data.returnDate,
-    total_seats: parsed.data.totalSeats,
-  });
-  if (error) return { error: error.message };
-  revalidatePath("/admin/catalog/umrah");
+  const { error } = await supabase
+    .from("umrah_package_departures")
+    .insert({ package_id: parsed.packageId, ...parsed.row });
+  if (error) return { error: departureErrorMessage(error) };
+  revalidateUmrahPackage(parsed.packageId);
+  return { error: null };
+}
+
+export async function updateUmrahDeparture(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requirePlatformAdmin();
+  const departureId = z.string().uuid().safeParse(formData.get("departureId"));
+  if (!departureId.success) return { error: "Invalid departure." };
+  const parsed = parseDeparture(formData);
+  if (!parsed.ok) return { error: parsed.error };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("umrah_package_departures")
+    .update(parsed.row)
+    .eq("id", departureId.data)
+    .eq("package_id", parsed.packageId)
+    .select("id");
+  if (error) return { error: departureErrorMessage(error) };
+  if (!data?.length) return { error: "Departure not found." };
+  revalidateUmrahPackage(parsed.packageId);
+  return { error: null };
+}
+
+export async function deleteUmrahDeparture(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requirePlatformAdmin();
+  const departureId = z.string().uuid().safeParse(formData.get("departureId"));
+  if (!departureId.success) return { error: "Invalid departure." };
+
+  const supabase = await createClient();
+  const { data: departure } = await supabase
+    .from("umrah_package_departures")
+    .select("id, package_id, booked_seats")
+    .eq("id", departureId.data)
+    .maybeSingle();
+  if (!departure) return { error: "Departure not found." };
+  if (departure.booked_seats > 0) return { error: "This departure has bookings and cannot be deleted." };
+
+  const { error } = await supabase.from("umrah_package_departures").delete().eq("id", departure.id);
+  if (error) return { error: departureErrorMessage(error) };
+  revalidateUmrahPackage(departure.package_id);
   return { error: null };
 }
 

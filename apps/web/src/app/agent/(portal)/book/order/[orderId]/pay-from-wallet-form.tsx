@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle } from "lucide-react";
 import {
@@ -13,7 +13,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
-import { initiatePayment } from "@/modules/payments/actions";
+import { trpc } from "@/lib/trpc/react";
 
 // Whole dollars, matching every other figure on this order page (Net,
 // Margin, Customer pays, Balance) — showing cents only here made the same
@@ -40,24 +40,28 @@ export function PayFromWalletForm({
   available: number;
   currency: string;
 }) {
-  const [state, formAction] = useActionState(initiatePayment, null);
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const remaining = available - amount;
-  const settled = useRef(false);
 
   // Settling lands back on this same page, so refresh rather than navigate.
-  useEffect(() => {
-    if (state?.destination && !settled.current) {
-      settled.current = true;
-      onSettled();
-    }
+  const initiate = trpc.payments.initiate.useMutation();
+  const [error, setError] = useState<string | null>(null);
 
-    function onSettled() {
+  async function handleSubmit() {
+    setError(null);
+    try {
+      const data = await initiate.mutateAsync({ orderId, methodId: "agency_wallet" });
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
       setOpen(false);
       router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start the payment.");
     }
-  }, [state, router]);
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -88,17 +92,14 @@ export function PayFromWalletForm({
           </div>
         </dl>
 
-        {state?.error ? (
+        {error ? (
           <Alert variant="destructive">
             <AlertCircle />
-            <AlertDescription>{state.error}</AlertDescription>
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : null}
 
-        <form action={formAction} className="flex justify-end gap-2">
-          <input type="hidden" name="orderId" value={orderId} />
-          <input type="hidden" name="methodId" value="agency_wallet" />
-          <input type="hidden" name="desk" value="1" />
+        <form action={handleSubmit} className="flex justify-end gap-2">
           <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
             Cancel
           </Button>

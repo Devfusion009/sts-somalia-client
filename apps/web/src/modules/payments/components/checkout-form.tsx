@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CreditCard, Smartphone, Wallet, Landmark, Building2, Lock, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { initiatePayment, type ActionState } from "@/modules/payments/actions";
+import { trpc } from "@/lib/trpc/react";
 
 /** Serializable subset of PaymentMethodDef safe to pass into a client component. */
 export type CheckoutMethod = {
@@ -49,10 +50,26 @@ export function CheckoutForm({
   /** Minimum a first payment must cover to count as a deposit (order.total * MIN_DEPOSIT_FRACTION). */
   minDeposit: number;
 }) {
-  const [state, formAction, pending] = useActionState<ActionState, FormData>(
-    initiatePayment,
-    null
-  );
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const initiate = trpc.payments.initiate.useMutation({
+    onSuccess: (data) => {
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
+      if (data.result?.type === "redirect") {
+        window.location.href = data.result.url;
+        return;
+      }
+      // "success" and "instructions" both land back on the checkout page: a
+      // fully-settled order redirects itself to /success on reload, a still-
+      // open balance or a requires_action banner just re-renders here.
+      router.push(`/checkout/${data.orderId ?? orderId}`);
+      router.refresh();
+    },
+    onError: (err) => setError(err.message),
+  });
   const [selectedId, setSelectedId] = useState(methods[0]?.id ?? "");
   const selected = methods.find((m) => m.id === selectedId);
 
@@ -62,12 +79,18 @@ export function CheckoutForm({
   const amountFloor = isFirstPayment ? minDeposit : 0.01;
   const payLabel = payChoice === "full" ? amountLabel : `${currency} ${amount.toFixed(2)}`;
 
-  return (
-    <form action={formAction} className="space-y-6">
-      <input type="hidden" name="orderId" value={orderId} />
-      <input type="hidden" name="methodId" value={selectedId} />
-      <input type="hidden" name="amount" value={payChoice === "full" ? "" : amount} />
+  function handleSubmit(formData: FormData) {
+    setError(null);
+    initiate.mutate({
+      orderId,
+      methodId: selectedId,
+      payerPhone: (formData.get("payerPhone")?.toString().trim() || undefined) as string | undefined,
+      amount: payChoice === "full" ? undefined : amount,
+    });
+  }
 
+  return (
+    <form action={handleSubmit} className="space-y-6">
       {remaining < 1 - 0.005 ? null : (
         <div>
           <h2 className="text-base font-semibold">How much would you like to pay?</h2>
@@ -201,9 +224,9 @@ export function CheckoutForm({
         </div>
       ) : null}
 
-      {state?.error ? (
+      {error ? (
         <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
 
@@ -219,14 +242,14 @@ export function CheckoutForm({
           type="submit"
           size="lg"
           disabled={
-            pending ||
+            initiate.isPending ||
             !selected ||
             (payChoice === "amount" && (!Number.isFinite(amount) || amount < amountFloor || amount > remaining))
           }
           className="gap-2"
         >
           <Lock className="size-4" />
-          {pending ? "Processing…" : `Pay Now ${payLabel}`}
+          {initiate.isPending ? "Processing…" : `Pay Now ${payLabel}`}
           <ArrowRight className="size-4" />
         </Button>
       </div>

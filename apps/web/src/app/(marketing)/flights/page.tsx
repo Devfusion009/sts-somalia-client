@@ -24,7 +24,7 @@ import {
   DEAL_GROUPS,
   FLIGHT_FAQS,
 } from "@/components/marketing/flights-data";
-import { getAirports } from "@/modules/flights/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { searchLiveFlights, type FlightSearchResult } from "@/modules/flights/provider";
 import { getCurrentProfile } from "@/lib/auth/session";
 import {
@@ -95,7 +95,11 @@ export default async function FlightsPage({
   };
 
   const hasSearch = Boolean(params.origin && params.destination && params.depart_date);
-  const [airports, profile] = await Promise.all([getAirports(), getCurrentProfile()]);
+  const trpc = await getServerTrpc();
+  const [airports, profile] = await Promise.all([
+    trpc.flights.airports.query().catch(() => []),
+    getCurrentProfile(),
+  ]);
 
   let result: FlightSearchResult | null = null;
   if (hasSearch) {

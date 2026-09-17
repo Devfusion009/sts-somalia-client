@@ -8,10 +8,75 @@ import type { ActionState } from "@/lib/auth/actions";
 import { getActiveAgencyId } from "@/modules/orders/helpers";
 import { createHotelBooking } from "@/modules/hotels/booking-actions";
 import { createUmrahBooking } from "@/modules/umrah/actions";
-import { createHallBooking } from "@/modules/events/actions";
-import { requestFlightQuote, type QuoteActionState } from "@/modules/flights/actions";
-import { initiatePayment } from "@/modules/payments/actions";
+import { getServerTrpc } from "@/lib/trpc/server";
+import { createHallBookingSchema, requestFlightQuoteSchema } from "@sts/shared-types";
 import { getBookingCustomers } from "./booking-context";
+
+export type QuoteActionState = { error: string | null; success?: boolean } | null;
+
+function parseHallBookingForm(formData: FormData) {
+  return createHallBookingSchema.safeParse({
+    venueId: formData.get("venueId"),
+    eventType: formData.get("eventType"),
+    eventName: formData.get("eventName")?.toString().trim() || undefined,
+    startDate: formData.get("startDate"),
+    endDate: formData.get("endDate"),
+    startTime: formData.get("startTime")?.toString() || undefined,
+    endTime: formData.get("endTime")?.toString() || undefined,
+    expectedGuests: formData.get("expectedGuests"),
+    setupRequirements: formData.get("setupRequirements")?.toString().trim() || undefined,
+    agencyCustomerId: formData.get("agencyCustomerId")?.toString() || undefined,
+    newCustomerName: formData.get("newCustomerName")?.toString() || undefined,
+    newCustomerPhone: formData.get("newCustomerPhone")?.toString() || undefined,
+  });
+}
+
+/** Runner shape for RUNNERS.hall — ported from modules/events/actions.ts onto the events tRPC router. */
+async function createHallBookingRunner(
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = parseHallBookingForm(formData);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const trpc = await getServerTrpc();
+  try {
+    const result = await trpc.events.createHallBooking.mutate(parsed.data);
+    return { error: null, orderId: result.orderId };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not create the booking. Please try again." };
+  }
+}
+
+function parseFlightQuoteForm(formData: FormData) {
+  return requestFlightQuoteSchema.safeParse({
+    origin: formData.get("origin")?.toString().toUpperCase(),
+    destination: formData.get("destination")?.toString().toUpperCase(),
+    departDate: formData.get("departDate"),
+    returnDate: formData.get("returnDate")?.toString() || undefined,
+    tripType: formData.get("tripType") ?? "one_way",
+    cabinClass: formData.get("cabinClass") ?? "economy",
+    adults: formData.get("adults") ?? 1,
+    contactPhone: formData.get("contactPhone"),
+    notes: formData.get("notes")?.toString().trim() || undefined,
+    agencyCustomerId: formData.get("agencyCustomerId")?.toString() || undefined,
+    newCustomerName: formData.get("newCustomerName")?.toString() || undefined,
+    newCustomerPhone: formData.get("newCustomerPhone")?.toString() || undefined,
+  });
+}
+
+async function requestFlightQuoteViaTrpc(formData: FormData): Promise<{ error: string | null }> {
+  const parsed = parseFlightQuoteForm(formData);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const trpc = await getServerTrpc();
+  try {
+    const result = await trpc.flights.requestQuote.mutate(parsed.data);
+    return result.error ? { error: result.error } : { error: null };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not send the quote request." };
+  }
+}
 
 /**
  * Places the same product for every customer on the counter.
@@ -31,7 +96,7 @@ import { getBookingCustomers } from "./booking-context";
 const RUNNERS = {
   hotel: createHotelBooking,
   umrah: createUmrahBooking,
-  hall: createHallBooking,
+  hall: createHallBookingRunner,
 } as const;
 
 type BatchVertical = keyof typeof RUNNERS;
@@ -156,14 +221,15 @@ export async function payBatchFromWallet(
 
   let firstError: string | null = null;
   let paid = 0;
+  const trpc = await getServerTrpc();
 
   for (const order of payable) {
-    const perOrder = new FormData();
-    perOrder.set("orderId", order.id);
-    perOrder.set("methodId", "agency_wallet");
-    perOrder.set("desk", "1");
-
-    const result = await initiatePayment(null, perOrder);
+    let result: { error: string | null };
+    try {
+      result = await trpc.payments.initiate.mutate({ orderId: order.id, methodId: "agency_wallet" });
+    } catch (err) {
+      result = { error: err instanceof Error ? err.message : "Could not process the payment." };
+    }
     if (result?.error) {
       // Almost always the balance running out partway through — stop rather
       // than hammering the wallet with calls that will each fail the same way.
@@ -203,7 +269,7 @@ export async function createBatchFlightQuotes(
   let sent = 0;
 
   for (const customer of customers) {
-    const result = await requestFlightQuote(null, cloneFor(formData, customer.id));
+    const result = await requestFlightQuoteViaTrpc(cloneFor(formData, customer.id));
     if (result?.error) {
       failed.push(customer.full_name);
     } else {

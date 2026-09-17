@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
 import { getPartnerBookings } from "@/modules/hotels/partner-queries";
-import { hotelGuestNames } from "@/modules/payments/queries";
+import { hotelGuestNames } from "@/modules/orders/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

@@ -64,6 +64,7 @@ export default async function AgentUmrahBookingPage({
             currency={pkg.currency}
             basePrice={Number(pkg.base_price)}
             departures={upcomingDepartures}
+            pricing={pkg.umrah_package_pricing}
             action={isGroup ? createBatchBooking : undefined}
             bookedForSlot={
               <>

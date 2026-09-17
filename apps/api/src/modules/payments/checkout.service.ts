@@ -5,6 +5,46 @@ import type { Database } from "@sts/shared-types";
 import { countryName } from "@sts/shared-types";
 import { format } from "date-fns";
 
+type Tables = Database["public"]["Tables"];
+
+/**
+ * Hand-declared, not inferred from the `.select()` call below — the same
+ * TS2589 trap `bookings.service.ts`'s MyBookingsResult works around.
+ * postgrest-js's generic inference over a join this wide (5 order_item
+ * branches, one nested two levels) is too deep for the AppRouter's exported
+ * .d.ts to survive re-instantiation on apps/web's side of the tRPC
+ * boundary; asserting the query result to this finite type once, here,
+ * keeps the emitted procedure type simple regardless of how the query
+ * itself is typed internally. Field set mirrors the select string exactly.
+ */
+export type CheckoutOrderRow = Tables["orders"]["Row"] & {
+  order_items: Array<
+    Tables["order_items"]["Row"] & {
+      hotel_booking:
+        | (Tables["hotel_bookings"]["Row"] & { hotel: Pick<Tables["hotels"]["Row"], "name"> })
+        | null;
+      flight_booking: Tables["flight_bookings"]["Row"] | null;
+      visa_application:
+        | (Tables["visa_applications"]["Row"] & {
+            visa_type: Pick<Tables["visa_types"]["Row"], "name" | "destination_country_code">;
+          })
+        | null;
+      umrah_booking:
+        | (Tables["umrah_bookings"]["Row"] & {
+            package: Pick<Tables["umrah_packages"]["Row"], "name">;
+            custom_request: Pick<Tables["umrah_custom_requests"]["Row"], "reference" | "departure_date"> | null;
+            umrah_pilgrims: Array<Pick<Tables["umrah_pilgrims"]["Row"], "full_name">>;
+            departure: Tables["umrah_package_departures"]["Row"] | null;
+          })
+        | null;
+      hall_booking:
+        | (Tables["hall_bookings"]["Row"] & { venue: Pick<Tables["event_venues"]["Row"], "name"> })
+        | null;
+    }
+  >;
+  payments: Array<Tables["payments"]["Row"]>;
+};
+
 /**
  * Direct port of apps/web's modules/payments/queries.ts. This is the exact
  * shape `invoicing` and `bookings/pdf/VoucherDocument.tsx` (both still in
@@ -20,7 +60,7 @@ export class CheckoutService {
   }
 
   /** Order + items (with human labels) + payment history for checkout/receipts. */
-  async getOrderForCheckout(orderId: string) {
+  async getOrderForCheckout(orderId: string): Promise<CheckoutOrderRow | null> {
     const { data: order } = await this.db()
       .from("orders")
       .select(
@@ -30,7 +70,17 @@ export class CheckoutService {
            hotel_booking:hotel_booking_id (id, status, check_in, check_out, num_rooms, guest_details, hotel:hotel_id (name)),
            flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at),
            visa_application:visa_application_id (id, application_ref, applicant_type, visa_type:visa_type_id (name, destination_country_code)),
-           umrah_booking:umrah_booking_id (id, num_pilgrims, booking_kind, status, package:package_id (name), custom_request:custom_request_id (reference, departure_date)),
+           umrah_booking:umrah_bookings!umrah_booking_id (
+             id, num_pilgrims, booking_kind, status, fulfillment_stage, room_sharing,
+             package:package_id (name),
+             custom_request:custom_request_id (reference, departure_date),
+             umrah_pilgrims (full_name),
+             departure:departure_id (
+               departure_date, return_date,
+               outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at,
+               return_airline, return_flight_number, return_departs_at, return_arrives_at, baggage_note
+             )
+           ),
            hall_booking:hall_booking_id (id, status, start_date, end_date, event_type, venue:venue_id (name))
          ),
          payments (*)`
@@ -38,11 +88,11 @@ export class CheckoutService {
       .eq("id", orderId)
       .maybeSingle();
 
-    return order;
+    return order as unknown as CheckoutOrderRow | null;
   }
 }
 
-export type CheckoutOrder = NonNullable<Awaited<ReturnType<CheckoutService["getOrderForCheckout"]>>>;
+export type CheckoutOrder = CheckoutOrderRow;
 export type CheckoutOrderItem = CheckoutOrder["order_items"][number];
 
 /** Direct port — reads hotel_bookings.guest_details ({full_name}[] jsonb) into plain names. */

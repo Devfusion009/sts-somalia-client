@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { AlertCircle, ArrowLeft, CheckCircle2, Download } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyOrder, getAgencyTopupRequests } from "@/modules/agencies/queries";
-import { describeOrderItem } from "@/modules/payments/queries";
+import { describeOrderItem } from "@/modules/orders/format";
 import { WalletPaymentPanel } from "@/modules/agencies/components/wallet-payment-panel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";

@@ -4,13 +4,14 @@ import { ExternalLink } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getUmrahPackageById, getActiveAgenciesForPicker } from "@/modules/admin/queries";
-import { getAirports } from "@/modules/flights/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { umrahImagePaths } from "@/modules/umrah/images";
+import { formatMoney } from "@/modules/umrah/pricing";
 import { cn } from "@/lib/utils";
-import { DeparturesForm } from "./departures-form";
+import { DepartureDialog, DeleteDepartureButton } from "./departures-form";
 import { GalleryManager } from "./gallery-manager";
 import { PackageDetailsForm } from "./package-details-form";
 import { HotelsManager, ItineraryManager, PricingManager, AgenciesPicker } from "./package-config-forms";
@@ -22,12 +23,17 @@ const STATUS_STYLES: Record<string, string> = {
   suspended: "bg-destructive/10 text-destructive",
 };
 
+function formatDay(value: string) {
+  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
 export default async function UmrahPackageConfigPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const trpc = await getServerTrpc();
   const [pkg, agencies, airports] = await Promise.all([
     getUmrahPackageById(id),
     getActiveAgenciesForPicker(),
-    getAirports(),
+    trpc.flights.airports.query().catch(() => []),
   ]);
   if (!pkg) notFound();
 
@@ -137,45 +143,64 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden pb-0">
         <CardHeader>
           <CardTitle className="text-base">Departures</CardTitle>
+          <CardAction>
+            <DepartureDialog packageId={pkg.id} currency={pkg.currency} />
+          </CardAction>
         </CardHeader>
-        <CardContent>
-          <DeparturesForm packageId={pkg.id} />
-        </CardContent>
-      </Card>
-
-      <Card className="overflow-hidden py-0">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Departure</TableHead>
               <TableHead>Return</TableHead>
               <TableHead>Seats</TableHead>
+              <TableHead>Seats left</TableHead>
+              <TableHead>Flights</TableHead>
               <TableHead>Price override</TableHead>
+              <TableHead className="text-right" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {departures.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
                   No departures scheduled yet.
                 </TableCell>
               </TableRow>
             ) : (
-              departures.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell>{new Date(d.departure_date).toLocaleDateString()}</TableCell>
-                  <TableCell>{new Date(d.return_date).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    {d.booked_seats} / {d.total_seats} booked
-                  </TableCell>
-                  <TableCell>
-                    {d.price_override ? `${pkg.currency} ${Number(d.price_override).toFixed(0)}` : "—"}
-                  </TableCell>
-                </TableRow>
-              ))
+              departures.map((d) => {
+                const seatsLeft = d.total_seats - d.booked_seats - d.offline_seats;
+                const flights = [
+                  [d.outbound_airline, d.outbound_flight_number].filter(Boolean).join(" "),
+                  [d.return_airline, d.return_flight_number].filter(Boolean).join(" "),
+                ].filter(Boolean);
+                return (
+                  <TableRow key={d.id}>
+                    <TableCell>{formatDay(d.departure_date)}</TableCell>
+                    <TableCell>{formatDay(d.return_date)}</TableCell>
+                    <TableCell className="tabular-nums">
+                      {d.booked_seats} + {d.offline_seats} offline / {d.total_seats}
+                    </TableCell>
+                    <TableCell className={cn("tabular-nums", seatsLeft <= 0 && "font-medium text-destructive")}>
+                      {seatsLeft}
+                    </TableCell>
+                    <TableCell>{flights.length ? flights.join(" · ") : "—"}</TableCell>
+                    <TableCell>
+                      {d.price_override !== null ? formatMoney(Number(d.price_override), pkg.currency) : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1.5">
+                        <DepartureDialog packageId={pkg.id} currency={pkg.currency} departure={d} />
+                        {d.booked_seats === 0 ? (
+                          <DeleteDepartureButton departureId={d.id} label={formatDay(d.departure_date)} />
+                        ) : null}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { UmrahService } from "@/modules/umrah/services";
+import { toSharingPriceMap, type SharingPriceMap } from "@/modules/umrah/pricing";
 
 const SERVICE_SELECT =
   "id, category, name, description, tier, price, currency, price_unit, star_rating, distance_to_haram_m, is_default, sort_order";
@@ -24,20 +25,42 @@ export async function getUmrahServices(): Promise<UmrahService[]> {
   return (data ?? []).map((s) => ({ ...s, price: Number(s.price) }));
 }
 
+/**
+ * Occupancy prices (single/double/triple/quad) for published hotel services,
+ * keyed by service id. Services without rows fall back to their base price.
+ */
+export async function getUmrahSharingPrices(): Promise<SharingPriceMap> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("umrah_service_sharing_prices")
+    .select("service_id, sharing, price, service:umrah_services!inner(status, category)")
+    .eq("service.status", "published")
+    .in("service.category", ["hotel_makkah", "hotel_madinah"]);
+
+  return toSharingPriceMap(data ?? []);
+}
+
 /** Every service including drafts — the admin catalog screen. */
 export async function getUmrahServicesAdmin() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("umrah_services")
-    .select(`${SERVICE_SELECT}, status`)
+    .select(`${SERVICE_SELECT}, status, sharing_prices:umrah_service_sharing_prices(sharing, price)`)
     .order("category")
     .order("sort_order");
 
-  return (data ?? []).map((s) => ({ ...s, price: Number(s.price) }));
+  return (data ?? []).map((s) => ({
+    ...s,
+    price: Number(s.price),
+    sharing_prices: (s.sharing_prices ?? []).map((p) => ({
+      sharing: p.sharing,
+      price: Number(p.price),
+    })),
+  }));
 }
 
 const REQUEST_SELECT =
-  `id, reference, status, current_step, tier, num_pilgrims, departure_date,
+  `id, reference, status, current_step, tier, num_pilgrims, room_sharing, departure_date,
    nights_makkah, nights_madinah, notes, pilgrims, subtotal, currency, customer_id, booked_by,
    agency_id, created_at,
    services:umrah_custom_request_services(id, service_id, category, name, price_unit, unit_price, quantity, line_total)`;

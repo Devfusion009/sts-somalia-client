@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Smartphone, Star, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,30 +35,61 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
-import {
-  saveWalletMethodAction,
-  deleteWalletMethodAction,
-  setDefaultWalletMethodAction,
-} from "../account-actions";
+import { trpc } from "@/lib/trpc/react";
 import { SAVABLE_WALLETS, WALLET_LABELS, maskMsisdn } from "../saved-methods";
-import type { SavedPaymentMethod } from "../account-queries";
+import type { Database } from "@/lib/types/database.types";
+import type { SaveWalletMethodInput } from "@sts/shared-types";
+
+type SavedPaymentMethod = Database["public"]["Tables"]["payment_methods"]["Row"];
 
 const WALLET_ITEMS = SAVABLE_WALLETS.map((w) => ({ value: w.id, label: w.label }));
 
 export function SavedMethodsManager({ methods }: { methods: SavedPaymentMethod[] }) {
+  const router = useRouter();
   const [editing, setEditing] = useState<SavedPaymentMethod | null | "new">(null);
   const [confirmDelete, setConfirmDelete] = useState<SavedPaymentMethod | null>(null);
-  const [state, formAction] = useActionState(saveWalletMethodAction, null);
 
-  // Close once the action succeeds. Derived during render rather than in an
-  // effect, per this codebase's established pattern (see
-  // src/app/affiliate/links/new-link-form.tsx): comparing against the
-  // last-seen state avoids the cascading re-render an effect would cause.
-  const [lastState, setLastState] = useState(state);
-  if (state !== lastState) {
-    setLastState(state);
-    if (state && !state.error) setEditing(null);
+  const saveMethod = trpc.payments.account.saveWalletMethod.useMutation({
+    onSuccess: (result) => {
+      if (result.error) return;
+      setEditing(null);
+      router.refresh();
+    },
+  });
+  const deleteMethod = trpc.payments.account.deleteWalletMethod.useMutation({
+    onSuccess: () => {
+      setConfirmDelete(null);
+      router.refresh();
+    },
+  });
+  const setDefaultMethod = trpc.payments.account.setDefaultWalletMethod.useMutation({
+    onSuccess: () => router.refresh(),
+  });
+
+  async function handleSave(formData: FormData) {
+    try {
+      await saveMethod.mutateAsync({
+        methodId: editing !== "new" ? editing?.id : undefined,
+        provider: formData.get("provider") as SaveWalletMethodInput["provider"],
+        msisdn: formData.get("msisdn") as string,
+        label: (formData.get("label") as string) || undefined,
+        makeDefault: formData.get("makeDefault") === "on",
+      });
+    } catch {
+      // handled via saveMethod.error below
+    }
   }
+
+  async function handleDelete() {
+    if (!confirmDelete) return;
+    try {
+      await deleteMethod.mutateAsync({ methodId: confirmDelete.id });
+    } catch {
+      // deletion failing silently matches the prior server-action behavior
+    }
+  }
+
+  const saveError = saveMethod.error?.message ?? saveMethod.data?.error ?? null;
 
   return (
     <div className="space-y-4">
@@ -122,18 +154,17 @@ export function SavedMethodsManager({ methods }: { methods: SavedPaymentMethod[]
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {!method.is_default ? (
-                    <form action={setDefaultWalletMethodAction}>
-                      <input type="hidden" name="methodId" value={method.id} />
-                      <Button
-                        type="submit"
-                        size="icon"
-                        variant="ghost"
-                        aria-label="Make default"
-                        title="Make default"
-                      >
-                        <Star className="size-4" />
-                      </Button>
-                    </form>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Make default"
+                      title="Make default"
+                      disabled={setDefaultMethod.isPending}
+                      onClick={() => setDefaultMethod.mutate({ methodId: method.id })}
+                    >
+                      <Star className="size-4" />
+                    </Button>
                   ) : null}
                   <Button
                     size="icon"
@@ -171,16 +202,12 @@ export function SavedMethodsManager({ methods }: { methods: SavedPaymentMethod[]
 
           <form
             key={editing === "new" ? "new" : (editing?.id ?? "none")}
-            action={formAction}
+            action={handleSave}
             className="space-y-4"
           >
-            {editing && editing !== "new" ? (
-              <input type="hidden" name="methodId" value={editing.id} />
-            ) : null}
-
-            {state?.error ? (
+            {saveError ? (
               <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
+                <AlertDescription>{saveError}</AlertDescription>
               </Alert>
             ) : null}
 
@@ -266,15 +293,13 @@ export function SavedMethodsManager({ methods }: { methods: SavedPaymentMethod[]
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep</AlertDialogCancel>
-            <form action={deleteWalletMethodAction}>
-              <input type="hidden" name="methodId" value={confirmDelete?.id ?? ""} />
-              <AlertDialogAction
-                type="submit"
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Remove
-              </AlertDialogAction>
-            </form>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMethod.isPending}
+              onClick={handleDelete}
+            >
+              Remove
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

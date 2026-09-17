@@ -21,9 +21,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getAllOrders } from "@/modules/admin/queries";
 import { describeOrderItem, travelWindow, travelLength, orderTravelStart } from "@/modules/admin/order-items";
-import { adminConfirmPayment } from "@/modules/payments/actions";
 import { OrderStatusSelect } from "./order-status-select";
 import { RecordPaymentDialog } from "./record-payment-dialog";
+import { ConfirmPaymentButton } from "./confirm-payment-button";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Orders & Payments" };
@@ -371,13 +371,7 @@ export default async function AdminOrdersPage({
                               {formatDistanceToNowStrict(new Date(payment.created_at))} ago
                             </span>
                             {payment.status === "requires_action" ? (
-                              <form action={adminConfirmPayment}>
-                                <input type="hidden" name="paymentId" value={payment.id} />
-                                <Button size="sm" type="submit" className="h-7 gap-1">
-                                  <BadgeCheck className="size-3.5" />
-                                  Confirm funds received
-                                </Button>
-                              </form>
+                              <ConfirmPaymentButton paymentId={payment.id} />
                             ) : null}
                           </div>
                         ))

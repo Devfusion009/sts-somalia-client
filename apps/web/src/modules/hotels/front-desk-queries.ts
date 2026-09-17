@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { hotelGuestNames } from "@/modules/payments/queries";
+import { hotelGuestNames } from "@/modules/orders/format";
 import { getHotelAvailability } from "@/modules/hotels/availability";
 
 export type FrontDeskStatus =

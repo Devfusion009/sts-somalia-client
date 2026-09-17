@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { format } from "date-fns";
-import { describeOrderItem, hotelGuestNames, type CheckoutOrder } from "@/modules/payments/queries";
+import { describeOrderItem, hotelGuestNames } from "@/modules/orders/format";
+import type { CheckoutOrderRow } from "api/dist/modules/payments/checkout.service";
 import { pdfText } from "@/lib/pdf-text";
 import { stsLogo, STS_LOGO_ASPECT } from "@/lib/pdf-logo";
 
@@ -89,7 +90,7 @@ export function InvoiceDocument({
   customer,
   agencyName,
 }: {
-  order: CheckoutOrder;
+  order: CheckoutOrderRow;
   invoiceNumber: string;
   issuedAt: string;
   customer: { full_name: string | null; email: string | null };

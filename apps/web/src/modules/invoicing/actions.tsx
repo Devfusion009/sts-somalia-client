@@ -2,7 +2,8 @@ import "server-only";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrderForCheckout } from "@/modules/payments/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
+import type { CheckoutOrderRow } from "api/dist/modules/payments/checkout.service";
 import { InvoiceDocument } from "./pdf/InvoiceDocument";
 
 const SIGNED_URL_TTL_SECONDS = 60;
@@ -10,14 +11,23 @@ const SIGNED_URL_TTL_SECONDS = 60;
 /**
  * Returns a short-lived signed URL to this order's invoice PDF, rendering
  * and caching it in Storage on first request. The order fetch goes through
- * the normal RLS-scoped client, so access control (customer/booker/agency
- * member/admin) is enforced the same way as everywhere else that reads an
- * order — this function never widens who can see what.
+ * apps/api's RLS-scoped payments router, so access control (customer/booker/
+ * agency member/admin) is enforced the same way as everywhere else that
+ * reads an order — this function never widens who can see what.
  */
 export async function getInvoicePdfUrl(orderId: string): Promise<string> {
   const supabase = await createClient();
 
-  const order = await getOrderForCheckout(orderId);
+  const trpc = await getServerTrpc();
+  let order: CheckoutOrderRow | null;
+  try {
+    // Cast, not inferred — see the comment on the same call in
+    // checkout/[orderId]/page.tsx: this procedure's output is deep enough to
+    // trip TS2589 when re-walked through tRPC's client-side inference.
+    order = (await trpc.payments.orderForCheckout.query({ orderId })) as unknown as CheckoutOrderRow | null;
+  } catch {
+    throw new Error("Invoice is temporarily unavailable. Please try again in a moment.");
+  }
   if (!order) {
     throw new Error("Order not found, or you don't have access to it.");
   }

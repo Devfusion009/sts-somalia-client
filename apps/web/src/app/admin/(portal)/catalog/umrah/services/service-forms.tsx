@@ -21,6 +21,7 @@ import { saveUmrahService, deleteUmrahService } from "@/modules/umrah/service-ad
 import type { ActionState } from "@/lib/auth/actions";
 import {
   PRICE_UNIT_LABELS,
+  ROOM_SHARING_OPTIONS,
   UMRAH_CATEGORIES,
   UMRAH_TIERS,
   type UmrahPriceUnit,
@@ -42,6 +43,7 @@ export type AdminService = {
   is_default: boolean;
   sort_order: number;
   status: string;
+  sharing_prices: { sharing: number; price: number }[];
 };
 
 const HOTEL_CATEGORIES: UmrahServiceCategory[] = ["hotel_makkah", "hotel_madinah"];
@@ -147,6 +149,25 @@ function ServiceFields({ service }: { service?: AdminService }) {
 
       {isHotel ? (
         <>
+          {ROOM_SHARING_OPTIONS.map((option) => {
+            const id = `sharingPrice${option.value}-${service?.id ?? "new"}`;
+            return (
+              <div key={option.value} className="space-y-2">
+                <Label htmlFor={id}>{option.label} (USD)</Label>
+                <Input
+                  id={id}
+                  name={`sharingPrice${option.value}`}
+                  type="number"
+                  min={0.01}
+                  step="0.01"
+                  defaultValue={
+                    service?.sharing_prices.find((p) => p.sharing === option.value)?.price ?? ""
+                  }
+                  placeholder={service ? String(service.price) : undefined}
+                />
+              </div>
+            );
+          })}
           <div className="space-y-2">
             <Label htmlFor={`starRating-${service?.id ?? "new"}`}>Star rating</Label>
             <Input

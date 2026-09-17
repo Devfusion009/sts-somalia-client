@@ -3,7 +3,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChevronRight, Home, Trash2 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import { getUmrahCustomRequest, getUmrahServices } from "@/modules/umrah/custom-queries";
+import {
+  getUmrahCustomRequest,
+  getUmrahServices,
+  getUmrahSharingPrices,
+} from "@/modules/umrah/custom-queries";
+import { isRoomSharing } from "@/modules/umrah/pricing";
 import { discardUmrahCustomRequest } from "@/modules/umrah/custom-actions";
 import type { PilgrimInput } from "@/modules/umrah/custom-actions";
 import { BuilderStepper, PriceSummary } from "@/modules/umrah/components/builder-shared";
@@ -45,7 +50,9 @@ export default async function PrivateUmrahBuilderPage({
 
   // Only the services step needs the whole catalog; the other three would be
   // paying for a query nothing renders.
-  const services = step === 2 ? await getUmrahServices() : [];
+  const [services, sharingPrices] =
+    step === 2 ? await Promise.all([getUmrahServices(), getUmrahSharingPrices()]) : [[], {}];
+  const roomSharing = isRoomSharing(request.room_sharing) ? request.room_sharing : 4;
 
   const savedLines = request.services.map((s) => ({
     id: s.id,
@@ -95,6 +102,7 @@ export default async function PrivateUmrahBuilderPage({
               total={request.subtotal}
               currency={request.currency}
               trip={trip}
+              roomSharing={roomSharing}
               emptyText="You haven't chosen any services yet."
             />
           ) : null}
@@ -143,6 +151,8 @@ export default async function PrivateUmrahBuilderPage({
               savedServiceIds={request.services
                 .map((s) => s.service_id)
                 .filter((id): id is string => id !== null)}
+              initialRoomSharing={roomSharing}
+              sharingPrices={sharingPrices}
             />
           ) : null}
 
@@ -161,6 +171,7 @@ export default async function PrivateUmrahBuilderPage({
               reference={request.reference}
               tier={request.tier}
               trip={trip}
+              roomSharing={roomSharing}
               departureDate={request.departure_date}
               lines={request.services}
               total={request.subtotal}

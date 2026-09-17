@@ -9,8 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
-import { requestFlightQuote } from "@/modules/flights/actions";
+import { trpc } from "@/lib/trpc/react";
+import { requestFlightQuoteSchema } from "@sts/shared-types";
 import type { FlightSearchDefaults } from "./flight-search-form";
+
+type QuoteActionState = { error: string | null; success?: boolean } | null;
 
 /**
  * Manual quote flow: pre-filled from the search the visitor just ran; STS
@@ -25,7 +28,38 @@ export function QuoteRequestForm({
   signedIn: boolean;
   bookedForSlot?: React.ReactNode;
 }) {
-  const [state, formAction] = useActionState(requestFlightQuote, null);
+  const requestQuote = trpc.flights.requestQuote.useMutation();
+
+  async function submitQuote(
+    _prev: QuoteActionState,
+    formData: FormData
+  ): Promise<QuoteActionState> {
+    const parsed = requestFlightQuoteSchema.safeParse({
+      origin: formData.get("origin")?.toString().toUpperCase(),
+      destination: formData.get("destination")?.toString().toUpperCase(),
+      departDate: formData.get("departDate"),
+      returnDate: formData.get("returnDate")?.toString() || undefined,
+      tripType: formData.get("tripType") ?? "one_way",
+      cabinClass: formData.get("cabinClass") ?? "economy",
+      adults: formData.get("adults") ?? 1,
+      contactPhone: formData.get("contactPhone"),
+      notes: formData.get("notes")?.toString().trim() || undefined,
+      agencyCustomerId: formData.get("agencyCustomerId")?.toString() || undefined,
+      newCustomerName: formData.get("newCustomerName")?.toString() || undefined,
+      newCustomerPhone: formData.get("newCustomerPhone")?.toString() || undefined,
+    });
+    if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+    try {
+      const result = await requestQuote.mutateAsync(parsed.data);
+      if (result.error) return { error: result.error };
+      return { error: null, success: true };
+    } catch {
+      return { error: "Could not send the quote request. Try again." };
+    }
+  }
+
+  const [state, formAction] = useActionState(submitQuote, null);
 
   if (!signedIn) {
     return (

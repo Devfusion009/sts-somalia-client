@@ -2,24 +2,27 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
 import { Download, ReceiptText, RotateCcw } from "lucide-react";
-import {
-  getMySavedPaymentMethods,
-  getMyReceipts,
-  getMyRefunds,
-} from "@/modules/payments/account-queries";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { SavedMethodsManager } from "@/modules/payments/components/saved-methods-manager";
 import { StatusBadge, formatMoney } from "@/modules/bookings/components/booking-shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 
 export const metadata: Metadata = { title: "Payments & Receipts" };
 
 export default async function AccountPaymentsPage() {
-  const [methods, receipts, refunds] = await Promise.all([
-    getMySavedPaymentMethods(),
-    getMyReceipts(),
-    getMyRefunds(),
-  ]);
+  const trpc = await getServerTrpc();
+  let methods, receipts, refunds;
+  try {
+    [methods, receipts, refunds] = await Promise.all([
+      trpc.payments.account.savedMethods.query(),
+      trpc.payments.account.receipts.query(),
+      trpc.payments.account.refunds.query(),
+    ]);
+  } catch {
+    return <UnavailableNotice label="Payments & Receipts" />;
+  }
 
   const hasRefundActivity = refunds.requests.length > 0 || refunds.settled.length > 0;
 

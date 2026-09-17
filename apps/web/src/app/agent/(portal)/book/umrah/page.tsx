@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight, Settings2 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getMyAgency } from "@/modules/agencies/queries";
@@ -39,7 +39,12 @@ export default async function AgentUmrahDeskPage() {
         <ArrowLeft className="size-3.5" /> Services
       </Link>
 
-      <h1 className="font-heading text-2xl font-bold">Umrah</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-heading text-2xl font-bold">Umrah</h1>
+        <Button render={<Link href="/agent/book/umrah/private" />} className="gap-2">
+          <Settings2 className="size-4" /> Build private Umrah <ArrowRight className="size-3.5" />
+        </Button>
+      </div>
 
       {packages.length === 0 ? (
         <Card>
@@ -64,7 +69,9 @@ export default async function AgentUmrahDeskPage() {
               <TableBody>
                 {packages.map((pkg) => {
                   const seatsLeft = pkg.nextDeparture
-                    ? pkg.nextDeparture.total_seats - pkg.nextDeparture.booked_seats
+                    ? pkg.nextDeparture.total_seats -
+                      pkg.nextDeparture.booked_seats -
+                      pkg.nextDeparture.offline_seats
                     : null;
                   return (
                     <TableRow key={pkg.id}>

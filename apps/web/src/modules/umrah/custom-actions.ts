@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentProfile, requireUser } from "@/lib/auth/session";
+import { portalLoginHref } from "@/lib/subdomain";
 import { createClient } from "@/lib/supabase/server";
 import {
   assertAgencyCanBookProduct,
@@ -13,7 +14,13 @@ import {
 import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
 import { REQUEST_NOT_EDITABLE_ERROR } from "@/modules/umrah/custom-errors";
 import { UMRAH_CATEGORIES, type UmrahService } from "@/modules/umrah/services";
-import { priceSelection } from "@/modules/umrah/pricing";
+import {
+  isRoomSharing,
+  priceSelection,
+  toSharingPriceMap,
+  unitPriceFor,
+  type SharingPriceMap,
+} from "@/modules/umrah/pricing";
 
 export type ActionState = {
   error: string | null;
@@ -22,8 +29,24 @@ export type ActionState = {
   values?: Record<string, string>;
 } | null;
 
-function wizardPath(requestId: string, step: number) {
-  return `/umrah/private/${requestId}?step=${step}`;
+/**
+ * Every wizard redirect goes through this so the builder can be hosted at
+ * two base paths — the B2C marketing route and the agent desk — without the
+ * two ever bleeding into each other. `desk` comes from a hidden form field
+ * each step's `<form>` renders when it is mounted under the agent portal;
+ * a plain B2C submission never sends it, so the default keeps the existing
+ * marketing behaviour unchanged.
+ */
+function wizardBasePath(desk: boolean): string {
+  return desk ? "/agent/book/umrah/private" : "/umrah/private";
+}
+
+function wizardPath(requestId: string, step: number, desk = false) {
+  return `${wizardBasePath(desk)}/${requestId}?step=${step}`;
+}
+
+function isDesk(formData: FormData): boolean {
+  return formData.get("desk") === "1";
 }
 
 function formValues(formData: FormData): Record<string, string> {
@@ -57,9 +80,16 @@ async function getEditableRequest(requestId: string, profileId: string) {
  * half-built trip somewhere the customer can no longer reach it, which is
  * exactly the bug the visa wizard already solved the same way.
  */
-export async function startUmrahCustomRequest(): Promise<void> {
+export async function startUmrahCustomRequest(formData: FormData): Promise<void> {
+  const desk = isDesk(formData);
   const profile = await getCurrentProfile();
-  if (!profile) redirect(`/login?redirect_to=${encodeURIComponent("/umrah/private")}`);
+  if (!profile) {
+    redirect(
+      desk
+        ? portalLoginHref("agent")
+        : `/login?redirect_to=${encodeURIComponent(wizardBasePath(desk))}`
+    );
+  }
 
   const supabase = await createClient();
 
@@ -76,11 +106,11 @@ export async function startUmrahCustomRequest(): Promise<void> {
   // data is already saved, so sending someone back through screens they've
   // already filled in just to reach the one they stopped on is the kind of
   // busywork a "resume" feature exists to remove.
-  if (existing) redirect(wizardPath(existing.id, existing.current_step));
+  if (existing) redirect(wizardPath(existing.id, existing.current_step, desk));
 
   const agencyId = await getActiveAgencyId(supabase, profile.id);
   const access = await assertAgencyCanBookProduct(supabase, agencyId, "umrah");
-  if (!access.ok) redirect("/umrah?blocked=1");
+  if (!access.ok) redirect(desk ? "/agent/book/umrah" : "/umrah?blocked=1");
 
   const { data: created, error } = await supabase
     .from("umrah_custom_requests")
@@ -92,8 +122,8 @@ export async function startUmrahCustomRequest(): Promise<void> {
     .select("id")
     .single();
 
-  if (error || !created) redirect("/umrah/private?error=1");
-  redirect(wizardPath(created.id, 1));
+  if (error || !created) redirect(`${wizardBasePath(desk)}?error=1`);
+  redirect(wizardPath(created.id, 1, desk));
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +144,7 @@ export async function saveUmrahTripBasics(
 ): Promise<ActionState> {
   const profile = await requireUser();
   const requestId = String(formData.get("requestId"));
+  const desk = isDesk(formData);
 
   const parsed = basicsSchema.safeParse({
     tier: formData.get("tier"),
@@ -188,7 +219,7 @@ export async function saveUmrahTripBasics(
   // a traveller.
   await repriceRequest(supabase, requestId);
 
-  redirect(wizardPath(requestId, 2));
+  redirect(wizardPath(requestId, 2, desk));
 }
 
 // ---------------------------------------------------------------------------
@@ -201,9 +232,13 @@ export async function saveUmrahTripServices(
 ): Promise<ActionState> {
   const profile = await requireUser();
   const requestId = String(formData.get("requestId"));
+  const desk = isDesk(formData);
 
   const { supabase, request } = await getEditableRequest(requestId, profile.id);
   if (!request) return { error: REQUEST_NOT_EDITABLE_ERROR };
+
+  const roomSharing = Number(formData.get("room_sharing"));
+  if (!isRoomSharing(roomSharing)) return { error: "Choose a room type." };
 
   const serviceIds = formData
     .getAll("service_id")
@@ -246,7 +281,11 @@ export async function saveUmrahTripServices(
     nightsMakkah: request.nights_makkah,
     nightsMadinah: request.nights_madinah,
   };
-  const { lines, total } = priceSelection(services, trip);
+  const sharingPrices = await loadSharingPrices(
+    supabase,
+    services.map((s) => s.id)
+  );
+  const { lines, total } = priceSelection(services, trip, { roomSharing, sharingPrices });
 
   // Replace wholesale rather than diffing: the selection IS the state, and a
   // partial update is how a deselected line survives into the total.
@@ -276,13 +315,14 @@ export async function saveUmrahTripServices(
     .from("umrah_custom_requests")
     .update({
       subtotal: total,
+      room_sharing: roomSharing,
       currency: services[0]?.currency ?? request.currency,
       current_step: Math.max(request.current_step, 3),
     })
     .eq("id", requestId);
   if (updateError) return { error: updateError.message };
 
-  redirect(wizardPath(requestId, 3));
+  redirect(wizardPath(requestId, 3, desk));
 }
 
 // ---------------------------------------------------------------------------
@@ -313,6 +353,7 @@ export async function saveUmrahTripPilgrims(
 ): Promise<ActionState> {
   const profile = await requireUser();
   const requestId = String(formData.get("requestId"));
+  const desk = isDesk(formData);
 
   const { supabase, request } = await getEditableRequest(requestId, profile.id);
   if (!request) return { error: REQUEST_NOT_EDITABLE_ERROR };
@@ -348,7 +389,7 @@ export async function saveUmrahTripPilgrims(
     .eq("id", requestId);
   if (error) return { error: error.message, values: formValues(formData) };
 
-  redirect(wizardPath(requestId, 4));
+  redirect(wizardPath(requestId, 4, desk));
 }
 
 // ---------------------------------------------------------------------------
@@ -372,6 +413,7 @@ export async function submitUmrahCustomRequest(
 ): Promise<ActionState> {
   const profile = await requireUser();
   const requestId = String(formData.get("requestId"));
+  const desk = isDesk(formData);
 
   const { supabase, request } = await getEditableRequest(requestId, profile.id);
   if (!request) return { error: REQUEST_NOT_EDITABLE_ERROR };
@@ -410,6 +452,7 @@ export async function submitUmrahCustomRequest(
       booked_by: profile.id,
       agency_id: agencyId,
       num_pilgrims: request.num_pilgrims,
+      room_sharing: request.room_sharing,
       total_price: total,
       currency: request.currency,
       special_requests: request.notes,
@@ -459,7 +502,7 @@ export async function submitUmrahCustomRequest(
     .update({ status: "submitted", subtotal: total })
     .eq("id", requestId);
 
-  redirect(`/account/bookings/${order.id}?requested=1`);
+  redirect(desk ? `/agent/bookings/${order.id}` : `/account/bookings/${order.id}?requested=1`);
 }
 
 // ---------------------------------------------------------------------------
@@ -467,6 +510,16 @@ export async function submitUmrahCustomRequest(
 // ---------------------------------------------------------------------------
 
 type Client = Awaited<ReturnType<typeof createClient>>;
+
+/** Occupancy prices for these services, as the pure pricing engine takes them. */
+async function loadSharingPrices(supabase: Client, serviceIds: string[]): Promise<SharingPriceMap> {
+  if (serviceIds.length === 0) return {};
+  const { data } = await supabase
+    .from("umrah_service_sharing_prices")
+    .select("service_id, sharing, price")
+    .in("service_id", serviceIds);
+  return toSharingPriceMap(data ?? []);
+}
 
 /**
  * Recomputes every stored line from the live catalog and the request's current
@@ -480,7 +533,7 @@ type Client = Awaited<ReturnType<typeof createClient>>;
 async function repriceRequest(supabase: Client, requestId: string): Promise<number | null> {
   const { data: request } = await supabase
     .from("umrah_custom_requests")
-    .select("num_pilgrims, nights_makkah, nights_madinah")
+    .select("num_pilgrims, nights_makkah, nights_madinah, room_sharing")
     .eq("id", requestId)
     .maybeSingle();
   if (!request) return null;
@@ -495,10 +548,22 @@ async function repriceRequest(supabase: Client, requestId: string): Promise<numb
     nightsMakkah: request.nights_makkah,
     nightsMadinah: request.nights_madinah,
   };
+  const sharing = {
+    roomSharing: isRoomSharing(request.room_sharing) ? request.room_sharing : 4,
+    sharingPrices: await loadSharingPrices(
+      supabase,
+      (lines ?? []).map((l) => l.service_id).filter((id): id is string => id !== null)
+    ),
+  } as const;
 
   const priced = (lines ?? []).map((line) => {
     const live = line.service as { price: number; name: string; status: string } | null;
-    const unitPrice = live && live.status === "published" ? Number(live.price) : Number(line.unit_price);
+    // A live, published service is priced for the request's room type; a
+    // withdrawn one keeps its snapshotted unit price as-is.
+    const unitPrice =
+      live && live.status === "published" && line.service_id
+        ? unitPriceFor({ id: line.service_id, category: line.category, price: Number(live.price) }, sharing)
+        : Number(line.unit_price);
     const { lines: [computed] } = priceSelection(
       [
         {
@@ -549,6 +614,7 @@ async function repriceRequest(supabase: Client, requestId: string): Promise<numb
 export async function discardUmrahCustomRequest(formData: FormData): Promise<void> {
   const profile = await requireUser();
   const requestId = String(formData.get("requestId"));
+  const desk = isDesk(formData);
   const supabase = await createClient();
   await supabase
     .from("umrah_custom_requests")
@@ -557,6 +623,6 @@ export async function discardUmrahCustomRequest(formData: FormData): Promise<voi
     .eq("booked_by", profile.id)
     .eq("status", "draft");
 
-  revalidatePath("/umrah/private");
-  redirect("/umrah");
+  revalidatePath(wizardBasePath(desk));
+  redirect(desk ? "/agent/book/umrah" : "/umrah");
 }

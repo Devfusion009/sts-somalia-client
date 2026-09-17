@@ -3,7 +3,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { CheckCircle2, Clock, ArrowRight, Download } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import { getOrderForCheckout, describeOrderItem, hotelGuestNames } from "@/modules/payments/queries";
+import { getServerTrpc } from "@/lib/trpc/server";
+import type { CheckoutOrderRow } from "api/dist/modules/payments/checkout.service";
+import { describeOrderItem, hotelGuestNames } from "@/modules/orders/format";
+import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -24,7 +27,16 @@ export default async function CheckoutSuccessPage({
   const { orderId } = await params;
   await requireUser();
 
-  const order = await getOrderForCheckout(orderId);
+  const trpc = await getServerTrpc();
+  let order: CheckoutOrderRow | null;
+  try {
+    // Cast, not inferred — see the comment on the same call in
+    // checkout/[orderId]/page.tsx: this procedure's output is deep enough to
+    // trip TS2589 when re-walked through tRPC's client-side inference.
+    order = (await trpc.payments.orderForCheckout.query({ orderId })) as unknown as CheckoutOrderRow | null;
+  } catch {
+    return <UnavailableNotice label="Payment Confirmation" />;
+  }
   if (!order) notFound();
   if (order.status === "pending_payment") redirect(`/checkout/${orderId}`);
 

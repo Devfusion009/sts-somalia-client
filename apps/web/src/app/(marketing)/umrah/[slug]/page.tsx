@@ -23,6 +23,7 @@ import { umrahImageUrls, MEAL_PLAN_LABELS, sharingLabel } from "@/modules/umrah/
 import { INCLUDE_DETAILS } from "@/modules/umrah/includes";
 import { cn } from "@/lib/utils";
 import { BookingForm } from "./booking-form";
+import { FlightDetails, hasFlightDetails } from "./flight-details";
 import { AgencyBookingSlot } from "@/modules/agencies/components/agency-booking-slot";
 
 export async function generateMetadata({
@@ -56,6 +57,9 @@ export default async function UmrahPackagePage({
   const hotels = [...(pkg.umrah_package_hotels ?? [])].sort((a, b) => a.sort_order - b.sort_order);
   const itinerary = [...(pkg.umrah_itinerary_days ?? [])].sort((a, b) => a.day_number - b.day_number);
   const rateCard = [...(pkg.umrah_package_pricing ?? [])].sort((a, b) => a.sharing - b.sharing);
+  const departuresWithFlights = upcomingDepartures.filter(hasFlightDetails);
+  const fromPrice =
+    rateCard.length > 0 ? Math.min(...rateCard.map((rate) => Number(rate.price))) : Number(pkg.base_price);
   const CITY_LABELS: Record<string, string> = { makkah: "Makkah", madinah: "Madinah", other: "Stay" };
 
   return (
@@ -209,7 +213,6 @@ export default async function UmrahPackagePage({
       {rateCard.length > 0 ? (
         <section className="mt-8">
           <h2 className="font-heading text-xl font-bold">Price per pilgrim</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Room sharing changes the per-person price.</p>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {rateCard.map((rate) => (
               <div key={rate.id} className="rounded-xl border border-border bg-card p-4 text-center">
@@ -217,6 +220,33 @@ export default async function UmrahPackagePage({
                 <p className="mt-1 font-heading text-lg font-bold text-primary">
                   {pkg.currency} {Number(rate.price).toFixed(0)}
                 </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {departuresWithFlights.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="font-heading text-xl font-bold">Flights</h2>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {departuresWithFlights.map((d) => (
+              <div key={d.id} className="rounded-xl border border-border bg-card p-4">
+                <p className="mb-3 flex items-center gap-1.5 text-sm font-bold">
+                  <CalendarDays className="size-4 text-primary" />
+                  {new Date(d.departure_date).toLocaleDateString(undefined, {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}{" "}
+                  –{" "}
+                  {new Date(d.return_date).toLocaleDateString(undefined, {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </p>
+                <FlightDetails departure={d} />
               </div>
             ))}
           </div>
@@ -253,6 +283,7 @@ export default async function UmrahPackagePage({
             currency={pkg.currency}
             basePrice={pkg.base_price}
             departures={upcomingDepartures}
+            pricing={rateCard}
             bookedForSlot={<AgencyBookingSlot />}
           />
         </div>
@@ -261,7 +292,7 @@ export default async function UmrahPackagePage({
           <div className="rounded-2xl border border-border bg-card p-5 shadow-xs lg:sticky lg:top-24">
             <p className="text-sm text-muted-foreground">Fixed price, from</p>
             <p className="font-heading text-3xl font-bold text-primary">
-              {pkg.currency} {pkg.base_price.toFixed(0)}
+              {pkg.currency} {fromPrice.toFixed(0)}
               <span className="text-sm font-normal text-muted-foreground"> / pilgrim</span>
             </p>
             {discount ? (
@@ -287,10 +318,6 @@ export default async function UmrahPackagePage({
                 <dd className="font-semibold">{tier.label}</dd>
               </div>
             </dl>
-            <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-              Select a departure and enter pilgrim details below — payment is the final step, and
-              our team confirms passport &amp; visa requirements with you personally.
-            </p>
           </div>
 
           <div className="rounded-2xl border border-border bg-secondary/50 p-5">

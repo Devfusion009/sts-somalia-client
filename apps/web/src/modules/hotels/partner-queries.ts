@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { hotelGuestNames } from "@/modules/payments/queries";
+import { hotelGuestNames } from "@/modules/orders/format";
 
 export async function getMyPartnerId(profileId: string) {
   const supabase = await createClient();

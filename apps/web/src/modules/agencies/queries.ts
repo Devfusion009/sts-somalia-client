@@ -32,7 +32,13 @@ export async function getAgencyBatchOrders(agencyId: string, batchId: string) {
   return data ?? [];
 }
 
-/** One order from the agency's own book — the desk's post-booking view. */
+/**
+ * One order from the agency's own book — the desk's post-booking view. The
+ * umrah embed carries the fulfillment-stage/departure fields the customer
+ * account page uses (see modules/payments/queries.ts's getOrderForCheckout)
+ * so this page can show the same progress timeline and flight details; the
+ * list queries below don't need them and stay on the narrower shape.
+ */
 export async function getAgencyOrder(agencyId: string, orderId: string) {
   const supabase = await createClient();
   const { data } = await supabase
@@ -45,7 +51,16 @@ export async function getAgencyOrder(agencyId: string, orderId: string) {
          hotel_booking:hotel_booking_id (id, status, check_in, check_out, num_rooms, guest_details, hotel:hotel_id (name)),
          flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at),
          visa_application:visa_application_id (id, application_ref, applicant_type, visa_type:visa_type_id (name, destination_country_code)),
-         umrah_booking:umrah_booking_id (id, num_pilgrims, booking_kind, status, package:package_id (name), custom_request:custom_request_id (reference, departure_date)),
+         umrah_booking:umrah_booking_id (
+           id, num_pilgrims, booking_kind, status, fulfillment_stage, room_sharing,
+           package:package_id (name),
+           custom_request:custom_request_id (reference, departure_date),
+           departure:departure_id (
+             departure_date, return_date,
+             outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at,
+             return_airline, return_flight_number, return_departs_at, return_arrives_at, baggage_note
+           )
+         ),
          hall_booking:hall_booking_id (id, status, start_date, end_date, event_type, venue:venue_id (name))
        ),
        payments (*)`

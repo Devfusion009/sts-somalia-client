@@ -25,12 +25,17 @@ export function StepPilgrims({
   numPilgrims,
   saved,
   notes,
+  desk,
 }: {
   requestId: string;
   numPilgrims: number;
   saved: PilgrimInput[];
   notes: string | null;
+  /** True when this builder is hosted inside the agent portal — see
+   *  wizardBasePath() in custom-actions.ts. */
+  desk?: boolean;
 }) {
+  const basePath = desk ? "/agent/book/umrah/private" : "/umrah/private";
   const [state, formAction] = useActionState(saveUmrahTripPilgrims, null);
   const formRef = useRef<HTMLFormElement>(null);
   useRestoreOnError(formRef, state);
@@ -38,6 +43,7 @@ export function StepPilgrims({
   return (
     <form ref={formRef} action={formAction} className="space-y-8">
       <input type="hidden" name="requestId" value={requestId} />
+      {desk ? <input type="hidden" name="desk" value="1" /> : null}
 
       <div>
         <h2 className="font-heading text-xl font-bold">Traveller details</h2>
@@ -159,13 +165,13 @@ export function StepPilgrims({
           <AlertCircle />
           <AlertDescription className="space-y-2">
             <p>{state.error}</p>
-            <TripNotFoundRecovery error={state.error} />
+            <TripNotFoundRecovery error={state.error} basePath={basePath} />
           </AlertDescription>
         </Alert>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
-        <Button render={<Link href={`/umrah/private/${requestId}?step=2`} />} variant="ghost" className="gap-2">
+        <Button render={<Link href={`${basePath}/${requestId}?step=2`} />} variant="ghost" className="gap-2">
           <ArrowLeft className="size-4" /> Back
         </Button>
         <SubmitButton size="lg" pendingText="Saving…" className="gap-2">

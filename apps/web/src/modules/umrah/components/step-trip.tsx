@@ -96,7 +96,8 @@ function Counter({
 
 export function StepTrip({
   requestId,
-  initial
+  initial,
+  desk
 }: {
   requestId: string;
   initial: {
@@ -109,7 +110,11 @@ export function StepTrip({
      *  step 3). Padded/truncated to numPilgrims by the caller. */
     travellerNames: string[];
   };
+  /** True when this builder is hosted inside the agent portal — see
+   *  wizardBasePath() in custom-actions.ts. */
+  desk?: boolean;
 }) {
+  const basePath = desk ? "/agent/book/umrah/private" : "/umrah/private";
   const [state, formAction] = useActionState(saveUmrahTripBasics, null);
   const [tier, setTier] = useState<UmrahTier>(initial.tier);
   const [numPilgrims, setNumPilgrims] = useState(initial.numPilgrims);
@@ -151,6 +156,7 @@ export function StepTrip({
     <div className="grid gap-8 xl:grid-cols-[1fr_300px]">
       <form action={formAction} className="space-y-8">
         <input type="hidden" name="requestId" value={requestId} />
+        {desk ? <input type="hidden" name="desk" value="1" /> : null}
 
         <section>
           <h2 className="font-heading text-lg font-bold">
@@ -299,7 +305,7 @@ export function StepTrip({
             <AlertCircle />
             <AlertDescription className="space-y-2">
               <p>{state.error}</p>
-              <TripNotFoundRecovery error={state.error} />
+              <TripNotFoundRecovery error={state.error} basePath={basePath} />
             </AlertDescription>
           </Alert>
         ) : null}

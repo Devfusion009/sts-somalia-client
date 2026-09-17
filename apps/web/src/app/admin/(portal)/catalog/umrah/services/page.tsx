@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { getUmrahServicesAdmin } from "@/modules/umrah/custom-queries";
 import {
   PRICE_UNIT_LABELS,
+  ROOM_SHARING_LABELS,
   UMRAH_CATEGORIES,
   UMRAH_TIER_LABELS,
 } from "@/modules/umrah/services";
@@ -34,11 +35,6 @@ export default async function AdminUmrahServicesPage() {
         <div>
           <BackLink href="/admin/catalog/umrah" label="Umrah catalog" className="mb-3" />
           <h1 className="font-heading text-2xl font-semibold">Private Umrah services</h1>
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            The options customers choose from when they build a private trip, and what each one
-            costs. Prices marked <em>per person, per night</em> are multiplied by the travellers and
-            the nights in that city; <em>for the whole party</em> is charged once.
-          </p>
         </div>
         <NewServiceForm />
       </div>
@@ -59,7 +55,7 @@ export default async function AdminUmrahServicesPage() {
 
             {rows.length === 0 ? (
               <Card className="p-6 text-sm text-muted-foreground">
-                No options yet — customers will not see this section in the builder.
+                No options yet.
               </Card>
             ) : (
               <div className="space-y-2">
@@ -91,6 +87,16 @@ export default async function AdminUmrahServicesPage() {
                             {formatMoney(service.price, service.currency)}{" "}
                             {PRICE_UNIT_LABELS[service.price_unit]}
                           </span>
+                          {[...service.sharing_prices]
+                            .sort((a, b) => a.sharing - b.sharing)
+                            .map((p) => (
+                              <span key={p.sharing}>
+                                {ROOM_SHARING_LABELS[p.sharing]}{" "}
+                                <span className="font-semibold text-foreground">
+                                  {formatMoney(p.price, service.currency)}
+                                </span>
+                              </span>
+                            ))}
                           {service.star_rating ? (
                             <span className="flex items-center gap-1">
                               <Star className="size-3 fill-brand-gold text-brand-gold" />

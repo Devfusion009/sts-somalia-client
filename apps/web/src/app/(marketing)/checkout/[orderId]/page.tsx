@@ -3,15 +3,16 @@ import { notFound, redirect } from "next/navigation";
 import { ShieldCheck, Headset, Hourglass, CalendarClock, X } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { getServerTrpc } from "@/lib/trpc/server";
+import type { CheckoutOrderRow } from "api/dist/modules/payments/checkout.service";
 import { getActiveAgencyId, HOLD_DURATION_HOURS } from "@/modules/orders/helpers";
-import { getOrderForCheckout, describeOrderItem } from "@/modules/payments/queries";
-import { getAvailablePaymentMethods } from "@/modules/payments/registry";
-import { cancelPendingPayment } from "@/modules/payments/actions";
+import { describeOrderItem } from "@/modules/orders/format";
 import { MIN_DEPOSIT_FRACTION } from "@/modules/payments/constants";
 import { CheckoutForm, type CheckoutMethod } from "@/modules/payments/components/checkout-form";
+import { CancelPendingPaymentButton } from "@/modules/payments/components/cancel-pending-payment-button";
+import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 import { WhatsAppInlineLink } from "@/components/marketing/whatsapp-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { CancelOrderButton } from "@/modules/orders/components/cancel-order-button";
 import { ConvertHoldButton } from "@/modules/orders/components/convert-hold-button";
@@ -30,7 +31,20 @@ export default async function CheckoutPage({
   const { orderId } = await params;
   const profile = await requireUser();
 
-  const order = await getOrderForCheckout(orderId);
+  const trpc = await getServerTrpc();
+  let order: CheckoutOrderRow | null;
+  try {
+    // Cast, not inferred: this procedure's output is a raw multi-branch join
+    // (order_items × 5 booking kinds) — deep enough that letting TS re-derive
+    // it through tRPC's own generic client machinery hits "type instantiation
+    // is excessively deep" (TS2589), the same trap documented on
+    // RlsSupabaseService.get() and bookings.service.ts's MyBookingsResult.
+    // The service already declares the real (checked) type; this just stops
+    // the client from re-walking it.
+    order = (await trpc.payments.orderForCheckout.query({ orderId })) as unknown as CheckoutOrderRow | null;
+  } catch {
+    return <UnavailableNotice label="Checkout" />;
+  }
   if (!order) notFound();
   if (!["pending_payment", "held", "partially_paid"].includes(order.status)) {
     redirect(`/checkout/${orderId}/success`);
@@ -75,7 +89,8 @@ export default async function CheckoutPage({
   }
 
   const pendingPayment = order.payments.find((p) => p.status === "requires_action");
-  const methods: CheckoutMethod[] = getAvailablePaymentMethods({ agencyWallet }).map(
+  const availableMethods = await trpc.payments.methods.query({ agencyWallet });
+  const methods: CheckoutMethod[] = availableMethods.map(
     ({ id, label, description, kind, badges, requiresPhone, simulated }) => ({
       id,
       label,
@@ -210,12 +225,7 @@ export default async function CheckoutPage({
                   Our team confirms the payment as soon as it arrives — you&apos;ll see the status
                   update in your account automatically.
                 </p>
-                <form action={cancelPendingPayment}>
-                  <input type="hidden" name="paymentId" value={pendingPayment.id} />
-                  <Button type="submit" variant="outline" size="sm">
-                    Choose a different method
-                  </Button>
-                </form>
+                <CancelPendingPaymentButton paymentId={pendingPayment.id} />
               </CardContent>
             </Card>
           ) : (

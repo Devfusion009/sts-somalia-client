@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AlertCircle, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyBatchOrders, getAgencyTopupRequests } from "@/modules/agencies/queries";
-import { describeOrderItem } from "@/modules/payments/queries";
+import { describeOrderItem } from "@/modules/orders/format";
 import { WalletPaymentPanel } from "@/modules/agencies/components/wallet-payment-panel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";

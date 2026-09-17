@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { format } from "date-fns";
-import { describeOrderItem, hotelGuestNames, type CheckoutOrder } from "@/modules/payments/queries";
+import { describeOrderItem, hotelGuestNames } from "@/modules/orders/format";
+import type { CheckoutOrderRow } from "api/dist/modules/payments/checkout.service";
 import { pdfText } from "@/lib/pdf-text";
 import { stsLogo, STS_LOGO_ASPECT } from "@/lib/pdf-logo";
 
@@ -84,6 +85,30 @@ const styles = StyleSheet.create({
   },
 });
 
+// Departure times are stored as local wall time tagged UTC; render them as-is.
+const FLIGHT_TIME = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "UTC",
+});
+
+function flightLine(
+  airline: string | null,
+  flightNumber: string | null,
+  departsAt: string | null,
+  arrivesAt: string | null
+): string | null {
+  const parts = [
+    [airline, flightNumber].filter(Boolean).join(" ") || null,
+    departsAt ? `Departs ${FLIGHT_TIME.format(new Date(departsAt))}` : null,
+    arrivesAt ? `Arrives ${FLIGHT_TIME.format(new Date(arrivesAt))}` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 const TYPE_LABEL: Record<string, string> = {
   hotel: "Hotel",
   flight: "Flight",
@@ -96,7 +121,7 @@ export function VoucherDocument({
   order,
   customer,
 }: {
-  order: CheckoutOrder;
+  order: CheckoutOrderRow;
   customer: { full_name: string | null; email: string | null };
 }) {
   const logo = stsLogo();
@@ -154,6 +179,25 @@ export function VoucherDocument({
           const described = describeOrderItem(item);
           const guests =
             item.item_type === "hotel" ? hotelGuestNames(item.hotel_booking?.guest_details) : [];
+          const umrah = item.item_type === "umrah" ? item.umrah_booking : null;
+          const umrahPilgrims = (umrah?.umrah_pilgrims ?? []).map((p) => p.full_name);
+          const umrahDeparture = umrah?.departure ?? null;
+          const outbound = umrahDeparture
+            ? flightLine(
+                umrahDeparture.outbound_airline,
+                umrahDeparture.outbound_flight_number,
+                umrahDeparture.outbound_departs_at,
+                umrahDeparture.outbound_arrives_at
+              )
+            : null;
+          const inbound = umrahDeparture
+            ? flightLine(
+                umrahDeparture.return_airline,
+                umrahDeparture.return_flight_number,
+                umrahDeparture.return_departs_at,
+                umrahDeparture.return_arrives_at
+              )
+            : null;
 
           return (
             <View key={item.id} style={styles.itemCard} wrap={false}>
@@ -174,6 +218,34 @@ export function VoucherDocument({
                 <View style={styles.itemDetail}>
                   <Text style={styles.detailLabel}>Guests</Text>
                   <Text>{guests.join(", ")}</Text>
+                </View>
+              ) : null}
+
+              {umrahPilgrims.length > 0 ? (
+                <View style={styles.itemDetail}>
+                  <Text style={styles.detailLabel}>Pilgrims</Text>
+                  <Text>{pdfText(umrahPilgrims.join(", "))}</Text>
+                </View>
+              ) : null}
+
+              {outbound ? (
+                <View style={styles.itemDetail}>
+                  <Text style={styles.detailLabel}>Outbound flight</Text>
+                  <Text>{pdfText(outbound)}</Text>
+                </View>
+              ) : null}
+
+              {inbound ? (
+                <View style={styles.itemDetail}>
+                  <Text style={styles.detailLabel}>Return flight</Text>
+                  <Text>{pdfText(inbound)}</Text>
+                </View>
+              ) : null}
+
+              {umrahDeparture?.baggage_note ? (
+                <View style={styles.itemDetail}>
+                  <Text style={styles.detailLabel}>Baggage</Text>
+                  <Text>{pdfText(umrahDeparture.baggage_note)}</Text>
                 </View>
               ) : null}
 
