@@ -151,8 +151,8 @@ export function FlightSearchForm({
         </RadioGroup>
 
         <div className="flex flex-col lg:flex-row lg:items-stretch">
-        <div className={cn(CELL, "lg:flex-[1.35] lg:pl-5")}>
-          <label htmlFor="origin" className="mb-0.5 block text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        <div className={cn(CELL, "lg:flex-1 lg:pl-5")}>
+          <label htmlFor="origin" className="mb-0.5 block text-xs font-medium text-muted-foreground">
             From
           </label>
           <AirportPicker
@@ -181,8 +181,8 @@ export function FlightSearchForm({
           </button>
         </div>
 
-        <div className={cn(CELL, "lg:flex-[1.35] lg:pl-6")}>
-          <label htmlFor="destination" className="mb-0.5 block text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        <div className={cn(CELL, "lg:flex-1 lg:pl-6")}>
+          <label htmlFor="destination" className="mb-0.5 block text-xs font-medium text-muted-foreground">
             To
           </label>
           <AirportPicker
@@ -195,10 +195,11 @@ export function FlightSearchForm({
           />
         </div>
 
-        <span className="hidden w-px self-center bg-border lg:block lg:h-11" aria-hidden />
+        </div>
 
-        <div className={cn(CELL, "lg:flex-[1.05]")}>
-          <label htmlFor="depart_date" className="mb-0.5 block text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        <div className="grid grid-cols-2 border-t border-border lg:grid-cols-[1fr_1fr_1.25fr_auto]">
+        <div className={cn(CELL, "lg:pl-5")}>
+          <label htmlFor="depart_date" className="mb-0.5 block text-xs font-medium text-muted-foreground">
             Departure
           </label>
           <div className="flex items-center gap-1.5">
@@ -215,10 +216,8 @@ export function FlightSearchForm({
           </div>
         </div>
 
-        <span className="hidden w-px self-center bg-border lg:block lg:h-11" aria-hidden />
-
-        <div className={cn(CELL, "lg:flex-[1.05]", !roundTrip && "opacity-40")}>
-          <label htmlFor="return_date" className="mb-0.5 block text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        <div className={cn(CELL, "border-l border-border", !roundTrip && "opacity-40")}>
+          <label htmlFor="return_date" className="mb-0.5 block text-xs font-medium text-muted-foreground">
             Return
           </label>
           <div className="flex items-center gap-1.5">
@@ -235,11 +234,9 @@ export function FlightSearchForm({
           </div>
         </div>
 
-        <span className="hidden w-px self-center bg-border lg:block lg:h-11" aria-hidden />
-
         {/* Travellers + cabin, combined into one cell as in the reference */}
-        <div className={cn(CELL, "lg:flex-[1.5]")}>
-          <span className="mb-0.5 block text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        <div className={cn(CELL, "col-span-2 border-t border-border lg:col-span-1 lg:border-t-0 lg:border-l")}>
+          <span className="mb-0.5 block text-xs font-medium text-muted-foreground">
             Travellers
           </span>
           <div className="flex items-center gap-1.5">
@@ -284,10 +281,10 @@ export function FlightSearchForm({
           </div>
         </div>
 
-        <div className="p-2 lg:flex lg:items-center lg:p-2">
+        <div className="col-span-2 p-2 lg:col-span-1 lg:flex lg:items-center lg:p-2">
           <button
             type="submit"
-            className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-brand-accent px-8 font-heading text-base font-bold text-brand-accent-foreground shadow-md shadow-brand-accent/30 transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-accent/90 hover:shadow-lg hover:shadow-brand-accent/40 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none lg:h-[3.25rem]"
+            className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-brand-accent px-8 font-heading text-base font-bold text-brand-accent-foreground shadow-md shadow-brand-accent/30 transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-accent/90 hover:shadow-lg hover:shadow-brand-accent/40 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none lg:h-[3.25rem] lg:min-w-44"
           >
             <SearchIcon sx={{ fontSize: 20 }} />
             Search

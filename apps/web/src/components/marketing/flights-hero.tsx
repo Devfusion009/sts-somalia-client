@@ -28,28 +28,32 @@ export function FlightsHero({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <section className="relative isolate overflow-hidden bg-sidebar text-sidebar-foreground">
-      {/* Backdrop photograph. Deliberately a dark, near-empty cloudscape: the
-          headline, mode tiles and search pill all sit on top of it, so the
-          image has to add depth without competing for attention. */}
-      <Image
-        src="/marketing/flights-hero-bg.webp"
-        alt=""
-        fill
-        priority
-        sizes="100vw"
-        className="object-cover object-center opacity-95"
-      />
-      {/* Brand wash over the photo — keeps the band unmistakably STS-dark and
-          guarantees white text clears contrast wherever the photo is lightest. */}
-      <div
-        className="absolute inset-0 bg-gradient-to-r from-sidebar/90 via-sidebar/70 to-sidebar/45"
+    <section className="relative isolate overflow-hidden bg-[#06372f] text-white">
+      {/* Solid brand-teal canvas with the routes STS actually sells: dotted
+          great-circle arcs fanning out from Mogadishu. Quiet on purpose — the
+          orange origin dot is the only accent. */}
+      <svg
+        className="absolute inset-0 size-full"
+        viewBox="0 0 1200 560"
+        preserveAspectRatio="xMidYMid slice"
+        fill="none"
         aria-hidden
-      />
-      <div
-        className="absolute inset-0 bg-[radial-gradient(70%_90%_at_15%_0%,rgba(45,212,180,0.18),transparent),radial-gradient(60%_80%_at_100%_100%,rgba(244,113,28,0.14),transparent)]"
-        aria-hidden
-      />
+      >
+        <g stroke="white" strokeOpacity="0.28" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="1 9">
+          <path d="M150 470 Q 330 120 620 70" />
+          <path d="M150 470 Q 480 210 860 150" />
+          <path d="M150 470 Q 560 330 1010 300" />
+          <path d="M150 470 Q 260 250 430 170" />
+        </g>
+        <g fill="white" fillOpacity="0.5">
+          <circle cx="620" cy="70" r="3.5" />
+          <circle cx="860" cy="150" r="3.5" />
+          <circle cx="1010" cy="300" r="3.5" />
+          <circle cx="430" cy="170" r="3.5" />
+        </g>
+        <circle cx="150" cy="470" r="14" fill="#f4711c" fillOpacity="0.25" />
+        <circle cx="150" cy="470" r="5" fill="#f4711c" />
+      </svg>
 
       {/* Collage */}
       <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[30%] xl:block" aria-hidden>
