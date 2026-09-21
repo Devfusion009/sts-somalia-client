@@ -76,7 +76,7 @@ export async function SiteHeader() {
             href="/"
             className="flex shrink-0 items-center rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
-            <Image src="/logo.png" alt="STS Somalia" width={714} height={312} priority className="h-11 w-auto transition-[height] duration-300 ease-out group-data-[condensed]/header:h-9" />
+            <Image src="/logo.png" alt="STS Somalia" width={714} height={312} priority className="h-11 w-auto transition-[height] duration-300 ease-out group-data-[condensed]/header:h-9 dark:brightness-0 dark:invert" />
           </Link>
           <SiteHeaderClient profile={profile} contexts={contexts} />
         </div>

@@ -124,6 +124,15 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
                 defaultValue={hotel?.description ?? ""}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="hotel-description-so">Description (Somali)</Label>
+              <Textarea
+                id="hotel-description-so"
+                name="descriptionSo"
+                rows={3}
+                defaultValue={hotel?.description_so ?? ""}
+              />
+            </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="hotel-address">Address</Label>

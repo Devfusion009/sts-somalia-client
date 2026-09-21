@@ -93,7 +93,7 @@ export function CheckoutForm({
     <form action={handleSubmit} className="space-y-6">
       {remaining < 1 - 0.005 ? null : (
         <div>
-          <h2 className="text-base font-semibold">How much would you like to pay?</h2>
+          <h2 className="font-heading text-base font-semibold">How much would you like to pay?</h2>
           <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
             <button
               type="button"
@@ -149,7 +149,7 @@ export function CheckoutForm({
       )}
 
       <div>
-        <h2 className="text-base font-semibold">Select Payment Method</h2>
+        <h2 className="font-heading text-base font-semibold">Select Payment Method</h2>
         <div className="mt-3 space-y-2.5" role="radiogroup" aria-label="Payment method">
           {methods.map((method) => {
             const Icon = KIND_ICONS[method.kind];

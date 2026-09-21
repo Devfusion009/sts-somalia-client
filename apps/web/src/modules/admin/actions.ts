@@ -755,6 +755,7 @@ export async function adminSetRoomStatus(_prev: ActionState, formData: FormData)
 const hotelSchema = z.object({
   name: z.string().min(2, "Enter a hotel name."),
   description: z.string().optional(),
+  descriptionSo: z.string().optional(),
   starRating: z.coerce.number().int().min(1).max(5).optional(),
   addressLine: z.string().optional(),
   city: z.string().min(1, "Enter a city."),
@@ -775,6 +776,7 @@ function hotelInput(formData: FormData) {
   return {
     name: formData.get("name"),
     description: formData.get("description") || undefined,
+    descriptionSo: formData.get("descriptionSo") || undefined,
     starRating: formData.get("starRating") || undefined,
     addressLine: formData.get("addressLine") || undefined,
     city: formData.get("city"),
@@ -799,6 +801,7 @@ function hotelRow(data: z.infer<typeof hotelSchema>) {
   return {
     name: data.name,
     description: data.description ?? null,
+    description_so: data.descriptionSo ?? null,
     star_rating: data.starRating ?? null,
     address_line: data.addressLine ?? null,
     city: data.city,
@@ -851,7 +854,9 @@ export async function updateHotel(_prev: ActionState, formData: FormData): Promi
 
 const roomSchema = z.object({
   name: z.string().min(1, "Enter a room name."),
+  nameSo: z.string().optional(),
   description: z.string().optional(),
+  descriptionSo: z.string().optional(),
   maxOccupancy: z.coerce.number().int().min(1),
   bedType: z.string().optional(),
   floor: z.string().optional(),
@@ -882,7 +887,9 @@ const roomSchema = z.object({
 function roomInput(formData: FormData) {
   return {
     name: formData.get("name"),
+    nameSo: formData.get("nameSo") || undefined,
     description: formData.get("description") || undefined,
+    descriptionSo: formData.get("descriptionSo") || undefined,
     maxOccupancy: formData.get("maxOccupancy"),
     bedType: formData.get("bedType") || undefined,
     floor: formData.get("floor") || undefined,
@@ -898,7 +905,9 @@ function roomInput(formData: FormData) {
 function roomRow(data: z.infer<typeof roomSchema>) {
   return {
     name: data.name,
+    name_so: data.nameSo ?? null,
     description: data.description ?? null,
+    description_so: data.descriptionSo ?? null,
     max_occupancy: data.maxOccupancy,
     bed_type: data.bedType ?? null,
     floor: data.floor ?? null,

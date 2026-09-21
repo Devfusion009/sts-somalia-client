@@ -71,7 +71,7 @@ export function LoginForm({
 
   return (
     <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl shadow-xl lg:grid-cols-2">
-      <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-primary via-primary to-[#00594c] p-10 text-primary-foreground lg:flex">
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-primary via-primary to-[color-mix(in_srgb,var(--primary)_60%,black)] p-10 text-primary-foreground lg:flex">
         {/* Ambient brand-accent glow — warm counterpoint to the cool teal, gives the
             panel depth instead of a flat fill. */}
         <div className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-brand-gold/25 blur-3xl" />

@@ -48,10 +48,22 @@ export class BookingsService {
    * normalised into one shape and annotated with its order. Returns
    * orderMeta as a plain object, not a Map — no superjson transformer on
    * this tRPC setup, same reasoning as PreferencesService.getFxRates.
+   *
+   * `personalOnly` drops the `booked_by` side of the match — an agent's
+   * `booked_by` is set on every order they process for their agency's
+   * customers too, so the plain `customer_id`-only filter is what actually
+   * isolates "bookings where I am the traveller" from "bookings I booked
+   * for someone else." Used by the agent portal's own read-only history of
+   * orders from before the account became an agent.
    */
-  async getMyBookings(userId: string): Promise<MyBookingsResult> {
+  async getMyBookings(userId: string, opts: { personalOnly?: boolean } = {}): Promise<MyBookingsResult> {
     const supabase = this.db();
-    const orFilter = `customer_id.eq.${userId},booked_by.eq.${userId}`;
+    const orFilter = opts.personalOnly
+      ? `customer_id.eq.${userId}`
+      : `customer_id.eq.${userId},booked_by.eq.${userId}`;
+    const visaOrFilter = opts.personalOnly
+      ? `applicant_profile_id.eq.${userId}`
+      : `applicant_profile_id.eq.${userId},submitted_by.eq.${userId}`;
 
     const [hotelRes, flightRes, visaRes, umrahRes, umrahDraftRes, hallRes, orderItemsRes] = await Promise.all([
       supabase
@@ -65,7 +77,7 @@ export class BookingsService {
       supabase
         .from("visa_applications")
         .select("id, status, price, currency, created_at, travel_details, visa_types(name)")
-        .or(`applicant_profile_id.eq.${userId},submitted_by.eq.${userId}`),
+        .or(visaOrFilter),
       supabase
         .from("umrah_bookings")
         .select(
@@ -93,7 +105,10 @@ export class BookingsService {
     const orderMeta: MyBookingsResult["orderMeta"] = {};
 
     for (const item of orderItemsRes.data ?? []) {
-      if (item.orders.customer_id !== userId && item.orders.booked_by !== userId) continue;
+      const matches = opts.personalOnly
+        ? item.orders.customer_id === userId
+        : item.orders.customer_id === userId || item.orders.booked_by === userId;
+      if (!matches) continue;
 
       orderMeta[item.order_id] = {
         orderNumber: item.orders.order_number,

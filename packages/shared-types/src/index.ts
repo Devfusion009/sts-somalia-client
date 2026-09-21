@@ -666,6 +666,90 @@ export type CreateHallBookingInput = z.infer<typeof createHallBookingSchema>;
 
 export const venuePriceUnitValues = ["per_event", "per_day", "per_hour", "per_person"] as const;
 
+export type HallPriceUnit = (typeof venuePriceUnitValues)[number];
+
+export type HallPriceInput = {
+  basePrice: number;
+  priceUnit: string;
+  expectedGuests: number;
+  startDate: string;
+  endDate: string;
+  startTime?: string | null;
+  endTime?: string | null;
+};
+
+export type HallPriceBreakdown = {
+  /** Units charged for: guests, days, hours, or 1 for a flat event fee. */
+  quantity: number;
+  /** Singular noun for the multiplied unit — "guest", "day", "hour", or null for a flat fee. */
+  unitNoun: "guest" | "day" | "hour" | null;
+  unitPrice: number;
+  total: number;
+  /** Venue publishes no price; the events team quotes it manually. */
+  onRequest: boolean;
+  /** per_hour with no times entered — quantity can't be known, so total is not yet final. */
+  needsTimes: boolean;
+};
+
+/** Inclusive day count: same start and end date is one day, not zero. */
+function hallDayCount(startDate: string, endDate: string): number {
+  const start = Date.parse(`${startDate}T00:00:00Z`);
+  const end = Date.parse(`${endDate}T00:00:00Z`);
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return 1;
+  return Math.floor((end - start) / 86_400_000) + 1;
+}
+
+/** Hours between two "HH:MM" times, rounded up; an end at or before the start is treated as overnight. */
+function hallHoursPerDay(startTime?: string | null, endTime?: string | null): number | null {
+  if (!startTime || !endTime) return null;
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  if ([sh, sm, eh, em].some((n) => !Number.isFinite(n))) return null;
+  const minutes = eh * 60 + em - (sh * 60 + sm);
+  const spanned = minutes > 0 ? minutes : minutes + 24 * 60;
+  return Math.max(1, Math.ceil(spanned / 60));
+}
+
+/**
+ * The one place a hall's price is calculated. Both the customer-facing
+ * estimate and the row written to hall_bookings call this, so what a
+ * customer is quoted and what they are charged cannot drift apart — before
+ * this existed, apps/api multiplied per_person by headcount but billed
+ * per_day and per_hour venues a single unit regardless of how many days or
+ * hours were booked.
+ */
+export function computeHallPrice(input: HallPriceInput): HallPriceBreakdown {
+  const unitPrice = Number(input.basePrice) || 0;
+  const flat: HallPriceBreakdown = {
+    quantity: 1,
+    unitNoun: null,
+    unitPrice,
+    total: unitPrice,
+    onRequest: unitPrice <= 0,
+    needsTimes: false,
+  };
+  if (unitPrice <= 0) return flat;
+
+  switch (input.priceUnit) {
+    case "per_person": {
+      const quantity = Math.max(1, Math.floor(input.expectedGuests) || 1);
+      return { ...flat, quantity, unitNoun: "guest", total: unitPrice * quantity, onRequest: false };
+    }
+    case "per_day": {
+      const quantity = hallDayCount(input.startDate, input.endDate);
+      return { ...flat, quantity, unitNoun: "day", total: unitPrice * quantity, onRequest: false };
+    }
+    case "per_hour": {
+      const hours = hallHoursPerDay(input.startTime, input.endTime);
+      if (hours === null) return { ...flat, unitNoun: "hour", needsTimes: true, onRequest: false };
+      const quantity = hours * hallDayCount(input.startDate, input.endDate);
+      return { ...flat, quantity, unitNoun: "hour", total: unitPrice * quantity, onRequest: false };
+    }
+    default:
+      return { ...flat, onRequest: false };
+  }
+}
+
 export const venueUpsertSchema = z.object({
   name: z.string().min(2, "Enter the venue name."),
   city: z.string().min(1, "Enter the city."),

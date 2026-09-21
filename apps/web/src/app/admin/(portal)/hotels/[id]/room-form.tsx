@@ -34,7 +34,9 @@ import { ROOM_BED_TYPES } from "@/modules/hotels/constants";
 type Room = {
   id: string;
   name: string;
+  name_so: string | null;
   description: string | null;
+  description_so: string | null;
   max_occupancy: number;
   bed_type: string | null;
   floor: string | null;
@@ -102,8 +104,18 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="room-name-so">Room type (Somali)</Label>
+            <Input id="room-name-so" name="nameSo" defaultValue={room?.name_so ?? ""} />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="room-description">Description</Label>
             <Textarea id="room-description" name="description" rows={2} defaultValue={room?.description ?? ""} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="room-description-so">Description (Somali)</Label>
+            <Textarea id="room-description-so" name="descriptionSo" rows={2} defaultValue={room?.description_so ?? ""} />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">

@@ -27,6 +27,16 @@ import { useTheme as useNextTheme } from "next-themes";
  *
  * Colors mirror globals.css so MUI surfaces track the STS brand and the
  * next-themes dark class in both directions.
+ *
+ * `primary`/`secondary`/`warning` `.main` stay literal hex rather than
+ * `var(--token)`: MUI's `augmentColor()` derives `light`/`dark` shades by
+ * calling `lighten()`/`darken()` on `main` (see
+ * node_modules/@mui/material/styles/createPalette.js `addLightOrDark`),
+ * which decomposes the string into RGB components synchronously at theme
+ * creation. A CSS custom property can't be decomposed outside the browser's
+ * paint step, so passing `var(--primary)` there throws
+ * "MUI: Unsupported `var(--primary)` color" and crashes theme creation.
+ * Every other palette field below reads its CSS variable directly.
  */
 export function MuiProvider({ children }: { children: React.ReactNode }) {
   const { resolvedTheme } = useNextTheme();
@@ -40,22 +50,22 @@ export function MuiProvider({ children }: { children: React.ReactNode }) {
           mode,
           primary: {
             main: mode === "dark" ? "#2dd4b4" : "#00947c",
-            contrastText: mode === "dark" ? "#04211c" : "#ffffff",
+            contrastText: "var(--primary-foreground)",
           },
           secondary: {
             main: mode === "dark" ? "#fb8b3c" : "#f4711c",
-            contrastText: "#ffffff",
+            contrastText: "var(--brand-accent-foreground)",
           },
           warning: { main: mode === "dark" ? "#fbbf24" : "#f59e0b" },
           background: {
-            default: mode === "dark" ? "#061412" : "#f8fbfa",
-            paper: mode === "dark" ? "#0a211d" : "#ffffff",
+            default: "var(--background)",
+            paper: "var(--card)",
           },
           text: {
-            primary: mode === "dark" ? "#e2f3ee" : "#10312c",
-            secondary: mode === "dark" ? "#8fb3ab" : "#5f7873",
+            primary: "var(--foreground)",
+            secondary: "var(--muted-foreground)",
           },
-          divider: mode === "dark" ? "rgba(255,255,255,0.1)" : "#dfeae6",
+          divider: "var(--border)",
         },
         shape: { borderRadius: 12 },
         typography: {

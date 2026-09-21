@@ -133,6 +133,9 @@ export default async function HotelDetailPage({
       {hotel.description ? (
         <p className="mt-5 max-w-3xl leading-relaxed text-muted-foreground">{hotel.description}</p>
       ) : null}
+      {hotel.description_so ? (
+        <p className="mt-2 max-w-3xl leading-relaxed text-muted-foreground">{hotel.description_so}</p>
+      ) : null}
 
       {amenities.length > 0 ? (
         <div className="mt-5 flex flex-wrap gap-2">
@@ -179,6 +182,9 @@ export default async function HotelDetailPage({
                   )}
                   <div className="flex flex-1 flex-col gap-2 p-5">
                     <h3 className="font-heading text-lg font-bold">{room.name}</h3>
+                    {room.name_so ? (
+                      <p className="-mt-1.5 text-sm text-muted-foreground">{room.name_so}</p>
+                    ) : null}
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Users className="size-3.5" /> Up to {room.max_occupancy} guests
@@ -196,6 +202,9 @@ export default async function HotelDetailPage({
                     </div>
                     {room.description ? (
                       <p className="text-sm text-muted-foreground">{room.description}</p>
+                    ) : null}
+                    {room.description_so ? (
+                      <p className="text-sm text-muted-foreground">{room.description_so}</p>
                     ) : null}
                     {roomAmenities.length > 0 ? (
                       <div className="flex flex-wrap gap-1.5">

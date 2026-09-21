@@ -25,7 +25,7 @@ export default async function AgentLoginPage({
         <div className="flex w-full flex-col justify-center px-6 py-10 sm:px-10 lg:w-[26rem] lg:shrink-0 lg:px-10 xl:w-[28rem]">
           <div className="mx-auto w-full max-w-sm">
             <Link href={root || "/"} className="block">
-              <Image src="/logo.png" alt="STS" width={160} height={70} className="h-11 w-auto" priority />
+              <Image src="/logo.png" alt="STS Somalia" width={714} height={312} className="h-11 w-auto" priority />
               <p className="mt-1.5 text-xs font-bold tracking-[0.08em] text-brand-accent uppercase">
                 Scout Travel Solution LTD
               </p>
@@ -33,7 +33,6 @@ export default async function AgentLoginPage({
 
             <div className="mt-8">
               <h1 className="font-heading text-2xl font-bold tracking-tight">B2B Agent Portal</h1>
-              <p className="mt-1 text-sm text-muted-foreground">Log in to access your account.</p>
             </div>
 
             <div className="mt-6">

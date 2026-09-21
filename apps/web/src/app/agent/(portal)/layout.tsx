@@ -39,6 +39,7 @@ const NAV_GROUPS: PortalNavGroup[] = [
     label: "Finance",
     items: [
       { href: "/agent/finance", label: "Overview", icon: "payouts" },
+      { href: "/agent/finance/top-up", label: "Top Up Wallet", icon: "bank" },
       { href: "/agent/finance/transactions", label: "Transactions", icon: "payments" },
       { href: "/agent/finance/withdrawals", label: "Withdraw Earnings", icon: "bank" },
       { href: "/agent/finance/billing", label: "Billing", icon: "invoice" },
@@ -51,6 +52,7 @@ const NAV_GROUPS: PortalNavGroup[] = [
     items: [
       { href: "/agent/bank-details", label: "Bank Details", icon: "bank" },
       { href: "/agent/refunds", label: "Refunds", icon: "refund" },
+      { href: "/agent/personal-bookings", label: "Personal Bookings", icon: "bookings" },
     ],
   },
   {
@@ -125,6 +127,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
       contexts={contexts}
       isPlatformAdmin={profile.is_platform_admin}
       accent="agent"
+      accountCode={profile.agent_code}
       brandLogoUrl={agencyLogoUrl(membership.agency.logo_path)}
       headerExtra={<AgentNotificationBell notifications={notifications} />}
     >

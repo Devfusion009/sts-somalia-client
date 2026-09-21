@@ -10,10 +10,13 @@ import {
   CalendarDays,
   CircleCheck,
   CircleDollarSign,
+  CreditCard,
   HeartHandshake,
   Headset,
   Lock,
+  MessageCircle,
   PackageCheck,
+  PackageSearch,
   Plane,
   Settings2,
   ShieldCheck,
@@ -21,6 +24,7 @@ import {
   Stamp,
   Tag,
   TrainFront,
+  UserRoundPlus,
   Users,
   UsersRound,
 } from "lucide-react";
@@ -138,6 +142,35 @@ const COMPARISON: { label: string; group: string; private: string }[] = [
   { label: "Services", group: "All included as listed", private: "Add or leave out any service" },
   { label: "Who you travel with", group: "A group, with a guide", private: "Just your own party" },
   { label: "Best for", group: "First-time and value-focused pilgrims", private: "Families, couples and specific needs" },
+];
+
+/** The five steps every booking goes through, whichever flow a pilgrim picks. */
+const BOOKING_STEPS = [
+  {
+    icon: PackageSearch,
+    title: "Choose your package",
+    description: "Pick a group package or build your own trip — set dates, hotel tier and pilgrim count.",
+  },
+  {
+    icon: UserRoundPlus,
+    title: "Add pilgrim details",
+    description: "Enter each traveller's name and passport details exactly as they'll appear on the visa.",
+  },
+  {
+    icon: CreditCard,
+    title: "Pay a deposit or in full",
+    description: "A 50% deposit holds your booking. Card, mobile money, bank transfer or agency wallet.",
+  },
+  {
+    icon: Stamp,
+    title: "Visa & travel confirmation",
+    description: "Track visa processing through to travel-ready on your booking's timeline.",
+  },
+  {
+    icon: MessageCircle,
+    title: "Stay in touch",
+    description: "WhatsApp and account notifications keep you updated at every stage, up to departure.",
+  },
 ];
 
 export default async function UmrahPage() {
@@ -302,6 +335,44 @@ export default async function UmrahPage() {
               </li>
             ))}
           </ul>
+        </div>
+      </div>
+
+      {/* How a booking moves from search to departure — the same five steps
+          regardless of which flow above a pilgrim picked. */}
+      <div className="border-t border-border bg-secondary/20">
+        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-xl text-center">
+            <h2 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
+              How your booking works
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Five steps from choosing a package to boarding your flight.
+            </p>
+          </div>
+
+          <ol className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+            {BOOKING_STEPS.map((step, i) => (
+              <li
+                key={step.title}
+                className="relative flex flex-col items-center rounded-2xl border border-border bg-card px-5 pt-8 pb-6 text-center shadow-xs transition-shadow hover:shadow-md"
+              >
+                <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <step.icon className="size-5" aria-hidden />
+                </span>
+                <span
+                  className="absolute top-3 right-3 flex size-5 items-center justify-center rounded-full bg-primary font-heading text-[11px] font-bold text-primary-foreground"
+                  aria-hidden
+                >
+                  {i + 1}
+                </span>
+                <h3 className="mt-4 font-heading text-base font-semibold">{step.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  {step.description}
+                </p>
+              </li>
+            ))}
+          </ol>
         </div>
       </div>
 

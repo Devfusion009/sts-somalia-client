@@ -308,6 +308,7 @@ export function PortalShell({
   accent = "customer",
   brandLogoUrl,
   headerExtra,
+  accountCode,
   children,
 }: {
   portalName: string;
@@ -317,6 +318,8 @@ export function PortalShell({
   profileEmail: string | null;
   /** Every other partner identity (and "Personal Account") this profile can switch into — same list everywhere, see getMyPartnerContexts(). */
   contexts?: PartnerContext[];
+  /** Display-only identifier shown under the name in the account menu — e.g. an agent's agent_code. Sign-in stays email + password; this is just something short to quote to support. */
+  accountCode?: string | null;
   /** Adds an "Admin Console" switch item — is_platform_admin is a separate flag from `contexts`, which only covers business/partner kinds. */
   isPlatformAdmin?: boolean;
   accent?: PortalAccent;
@@ -430,6 +433,9 @@ export function PortalShell({
                     <Badge variant="outline" className={`w-fit text-[10px] ${styles.badge}`}>
                       {roleLabel}
                     </Badge>
+                    {accountCode ? (
+                      <span className="truncate text-[10px] text-sidebar-foreground/50">{accountCode}</span>
+                    ) : null}
                   </div>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" side="top" className="w-64">
@@ -437,9 +443,12 @@ export function PortalShell({
                     <DropdownMenuLabel>Switch account</DropdownMenuLabel>
                   </DropdownMenuGroup>
                   {/* A hotel manager has no B2C account behind it — see the
-                      rejection in signInAction — so there's nothing to
-                      switch to here, unlike every other portal. */}
-                  {accent !== "manager" ? (
+                      rejection in signInAction. An agent's role fully
+                      replaces "customer" on approval — see account/layout.tsx
+                      — so /account is a dead end for them too, unlike every
+                      other partner portal (hotel partner, affiliate, venue
+                      keep their dual Personal/partner access). */}
+                  {accent !== "manager" && accent !== "agent" ? (
                     <DropdownMenuItem render={<Link href={rootOrigin() ? `${rootOrigin()}/account` : "/account"} />}>
                       <User /> Personal Account
                     </DropdownMenuItem>

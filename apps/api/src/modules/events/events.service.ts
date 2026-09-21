@@ -3,6 +3,7 @@ import { RlsSupabaseService } from "../../infra/supabase/rls-supabase.service";
 import { createAnonClient } from "../../infra/supabase/supabase-clients";
 import { OrdersService } from "../orders/orders.service";
 import { notifyPartnerOfBooking } from "../../infra/notify/partner-booking-notify";
+import { computeHallPrice } from "@sts/shared-types";
 import type { VenueFilters, VenueOccupiedRangesInput, CreateHallBookingInput } from "@sts/shared-types";
 
 /**
@@ -117,8 +118,16 @@ export class EventsService {
       newCustomerPhone: input.newCustomerPhone,
     });
 
-    const estimatedPrice =
-      venue.price_unit === "per_person" ? Number(venue.base_price) * input.expectedGuests : Number(venue.base_price);
+    const priceBreakdown = computeHallPrice({
+      basePrice: Number(venue.base_price),
+      priceUnit: venue.price_unit,
+      expectedGuests: input.expectedGuests,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      startTime: input.startTime,
+      endTime: input.endTime,
+    });
+    const estimatedPrice = priceBreakdown.total;
 
     const { data: booking, error: bookingError } = await supabase
       .from("hall_bookings")
@@ -172,9 +181,12 @@ export class EventsService {
     });
 
     // Per-person / price-on-request venues confirm the final price before
-    // completing — matches the original's skip-checkout branch. The caller
-    // (apps/web) decides where to navigate; we just report which path.
-    const requiresPriceConfirmation = venue.price_unit === "per_person" || Number(venue.base_price) === 0;
+    // completing — matches the original's skip-checkout branch. per_hour
+    // bookings submitted without start/end times are the same case: the
+    // total written above is a placeholder single-unit charge, not the real
+    // price, so the caller must not let checkout proceed on it either.
+    const requiresPriceConfirmation =
+      venue.price_unit === "per_person" || Number(venue.base_price) === 0 || priceBreakdown.needsTimes;
     return { orderId: order.id, requiresPriceConfirmation };
   }
 }

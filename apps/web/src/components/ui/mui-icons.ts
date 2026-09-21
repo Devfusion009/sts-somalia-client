@@ -66,6 +66,18 @@ export { default as WbSunnyIcon } from "@mui/icons-material/WbSunny";
 export { default as XIcon } from "@mui/icons-material/X";
 export { default as YouTubeIcon } from "@mui/icons-material/YouTube";
 
+// @mui/icons-material ships no TikTok glyph — built the same way MUI builds
+// its own icons, via createSvgIcon, so it behaves identically to every
+// import above (same sx/fontSize API, same client-boundary reasoning).
+import { createSvgIcon } from "@mui/material/utils";
+import { createElement } from "react";
+export const TikTokIcon = createSvgIcon(
+  createElement("path", {
+    d: "M16.6 5.82c-.9-.98-1.4-2.26-1.4-3.6h-3.03v13.96c0 1.53-1.24 2.78-2.78 2.78a2.78 2.78 0 0 1 0-5.56c.28 0 .55.04.8.12V10.4a5.8 5.8 0 0 0-.8-.06A5.83 5.83 0 0 0 3.56 16.17 5.83 5.83 0 0 0 9.39 22a5.83 5.83 0 0 0 5.83-5.83V9.3a9.05 9.05 0 0 0 5.22 1.66V7.93a5.7 5.7 0 0 1-3.84-2.1Z",
+  }),
+  "TikTok"
+);
+
 export { default as CloseIcon } from "@mui/icons-material/Close";
 export { default as TrendingUpIcon } from "@mui/icons-material/TrendingUp";
 export { default as AutoAwesomeIcon } from "@mui/icons-material/AutoAwesome";

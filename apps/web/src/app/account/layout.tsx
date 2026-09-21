@@ -51,6 +51,8 @@ export default async function AccountLayout({ children }: { children: React.Reac
   // the same rejection in signInAction. Only reachable by typing the URL
   // directly, since nothing links here for a manager anymore.
   if (profile.role === "hotel_manager") redirect(deniedDestination());
+  // The agent guard lives on the (customer) route group, not here, so
+  // /account/become stays reachable for them — see that layout.
   const trpc = await getServerTrpc();
   const [notifications, contexts, visaActionRequired] = await Promise.all([
     // apps/api is a separate deployment (not yet reachable from every

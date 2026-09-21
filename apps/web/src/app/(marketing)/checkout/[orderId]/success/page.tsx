@@ -55,12 +55,12 @@ export default async function CheckoutSuccessPage({
             <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-primary/10">
               <CheckCircle2 className="size-9 text-primary" />
             </span>
-            <h1 className="mt-4 text-2xl font-bold tracking-tight lg:text-3xl">
+            <h1 className="mt-4 font-heading text-2xl font-bold tracking-tight lg:text-3xl">
               Payment received — thank you!
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Your order <span className="font-medium text-foreground">{order.order_number}</span>{" "}
-              is confirmed. A receipt has been added to your account.
+              Order <span className="font-medium text-foreground">{order.order_number}</span>{" "}
+              confirmed. Receipt added to your account.
             </p>
           </>
         ) : (
@@ -68,7 +68,7 @@ export default async function CheckoutSuccessPage({
             <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-muted">
               <Clock className="size-9 text-muted-foreground" />
             </span>
-            <h1 className="mt-4 text-2xl font-bold tracking-tight">Order {order.status}</h1>
+            <h1 className="mt-4 font-heading text-2xl font-bold tracking-tight">Order {order.status}</h1>
           </>
         )}
       </div>

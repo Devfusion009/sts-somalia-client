@@ -191,9 +191,11 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                 <DropdownMenuLabel className="truncate">{profile.email}</DropdownMenuLabel>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem render={<Link href="/account" />}>
-                <PersonIcon sx={{ fontSize: 18 }} /> My Account
-              </DropdownMenuItem>
+              {profile.role !== "agent" ? (
+                <DropdownMenuItem render={<Link href="/account" />}>
+                  <PersonIcon sx={{ fontSize: 18 }} /> My Account
+                </DropdownMenuItem>
+              ) : null}
               {profile?.is_platform_admin ? (
                 <DropdownMenuItem render={<Link href={portalHref("admin")} />}>
                   <DashboardIcon sx={{ fontSize: 18 }} /> Admin Console
@@ -301,9 +303,11 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
             <div className="mt-6 border-t border-border pt-4">
               {profile ? (
                 <div className="flex flex-col gap-1">
-                  <SheetClose render={<Link href="/account" className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent" />}>
-                    My Account
-                  </SheetClose>
+                  {profile.role !== "agent" ? (
+                    <SheetClose render={<Link href="/account" className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent" />}>
+                      My Account
+                    </SheetClose>
+                  ) : null}
                   {profile?.is_platform_admin ? (
                     <SheetClose render={<Link href={portalHref("admin")} className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent" />}>
                       Admin Console

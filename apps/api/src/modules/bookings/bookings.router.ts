@@ -9,6 +9,12 @@ export const bookingsRouter = router({
     return svc.getMyBookings(ctx.user!.id);
   }),
 
+  /** Agent portal's read-only history: orders from before the account became an agent. */
+  myPersonalBookings: protectedProcedure.query(async ({ ctx }) => {
+    const svc = await ctx.resolve(BookingsService);
+    return svc.getMyBookings(ctx.user!.id, { personalOnly: true });
+  }),
+
   requestsForOrder: protectedProcedure
     .input(z.object({ orderId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {

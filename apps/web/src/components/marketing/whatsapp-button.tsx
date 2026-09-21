@@ -14,15 +14,24 @@ function WhatsAppIcon({ className }: { className?: string }) {
  */
 export function WhatsAppFloatingButton() {
   return (
-    <a
-      href={whatsappLink("Hello STS! I have a question about booking.")}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label="Chat with us on WhatsApp"
-      className="fixed bottom-5 right-5 z-50 flex size-13 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#25D366]"
-    >
-      <WhatsAppIcon className="size-7" />
-    </a>
+    <div className="fixed bottom-5 right-5 z-50">
+      {/* One outward ripple, not a scattered set — a single deliberate cue
+          that this is live and tappable, not decoration. Respects reduced
+          motion (no ping when the user has that preference set). */}
+      <span
+        className="absolute inset-0 rounded-full bg-[#25D366] motion-safe:animate-ping motion-safe:[animation-duration:2.2s]"
+        aria-hidden
+      />
+      <a
+        href={whatsappLink("Hello STS! I have a question about booking.")}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Chat with us on WhatsApp"
+        className="relative flex size-13 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#25D366]"
+      >
+        <WhatsAppIcon className="size-7" />
+      </a>
+    </div>
   );
 }
 

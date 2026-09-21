@@ -111,7 +111,7 @@ export async function getHotelBySlug(slug: string) {
   const { data } = await supabase
     .from("hotels")
     .select(
-      "id, slug, name, description, address_line, city, country_code, star_rating, amenities, images, status, booking_mode, phone, property_links(label, url, sort_order), property_reviews(id, author_name, rating, body, created_at), hotel_rooms(id, name, description, max_occupancy, bed_type, size_sqm, amenities, images, base_price, currency, status)"
+      "id, slug, name, description, description_so, address_line, city, country_code, star_rating, amenities, images, status, booking_mode, phone, property_links(label, url, sort_order), property_reviews(id, author_name, rating, body, created_at), hotel_rooms(id, name, name_so, description, description_so, max_occupancy, bed_type, size_sqm, amenities, images, base_price, currency, status)"
     )
     .eq("slug", slug)
     .eq("status", "published")

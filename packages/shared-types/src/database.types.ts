@@ -2628,12 +2628,14 @@ export type Database = {
           created_at: string
           currency: string
           description: string | null
+          description_so: string | null
           floor: string | null
           hotel_id: string
           id: string
           images: Json
           max_occupancy: number
           name: string
+          name_so: string | null
           size_sqm: number | null
           status: Database["public"]["Enums"]["listing_status"]
           total_units: number
@@ -2646,12 +2648,14 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          description_so?: string | null
           floor?: string | null
           hotel_id: string
           id?: string
           images?: Json
           max_occupancy?: number
           name: string
+          name_so?: string | null
           size_sqm?: number | null
           status?: Database["public"]["Enums"]["listing_status"]
           total_units: number
@@ -2664,12 +2668,14 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          description_so?: string | null
           floor?: string | null
           hotel_id?: string
           id?: string
           images?: Json
           max_occupancy?: number
           name?: string
+          name_so?: string | null
           size_sqm?: number | null
           status?: Database["public"]["Enums"]["listing_status"]
           total_units?: number
@@ -2697,6 +2703,7 @@ export type Database = {
           country_code: string
           created_at: string
           description: string | null
+          description_so: string | null
           id: string
           images: Json
           latitude: number | null
@@ -2722,6 +2729,7 @@ export type Database = {
           country_code: string
           created_at?: string
           description?: string | null
+          description_so?: string | null
           id?: string
           images?: Json
           latitude?: number | null
@@ -2747,6 +2755,7 @@ export type Database = {
           country_code?: string
           created_at?: string
           description?: string | null
+          description_so?: string | null
           id?: string
           images?: Json
           latitude?: number | null
@@ -3481,6 +3490,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          agent_code: string | null
           avatar_url: string | null
           country_code: string | null
           created_at: string
@@ -3495,6 +3505,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agent_code?: string | null
           avatar_url?: string | null
           country_code?: string | null
           created_at?: string
@@ -3509,6 +3520,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agent_code?: string | null
           avatar_url?: string | null
           country_code?: string | null
           created_at?: string
@@ -5493,6 +5505,7 @@ export type Database = {
       }
       generate_affiliate_application_ref: { Args: never; Returns: string }
       generate_agency_application_ref: { Args: never; Returns: string }
+      generate_agent_code: { Args: never; Returns: string }
       generate_hall_booking_ref: { Args: never; Returns: string }
       generate_hotel_partner_application_ref: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }

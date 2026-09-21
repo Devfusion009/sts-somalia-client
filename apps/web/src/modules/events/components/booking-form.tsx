@@ -17,10 +17,16 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SubmitButton } from "@/components/submit-button";
 import { trpc } from "@/lib/trpc/react";
-import { createHallBookingSchema } from "@sts/shared-types";
-import { eventTypeLabel, priceUnitLabel } from "./amenities";
+import { computeHallPrice, createHallBookingSchema } from "@sts/shared-types";
+import { eventTypeLabel } from "./amenities";
 
 export type ActionState = { error: string | null; destination?: string; orderId?: string } | null;
+
+/** "3 days", "1 day", "6 hours" — the multiplied quantity for a price breakdown line. */
+function formatUnitQuantity(quantity: number, unitNoun: "guest" | "day" | "hour" | null) {
+  if (!unitNoun) return null;
+  return `${quantity} ${unitNoun}${quantity > 1 ? "s" : ""}`;
+}
 
 function parseBookingForm(formData: FormData) {
   return createHallBookingSchema.safeParse({
@@ -91,6 +97,9 @@ export function HallBookingForm({
   const [state, formAction] = useActionState(action ?? submitBooking, null);
   const [guests, setGuests] = useState(100);
   const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const router = useRouter();
 
   // Desk submissions get a path back instead of a redirect, because a Server
@@ -106,6 +115,17 @@ export function HallBookingForm({
   // Per-person and price-on-request venues confirm the final price before the
   // booking completes — the request is sent without payment.
   const isRequestFirst = perPerson || basePrice === 0;
+  // Single source of truth for the price shown here and the price charged —
+  // apps/api's booking write calls this same function.
+  const price = computeHallPrice({
+    basePrice,
+    priceUnit,
+    expectedGuests: guests,
+    startDate,
+    endDate,
+    startTime,
+    endTime,
+  });
 
   return (
     <form action={formAction} className="space-y-4">
@@ -148,7 +168,15 @@ export function HallBookingForm({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="endDate">End Date <span className="text-destructive">*</span></Label>
-          <Input id="endDate" name="endDate" type="date" min={startDate || undefined} required />
+          <Input
+            id="endDate"
+            name="endDate"
+            type="date"
+            min={startDate || undefined}
+            required
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
@@ -157,12 +185,30 @@ export function HallBookingForm({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="startTime">Start Time</Label>
-          <Input id="startTime" name="startTime" type="time" />
+          <Label htmlFor="startTime">
+            Start Time {priceUnit === "per_hour" ? <span className="text-destructive">*</span> : null}
+          </Label>
+          <Input
+            id="startTime"
+            name="startTime"
+            type="time"
+            required={priceUnit === "per_hour"}
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+          />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="endTime">End Time</Label>
-          <Input id="endTime" name="endTime" type="time" />
+          <Label htmlFor="endTime">
+            End Time {priceUnit === "per_hour" ? <span className="text-destructive">*</span> : null}
+          </Label>
+          <Input
+            id="endTime"
+            name="endTime"
+            type="time"
+            required={priceUnit === "per_hour"}
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+          />
         </div>
       </div>
 
@@ -204,19 +250,19 @@ export function HallBookingForm({
 
       <Separator />
 
-      {/* Per-person venues estimate by headcount; the venue confirms the
-          final price before the booking completes, so the request goes in
-          WITHOUT payment. Fixed-price venues keep the pay-now flow. */}
+      {/* Per-person and price-on-request venues estimate/confirm before the
+          booking completes, so the request goes in WITHOUT payment.
+          Fixed-price venues keep the pay-now flow. */}
       {isRequestFirst ? (
         <div className="space-y-3">
           <div className="rounded-lg bg-muted/60 p-3">
-            {perPerson && basePrice > 0 ? (
+            {!price.onRequest ? (
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  {currency} {basePrice.toFixed(0)} per person × {guests} guest{guests > 1 ? "s" : ""}
+                  {currency} {price.unitPrice.toFixed(0)} × {formatUnitQuantity(price.quantity, price.unitNoun)}
                 </p>
                 <p className="font-heading text-xl font-bold text-primary">
-                  {currency} {(basePrice * guests).toFixed(0)}
+                  {currency} {price.total.toFixed(0)}
                   <span className="ml-1 text-xs font-normal text-muted-foreground">estimated</span>
                 </p>
               </div>
@@ -233,20 +279,30 @@ export function HallBookingForm({
           </SubmitButton>
         </div>
       ) : (
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground">Venue fee</p>
-            <p className="font-heading text-xl font-bold text-primary">
-              {currency} {basePrice.toFixed(0)}
-              <span className="text-xs font-normal text-muted-foreground">
-                {" "}
-                {priceUnitLabel(priceUnit)}
-              </span>
-            </p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              {!price.needsTimes ? (
+                <p className="text-xs text-muted-foreground">
+                  {price.unitNoun
+                    ? `${currency} ${price.unitPrice.toFixed(0)} × ${formatUnitQuantity(price.quantity, price.unitNoun)}`
+                    : "Venue fee"}
+                </p>
+              ) : null}
+              <p className="font-heading text-xl font-bold text-primary">
+                {currency} {(price.needsTimes ? price.unitPrice : price.total).toFixed(0)}
+                {price.needsTimes ? (
+                  <span className="text-xs font-normal text-muted-foreground"> per hour</span>
+                ) : null}
+              </p>
+            </div>
+            <SubmitButton pendingText="Reserving…" className="gap-1.5" disabled={price.needsTimes}>
+              Reserve &amp; Pay <ArrowRight className="size-4" />
+            </SubmitButton>
           </div>
-          <SubmitButton pendingText="Reserving…" className="gap-1.5">
-            Reserve &amp; Pay <ArrowRight className="size-4" />
-          </SubmitButton>
+          {price.needsTimes ? (
+            <p className="text-xs text-muted-foreground">Total shown once start and end time are set.</p>
+          ) : null}
         </div>
       )}
 

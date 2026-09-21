@@ -5,7 +5,7 @@ import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
 import { NAV_LINKS, PARTNER_LINKS } from "@/lib/nav-links";
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from "@/lib/marketing-nav";
 
-import { EmailIcon, FacebookIcon, InstagramIcon, LinkedInIcon, PhoneInTalkIcon, PlaceIcon, XIcon, YouTubeIcon } from "@/components/ui/mui-icons";
+import { EmailIcon, FacebookIcon, InstagramIcon, LinkedInIcon, PhoneInTalkIcon, PlaceIcon, TikTokIcon, XIcon, YouTubeIcon } from "@/components/ui/mui-icons";
 import type { SvgIconComponent } from "@/components/ui/mui-icons";
 const COMPANY_LINKS = [
   { href: "/about", label: "About us" },
@@ -18,10 +18,12 @@ const COMPANY_LINKS = [
   { href: "/partner-terms", label: "Partner Terms" },
 ];
 
-/* Placeholder handles — point these at the real STS profiles before launch. */
+/* LinkedIn/Facebook/YouTube/X are still placeholder handles — point these at
+   the real STS profiles once they exist. Instagram and TikTok are real. */
 const SOCIALS: Array<{ icon: SvgIconComponent; label: string; href: string }> = [
+  { icon: InstagramIcon, label: "Instagram", href: "https://www.instagram.com/scouttravelsolution" },
+  { icon: TikTokIcon, label: "TikTok", href: "https://www.tiktok.com/@scoutsts2" },
   { icon: LinkedInIcon, label: "LinkedIn", href: "https://www.linkedin.com" },
-  { icon: InstagramIcon, label: "Instagram", href: "https://www.instagram.com" },
   { icon: FacebookIcon, label: "Facebook", href: "https://www.facebook.com" },
   { icon: YouTubeIcon, label: "YouTube", href: "https://www.youtube.com" },
   { icon: XIcon, label: "X", href: "https://x.com" },
