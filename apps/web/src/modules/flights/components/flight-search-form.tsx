@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CalendarMonthIcon,
   CloseIcon,
@@ -17,7 +17,17 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
-import { countryFlag } from "@/lib/countries";
+import {
+  Combobox,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxPopup,
+  ComboboxPortal,
+  ComboboxPositioner,
+} from "@/components/ui/combobox";
+import { countryName } from "@/lib/countries";
 import type { Airport } from "@sts/shared-types";
 
 export type FlightSearchDefaults = {
@@ -46,6 +56,19 @@ const RESET_INPUT =
   // ones, and the field is clickable anywhere, not just on a tiny glyph.
   "[&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0";
 
+type Place = { code: string; label: string; country: string };
+
+const placeText = (p: Place) => `${p.label} (${p.code})`;
+
+function airportToPlace(a: Airport): Place {
+  return { code: a.iata_code, label: a.city, country: countryName(a.country_code) };
+}
+
+/**
+ * Type-ahead airport/city picker. With nothing typed it lists the local
+ * shortlist; from 2 characters on it queries /api/places/airports, and falls
+ * back to filtering the shortlist if that lookup returns nothing.
+ */
 function AirportPicker({
   id,
   name,
@@ -57,51 +80,107 @@ function AirportPicker({
   id: string;
   name: string;
   airports: Airport[];
-  value: string | null;
-  onValueChange: (v: string | null) => void;
+  value: Place | null;
+  onValueChange: (v: Place | null) => void;
   placeholder: string;
 }) {
-  const selected = airports.find((a) => a.iata_code === value);
+  const shortlist = useMemo(() => airports.map(airportToPlace), [airports]);
+  const [query, setQuery] = useState("");
+  const [remote, setRemote] = useState<{ term: string; places: Place[] } | null>(null);
+
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/places/airports?input=${encodeURIComponent(term)}`, {
+          signal: controller.signal,
+        });
+        const data = (await res.json()) as { places?: Place[] };
+        setRemote({ term, places: data.places ?? [] });
+      } catch {
+        // aborted or offline — keep whatever is showing
+      }
+    }, 200);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+
+  const items = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (term.length < 2) return shortlist;
+    if (remote && remote.term === query.trim() && remote.places.length > 0) return remote.places;
+    return shortlist.filter((p) => `${p.label} ${p.code}`.toLowerCase().includes(term));
+  }, [query, remote, shortlist]);
 
   return (
     <>
-      {/* Controlled so the swap button can rewrite both ends; the hidden input
-          is what the GET form actually submits. */}
-      <input type="hidden" name={name} value={value ?? ""} />
-      {selected ? (
-        // Selected airport renders as a removable chip, as in the reference.
-        <span className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-secondary py-1 pr-1 pl-2 text-sm font-semibold text-secondary-foreground">
-          <span className="truncate">
-            {countryFlag(selected.country_code)} {selected.city} ({selected.iata_code})
+      <input type="hidden" name={name} value={value?.code ?? ""} />
+      <Combobox
+        items={items}
+        filter={null}
+        value={value}
+        onValueChange={(next) => onValueChange(next ?? null)}
+        inputValue={query}
+        onInputValueChange={setQuery}
+        itemToStringLabel={placeText}
+        isItemEqualToValue={(a, b) => a.code === b.code}
+        autoHighlight
+      >
+        {value ? (
+          <span className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-secondary py-1 pr-1 pl-2 text-sm font-semibold text-secondary-foreground">
+            <span className="truncate">{placeText(value)}</span>
+            <button
+              type="button"
+              onClick={() => {
+                onValueChange(null);
+                setQuery("");
+              }}
+              aria-label={`Clear ${placeholder}`}
+              className="grid size-5 shrink-0 place-items-center rounded text-secondary-foreground/70 transition-colors hover:bg-black/10 hover:text-secondary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <CloseIcon sx={{ fontSize: 14 }} />
+            </button>
           </span>
-          <button
-            type="button"
-            onClick={() => onValueChange(null)}
-            aria-label={`Clear ${placeholder}`}
-            className="grid size-5 shrink-0 place-items-center rounded text-secondary-foreground/70 transition-colors hover:bg-black/10 hover:text-secondary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            <CloseIcon sx={{ fontSize: 14 }} />
-          </button>
-        </span>
-      ) : (
-        <Select value={value} onValueChange={(v) => onValueChange(v ? String(v) : null)}>
-          <SelectTrigger
+        ) : (
+          <ComboboxInput
             id={id}
-            className="h-8 w-full border-0 bg-transparent p-0 text-sm font-normal text-muted-foreground shadow-none focus-visible:ring-0 data-placeholder:text-muted-foreground dark:bg-transparent [&_svg]:hidden"
-          >
-            <SelectValue placeholder={placeholder} />
-          </SelectTrigger>
-          <SelectContent>
-            {airports.map((airport) => (
-              <SelectItem key={airport.iata_code} value={airport.iata_code}>
-                {countryFlag(airport.country_code)} {airport.city} ({airport.iata_code})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+            placeholder={placeholder}
+            autoComplete="off"
+            className="h-8 rounded-none border-0 bg-transparent p-0 text-sm font-semibold shadow-none placeholder:font-normal focus-visible:ring-0 dark:bg-transparent"
+          />
+        )}
+        <ComboboxPortal>
+          <ComboboxPositioner className="z-[60]">
+            <ComboboxPopup className="min-w-72">
+              <ComboboxEmpty>No matching airports.</ComboboxEmpty>
+              <ComboboxList>
+                {(place: Place) => (
+                  <ComboboxItem key={place.code} value={place}>
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate font-medium">{placeText(place)}</span>
+                      {place.country ? (
+                        <span className="truncate text-xs text-muted-foreground">{place.country}</span>
+                      ) : null}
+                    </span>
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxPopup>
+          </ComboboxPositioner>
+        </ComboboxPortal>
+      </Combobox>
     </>
   );
+}
+
+function resolveDefault(code: string | undefined, airports: Airport[]): Place | null {
+  if (!code) return null;
+  const local = airports.find((a) => a.iata_code === code);
+  return local ? airportToPlace(local) : { code, label: code, country: "" };
 }
 
 /**
@@ -117,8 +196,27 @@ export function FlightSearchForm({
   defaults: FlightSearchDefaults;
 }) {
   const [tripType, setTripType] = useState(defaults.tripType === "one_way" ? "one_way" : "round_trip");
-  const [origin, setOrigin] = useState<string | null>(defaults.origin ?? null);
-  const [destination, setDestination] = useState<string | null>(defaults.destination ?? null);
+  const [origin, setOrigin] = useState<Place | null>(() => resolveDefault(defaults.origin, airports));
+  const [destination, setDestination] = useState<Place | null>(() => resolveDefault(defaults.destination, airports));
+
+  // A code from the URL that isn't in the local shortlist (e.g. CCU) shows as a
+  // bare code until the lookup names it.
+  useEffect(() => {
+    for (const [current, set] of [
+      [origin, setOrigin],
+      [destination, setDestination],
+    ] as const) {
+      if (!current || current.label !== current.code) continue;
+      fetch(`/api/places/airports?input=${encodeURIComponent(current.code)}`)
+        .then((r) => r.json() as Promise<{ places?: Place[] }>)
+        .then((d) => {
+          const hit = d.places?.find((p) => p.code === current.code);
+          if (hit) set(hit);
+        })
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [adults, setAdults] = useState(defaults.adults ?? "1");
   const [cabin, setCabin] = useState(defaults.cabin ?? "economy");
   const roundTrip = tripType === "round_trip";
