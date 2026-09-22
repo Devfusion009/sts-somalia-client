@@ -379,12 +379,16 @@ export function HeaderSearch() {
   // Only the home page hides it initially — it already has a big hero search,
   // so this one reveals once that scrolls away. Everywhere else it's always up.
   const isHome = pathname === "/";
+  // A specific hotel's own pages (detail, booking review) aren't a place to
+  // search for a destination — you're already at one. /hotels itself (the
+  // listing/search page) keeps the bar.
+  const onHotelDetail = pathname.startsWith("/hotels/");
   // Cached + hysteresis store, same reasoning as the header shell: revealing
   // this bar adds ~47px of layout, which feeds back into scroll position. A
   // live `window.scrollY` snapshot would make React's commit-time re-read
   // disagree with render and loop.
   const scrolledPast = useSearchRevealed();
-  const visible = !isHome || scrolledPast;
+  const visible = !onHotelDetail && (!isHome || scrolledPast);
 
   return (
     <AnimatePresence initial={false}>

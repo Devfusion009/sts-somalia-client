@@ -242,18 +242,31 @@ export function BookingReviewForm({
             {priceOnRequest ? (
               <p className="text-sm text-muted-foreground">Price on request</p>
             ) : (
-              <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>
-                    {room.currency} {room.base_price.toFixed(0)} × {numRooms} room{numRooms > 1 ? "s" : ""} ×{" "}
-                    {nights || 0} night{nights === 1 ? "" : "s"}
+              <div className="space-y-2 text-sm">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-muted-foreground">Per night</span>
+                  <span className="font-semibold tabular-nums">
+                    {room.currency} {room.base_price.toFixed(0)}
                   </span>
                 </div>
                 <Separator />
-                <div className="flex items-center justify-between text-base font-semibold">
-                  <span>Total</span>
-                  <span className="text-primary">{total !== null ? `${room.currency} ${total.toFixed(0)}` : "—"}</span>
-                </div>
+                {/* Before dates are picked there is no stay length to multiply
+                    by — a "× 0 nights" line reads as a broken total. */}
+                {nights === 0 || total === null ? (
+                  <p className="text-muted-foreground">Select dates to calculate the total.</p>
+                ) : (
+                  <>
+                    <p className="text-muted-foreground">
+                      {nights} night{nights > 1 ? "s" : ""} × {numRooms} room{numRooms > 1 ? "s" : ""}
+                    </p>
+                    <div className="flex items-center justify-between text-base font-semibold">
+                      <span>Total</span>
+                      <span className="text-primary tabular-nums">
+                        {room.currency} {total.toFixed(0)}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Minus, Plus } from "lucide-react";
 import {
   CalendarMonthIcon,
   CloseIcon,
@@ -15,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import {
@@ -332,51 +334,65 @@ export function FlightSearchForm({
           </div>
         </div>
 
-        {/* Travellers + cabin, combined into one cell as in the reference */}
+        {/* Travellers + cabin — one popover, one trigger, so every pixel of
+            the cell (icon included) opens the same panel instead of two
+            adjacent selects with a dead zone between them. */}
         <div className={cn(CELL, "col-span-2 border-t border-border lg:col-span-1 lg:border-t-0 lg:border-l")}>
           <span className="mb-0.5 block text-xs font-medium text-muted-foreground">
             Travellers
           </span>
-          <div className="flex items-center gap-1.5">
-            <PersonIcon sx={{ fontSize: 16 }} className="shrink-0 text-muted-foreground" />
-            <label htmlFor="adults-select" className="sr-only">
-              Adults
-            </label>
-            <Select value={adults} onValueChange={(v) => setAdults(String(v ?? "1"))}>
-              <SelectTrigger
-                id="adults-select"
-                className="h-8 w-auto border-0 bg-transparent p-0 text-sm font-semibold text-foreground shadow-none focus-visible:ring-0 dark:bg-transparent [&_svg]:hidden"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => (
-                  <SelectItem key={n} value={n}>
-                    {n} {n === "1" ? "adult" : "adults"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span className="-ml-1 text-sm font-semibold text-foreground">,</span>
-            <label htmlFor="cabin-select" className="sr-only">
-              Cabin
-            </label>
-            <Select value={cabin} onValueChange={(v) => setCabin(String(v ?? "economy"))}>
-              <SelectTrigger
-                id="cabin-select"
-                className="h-8 w-auto min-w-0 border-0 bg-transparent p-0 text-sm font-semibold text-foreground shadow-none focus-visible:ring-0 dark:bg-transparent [&_svg]:hidden"
-              >
-                <span className="truncate">{cabinLabel}</span>
-              </SelectTrigger>
-              <SelectContent>
-                {CABINS.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Popover>
+            <PopoverTrigger className="flex h-8 w-full items-center gap-1.5 text-left text-sm font-semibold text-foreground focus-visible:outline-none">
+              <PersonIcon sx={{ fontSize: 16 }} className="shrink-0 text-muted-foreground" />
+              <span className="truncate">
+                {adults} {adults === "1" ? "adult" : "adults"}, {cabinLabel}
+              </span>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-64 gap-4 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">Adults</span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setAdults((n) => String(Math.max(1, Number(n) - 1)))}
+                    disabled={adults === "1"}
+                    aria-label="Fewer adults"
+                    className="grid size-7 place-items-center rounded-full border border-border text-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    <Minus className="size-3.5" />
+                  </button>
+                  <span className="w-4 text-center text-sm font-semibold tabular-nums">{adults}</span>
+                  <button
+                    type="button"
+                    onClick={() => setAdults((n) => String(Math.min(9, Number(n) + 1)))}
+                    disabled={adults === "9"}
+                    aria-label="More adults"
+                    className="grid size-7 place-items-center rounded-full border border-border text-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    <Plus className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 border-t border-border pt-4">
+                <label htmlFor="cabin-select" className="text-sm font-medium text-foreground">
+                  Cabin class
+                </label>
+                <Select value={cabin} onValueChange={(v) => setCabin(String(v ?? "economy"))}>
+                  <SelectTrigger id="cabin-select" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CABINS.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="col-span-2 p-2 lg:col-span-1 lg:flex lg:items-center lg:p-2">

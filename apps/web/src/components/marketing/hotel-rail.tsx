@@ -84,7 +84,7 @@ export function HotelRail({
                         per night
                       </>
                     ) : (
-                      "See availability"
+                      "Price on request"
                     )}
                   </p>
                 </div>

@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   BedDouble,
-  Building2,
   ChevronRight,
   Home,
   MapPin,
@@ -22,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookingForm } from "./booking-form";
+import { HotelGallery } from "./hotel-gallery";
 
 export async function generateMetadata({
   params,
@@ -90,29 +90,7 @@ export default async function HotelDetailPage({
         <span className="font-medium text-foreground">{hotel.name}</span>
       </nav>
 
-      {/* Gallery */}
-      {images.length > 1 ? (
-        <div className="grid h-64 grid-cols-4 gap-2 overflow-hidden rounded-2xl sm:h-80">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={images[0]} alt={hotel.name} className="col-span-4 h-full w-full object-cover sm:col-span-2 sm:row-span-2" />
-          <div className="col-span-4 hidden grid-cols-2 gap-2 sm:col-span-2 sm:grid">
-            {images.slice(1, 5).map((src, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={src} src={src} alt={`${hotel.name} photo ${i + 2}`} className="h-full w-full object-cover" />
-            ))}
-            {images.length < 5
-              ? Array.from({ length: 5 - images.length }).map((_, i) => (
-                  <MediaPlaceholder key={i} seed={`${hotel.id}-${i}`} icon={Building2} className="h-full w-full" />
-                ))
-              : null}
-          </div>
-        </div>
-      ) : images.length === 1 ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={images[0]} alt={hotel.name} className="h-64 w-full rounded-2xl object-cover sm:h-80" />
-      ) : (
-        <MediaPlaceholder seed={hotel.id} icon={Building2} className="h-56 w-full rounded-2xl sm:h-72" />
-      )}
+      <HotelGallery images={images} hotelId={hotel.id} hotelName={hotel.name} />
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
         {/* Main column */}

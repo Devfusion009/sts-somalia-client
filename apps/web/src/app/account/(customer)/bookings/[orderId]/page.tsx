@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import {
   ArrowRight,
+  Check,
   CreditCard,
   Download,
   FileText,
@@ -90,10 +91,17 @@ function manualBookingStageIndex(status: string): { index: number; outcome: "pen
 
 export default async function BookingDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orderId: string }>;
+  searchParams: Promise<{ requested?: string; waitlisted?: string }>;
 }) {
-  const { orderId } = await params;
+  const [{ orderId }, submitted] = await Promise.all([params, searchParams]);
+  // Set by the booking actions' redirect — this is the one render where the
+  // customer has just pressed submit, so the page opens on the outcome
+  // instead of the same detail view they'd see a week later.
+  const justRequested = submitted.requested === "1" || submitted.waitlisted === "1";
+  const justWaitlisted = submitted.waitlisted === "1";
   const profile = await requireUser();
 
   const trpc = await getServerTrpc();
@@ -206,6 +214,20 @@ export default async function BookingDetailPage({
     <div className="space-y-6">
       <div>
         <BackLink href="/account/bookings" label="All bookings" className="mb-3" />
+
+        {justRequested ? (
+          <div className="mb-5 flex flex-wrap items-center gap-4 rounded-xl bg-primary/5 p-5 ring-1 ring-primary/20">
+            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+              <Check className="size-6" />
+            </span>
+            <h2 className="font-heading text-lg font-bold">
+              {justWaitlisted ? "You're on the waitlist" : "Booking request received"}
+            </h2>
+            <Button variant="outline" size="sm" className="ml-auto gap-1.5" render={<Link href="/hotels" />}>
+              Browse hotels <ArrowRight className="size-3.5" />
+            </Button>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
