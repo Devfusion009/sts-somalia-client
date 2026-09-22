@@ -119,6 +119,8 @@ export function HotelListRow({ hotel, bookingSuffix = "" }: { hotel: HotelCardDa
           ) : (
             <Link
               href={href}
+              target="_blank"
+              rel="noopener noreferrer"
               className="mt-2 inline-flex h-9 items-center rounded-lg bg-brand-accent px-4 font-heading text-sm font-bold text-brand-accent-foreground transition-colors hover:bg-brand-accent/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
             >
               See availability

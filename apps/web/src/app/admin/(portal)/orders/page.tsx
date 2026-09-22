@@ -171,10 +171,7 @@ export default async function AdminOrdersPage({
       {visible.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
-            <p className="font-medium">No orders here</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {orders.length === 0 ? "No orders have been placed yet." : "Try another filter."}
-            </p>
+            <p className="text-sm font-medium">{orders.length === 0 ? "No orders yet." : "No orders match this filter."}</p>
           </CardContent>
         </Card>
       ) : (

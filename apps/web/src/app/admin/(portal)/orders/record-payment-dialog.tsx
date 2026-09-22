@@ -10,7 +10,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -62,10 +61,6 @@ export function RecordPaymentDialog({
         <form action={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Record a payment</DialogTitle>
-            <DialogDescription>
-              For payments taken outside the online flow — cash at the office, a bank transfer
-              that arrived without the customer starting a &ldquo;Pay at Office&rdquo; attempt first.
-            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-1.5">
@@ -80,9 +75,6 @@ export function RecordPaymentDialog({
                 defaultValue={remaining.toFixed(2)}
                 required
               />
-              <p className="text-xs text-muted-foreground">
-                Remaining balance: {currency} {remaining.toFixed(2)}
-              </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="record-method">How did they pay?</Label>

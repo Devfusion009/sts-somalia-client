@@ -38,7 +38,7 @@ export function SiteFooter() {
       <div className="border-b border-sidebar-border">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-3 lg:items-center lg:px-8">
           <Link href="/" className="inline-flex items-center rounded-lg focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none">
-            <Image src="/logo.png" alt="STS Somalia" width={714} height={312} className="h-10 w-auto brightness-0 invert" />
+            <Image src="/logo.png" alt="STS Somalia" width={714} height={312} className="h-10 w-auto" />
           </Link>
 
           <div>

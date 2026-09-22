@@ -1,14 +1,5 @@
 import type { Metadata } from "next";
-import {
-  BadgePercent,
-  Clock3,
-  Headset,
-  Luggage,
-  MoveRight,
-  Plane,
-  RefreshCcw,
-  ShieldCheck,
-} from "lucide-react";
+import { Clock3, Luggage, MoveRight, Plane, RefreshCcw, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FlightsHero } from "@/components/marketing/flights-hero";
@@ -45,12 +36,6 @@ const faqJsonLd = (faqs: Array<{ question: string; answer: string }>) => ({
     acceptedAnswer: { "@type": "Answer", text: faq.answer },
   })),
 });
-
-const TRUST_POINTS = [
-  { icon: BadgePercent, text: "Fair, transparent fares" },
-  { icon: ShieldCheck, text: "IATA-experienced booking team" },
-  { icon: Headset, text: "24/7 support before and during travel" },
-];
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
@@ -129,13 +114,6 @@ export default async function FlightsPage({
 
       <FlightsHero>
         <FlightSearchForm airports={airports} defaults={defaults} />
-        <ul className="mt-5 flex flex-wrap gap-x-7 gap-y-2">
-          {TRUST_POINTS.map((point) => (
-            <li key={point.text} className="flex items-center gap-2 text-sm font-medium text-sidebar-foreground/75">
-              <point.icon className="size-4 text-sidebar-primary" /> {point.text}
-            </li>
-          ))}
-        </ul>
       </FlightsHero>
 
       {/* Discovery content only when the visitor hasn't searched yet. */}

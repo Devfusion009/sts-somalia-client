@@ -73,7 +73,12 @@ export async function searchHotels(filters: {
     query = query.ilike("city", `%${filters.city}%`);
   }
 
-  const { data } = await query.order("star_rating", { ascending: false }).order("name");
+  // nullsFirst: false — Postgres' default for DESC is NULLS FIRST, which
+  // ranks unrated hotels ahead of 5-star ones. Explicit here so a hotel
+  // missing a star rating sorts to the back of the list, not the front.
+  const { data } = await query
+    .order("star_rating", { ascending: false, nullsFirst: false })
+    .order("name");
   const internal = (data ?? []).map(toCardData);
 
   // Blend in live external-supplier availability — only meaningful with a

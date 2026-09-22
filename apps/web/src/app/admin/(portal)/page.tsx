@@ -11,7 +11,6 @@ import {
   Landmark,
   PartyPopper,
   Download,
-  Trophy,
   ArrowUpRight,
   ArrowDownRight,
   ArrowRight,
@@ -392,9 +391,7 @@ export default async function AdminDashboardPage({
 
       <Card className={CARD}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="size-4 text-brand-gold" /> Agent leaderboard
-          </CardTitle>
+          <CardTitle>Agent leaderboard</CardTitle>
           <CardAction>
             <ExportLink href={`/admin/reports/agent-leaderboard/export?${rangeQuery}`} />
           </CardAction>
