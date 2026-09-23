@@ -69,8 +69,14 @@ export async function searchHotels(filters: {
   const supabase = await createClient();
   let query = supabase.from("hotels").select(CARD_SELECT).eq("status", "published");
 
-  if (filters.city) {
-    query = query.ilike("city", `%${filters.city}%`);
+  // The city field carries whatever the autocomplete suggestion read, e.g.
+  // "Bosaso, Puntland, Somalia" — hotels.city only ever holds the bare city
+  // name, so matching the full string can never hit a row (the needle is
+  // longer than the haystack). Match on the city segment alone.
+  const cityName = filters.city?.split(",")[0]?.trim();
+
+  if (cityName) {
+    query = query.ilike("city", `%${cityName}%`);
   }
 
   // nullsFirst: false — Postgres' default for DESC is NULLS FIRST, which
@@ -84,9 +90,9 @@ export async function searchHotels(filters: {
   // Blend in live external-supplier availability — only meaningful with a
   // city and stay dates, same as any real hotel search. Failures here never
   // break the page; internal listings still render.
-  if (filters.city && filters.checkIn && filters.checkOut) {
+  if (cityName && filters.checkIn && filters.checkOut) {
     const external = await searchHotelbedsAvailability({
-      city: filters.city,
+      city: cityName,
       checkIn: filters.checkIn,
       checkOut: filters.checkOut,
       adults: filters.adults ?? 2,
