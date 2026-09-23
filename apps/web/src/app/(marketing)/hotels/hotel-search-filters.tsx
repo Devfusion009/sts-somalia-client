@@ -62,6 +62,7 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
             placeholder="Enter a city"
             value={values.city}
             onChange={(city) => set("city", city)}
+            icon={false}
           />
         </div>
       </div>

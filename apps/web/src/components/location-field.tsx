@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -24,6 +25,7 @@ export function LocationField({
   required,
   placeholder,
   id,
+  icon = true,
 }: {
   name?: string;
   defaultValue?: string;
@@ -32,6 +34,8 @@ export function LocationField({
   required?: boolean;
   placeholder?: string;
   id?: string;
+  /** Off where the surrounding layout already labels the field with its own pin. */
+  icon?: boolean;
 }) {
   const [internalValue, setInternalValue] = useState(defaultValue ?? "");
   const isControlled = controlledValue !== undefined;
@@ -39,7 +43,9 @@ export function LocationField({
   const setValue = isControlled ? controlledOnChange! : setInternalValue;
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<{ top: number; left: number; width: number } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -61,10 +67,55 @@ export function LocationField({
     };
   }, [value]);
 
+  // The list is portalled to the body and positioned against the input: the
+  // search bars this sits in are `overflow-hidden` rounded containers, which
+  // otherwise clip the suggestions down to a sliver of empty panel.
+  const showList = open && predictions.length > 0;
+  useLayoutEffect(() => {
+    if (!showList) return;
+    const place = () => {
+      const box = wrapRef.current?.getBoundingClientRect();
+      if (box) setAnchor({ top: box.bottom + 4, left: box.left, width: box.width });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [showList]);
+
+  const list = showList && anchor ? (
+    <div
+      style={{ top: anchor.top, left: anchor.left, width: Math.max(anchor.width, 240) }}
+      className="fixed z-[70] max-h-64 overflow-y-auto rounded-xl border border-border bg-popover py-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10"
+    >
+      {predictions.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setValue(p.text);
+            setPredictions([]);
+            setOpen(false);
+          }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+        >
+          <MapPin className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate">{p.text}</span>
+        </button>
+      ))}
+    </div>
+  ) : null;
+
   return (
-    <div className="relative">
+    <div className="relative" ref={wrapRef}>
       <div className="relative">
-        <MapPin className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        {icon ? (
+          <MapPin className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        ) : null}
         <Input
           id={id}
           name={name}
@@ -75,29 +126,10 @@ export function LocationField({
           placeholder={placeholder}
           required={required}
           autoComplete="off"
-          className="pl-8"
+          className={icon ? "pl-8" : undefined}
         />
       </div>
-      {open && predictions.length > 0 ? (
-        <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-popover py-1 shadow-md ring-1 ring-foreground/10">
-          {predictions.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setValue(p.text);
-                setPredictions([]);
-                setOpen(false);
-              }}
-              className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-            >
-              <MapPin className="size-3.5 shrink-0 text-muted-foreground" />
-              {p.text}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      {list && typeof document !== "undefined" ? createPortal(list, document.body) : null}
     </div>
   );
 }

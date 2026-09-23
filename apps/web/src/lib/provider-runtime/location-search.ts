@@ -33,6 +33,15 @@ type PhotonFeature = {
 const REGION_BIAS_LAT = 2.0469;
 const REGION_BIAS_LON = 45.3182;
 
+/** Lower is better; 3 means the name doesn't actually contain what was typed. */
+function placeRank(name: string, term: string): number {
+  const lower = name.toLowerCase();
+  if (lower === term) return 0;
+  if (lower.startsWith(term)) return 1;
+  if (lower.includes(term)) return 2;
+  return 3;
+}
+
 async function searchPhoton(query: string): Promise<LocationSearchResult> {
   const params = new URLSearchParams({
     q: query,
@@ -47,15 +56,28 @@ async function searchPhoton(query: string): Promise<LocationSearchResult> {
   if (!res.ok) return { enabled: true, predictions: [] };
 
   const payload = (await res.json()) as { features?: PhotonFeature[] };
+  const term = query.trim().toLowerCase();
   const predictions = (payload.features ?? [])
-    .map((f): LocationPrediction | null => {
+    .map((f, index) => {
       const p = f.properties;
       const name = p?.city ?? p?.name;
       if (!name) return null;
       const parts = [name, p?.state, p?.country].filter(Boolean);
-      return { id: String(p?.osm_id ?? name), text: parts.join(", ") };
+      return {
+        index,
+        rank: placeRank(name, term),
+        prediction: { id: String(p?.osm_id ?? name), text: parts.join(", ") },
+      };
     })
-    .filter((p): p is LocationPrediction => p !== null);
+    .filter((x): x is { index: number; rank: number; prediction: LocationPrediction } => x !== null)
+    // Photon matches loosely — "Bosaso" also returns Bogajo (ES), Besano and
+    // Bosaro (IT). Those out-rank nothing the traveller typed, so they go.
+    .filter((x) => x.rank < 3)
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map((x) => x.prediction)
+    // OSM often holds several nodes for one place (Dubai the city and Dubai
+    // the emirate resolve to the same line) — one row per label.
+    .filter((p, i, all) => all.findIndex((o) => o.text === p.text) === i);
 
   return { enabled: true, predictions };
 }
