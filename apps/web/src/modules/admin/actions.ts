@@ -10,6 +10,7 @@ import type { ActionState } from "@/lib/auth/actions";
 import type { Database } from "@/lib/types/database.types";
 import { UMRAH_INCLUDE_KEYS } from "@/modules/umrah/includes";
 import { rememberRoomType } from "@/modules/hotels/room-types";
+import { TARGETS, uploadImages } from "@/modules/admin/property-gallery-actions";
 import { repriceQuotedOrder } from "@/modules/orders/helpers";
 import { commaList, parseLinks, replacePropertyLinks } from "@/modules/hotels/listing-fields";
 import { sanitizeKey, parseDocumentSlotsJson } from "./visa-type-utils";
@@ -926,9 +927,31 @@ export async function createRoom(_prev: ActionState, formData: FormData): Promis
   const parsed = roomSchema.safeParse(roomInput(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
+  // A room with no photo is unbookable in practice — a traveller doesn't
+  // request a room they can't see — so at least one is required at creation,
+  // not left as an easy-to-skip follow-up step on a separate page.
+  const photos = formData.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
+  if (photos.length === 0) return { error: "Add at least one room photo." };
+
   const supabase = await createClient();
-  const { error } = await supabase.from("hotel_rooms").insert({ ...roomRow(parsed.data), hotel_id: hotelId });
+  const { data: inserted, error } = await supabase
+    .from("hotel_rooms")
+    .insert({ ...roomRow(parsed.data), hotel_id: hotelId })
+    .select("id")
+    .single();
   if (error) return { error: error.message };
+
+  const uploadForm = new FormData();
+  uploadForm.set("id", inserted.id);
+  for (const photo of photos) uploadForm.append("files", photo);
+  const uploadResult = await uploadImages(TARGETS.room, uploadForm);
+  if (uploadResult?.error) {
+    // All-or-nothing: a room row with no photo isn't the state either of us
+    // wants, so undo the insert rather than leave it half-created.
+    await supabase.from("hotel_rooms").delete().eq("id", inserted.id);
+    return { error: uploadResult.error };
+  }
+
   await rememberRoomType(supabase, parsed.data.name);
   revalidatePath(`/admin/hotels/${hotelId}`);
   return { error: null };

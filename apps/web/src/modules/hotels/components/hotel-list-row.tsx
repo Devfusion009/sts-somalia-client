@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Building2 } from "lucide-react";
-import { StarIcon, LocationOnIcon, CheckCircleIcon } from "@/components/ui/mui-icons";
+import { StarIcon, LocationOnIcon } from "@/components/ui/mui-icons";
 import { MediaPlaceholder } from "@/components/media-placeholder";
 import { Badge } from "@/components/ui/badge";
-import { amenityLabel } from "@/modules/hotels/images";
+import { HotelAmenitiesList } from "@/modules/hotels/components/hotel-amenities-list";
 import type { HotelCardData } from "@/modules/hotels/components/hotel-card";
 
 /**
@@ -65,19 +65,7 @@ export function HotelListRow({ hotel, bookingSuffix = "" }: { hotel: HotelCardDa
           <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{hotel.description}</p>
         ) : null}
 
-        {hotel.amenities.length > 0 ? (
-          <ul className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
-            {hotel.amenities.slice(0, 4).map((amenity) => (
-              <li key={amenity} className="flex items-center gap-1 text-xs font-medium text-foreground">
-                <CheckCircleIcon sx={{ fontSize: 13 }} className="text-primary" />
-                {amenityLabel(amenity)}
-              </li>
-            ))}
-            {hotel.amenities.length > 4 ? (
-              <li className="text-xs text-muted-foreground">+{hotel.amenities.length - 4} more</li>
-            ) : null}
-          </ul>
-        ) : null}
+        <HotelAmenitiesList amenities={hotel.amenities} />
 
         {isExternal ? (
           <Badge variant="outline" className="mt-3 text-xs text-muted-foreground">

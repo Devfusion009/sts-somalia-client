@@ -100,4 +100,18 @@ export { default as PaymentsIcon } from "@mui/icons-material/Payments";
 export { default as NightsStayIcon } from "@mui/icons-material/NightsStay";
 export { default as PublicIcon } from "@mui/icons-material/Public";
 
+// Hotel/room facility icons — one distinct glyph per amenity, see
+// modules/hotels/amenity-icons.ts for the amenity-key -> icon mapping.
+export { default as WifiIcon } from "@mui/icons-material/Wifi";
+export { default as LocalParkingIcon } from "@mui/icons-material/LocalParking";
+export { default as PoolIcon } from "@mui/icons-material/Pool";
+export { default as FreeBreakfastIcon } from "@mui/icons-material/FreeBreakfast";
+export { default as AirportShuttleIcon } from "@mui/icons-material/AirportShuttle";
+export { default as RestaurantIcon } from "@mui/icons-material/Restaurant";
+export { default as RoomServiceIcon } from "@mui/icons-material/RoomService";
+export { default as FitnessCenterIcon } from "@mui/icons-material/FitnessCenter";
+export { default as SpaIcon } from "@mui/icons-material/Spa";
+export { default as ElevatorIcon } from "@mui/icons-material/Elevator";
+export { default as SmokeFreeIcon } from "@mui/icons-material/SmokeFree";
+
 export type { SvgIconComponent } from "@mui/icons-material";

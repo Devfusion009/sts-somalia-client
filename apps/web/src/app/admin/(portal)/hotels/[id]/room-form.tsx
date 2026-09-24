@@ -25,11 +25,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
 import { createRoom, updateRoom } from "@/modules/admin/actions";
+import { uploadRoomImages, removeRoomImage, setRoomCoverImage } from "@/modules/admin/property-gallery-actions";
+import { GalleryManager } from "@/components/admin/gallery-manager";
+import { RoomPhotosField } from "@/modules/hotels/components/room-photos-field";
 import { RoomTypeCombobox } from "@/modules/hotels/components/room-type-combobox";
 import { RoomAmenitiesField } from "@/modules/hotels/components/room-amenities-field";
 import { RoomFloorField } from "@/modules/hotels/components/room-floor-field";
 import { RoomSizeField } from "@/modules/hotels/components/room-size-field";
-import { ROOM_BED_TYPES } from "@/modules/hotels/constants";
+import { ROOM_AMENITIES, ROOM_BED_TYPES } from "@/modules/hotels/constants";
 
 type Room = {
   id: string;
@@ -42,19 +45,25 @@ type Room = {
   floor: string | null;
   size_sqm: number | null;
   amenities: unknown;
+  images: unknown;
   base_price: number;
   currency: string;
   total_units: number | null;
   status: string;
 };
 
+const KNOWN_ROOM_AMENITIES = new Set<string>(ROOM_AMENITIES.map((a) => a.value));
+
 export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room?: Room; roomTypes: string[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(room?.name ?? "");
-  const [amenities, setAmenities] = useState<string[]>(
-    Array.isArray(room?.amenities) ? (room.amenities as string[]) : []
-  );
+  // Same self-healing filter as AmenitiesField: a value the checkbox grid
+  // doesn't render must not silently survive every future save.
+  const [amenities, setAmenities] = useState<string[]>(() => {
+    const raw = Array.isArray(room?.amenities) ? (room.amenities as string[]) : [];
+    return raw.filter((a) => KNOWN_ROOM_AMENITIES.has(a));
+  });
   const action = room ? updateRoom : createRoom;
   const [state, formAction] = useActionState(action, null);
 
@@ -107,6 +116,8 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
             <Label htmlFor="room-name-so">Room type (Somali)</Label>
             <Input id="room-name-so" name="nameSo" defaultValue={room?.name_so ?? ""} />
           </div>
+
+          {!room ? <RoomPhotosField id="room-photos" /> : null}
 
           <div className="space-y-2">
             <Label htmlFor="room-description">Description</Label>
@@ -187,6 +198,20 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
             <input type="hidden" name="amenities" value={JSON.stringify(amenities)} />
             <RoomAmenitiesField id="room-amenities" value={amenities} onValueChange={setAmenities} />
           </div>
+
+          {room ? (
+            <div className="space-y-2">
+              <Label>Photos</Label>
+              <GalleryManager
+                id={room.id}
+                paths={Array.isArray(room.images) ? room.images.filter((p): p is string => typeof p === "string") : []}
+                bucket="hotel-images"
+                uploadAction={uploadRoomImages}
+                removeAction={removeRoomImage}
+                setCoverAction={setRoomCoverImage}
+              />
+            </div>
+          ) : null}
 
           {room ? (
             <div className="space-y-2">

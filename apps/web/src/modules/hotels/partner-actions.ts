@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getMyPartnerId, getMyHotelScope, type HotelScope } from "@/modules/hotels/partner-queries";
 import { rememberRoomType } from "@/modules/hotels/room-types";
+import { attachRoomPhotos } from "@/modules/hotels/hotel-gallery-actions";
 import { commaList, parseLinks, replacePropertyLinks } from "@/modules/hotels/listing-fields";
 import { phoneSchema } from "@/modules/partner-applications/schemas";
 import type { ActionState } from "@/lib/auth/actions";
@@ -268,23 +269,39 @@ export async function createRoom(_prevState: ActionState, formData: FormData): P
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("hotel_rooms").insert({
-    hotel_id: hotelId,
-    name: parsed.data.name,
-    description: parsed.data.description ?? null,
-    max_occupancy: parsed.data.maxOccupancy,
-    bed_type: parsed.data.bedType ?? null,
-    floor: parsed.data.floor ?? null,
-    size_sqm: parsed.data.sizeSqm ?? null,
-    amenities: parsed.data.amenities,
-    base_price: parsed.data.basePrice,
-    currency: parsed.data.currency.toUpperCase(),
-    total_units: parsed.data.totalUnits ?? null,
-    status: parsed.data.status,
-  });
+  // A room with no photo is unbookable in practice, so it's required at
+  // creation rather than left as an easy-to-skip follow-up step.
+  const photos = formData.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
+  if (photos.length === 0) return { error: "Add at least one room photo." };
 
+  const supabase = await createClient();
+  const { data: inserted, error } = await supabase
+    .from("hotel_rooms")
+    .insert({
+      hotel_id: hotelId,
+      name: parsed.data.name,
+      description: parsed.data.description ?? null,
+      max_occupancy: parsed.data.maxOccupancy,
+      bed_type: parsed.data.bedType ?? null,
+      floor: parsed.data.floor ?? null,
+      size_sqm: parsed.data.sizeSqm ?? null,
+      amenities: parsed.data.amenities,
+      base_price: parsed.data.basePrice,
+      currency: parsed.data.currency.toUpperCase(),
+      total_units: parsed.data.totalUnits ?? null,
+      status: parsed.data.status,
+    })
+    .select("id")
+    .single();
   if (error) return { error: error.message };
+
+  const uploadResult = await attachRoomPhotos(inserted.id, photos);
+  if (uploadResult?.error) {
+    // All-or-nothing: don't leave a photo-less room row behind.
+    await supabase.from("hotel_rooms").delete().eq("id", inserted.id);
+    return { error: uploadResult.error };
+  }
+
   await rememberRoomType(supabase, parsed.data.name);
 
   revalidatePath(`/partner/hotels/${hotelId}`);

@@ -4,7 +4,7 @@ import { AlertCircle, CalendarPlus, Pencil } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
-import { getRoomForInventory, getRoomUnits, getRoomBookings } from "@/modules/hotels/partner-queries";
+import { getRoomForInventory, getRoomUnits, getRoomBookings, getHotelForEdit } from "@/modules/hotels/partner-queries";
 import { getHotelAvailability } from "@/modules/hotels/availability";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -30,12 +30,23 @@ export default async function ManagerRoomInventoryPage({
   const room = await getRoomForInventory(roomId, hotelId, [hotelId]);
   if (!room) notFound();
 
-  const [availability, roomUnits, bookings] = await Promise.all([
-    getHotelAvailability(hotelId, { roomId: room.id, days: 60 }),
+  const [hotel, availability, roomUnits, bookings] = await Promise.all([
+    getHotelForEdit(hotelId, [hotelId]),
+    // No roomId filter: one call returns every room type's nights, so the
+    // offline-booking form's room-type picker can show live availability
+    // for whichever type is selected, not just this page's own room.
+    getHotelAvailability(hotelId, { days: 60 }),
     getRoomUnits(room.id, hotelId, [hotelId]),
     getRoomBookings(room.id, hotelId, [hotelId]),
   ]);
-  const nights = availability[0]?.nights ?? [];
+  const nights = availability.find((a) => a.roomId === room.id)?.nights ?? [];
+  const availabilityByRoom = Object.fromEntries(availability.map((a) => [a.roomId, a.nights]));
+  // Always include the room this page is on, even if it isn't published — an
+  // unpublished type can't drop out of the picker while you're actively
+  // managing it here. Every other published type is offered alongside it.
+  const roomTypes = (hotel?.hotel_rooms ?? [])
+    .filter((r) => r.status === "published" || r.id === room.id)
+    .map((r) => ({ id: r.id, name: r.name, currency: r.currency, basePrice: Number(r.base_price) }));
   const canEditRooms = hasPermission(managed, "rooms");
   const canEditBookings = hasPermission(managed, "bookings");
 
@@ -77,7 +88,14 @@ export default async function ManagerRoomInventoryPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <OfflineBookingPanel hotelId={hotelId} roomTypeId={room.id} bookings={bookings} canEdit={canEditBookings} />
+          <OfflineBookingPanel
+            hotelId={hotelId}
+            roomTypes={roomTypes}
+            defaultRoomTypeId={room.id}
+            availabilityByRoom={availabilityByRoom}
+            bookings={bookings}
+            canEdit={canEditBookings}
+          />
         </CardContent>
       </Card>
 

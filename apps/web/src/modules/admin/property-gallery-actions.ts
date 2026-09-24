@@ -29,7 +29,7 @@ export type GalleryTarget = {
   revalidate: (id: string) => void;
 };
 
-const TARGETS: Record<"hotel" | "room" | "venue", GalleryTarget> = {
+export const TARGETS: Record<"hotel" | "room" | "venue", GalleryTarget> = {
   hotel: {
     table: "hotels",
     bucket: "hotel-images",

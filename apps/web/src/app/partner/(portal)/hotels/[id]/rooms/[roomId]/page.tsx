@@ -3,7 +3,13 @@ import { notFound } from "next/navigation";
 import { AlertCircle, CalendarPlus, Pencil } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { requireUser } from "@/lib/auth/session";
-import { getMyHotelScope, getRoomForInventory, getRoomUnits, getRoomBookings } from "@/modules/hotels/partner-queries";
+import {
+  getMyHotelScope,
+  getRoomForInventory,
+  getRoomUnits,
+  getRoomBookings,
+  getHotelForEdit,
+} from "@/modules/hotels/partner-queries";
 import { getHotelAvailability } from "@/modules/hotels/availability";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -25,12 +31,23 @@ export default async function RoomInventoryPage({
   const room = await getRoomForInventory(roomId, id, scope.hotelIds);
   if (!room) notFound();
 
-  const [availability, roomUnits, bookings] = await Promise.all([
-    getHotelAvailability(id, { roomId: room.id, days: 60 }),
+  const [hotel, availability, roomUnits, bookings] = await Promise.all([
+    getHotelForEdit(id, scope.hotelIds),
+    // No roomId filter: one call returns every room type's nights, so the
+    // offline-booking form's room-type picker can show live availability
+    // for whichever type is selected, not just this page's own room.
+    getHotelAvailability(id, { days: 60 }),
     getRoomUnits(room.id, id, scope.hotelIds),
     getRoomBookings(room.id, id, scope.hotelIds),
   ]);
-  const nights = availability[0]?.nights ?? [];
+  const nights = availability.find((a) => a.roomId === room.id)?.nights ?? [];
+  const availabilityByRoom = Object.fromEntries(availability.map((a) => [a.roomId, a.nights]));
+  // Always include the room this page is on, even if it isn't published — an
+  // unpublished type can't drop out of the picker while you're actively
+  // managing it here. Every other published type is offered alongside it.
+  const roomTypes = (hotel?.hotel_rooms ?? [])
+    .filter((r) => r.status === "published" || r.id === room.id)
+    .map((r) => ({ id: r.id, name: r.name, currency: r.currency, basePrice: Number(r.base_price) }));
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -68,7 +85,14 @@ export default async function RoomInventoryPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <OfflineBookingPanel hotelId={id} roomTypeId={room.id} bookings={bookings} canEdit />
+          <OfflineBookingPanel
+            hotelId={id}
+            roomTypes={roomTypes}
+            defaultRoomTypeId={room.id}
+            availabilityByRoom={availabilityByRoom}
+            bookings={bookings}
+            canEdit
+          />
         </CardContent>
       </Card>
 

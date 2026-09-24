@@ -4,8 +4,14 @@ import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { AMENITIES, AMENITY_LABELS } from "@/modules/partner-applications/config";
 
+const KNOWN = new Set<string>(AMENITIES);
+
 export function AmenitiesField({ initial }: { initial: string[] }) {
-  const [checked, setChecked] = useState<string[]>(initial);
+  // A value the checkbox list doesn't render (an old key from before the
+  // list was standardized) still sat in this state and got resubmitted on
+  // every save — invisible and un-removable from the UI. Drop anything the
+  // admin can't actually see or uncheck.
+  const [checked, setChecked] = useState<string[]>(() => initial.filter((a) => KNOWN.has(a)));
   return (
     <div className="space-y-2">
       <Label>Facilities</Label>

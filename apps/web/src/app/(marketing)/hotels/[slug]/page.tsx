@@ -8,12 +8,12 @@ import {
   MapPin,
   Phone,
   Ruler,
-  ShieldCheck,
   Star,
   Users,
 } from "lucide-react";
 import { getHotelBySlug, getRoomAvailability } from "@/modules/hotels/queries";
-import { hotelImageUrls, amenityLabel } from "@/modules/hotels/images";
+import { hotelImageUrls } from "@/modules/hotels/images";
+import { amenityDisplayLabel, amenityIcon, sortAmenities } from "@/modules/hotels/amenity-icons";
 import { MediaPlaceholder } from "@/components/media-placeholder";
 import { PropertyLinks } from "@/components/property-links";
 import { PropertyReviews } from "@/components/property-reviews";
@@ -142,12 +142,15 @@ export default async function HotelDetailPage({
             <div className="mt-6">
               <h2 className="font-heading text-lg font-bold">Amenities</h2>
               <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-                {amenities.map((amenity) => (
-                  <span key={amenity} className="flex items-center gap-2 text-sm text-foreground">
-                    <ShieldCheck className="size-4 shrink-0 text-primary" />
-                    {amenityLabel(amenity)}
-                  </span>
-                ))}
+                {sortAmenities(amenities).map((amenity) => {
+                  const Icon = amenityIcon(amenity);
+                  return (
+                    <span key={amenity} className="flex items-center gap-2 text-sm text-foreground">
+                      <Icon sx={{ fontSize: 18 }} className="shrink-0 text-primary" />
+                      {amenityDisplayLabel(amenity)}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           ) : null}
@@ -219,7 +222,7 @@ export default async function HotelDetailPage({
                                   key={a}
                                   className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground"
                                 >
-                                  {amenityLabel(a)}
+                                  {amenityDisplayLabel(a)}
                                 </span>
                               ))}
                             </div>

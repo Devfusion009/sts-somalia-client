@@ -24,6 +24,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
 import { createRoom, updateRoom } from "@/modules/hotels/partner-actions";
+import {
+  uploadRoomImagesPartner,
+  removeRoomImagePartner,
+  setRoomCoverImagePartner,
+} from "@/modules/hotels/hotel-gallery-actions";
+import { GalleryManager } from "@/components/admin/gallery-manager";
+import { RoomPhotosField } from "@/modules/hotels/components/room-photos-field";
 import { RoomTypeCombobox } from "@/modules/hotels/components/room-type-combobox";
 import { RoomAmenitiesField } from "@/modules/hotels/components/room-amenities-field";
 import { RoomFloorField } from "@/modules/hotels/components/room-floor-field";
@@ -39,6 +46,7 @@ type Room = {
   floor: string | null;
   size_sqm: number | null;
   amenities: unknown;
+  images: unknown;
   base_price: number;
   currency: string;
   total_units: number | null;
@@ -91,6 +99,8 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
             <input type="hidden" name="name" value={name} />
             <RoomTypeCombobox id="room-name" value={name} onValueChange={setName} types={roomTypes} />
           </div>
+
+          {!room ? <RoomPhotosField id="room-photos" /> : null}
 
           <div className="space-y-2">
             <Label htmlFor="room-description">Description</Label>
@@ -173,6 +183,20 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
             <input type="hidden" name="amenities" value={JSON.stringify(amenities)} />
             <RoomAmenitiesField id="room-amenities" value={amenities} onValueChange={setAmenities} />
           </div>
+
+          {room ? (
+            <div className="space-y-2">
+              <Label>Photos</Label>
+              <GalleryManager
+                id={room.id}
+                paths={Array.isArray(room.images) ? room.images.filter((p): p is string => typeof p === "string") : []}
+                bucket="hotel-images"
+                uploadAction={uploadRoomImagesPartner}
+                removeAction={removeRoomImagePartner}
+                setCoverAction={setRoomCoverImagePartner}
+              />
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="room-status">Status</Label>
