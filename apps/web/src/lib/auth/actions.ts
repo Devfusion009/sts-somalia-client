@@ -69,33 +69,27 @@ export async function signInAction(
     // and it mirrors signInToPortalAction, which already turns non-admins
     // away from /admin/login.
     //
-    // Sign back out first: leaving a valid admin session attached to a
+    // Sign back out first: leaving a valid staff session attached to a
     // "rejected" sign-in would defeat the entire point. The error is
     // deliberately the same generic line as a wrong password below — naming
     // the account's real type here would let this form be used to test
     // whether a given email is staff/a manager, which is exactly the kind
     // of account-enumeration leak a login form must not offer.
-    if (profile?.is_platform_admin) {
-      await supabase.auth.signOut();
-      return { error: "Incorrect email or password." };
-    }
-
-    // hotel_manager is deliberately NOT one of the unified-identity roles
-    // below — unlike agent/affiliate/hotel_partner/venue_partner (each its
-    // own B2C account that also applied for a program), a manager is an
-    // admin-assigned staff seat on a specific hotel with no B2C account of
-    // its own behind it. Rejected here the same way is_platform_admin is,
-    // rather than folded into /account: 2026-08-23, after a manager account
-    // reached the customer site via the account switcher and could switch
-    // back into a "My Account" view that isn't really theirs. Same generic
-    // error as above, for the same reason.
     //
-    // Checked against the real hotel_managers row, not profile.role: an
+    // Covers both platform admin and hotel manager — neither has a B2C
+    // account of its own behind it, unlike agent/affiliate/hotel_partner/
+    // venue_partner below (each its own B2C account that also applied for a
+    // program). The manager half is checked against the real hotel_managers
+    // row rather than profile.role (hasActiveHotelManagerRow, below): an
     // account assigned as manager by any path that skips the admin
-    // promotion RPC (seed data, most notably) never gets role bumped to
-    // 'hotel_manager', and that stale role was letting it straight through
-    // this gate into a full customer session.
-    if (await hasActiveHotelManagerRow(supabase, user.id)) {
+    // promotion RPC (seed data, notably) never gets that role column
+    // bumped, and this used to be two separate checks that each missed a
+    // different case — this one missed manager, modules/identity's
+    // isPortalOnlyIdentity (site-header.tsx, account/layout.tsx) missed
+    // admin — before being written as one condition here. 2026-08-23: a
+    // manager reached the customer site via the account switcher and could
+    // switch back into a "My Account" view that isn't really theirs.
+    if (profile?.is_platform_admin || (await hasActiveHotelManagerRow(supabase, user.id))) {
       await supabase.auth.signOut();
       return { error: "Incorrect email or password." };
     }

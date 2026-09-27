@@ -2,10 +2,30 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { getMyPartnerId, getMyPartner } from "@/modules/hotels/partner-queries";
+import { getMyManagedHotels } from "@/modules/hotels/manager-queries";
 import { getMyVenuePartnerId, getMyVenuePartner } from "@/modules/events/venue-partner-queries";
 import { getMyPartnerAccountId } from "@/modules/admin/partner-accounts";
 import { ACCOUNT_TYPE_LABEL, type PartnerAccountType, type PartnerAccountStatus } from "@/modules/admin/partner-account-shared";
 import { portalHref } from "@/lib/subdomain";
+
+/**
+ * True for an identity that exists purely inside a staff console — a
+ * platform admin, or a hotel manager (an admin-assigned seat, not an
+ * account someone signed up with) — with no B2C account of its own behind
+ * it. Every other role (agent, affiliate, hotel_partner, venue_partner,
+ * plain customer) IS a real B2C account first and stays reachable there.
+ *
+ * Checked against the real hotel_managers row rather than profile.role,
+ * since a manager assigned by any path that skips the admin promotion RPC
+ * (seed data, notably) never gets that role column bumped. Used by
+ * site-header.tsx and account/layout.tsx; signInAction (src/lib, which may
+ * not depend on src/modules — see modules/README.md) keeps its own
+ * equivalent check inline for the same reason.
+ */
+export async function isPortalOnlyIdentity(profile: { id: string; is_platform_admin: boolean }): Promise<boolean> {
+  if (profile.is_platform_admin) return true;
+  return (await getMyManagedHotels(profile.id)).length > 0;
+}
 
 export type PartnerContext = {
   type: PartnerAccountType;

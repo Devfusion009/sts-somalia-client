@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireUser, deniedDestination } from "@/lib/auth/session";
 import { roleLabel } from "@/lib/auth/roles";
-import { getMyPartnerContexts } from "@/modules/identity/queries";
-import { getMyManagedHotels } from "@/modules/hotels/manager-queries";
+import { getMyPartnerContexts, isPortalOnlyIdentity } from "@/modules/identity/queries";
 import { getMyVisaActionRequiredCount } from "@/modules/visa/queries";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { CustomerNotificationBell } from "@/components/portal/customer-notification-bell";
@@ -48,13 +47,12 @@ const NAV_GROUPS: PortalNavGroup[] = [
 
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireUser();
-  // Hotel managers have no B2C account of their own to land on here — see
-  // the same rejection in signInAction. Only reachable by typing the URL
-  // directly, since nothing links here for a manager anymore.
-  //
-  // Checked against the real hotel_managers row, not profile.role — see the
-  // same fix in signInAction and site-header.tsx.
-  if ((await getMyManagedHotels(profile.id)).length > 0) redirect(deniedDestination());
+  // A platform admin or hotel manager has no B2C account of their own to
+  // land on here — see the same rejection in signInAction. Only reachable
+  // by typing the URL directly (or already holding the session from another
+  // portal tab — no custom domain yet means every portal shares one cookie
+  // with the public site), since nothing links here for either anymore.
+  if (await isPortalOnlyIdentity(profile)) redirect(deniedDestination());
   // The agent guard lives on the (customer) route group, not here, so
   // /account/become stays reachable for them — see that layout.
   const trpc = await getServerTrpc();

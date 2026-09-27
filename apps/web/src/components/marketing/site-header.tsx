@@ -2,8 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 import { getCurrentProfile } from "@/lib/auth/session";
-import { getMyPartnerContexts } from "@/modules/identity/queries";
-import { getMyManagedHotels } from "@/modules/hotels/manager-queries";
+import { getMyPartnerContexts, isPortalOnlyIdentity } from "@/modules/identity/queries";
 import { SiteHeaderClient, HeaderSearch } from "@/components/marketing/site-header-client";
 import { HeaderShell } from "@/components/marketing/header-shell";
 import { ScrollProgressBar } from "@/components/ui/aceternity/motion-primitives";
@@ -22,19 +21,13 @@ import { InfoOutlinedIcon, PhoneInTalkIcon, StorefrontIcon, SupportAgentIcon } f
  */
 export async function SiteHeader() {
   const rawProfile = await getCurrentProfile();
-  // A hotel manager has no B2C identity of their own — see the rejection in
-  // signInAction. Treated as signed-out here so the public site never shows
-  // them a "My Account" customer identity that isn't really theirs, even
-  // though the /manager session cookie is still valid.
-  //
-  // Checked against the real hotel_managers row (same query signInAction's
-  // hasActiveHotelManagerRow and every manager layout use), not
-  // profile.role: a manager assigned by seed data or any path that doesn't
-  // run the admin promotion RPC never gets role bumped to 'hotel_manager',
-  // and that stale role was silently letting them appear as a signed-in
-  // customer here.
-  const managedHotels = rawProfile ? await getMyManagedHotels(rawProfile.id) : [];
-  const profile = managedHotels.length > 0 ? null : rawProfile;
+  // A platform admin or hotel manager has no B2C identity of their own —
+  // see the rejection in signInAction. Treated as signed-out here so the
+  // public site never shows them a "My Account" customer identity that
+  // isn't really theirs, even though their portal session cookie is still
+  // valid (no custom domain yet means every portal and the public site
+  // share one cookie — see the comment on rootOrigin()).
+  const profile = rawProfile && !(await isPortalOnlyIdentity(rawProfile)) ? rawProfile : null;
   const contexts = profile ? await getMyPartnerContexts(profile.id, profile.full_name) : [];
 
   return (
