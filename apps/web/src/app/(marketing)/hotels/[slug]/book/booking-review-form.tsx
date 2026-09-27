@@ -1,13 +1,14 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { useActionState, useMemo, useRef, useState } from "react";
+import { AlertCircle, Plus, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
 import { createHotelBooking } from "@/modules/hotels/booking-actions";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,10 @@ export function BookingReviewForm({
   const [numRooms, setNumRooms] = useState(Math.max(1, Number.parseInt(defaults.numRooms ?? "1", 10) || 1));
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
   const [extraNotes, setExtraNotes] = useState("");
+  const [guestNameRows, setGuestNameRows] = useState<{ id: number; value: string }[]>([]);
+  const nextGuestRowId = useRef(0);
+  const guestNamesRef = useRef<HTMLInputElement>(null);
+  const MAX_GUEST_NAMES = 20;
 
   function toggleRequest(option: string) {
     setSelectedRequests((prev) => (prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option]));
@@ -83,10 +88,22 @@ export function BookingReviewForm({
   );
 
   return (
-    <form action={formAction} className="grid gap-8 lg:grid-cols-[1fr_360px]">
+    <form
+      action={formAction}
+      onSubmit={() => {
+        if (guestNamesRef.current) {
+          guestNamesRef.current.value = guestNameRows
+            .map((r) => r.value.trim())
+            .filter(Boolean)
+            .join("\n");
+        }
+      }}
+      className="grid gap-8 lg:grid-cols-[1fr_360px]"
+    >
       <input type="hidden" name="hotelId" value={hotelId} />
       <input type="hidden" name="roomId" value={room.id} />
       <input type="hidden" name="specialRequests" value={combinedRequests} />
+      <input type="hidden" name="guestNames" ref={guestNamesRef} />
 
       <div className="space-y-6">
         {hotelSummary}
@@ -212,14 +229,47 @@ export function BookingReviewForm({
           </CardHeader>
           <CardContent className="space-y-4">
             {bookedForSlot}
-            <div className="space-y-1.5">
-              <Label htmlFor="guestNames">Guest names (optional)</Label>
-              <Textarea
-                id="guestNames"
-                name="guestNames"
-                rows={3}
-                placeholder={"One name per line — e.g.\nAhmed Hassan\nFatima Ali"}
-              />
+            <div className="space-y-2">
+              <Label>Guest names (optional)</Label>
+              {guestNameRows.map((row, i) => (
+                <div key={row.id} className="flex items-center gap-2">
+                  <Input
+                    aria-label={`Guest ${i + 1} full name`}
+                    placeholder="Full name"
+                    autoComplete="off"
+                    maxLength={120}
+                    value={row.value}
+                    onChange={(e) =>
+                      setGuestNameRows((rows) =>
+                        rows.map((r) => (r.id === row.id ? { ...r, value: e.target.value } : r))
+                      )
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-9 shrink-0 text-muted-foreground"
+                    aria-label="Remove guest"
+                    onClick={() => setGuestNameRows((rows) => rows.filter((r) => r.id !== row.id))}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </div>
+              ))}
+              {guestNameRows.length < MAX_GUEST_NAMES ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() =>
+                    setGuestNameRows((rows) => [...rows, { id: nextGuestRowId.current++, value: "" }])
+                  }
+                >
+                  <Plus className="size-3.5" /> Add guest
+                </Button>
+              ) : null}
               <p className="text-xs text-muted-foreground">Helps the hotel prepare — you can also add this later.</p>
             </div>
           </CardContent>
