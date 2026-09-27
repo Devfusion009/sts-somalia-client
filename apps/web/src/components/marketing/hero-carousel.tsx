@@ -69,7 +69,7 @@ const SLIDES = [
   },
   {
     image: "/marketing/slide-coast.webp",
-    video: undefined,
+    video: "/marketing/slide-coast.mp4",
     eyebrow: "Somalia & East Africa",
     title: "Seafront Stays Along the Somali Coast",
     subtitle: "Verified hotels at confirmed rates, booked in your own currency",
@@ -273,7 +273,7 @@ export function HeroCarousel() {
                   where the copy and search need the full width. */}
               <HeroDealCard
                 deal={s.deal}
-                className="hidden shrink-0 lg:block"
+                className="hidden shrink-0 self-start lg:block"
                 aria-hidden={i !== index}
               />
             </div>
@@ -281,14 +281,16 @@ export function HeroCarousel() {
         ))}
       </div>
 
-      {/* Centered destination search, overlapping the hero's lower edge */}
-      <div className="absolute inset-x-0 bottom-16 z-20 px-4 sm:px-6 lg:bottom-20">
+      {/* Destination search, aligned under the left copy column (not centered
+          on the full viewport) so it can never drift under the deal card on
+          the right at in-between widths — overlapping the hero's lower edge. */}
+      <div className="absolute inset-x-0 bottom-16 z-20 mx-auto max-w-7xl px-4 sm:px-6 lg:bottom-20 lg:px-8">
         <form
           onSubmit={(e) => {
             e.preventDefault();
             router.push(query.trim() ? `/hotels?city=${encodeURIComponent(query.trim())}` : "/hotels");
           }}
-          className="mx-auto flex max-w-2xl items-center rounded-2xl bg-white p-1.5 shadow-2xl shadow-black/40"
+          className="flex max-w-xl items-center rounded-2xl bg-white p-1.5 shadow-2xl shadow-black/40"
         >
           <div className="relative flex-1">
             <PlaceIcon
