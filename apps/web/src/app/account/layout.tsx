@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireUser, deniedDestination } from "@/lib/auth/session";
 import { roleLabel } from "@/lib/auth/roles";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
+import { getMyManagedHotels } from "@/modules/hotels/manager-queries";
 import { getMyVisaActionRequiredCount } from "@/modules/visa/queries";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { CustomerNotificationBell } from "@/components/portal/customer-notification-bell";
@@ -50,7 +51,10 @@ export default async function AccountLayout({ children }: { children: React.Reac
   // Hotel managers have no B2C account of their own to land on here — see
   // the same rejection in signInAction. Only reachable by typing the URL
   // directly, since nothing links here for a manager anymore.
-  if (profile.role === "hotel_manager") redirect(deniedDestination());
+  //
+  // Checked against the real hotel_managers row, not profile.role — see the
+  // same fix in signInAction and site-header.tsx.
+  if ((await getMyManagedHotels(profile.id)).length > 0) redirect(deniedDestination());
   // The agent guard lives on the (customer) route group, not here, so
   // /account/become stays reachable for them — see that layout.
   const trpc = await getServerTrpc();

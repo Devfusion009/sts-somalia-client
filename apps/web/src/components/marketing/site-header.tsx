@@ -3,6 +3,7 @@ import Image from "next/image";
 
 import { getCurrentProfile } from "@/lib/auth/session";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
+import { getMyManagedHotels } from "@/modules/hotels/manager-queries";
 import { SiteHeaderClient, HeaderSearch } from "@/components/marketing/site-header-client";
 import { HeaderShell } from "@/components/marketing/header-shell";
 import { ScrollProgressBar } from "@/components/ui/aceternity/motion-primitives";
@@ -25,7 +26,15 @@ export async function SiteHeader() {
   // signInAction. Treated as signed-out here so the public site never shows
   // them a "My Account" customer identity that isn't really theirs, even
   // though the /manager session cookie is still valid.
-  const profile = rawProfile?.role === "hotel_manager" ? null : rawProfile;
+  //
+  // Checked against the real hotel_managers row (same query signInAction's
+  // hasActiveHotelManagerRow and every manager layout use), not
+  // profile.role: a manager assigned by seed data or any path that doesn't
+  // run the admin promotion RPC never gets role bumped to 'hotel_manager',
+  // and that stale role was silently letting them appear as a signed-in
+  // customer here.
+  const managedHotels = rawProfile ? await getMyManagedHotels(rawProfile.id) : [];
+  const profile = managedHotels.length > 0 ? null : rawProfile;
   const contexts = profile ? await getMyPartnerContexts(profile.id, profile.full_name) : [];
 
   return (

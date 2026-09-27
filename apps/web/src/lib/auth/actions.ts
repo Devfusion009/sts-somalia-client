@@ -89,7 +89,13 @@ export async function signInAction(
     // reached the customer site via the account switcher and could switch
     // back into a "My Account" view that isn't really theirs. Same generic
     // error as above, for the same reason.
-    if (profile?.role === "hotel_manager") {
+    //
+    // Checked against the real hotel_managers row, not profile.role: an
+    // account assigned as manager by any path that skips the admin
+    // promotion RPC (seed data, most notably) never gets role bumped to
+    // 'hotel_manager', and that stale role was letting it straight through
+    // this gate into a full customer session.
+    if (await hasActiveHotelManagerRow(supabase, user.id)) {
       await supabase.auth.signOut();
       return { error: "Incorrect email or password." };
     }
