@@ -14,6 +14,7 @@ import { HeroDealCard, type HeroDeal } from "@/components/marketing/hero-deal-ca
 const SLIDES = [
   {
     image: "/marketing/slide-gulf-city.webp",
+    video: "/marketing/slide-gulf-city.mp4",
     eyebrow: "Gulf & Middle East",
     title: "Direct Fares to Dubai & Doha",
     subtitle: "Business trips and family visits, sorted in minutes",
@@ -40,6 +41,7 @@ const SLIDES = [
   },
   {
     image: "/marketing/slide-dunes.webp",
+    video: "/marketing/slide-dunes.mp4",
     eyebrow: "Umrah season",
     title: "Guided Umrah for Families & Groups",
     subtitle: "Flights, visa, hotels near the Haram and a guide throughout",
@@ -67,6 +69,7 @@ const SLIDES = [
   },
   {
     image: "/marketing/slide-coast.webp",
+    video: undefined,
     eyebrow: "Somalia & East Africa",
     title: "Seafront Stays Along the Somali Coast",
     subtitle: "Verified hotels at confirmed rates, booked in your own currency",
@@ -96,6 +99,7 @@ const SLIDES = [
   },
   {
     image: "/marketing/slide-istanbul.webp",
+    video: "/marketing/slide-istanbul.mp4",
     eyebrow: "Turkey & Europe Gateway",
     title: "Fly to Istanbul, Direct",
     subtitle: "Turkish Airlines connections to Europe, sorted from Mogadishu",
@@ -122,6 +126,7 @@ const SLIDES = [
   },
   {
     image: "/marketing/slide-nairobi.webp",
+    video: "/marketing/slide-nairobi.mp4",
     eyebrow: "East Africa Regional",
     title: "City Stays in Nairobi",
     subtitle: "Business trips and layovers, verified hotels near the CBD",
@@ -199,14 +204,29 @@ export function HeroCarousel() {
       >
         {SLIDES.map((s, i) => (
           <div key={s.image} className="relative h-full w-full shrink-0">
-            <Image
-              src={s.image}
-              alt=""
-              fill
-              priority={i === 0}
-              sizes="100vw"
-              className="object-cover"
-            />
+            {s.video && !reduced ? (
+              <video
+                key={s.video}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload={i === 0 ? "auto" : "none"}
+                poster={s.image}
+                className="absolute inset-0 h-full w-full object-cover"
+              >
+                <source src={s.video} type="video/mp4" />
+              </video>
+            ) : (
+              <Image
+                src={s.image}
+                alt=""
+                fill
+                priority={i === 0}
+                sizes="100vw"
+                className="object-cover"
+              />
+            )}
 
             {/* Scrim — heavy on the left where the offer card sits */}
             <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/25" aria-hidden />
