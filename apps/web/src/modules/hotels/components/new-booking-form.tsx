@@ -13,6 +13,8 @@ import {
   Minus,
   Plus,
   Smartphone,
+  UserPlus,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -118,6 +120,7 @@ type Confirmation = {
   bookingId: string;
   status: "confirmed" | "waitlisted";
   guestName: string;
+  extraGuestCount: number;
   room: QuotedRoom;
   quote: StayQuote;
   numRooms: number;
@@ -156,6 +159,8 @@ export function NewBookingForm({
   const [numRooms, setNumRooms] = useState(1);
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
+  const [additionalGuests, setAdditionalGuests] = useState<{ id: number; name: string }[]>([]);
+  const nextGuestId = useRef(0);
   const [method, setMethod] = useState<OfflinePaymentMethod>("cash");
   const [paid, setPaid] = useState(true);
 
@@ -169,6 +174,15 @@ export function NewBookingForm({
   const guestLimit = room ? room.maxOccupancy * numRooms : 80;
   const tooManyGuests = room !== null && adults + children > guestLimit;
   const total = room ? room.stayPricePerRoom * numRooms : 0;
+
+  // Room type or room count can shrink the party this room can hold after
+  // guests were already named. Rather than delete what was typed, only the
+  // slots that still fit are rendered and submitted — the rest reappear if
+  // the room/count choice grows again.
+  const visibleGuests = additionalGuests.slice(0, Math.max(0, guestLimit - 1));
+  const totalNamedGuests = 1 + visibleGuests.length;
+  const canAddGuest = room !== null && totalNamedGuests < guestLimit;
+
   const datesValid = Boolean(checkIn && checkOut && checkOut > checkIn);
   const canSubmit = datesValid && !quoteError && !quoting && room !== null && !tooManyGuests && !submitting;
 
@@ -217,7 +231,15 @@ export function NewBookingForm({
     if (!canSubmit || !room) return;
     const formData = new FormData(event.currentTarget);
     const guestName = formData.get("guestName")?.toString().trim() ?? "";
-    const snapshot = { room, quote, numRooms, guests: adults + children, method, paid };
+    const snapshot = {
+      room,
+      quote,
+      numRooms,
+      guests: adults + children,
+      method,
+      paid,
+      extraGuestCount: visibleGuests.filter((g) => g.name.trim()).length,
+    };
     setError(null);
     startSubmit(async () => {
       const result = await createReservation(formData);
@@ -235,6 +257,7 @@ export function NewBookingForm({
     setNumRooms(1);
     setAdults(1);
     setChildren(0);
+    setAdditionalGuests([]);
     setMethod("cash");
     setPaid(true);
     requote(checkIn, checkOut);
@@ -266,7 +289,12 @@ export function NewBookingForm({
 
           <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 text-sm">
             <dt className="text-muted-foreground">Guest</dt>
-            <dd className="font-medium">{confirmation.guestName}</dd>
+            <dd className="font-medium">
+              {confirmation.guestName}
+              {confirmation.extraGuestCount > 0
+                ? ` + ${plural(confirmation.extraGuestCount, "more guest")}`
+                : ""}
+            </dd>
             <dt className="text-muted-foreground">Room</dt>
             <dd>
               {confirmation.numRooms} × {confirmation.room.name}
@@ -465,6 +493,53 @@ export function NewBookingForm({
                 <Input id="nb-guest-email" name="guestEmail" type="email" autoComplete="off" maxLength={160} />
               </div>
             </div>
+
+            {visibleGuests.length > 0 ? (
+              <div className="space-y-2">
+                <Label>Other guests</Label>
+                {visibleGuests.map((guest, i) => (
+                  <div key={guest.id} className="flex items-center gap-2">
+                    <Input
+                      name="guestNames"
+                      aria-label={`Guest ${i + 2} full name`}
+                      placeholder="Full name"
+                      autoComplete="off"
+                      maxLength={120}
+                      value={guest.name}
+                      onChange={(e) =>
+                        setAdditionalGuests((list) =>
+                          list.map((g) => (g.id === guest.id ? { ...g, name: e.target.value } : g))
+                        )
+                      }
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 shrink-0 text-muted-foreground"
+                      aria-label="Remove guest"
+                      onClick={() => setAdditionalGuests((list) => list.filter((g) => g.id !== guest.id))}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {canAddGuest ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() =>
+                  setAdditionalGuests((list) => [...list, { id: nextGuestId.current++, name: "" }])
+                }
+              >
+                <UserPlus className="size-3.5" /> Add guest
+              </Button>
+            ) : null}
+
             <div className="space-y-1.5">
               <Label htmlFor="nb-notes">Special requests</Label>
               <Textarea id="nb-notes" name="notes" rows={2} maxLength={500} />

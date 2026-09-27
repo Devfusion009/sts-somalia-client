@@ -101,6 +101,7 @@ const reservationSchema = z
     guestName: z.string().trim().min(2, "Enter the guest's full name.").max(120),
     guestPhone: z.string().trim().max(30).optional(),
     guestEmail: z.string().trim().email("Enter a valid email address.").max(160).optional(),
+    guestNames: z.array(z.string().trim().min(1).max(120)).max(39),
     paymentMethod: z.enum(OFFLINE_PAYMENT_METHODS, { message: "Choose a payment method." }),
     paymentStatus: z.enum(["paid", "unpaid"]),
     paymentReference: z.string().trim().max(120).optional(),
@@ -136,6 +137,10 @@ export async function createReservation(formData: FormData): Promise<Reservation
     guestName: formData.get("guestName")?.toString() ?? "",
     guestPhone: optionalText(formData, "guestPhone"),
     guestEmail: optionalText(formData, "guestEmail"),
+    guestNames: formData
+      .getAll("guestNames")
+      .map((v) => v.toString().trim())
+      .filter(Boolean),
     paymentMethod: formData.get("paymentMethod") ?? undefined,
     paymentStatus: formData.get("paymentStatus"),
     paymentReference: optionalText(formData, "paymentReference"),
@@ -181,7 +186,10 @@ export async function createReservation(formData: FormData): Promise<Reservation
       num_rooms: d.numRooms,
       num_adults: d.adults,
       num_children: d.children,
-      guest_details: [{ full_name: d.guestName, phone: d.guestPhone ?? null, email: d.guestEmail ?? null }],
+      guest_details: [
+        { full_name: d.guestName, phone: d.guestPhone ?? null, email: d.guestEmail ?? null },
+        ...d.guestNames.map((full_name) => ({ full_name, phone: null, email: null })),
+      ],
       special_requests: d.notes ?? null,
       total_price: room.stayPricePerRoom * d.numRooms,
       currency: room.currency,
