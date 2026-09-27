@@ -17,7 +17,11 @@ export async function getMyPartnerId(profileId: string) {
 
 export async function getMyPartner(partnerId: string) {
   const supabase = await createClient();
-  const { data } = await supabase.from("hotel_partners").select("*").eq("id", partnerId).maybeSingle();
+  const { data } = await supabase
+    .from("hotel_partners")
+    .select("*")
+    .eq("id", partnerId)
+    .maybeSingle();
   return data;
 }
 
@@ -51,7 +55,9 @@ export async function getMyHotels(hotelIds: string[]) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("hotels")
-    .select("id, name, slug, city, country_code, star_rating, images, status, partner_id, hotel_rooms(id)")
+    .select(
+      "id, name, slug, city, country_code, star_rating, images, status, partner_id, hotel_rooms(id)",
+    )
     .in("id", hotelIds)
     .order("created_at", { ascending: false });
 
@@ -73,7 +79,11 @@ export async function getHotelForEdit(hotelId: string, hotelIds: string[]) {
 }
 
 /** Room + parent hotel, scoped by hotelIds like getHotelForEdit. */
-export async function getRoomForInventory(roomId: string, hotelId: string, hotelIds: string[]) {
+export async function getRoomForInventory(
+  roomId: string,
+  hotelId: string,
+  hotelIds: string[],
+) {
   if (!hotelIds.includes(hotelId)) return null;
   const supabase = await createClient();
   const { data } = await supabase
@@ -86,7 +96,11 @@ export async function getRoomForInventory(roomId: string, hotelId: string, hotel
 }
 
 /** Physical rooms (number, floor, status) under one room type — the front desk board's row list. */
-export async function getRoomUnits(roomTypeId: string, hotelId: string, hotelIds: string[]) {
+export async function getRoomUnits(
+  roomTypeId: string,
+  hotelId: string,
+  hotelIds: string[],
+) {
   if (!hotelIds.includes(hotelId)) return [];
   const supabase = await createClient();
   const { data } = await supabase
@@ -105,12 +119,18 @@ export async function getRoomUnits(roomTypeId: string, hotelId: string, hotelIds
  * so "is this date free" is answered by reading the real ledger instead of
  * trusting a capacity number in isolation.
  */
-export async function getRoomBookings(roomTypeId: string, hotelId: string, hotelIds: string[]) {
+export async function getRoomBookings(
+  roomTypeId: string,
+  hotelId: string,
+  hotelIds: string[],
+) {
   if (!hotelIds.includes(hotelId)) return [];
   const supabase = await createClient();
   const { data } = await supabase
     .from("hotel_bookings")
-    .select("id, check_in, check_out, num_rooms, num_adults, num_children, status, source, guest_details, special_requests, created_at")
+    .select(
+      "id, check_in, check_out, num_rooms, num_adults, num_children, status, source, guest_details, special_requests, created_at",
+    )
     .eq("room_id", roomTypeId)
     .eq("hotel_id", hotelId)
     .in("status", ["pending", "confirmed", "waitlisted"])
@@ -142,13 +162,16 @@ export async function getRoomBookings(roomTypeId: string, hotelId: string, hotel
  * cancelled/completed/refunded aren't current.
  */
 export async function getHotelFrontDesk(hotelId: string, hotelIds: string[]) {
-  if (!hotelIds.includes(hotelId)) return { inHouse: [], arrivingToday: [], departingToday: [] };
+  if (!hotelIds.includes(hotelId))
+    return { inHouse: [], arrivingToday: [], departingToday: [] };
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
 
   const { data } = await supabase
     .from("hotel_bookings")
-    .select("id, check_in, check_out, num_rooms, guest_details, hotel_rooms(name)")
+    .select(
+      "id, check_in, check_out, num_rooms, num_adults, checked_in_at, checked_out_at, guest_details, hotel_rooms(name)",
+    )
     .eq("hotel_id", hotelId)
     .eq("status", "confirmed")
     .gte("check_out", today)
@@ -162,6 +185,53 @@ export async function getHotelFrontDesk(hotelId: string, hotelIds: string[]) {
   };
 }
 
+/**
+ * One week's occupancy across every room type (booked vs. capacity room-
+ * nights, from the same allocator-fed numbers the Availability board shows)
+ * plus how many confirmed stays arrive in that window — the three figures
+ * the manager dashboard's Forecast panel is built from.
+ */
+export async function getWeekForecast(hotelId: string, weekStart: string) {
+  const supabase = await createClient();
+  const weekEnd = new Date(`${weekStart}T00:00:00Z`);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+  const weekEndIso = weekEnd.toISOString().slice(0, 10);
+
+  const [{ data: rooms }, { count }] = await Promise.all([
+    supabase.rpc("hotel_availability", {
+      p_hotel_id: hotelId,
+      p_from: weekStart,
+      p_days: 7,
+    }),
+    supabase
+      .from("hotel_bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("hotel_id", hotelId)
+      .eq("status", "confirmed")
+      .gte("check_in", weekStart)
+      .lt("check_in", weekEndIso),
+  ]);
+
+  let bookedNights = 0;
+  let capacityNights = 0;
+  for (const row of rooms ?? []) {
+    if (row.capacity === null) continue;
+    capacityNights += row.capacity;
+    bookedNights += row.booked;
+  }
+
+  return {
+    weekEnd: weekEndIso,
+    bookedNights,
+    capacityNights,
+    occupancyPct:
+      capacityNights > 0
+        ? Math.round((bookedNights / capacityNights) * 100)
+        : 0,
+    arrivals: count ?? 0,
+  };
+}
+
 export async function getPartnerBookings(hotelIds: string[]) {
   if (hotelIds.length === 0) return [];
   const supabase = await createClient();
@@ -169,7 +239,7 @@ export async function getPartnerBookings(hotelIds: string[]) {
   const { data } = await supabase
     .from("hotel_bookings")
     .select(
-      "id, hotel_id, check_in, check_out, num_rooms, num_adults, num_children, status, channel, total_price, currency, created_at, guest_details, hotels(name), hotel_rooms(name)"
+      "id, hotel_id, check_in, check_out, num_rooms, num_adults, num_children, status, channel, total_price, currency, created_at, guest_details, hotels(name), hotel_rooms(name)",
     )
     .in("hotel_id", hotelIds)
     .order("created_at", { ascending: false });
@@ -183,7 +253,10 @@ export async function getPartnerBookings(hotelIds: string[]) {
  * the 'bookings' permission on (20260821000002). Drives which rows on the
  * bookings list get the editable status control vs. a read-only badge.
  */
-export async function getMyBookingManageableHotelIds(profileId: string, scope: HotelScope): Promise<Set<string>> {
+export async function getMyBookingManageableHotelIds(
+  profileId: string,
+  scope: HotelScope,
+): Promise<Set<string>> {
   if (scope.partnerId !== null) return new Set(scope.hotelIds);
   if (scope.hotelIds.length === 0) return new Set();
 
@@ -204,10 +277,16 @@ export async function getPartnerStats(hotelIds: string[]) {
   const hotelCount = hotelIds.length;
   const hotels =
     hotelIds.length > 0
-      ? await supabase.from("hotels").select("id, hotel_rooms(id)").in("id", hotelIds)
+      ? await supabase
+          .from("hotels")
+          .select("id, hotel_rooms(id)")
+          .in("id", hotelIds)
       : { data: [] };
 
-  const roomCount = (hotels.data ?? []).reduce((sum, h) => sum + h.hotel_rooms.length, 0);
+  const roomCount = (hotels.data ?? []).reduce(
+    (sum, h) => sum + h.hotel_rooms.length,
+    0,
+  );
 
   let bookingCount = 0;
   let pendingCount = 0;
@@ -215,7 +294,10 @@ export async function getPartnerStats(hotelIds: string[]) {
   let revenueCurrency = "USD";
   if (hotelIds.length > 0) {
     const [{ count: total }, { count: pending }, settled] = await Promise.all([
-      supabase.from("hotel_bookings").select("*", { count: "exact", head: true }).in("hotel_id", hotelIds),
+      supabase
+        .from("hotel_bookings")
+        .select("*", { count: "exact", head: true })
+        .in("hotel_id", hotelIds),
       supabase
         .from("hotel_bookings")
         .select("*", { count: "exact", head: true })
@@ -229,11 +311,21 @@ export async function getPartnerStats(hotelIds: string[]) {
     ]);
     bookingCount = total ?? 0;
     pendingCount = pending ?? 0;
-    revenue = (settled.data ?? []).reduce((sum, b) => sum + Number(b.total_price), 0);
+    revenue = (settled.data ?? []).reduce(
+      (sum, b) => sum + Number(b.total_price),
+      0,
+    );
     revenueCurrency = settled.data?.[0]?.currency ?? "USD";
   }
 
-  return { hotelCount, roomCount, bookingCount, pendingCount, revenue, revenueCurrency };
+  return {
+    hotelCount,
+    roomCount,
+    bookingCount,
+    pendingCount,
+    revenue,
+    revenueCurrency,
+  };
 }
 
 /** Latest bookings across the user's operable hotels, for the dashboard. */
@@ -243,7 +335,9 @@ export async function getRecentPartnerBookings(hotelIds: string[], limit = 5) {
 
   const { data } = await supabase
     .from("hotel_bookings")
-    .select("id, check_in, check_out, status, total_price, currency, created_at, hotels(name), hotel_rooms(name)")
+    .select(
+      "id, check_in, check_out, status, total_price, currency, created_at, hotels(name), hotel_rooms(name)",
+    )
     .in("hotel_id", hotelIds)
     .order("created_at", { ascending: false })
     .limit(limit);

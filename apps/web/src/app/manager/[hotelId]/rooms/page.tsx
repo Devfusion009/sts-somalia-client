@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalendarDays } from "lucide-react";
+import { BedDouble, CalendarDays } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
 import { getHotelForEdit } from "@/modules/hotels/partner-queries";
@@ -64,17 +64,22 @@ export default async function ManagerRoomsPage({ params }: { params: Promise<{ h
           ) : (
             hotel.hotel_rooms.map((room) => (
               <div key={room.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">{room.name}</p>
-                    <Badge variant={STATUS_VARIANT[room.status] ?? "secondary"} className="capitalize">
-                      {room.status.replace(/_/g, " ")}
-                    </Badge>
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <BedDouble className="size-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate font-medium">{room.name}</p>
+                      <Badge variant={STATUS_VARIANT[room.status] ?? "secondary"} className="shrink-0 capitalize">
+                        {room.status.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {room.total_units === null ? "Count not set" : `${room.total_units} rooms`} · Up to {room.max_occupancy} guests · {room.currency} {room.base_price.toFixed(0)} / night
+                      {room.floor ? ` · Floor ${room.floor}` : ""}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {room.total_units === null ? "Count not set" : `${room.total_units} rooms`} · Up to {room.max_occupancy} guests · {room.currency} {room.base_price.toFixed(0)} / night
-                    {room.floor ? ` · Floor ${room.floor}` : ""}
-                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {canSetAvailability ? (

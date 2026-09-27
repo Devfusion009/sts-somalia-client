@@ -31,11 +31,11 @@ export function AvailabilityBoard({
   const nights = rooms[0].nights;
 
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full border-separate border-spacing-0 text-xs">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 min-w-40 bg-card py-2 pr-3 text-left font-medium text-muted-foreground">
+            <th className="sticky left-0 z-10 min-w-40 border-r border-border bg-card py-2 pr-3 text-left font-medium text-muted-foreground">
               Room
             </th>
             {nights.map((n) => {
@@ -56,7 +56,7 @@ export function AvailabilityBoard({
         <tbody>
           {rooms.map((room) => (
             <tr key={room.roomId}>
-              <td className="sticky left-0 z-10 bg-card py-1 pr-3">
+              <td className="sticky left-0 z-10 border-r border-border bg-card py-1 pr-3">
                 <div className="flex items-center gap-2">
                   {roomHref ? (
                     <Link href={roomHref(room.roomId)} className="truncate text-sm font-medium hover:underline">
@@ -69,9 +69,7 @@ export function AvailabilityBoard({
                     <Badge variant="outline" className="shrink-0 text-[10px] text-muted-foreground">
                       Count not set
                     </Badge>
-                  ) : (
-                    <span className="shrink-0 text-muted-foreground">{room.totalUnits}</span>
-                  )}
+                  ) : null}
                 </div>
               </td>
               {room.nights.map((night) => (
@@ -101,6 +99,7 @@ export function AvailabilityBoard({
           ))}
         </tbody>
       </table>
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-card to-transparent" />
     </div>
   );
 }
