@@ -95,6 +95,7 @@ export default async function ManagerRoomInventoryPage({
             availabilityByRoom={availabilityByRoom}
             bookings={bookings}
             canEdit={canEditBookings}
+            newBookingHref={`/manager/${hotelId}/bookings/new?room=${room.id}`}
           />
         </CardContent>
       </Card>

@@ -86,7 +86,10 @@ function GuestList({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-base">
+          {title}
+          <Badge variant="secondary">{bookings.length}</Badge>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {bookings.length === 0 ? (
@@ -172,14 +175,14 @@ export default async function ManagerDashboardPage({
 
       {canEditBookings ? (
         <Link
-          href={`/manager/${hotelId}/rooms`}
+          href={`/manager/${hotelId}/bookings/new`}
           className="flex items-center gap-3 rounded-xl bg-primary px-5 py-4 text-primary-foreground transition-opacity hover:opacity-90"
         >
           <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary-foreground/15">
             <CalendarPlus className="size-5" />
           </span>
           <span className="min-w-0 flex-1 text-sm font-bold">
-            Record an offline booking
+            Record offline booking
           </span>
           <ArrowRight className="size-4.5 shrink-0" />
         </Link>
@@ -214,6 +217,11 @@ export default async function ManagerDashboardPage({
             bookings={frontDesk.departingToday}
             mode="departing"
             canEdit={canEditBookings}
+          />
+          <GuestList
+            title="In house"
+            emptyLabel="No guests in house."
+            bookings={frontDesk.inHouse}
           />
         </div>
 
@@ -295,12 +303,6 @@ export default async function ManagerDashboardPage({
           </CardContent>
         </Card>
       </div>
-
-      <GuestList
-        title="In house"
-        emptyLabel="No guests in house."
-        bookings={frontDesk.inHouse}
-      />
 
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">

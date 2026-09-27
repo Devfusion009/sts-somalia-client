@@ -1,8 +1,13 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
 import { getPartnerBookings } from "@/modules/hotels/partner-queries";
+import { markBookingPaid } from "@/modules/hotels/reservation-actions";
+import { PAYMENT_METHOD_LABEL, type OfflinePaymentMethod } from "@/modules/hotels/reservation-types";
 import { hotelGuestNames } from "@/modules/orders/format";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -30,7 +35,14 @@ export default async function ManagerBookingsPage({ params }: { params: Promise<
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <h1 className="font-heading text-2xl font-semibold">Bookings</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-heading text-2xl font-semibold">Bookings</h1>
+        {canManage ? (
+          <Button className="gap-1.5" render={<Link href={`/manager/${hotelId}/bookings/new`} />}>
+            <Plus className="size-4" /> Record offline booking
+          </Button>
+        ) : null}
+      </div>
 
       {bookings.length === 0 ? (
         <Card>
@@ -38,47 +50,79 @@ export default async function ManagerBookingsPage({ params }: { params: Promise<
         </Card>
       ) : (
         <Card className="overflow-hidden py-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Guest</TableHead>
-                <TableHead>Room</TableHead>
-                <TableHead>Dates</TableHead>
-                <TableHead>Rooms</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {bookings.map((b) => (
-                <TableRow key={b.id}>
-                  <TableCell className="font-medium">
-                    {hotelGuestNames(b.guest_details)[0] ?? "Guest"}
-                  </TableCell>
-                  <TableCell>
-                    {b.hotel_rooms?.name}
-                    {b.channel === "b2b" ? <span className="ml-1.5 text-xs text-muted-foreground">Agency</span> : null}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {b.check_in} → {b.check_out}
-                  </TableCell>
-                  <TableCell>{b.num_rooms}</TableCell>
-                  <TableCell>
-                    {b.currency} {Number(b.total_price).toFixed(0)}
-                  </TableCell>
-                  <TableCell>
-                    {canManage ? (
-                      <BookingStatusControl bookingId={b.id} status={b.status} />
-                    ) : (
-                      <Badge className={`border-transparent capitalize ${STATUS_BADGE[b.status] ?? "bg-muted text-muted-foreground"}`}>
-                        {b.status.replace(/_/g, " ")}
-                      </Badge>
-                    )}
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Guest</TableHead>
+                  <TableHead>Room</TableHead>
+                  <TableHead>Dates</TableHead>
+                  <TableHead>Rooms</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>Payment</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {bookings.map((b) => (
+                  <TableRow key={b.id}>
+                    <TableCell className="font-medium">{hotelGuestNames(b.guest_details)[0] ?? "Guest"}</TableCell>
+                    <TableCell>
+                      {b.hotel_rooms?.name}
+                      {b.channel === "b2b" ? (
+                        <span className="ml-1.5 text-xs text-muted-foreground">Agency</span>
+                      ) : b.source === "offline" ? (
+                        <span className="ml-1.5 text-xs text-muted-foreground">Offline</span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {b.check_in} → {b.check_out}
+                    </TableCell>
+                    <TableCell>{b.num_rooms}</TableCell>
+                    <TableCell>
+                      {b.currency} {Number(b.total_price).toFixed(0)}
+                    </TableCell>
+                    <TableCell>
+                      {b.source !== "offline" || !b.payment_method ? (
+                        <span className="text-sm text-muted-foreground">Online</span>
+                      ) : b.paid_at ? (
+                        <span className="text-sm">
+                          {PAYMENT_METHOD_LABEL[b.payment_method as OfflinePaymentMethod]}
+                          <span className="ml-1.5 text-xs font-medium text-primary">Paid</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2 text-sm">
+                          {PAYMENT_METHOD_LABEL[b.payment_method as OfflinePaymentMethod]}
+                          {canManage ? (
+                            <form action={markBookingPaid}>
+                              <input type="hidden" name="bookingId" value={b.id} />
+                              <input type="hidden" name="hotelId" value={hotelId} />
+                              <Button type="submit" size="xs" variant="outline">
+                                Mark paid
+                              </Button>
+                            </form>
+                          ) : (
+                            <span className="text-xs font-medium text-brand-gold">Unpaid</span>
+                          )}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {canManage ? (
+                        <BookingStatusControl bookingId={b.id} status={b.status} />
+                      ) : (
+                        <Badge
+                          className={`border-transparent capitalize ${STATUS_BADGE[b.status] ?? "bg-muted text-muted-foreground"}`}
+                        >
+                          {b.status.replace(/_/g, " ")}
+                        </Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       )}
     </div>

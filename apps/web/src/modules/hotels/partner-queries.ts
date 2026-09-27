@@ -239,7 +239,7 @@ export async function getPartnerBookings(hotelIds: string[]) {
   const { data } = await supabase
     .from("hotel_bookings")
     .select(
-      "id, hotel_id, check_in, check_out, num_rooms, num_adults, num_children, status, channel, total_price, currency, created_at, guest_details, hotels(name), hotel_rooms(name)",
+      "id, hotel_id, check_in, check_out, num_rooms, num_adults, num_children, status, channel, source, payment_method, paid_at, total_price, currency, created_at, guest_details, hotels(name), hotel_rooms(name)",
     )
     .in("hotel_id", hotelIds)
     .order("created_at", { ascending: false });

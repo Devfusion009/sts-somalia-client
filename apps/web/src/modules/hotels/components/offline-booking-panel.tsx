@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import { CalendarPlus, PhoneCall, Globe, CircleCheck, CircleAlert, CircleX } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
 import { createFrontDeskBooking, type FrontDeskActionState } from "@/modules/hotels/front-desk-actions";
@@ -70,6 +72,7 @@ export function OfflineBookingPanel({
   availabilityByRoom,
   bookings,
   canEdit,
+  newBookingHref,
 }: {
   hotelId: string;
   roomTypes: RoomTypeOption[];
@@ -77,6 +80,8 @@ export function OfflineBookingPanel({
   availabilityByRoom: Record<string, RoomNight[]>;
   bookings: RoomBooking[];
   canEdit: boolean;
+  /** When set, the form is replaced by a link to the full booking flow (guest + payment capture). */
+  newBookingHref?: string;
 }) {
   const [state, formAction] = useActionState<FrontDeskActionState, FormData>(createFrontDeskBooking, null);
   const [lastState, setLastState] = useState(state);
@@ -142,7 +147,13 @@ export function OfflineBookingPanel({
         </ul>
       )}
 
-      {canEdit ? (
+      {canEdit && newBookingHref ? (
+        <div className="border-t border-border pt-4">
+          <Button className="w-full gap-1.5" render={<Link href={newBookingHref} />}>
+            <CalendarPlus className="size-4" /> Record offline booking
+          </Button>
+        </div>
+      ) : canEdit ? (
         <form key={formKey} action={formAction} className="space-y-3 border-t border-border pt-4">
           <input type="hidden" name="hotelId" value={hotelId} />
           <input type="hidden" name="roomTypeId" value={roomTypeId} />

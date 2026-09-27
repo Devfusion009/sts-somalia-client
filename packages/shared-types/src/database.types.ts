@@ -2112,6 +2112,9 @@ export type Database = {
           num_adults: number
           num_children: number
           num_rooms: number
+          paid_at: string | null
+          payment_method: string | null
+          payment_reference: string | null
           priority: number
           room_id: string
           source: string
@@ -2140,6 +2143,9 @@ export type Database = {
           num_adults?: number
           num_children?: number
           num_rooms?: number
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
           priority?: number
           room_id: string
           source?: string
@@ -2168,6 +2174,9 @@ export type Database = {
           num_adults?: number
           num_children?: number
           num_rooms?: number
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
           priority?: number
           room_id?: string
           source?: string
