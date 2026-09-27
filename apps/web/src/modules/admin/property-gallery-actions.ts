@@ -1,8 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
+import { TARGETS } from "@/modules/admin/gallery-targets";
 import type { ActionState } from "@/lib/auth/actions";
 
 /**
@@ -27,33 +27,6 @@ export type GalleryTarget = {
   bucket: "hotel-images" | "venue-images";
   pathPrefix: (id: string) => string;
   revalidate: (id: string) => void;
-};
-
-export const TARGETS: Record<"hotel" | "room" | "venue", GalleryTarget> = {
-  hotel: {
-    table: "hotels",
-    bucket: "hotel-images",
-    pathPrefix: (id) => `${id}`,
-    revalidate: (id) => {
-      revalidatePath(`/admin/hotels/${id}`);
-      revalidatePath("/admin/hotels");
-    },
-  },
-  room: {
-    table: "hotel_rooms",
-    bucket: "hotel-images",
-    pathPrefix: (id) => `rooms/${id}`,
-    revalidate: () => revalidatePath(`/admin/hotels`, "layout"),
-  },
-  venue: {
-    table: "event_venues",
-    bucket: "venue-images",
-    pathPrefix: (id) => `${id}`,
-    revalidate: (id) => {
-      revalidatePath(`/admin/events/${id}`);
-      revalidatePath("/admin/events");
-    },
-  },
 };
 
 async function getImages(supabase: Awaited<ReturnType<typeof createClient>>, target: GalleryTarget, id: string) {
