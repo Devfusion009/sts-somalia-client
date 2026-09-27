@@ -331,11 +331,16 @@ export function PortalShell({
 }) {
   const pathname = usePathname();
   const styles = ACCENT_STYLES[accent];
+  // The sidebar's own brand mark: like Stripe's or Shopify's dashboard logo,
+  // it returns to this portal's own home, never out to the public site — an
+  // operator console is a separate product from the B2C site, not a section
+  // of it. "Back to website" below is the one deliberate, labeled exit.
+  const dashboardHref = navGroups[0]?.items[0]?.href ?? "/";
   // Once portal subdomains are configured, "/" from inside admin.* or
   // agent.* would just re-resolve to this same portal (the proxy rewrites
-  // "/" to "/admin" or "/agent" on those hosts) — these links need to be
-  // absolute back to the root marketing site instead.
-  const homeHref = rootOrigin() || "/";
+  // "/" to "/admin" or "/agent" on those hosts) — this needs to be absolute
+  // back to the root marketing site instead.
+  const websiteHref = rootOrigin() || "/";
 
   // A route like "/admin/catalog/umrah" also starts with "/admin", so
   // naively prefix-matching every item would highlight "Dashboard" (href
@@ -365,7 +370,7 @@ export function PortalShell({
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" render={<Link href={homeHref} />}>
+              <SidebarMenuButton size="lg" render={<Link href={dashboardHref} />}>
                 <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg p-1 ${brandLogoUrl ? "bg-white" : styles.iconBg}`}>
                   {brandLogoUrl ? (
                     // Agency's own uploaded logo — a Supabase Storage URL, not a
@@ -401,7 +406,7 @@ export function PortalShell({
                     <SidebarMenuButton
                       tooltip="Back to website"
                       className="text-sidebar-foreground/60 hover:text-sidebar-foreground [&_svg]:size-3.5"
-                      render={<Link href={homeHref} />}
+                      render={<Link href={websiteHref} />}
                     >
                       <ExternalLink />
                       <span className="text-xs">Back to website</span>
