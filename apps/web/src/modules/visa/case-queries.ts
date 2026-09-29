@@ -1,0 +1,298 @@
+import "server-only";
+import { createClient } from "@/lib/supabase/server";
+import { getVisaOrderAdmin, getVisaProcessingWorkspace } from "@/modules/admin/queries";
+import { applicationDocumentSlots } from "./schemas";
+import type { PaymentState, ReadinessItem } from "./workflow";
+import type { VisaQueue } from "./queues";
+
+const STAFF_DOC_LABELS: Record<string, string> = {
+  visa_result: "Issued visa",
+  decision_letter: "Decision letter",
+  submission_receipt: "Submission receipt",
+  passport_authorization: "Collection authorisation",
+};
+
+/** Everything the staff case workspace renders, loaded in one round of parallel reads. */
+export async function getVisaCase(id: string) {
+  const supabase = await createClient();
+  const { data: app } = await supabase
+    .from("visa_applications")
+    .select(
+      `*,
+       visa_type:visa_type_id (*),
+       submitter:profiles!visa_applications_submitted_by_fkey (full_name, email, phone),
+       members:visa_members (*),
+       documents:visa_documents (*),
+       document_requests:visa_document_requests (*)`
+    )
+    .eq("id", id)
+    .neq("status", "draft")
+    .maybeSingle();
+  if (!app || !app.visa_type) return null;
+
+  const [
+    order,
+    workspace,
+    opsRes,
+    readinessRes,
+    paymentRes,
+    eventsRes,
+    appointmentsRes,
+    jobsRes,
+    decisionsRes,
+    passportsRes,
+    passportEventsRes,
+    centresRes,
+    typeCentresRes,
+    messagesRes,
+  ] = await Promise.all([
+    getVisaOrderAdmin(app.id),
+    getVisaProcessingWorkspace(app.id, app.visa_type.id),
+    supabase
+      .from("visa_case_ops")
+      .select("*, assignee:profiles!visa_case_ops_assigned_to_fkey (full_name, email)")
+      .eq("application_id", app.id)
+      .maybeSingle(),
+    supabase.rpc("visa_case_readiness", { p_application_id: app.id }),
+    supabase.rpc("visa_payment_state", { p_application_id: app.id }),
+    supabase.from("visa_case_events").select("*").eq("application_id", app.id).order("created_at", { ascending: false }),
+    supabase
+      .from("visa_appointments")
+      .select("*, centre:visa_application_centres (id, name, city, timezone, address)")
+      .eq("application_id", app.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("visa_processing_jobs")
+      .select("*, centre:visa_application_centres (id, name, city)")
+      .eq("application_id", app.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("visa_decisions")
+      .select("*, recorder:profiles!visa_decisions_recorded_by_fkey (full_name)")
+      .eq("application_id", app.id)
+      .order("recorded_at", { ascending: false }),
+    supabase.from("visa_passports").select("*").eq("application_id", app.id).order("created_at"),
+    supabase
+      .from("visa_passport_events")
+      .select("*")
+      .eq("application_id", app.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("visa_application_centres")
+      .select("id, name, city, country_code, timezone, is_active")
+      .eq("is_active", true)
+      .order("name"),
+    supabase.from("visa_type_centres").select("centre_id").eq("visa_type_id", app.visa_type.id),
+    supabase.from("visa_case_messages").select("*").eq("application_id", app.id).order("created_at"),
+  ]);
+
+  app.members.sort((a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order);
+  app.document_requests.sort((a, b) => a.created_at.localeCompare(b.created_at));
+
+  // Group every version under its slot, newest first; the head is current.
+  const slots = applicationDocumentSlots(app);
+  const byType = new Map<string, typeof app.documents>();
+  for (const doc of [...app.documents].sort((a, b) => b.version - a.version || b.created_at.localeCompare(a.created_at))) {
+    const list = byType.get(doc.document_type) ?? [];
+    list.push(doc);
+    byType.set(doc.document_type, list);
+  }
+  const documentSlots = [
+    ...slots.map((slot) => ({
+      key: slot.key,
+      label: slot.label,
+      required: slot.required,
+      staff: false,
+      versions: byType.get(slot.key) ?? [],
+    })),
+    ...[...byType.entries()]
+      .filter(([type]) => !slots.some((s) => s.key === type))
+      .map(([type, versions]) => ({
+        key: type,
+        label: STAFF_DOC_LABELS[type] ?? (type.startsWith("request:") ? type.slice(8) : type.replace(/_/g, " ")),
+        required: false,
+        staff: type in STAFF_DOC_LABELS,
+        versions,
+      })),
+  ];
+
+  // Decision chain: the current one is the row nobody supersedes.
+  const decisions = decisionsRes.data ?? [];
+  const supersededIds = new Set(decisions.map((d) => d.supersedes_id).filter(Boolean));
+  const currentDecision = decisions.find((d) => !supersededIds.has(d.id)) ?? null;
+
+  // Centres offered for booking: the visa type's own list, or every active centre when none is configured.
+  const typeCentreIds = new Set((typeCentresRes.data ?? []).map((r) => r.centre_id));
+  const allCentres = centresRes.data ?? [];
+  const centres = typeCentreIds.size > 0 ? allCentres.filter((c) => typeCentreIds.has(c.id)) : allCentres;
+
+  const docById = new Map(app.documents.map((d) => [d.id, d]));
+
+  return {
+    application: app,
+    order,
+    workspace,
+    ops: opsRes.data,
+    readiness: (readinessRes.data ?? []) as ReadinessItem[],
+    paymentState: ((paymentRes.data as string | null) ?? "not_billed") as PaymentState,
+    events: eventsRes.data ?? [],
+    documentSlots,
+    appointments: appointmentsRes.data ?? [],
+    jobs: jobsRes.data ?? [],
+    activeJob: (jobsRes.data ?? []).find((j) => j.status === "active") ?? null,
+    decisions,
+    currentDecision,
+    passports: passportsRes.data ?? [],
+    passportEvents: passportEventsRes.data ?? [],
+    centres,
+    docById,
+    messages: messagesRes.data ?? [],
+  };
+}
+
+export type VisaCase = NonNullable<Awaited<ReturnType<typeof getVisaCase>>>;
+
+// ---------------------------------------------------------------------------
+// Applications console (queues)
+// ---------------------------------------------------------------------------
+
+export const QUEUE_PAGE_SIZE = 25;
+
+export type QueueFilters = {
+  queue: VisaQueue;
+  q?: string;
+  destination?: string;
+  owner?: string;
+  urgent?: boolean;
+  page: number;
+};
+
+const CLOSED = "(approved,rejected,issued,cancelled)";
+const PAID = "(paid,partially_paid)";
+
+export async function getVisaCaseQueue(filters: QueueFilters, meId: string) {
+  const supabase = await createClient();
+  let query = supabase.from("visa_case_queue").select("*", { count: "exact" });
+
+  switch (filters.queue) {
+    case "needs_action":
+      query = query.not("attention", "is", null);
+      break;
+    case "mine":
+      query = query.eq("assigned_to", meId).not("status", "in", CLOSED);
+      break;
+    case "unassigned":
+      query = query.is("assigned_to", null).not("status", "in", CLOSED);
+      break;
+    case "sla_at_risk":
+      query = query
+        .lt("sla_due_at", new Date(Date.now() + 24 * 3_600_000).toISOString())
+        .in("status", ["submitted", "in_review", "ready_for_processing"])
+        .in("payment_state", ["paid", "partially_paid"]);
+      break;
+    case "payment_pending":
+      query = query.eq("status", "submitted").not("payment_state", "in", PAID);
+      break;
+    case "new":
+      query = query.eq("status", "submitted").in("payment_state", ["paid", "partially_paid"]);
+      break;
+    case "document_review":
+      query = query.eq("status", "in_review");
+      break;
+    case "customer_action":
+      query = query.eq("status", "additional_info_required");
+      break;
+    case "appointment_pending":
+      query = query
+        .eq("requires_appointment", true)
+        .or("appointment_attended.is.null,appointment_attended.eq.false")
+        .in("status", ["in_review", "additional_info_required", "ready_for_processing"]);
+      break;
+    case "ready_for_submission":
+      query = query.eq("status", "ready_for_processing");
+      break;
+    case "processing":
+      query = query.eq("status", "processing");
+      break;
+    case "approved":
+      query = query.eq("status", "approved");
+      break;
+    case "refused":
+      query = query.eq("status", "rejected");
+      break;
+    case "passport_return":
+      query = query
+        .eq("requires_passport", true)
+        .in("status", ["approved", "rejected", "cancelled"])
+        .gt("passports_outstanding", 0);
+      break;
+    case "issued":
+      query = query.eq("status", "issued");
+      break;
+    case "cancelled":
+      query = query.eq("status", "cancelled");
+      break;
+    case "all":
+      break;
+  }
+
+  const term = filters.q?.trim().toLowerCase().replace(/[%_,()]/g, " ");
+  if (term) query = query.ilike("search_text", `%${term}%`);
+  if (filters.destination) query = query.eq("destination_country_code", filters.destination);
+  if (filters.owner === "none") query = query.is("assigned_to", null);
+  else if (filters.owner) query = query.eq("assigned_to", filters.owner);
+  if (filters.urgent) query = query.eq("priority", "urgent");
+
+  const from = (filters.page - 1) * QUEUE_PAGE_SIZE;
+  const closedQueue = ["approved", "refused", "issued", "cancelled", "all"].includes(filters.queue);
+  query = query.order("priority", { ascending: false });
+  query = closedQueue
+    ? query.order("submitted_at", { ascending: false, nullsFirst: false })
+    : query.order("sla_due_at", { ascending: true, nullsFirst: false });
+
+  const { data, count } = await query.range(from, from + QUEUE_PAGE_SIZE - 1);
+  return { rows: data ?? [], total: count ?? 0 };
+}
+
+export type QueueRow = Awaited<ReturnType<typeof getVisaCaseQueue>>["rows"][number];
+
+export async function getVisaQueueCounts() {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("visa_queue_counts");
+  return (data ?? {}) as Record<string, number>;
+}
+
+/** Staff who can own a case (assignment picker). */
+export async function getVisaStaff() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .eq("is_platform_admin", true)
+    .order("full_name");
+  return data ?? [];
+}
+
+/** Destinations present in the queue, for the filter. */
+export async function getVisaQueueDestinations() {
+  const supabase = await createClient();
+  const { data } = await supabase.from("visa_types").select("destination_country_code");
+  return [...new Set((data ?? []).map((r) => r.destination_country_code))].sort();
+}
+
+/** Booked appointments from today on (plus overdue ones still without an outcome). */
+export async function getUpcomingVisaAppointments(centreId?: string) {
+  const supabase = await createClient();
+  let query = supabase
+    .from("visa_appointments")
+    .select(
+      `*,
+       centre:visa_application_centres (id, name, city, timezone),
+       application:visa_applications (id, application_ref, traveler_details, visa_type:visa_type_id (name, destination_country_code))`
+    )
+    .eq("status", "booked")
+    .order("scheduled_at");
+  if (centreId) query = query.eq("centre_id", centreId);
+  const { data } = await query.limit(300);
+  return data ?? [];
+}

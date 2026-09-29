@@ -28,7 +28,7 @@ type NotificationRow = {
 function targetHref(n: NotificationRow): string | null {
   if (n.type === "new_order") return "/admin/queue";
   if (n.type === "payout_request") return "/admin/finance/withdrawals?status=pending";
-  if (n.type === "visa_application_submitted" || n.type === "visa_status_changed") {
+  if (n.type === "visa_application_submitted" || n.type === "visa_status_changed" || n.type === "visa_case_attention") {
     const applicationId = (n.data as { applicationId?: string } | null)?.applicationId;
     if (applicationId) return `/admin/visa/${applicationId}`;
   }

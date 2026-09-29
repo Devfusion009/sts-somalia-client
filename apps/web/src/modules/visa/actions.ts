@@ -13,8 +13,8 @@ import {
 } from "@/modules/orders/helpers";
 import {
   APPLICANT_TYPES,
+  applicationDocumentSlots,
   memberSchema,
-  parseDocumentSlots,
   parseApplicationQuestions,
   personalInfoSchema,
   travelInfoSchema,
@@ -111,14 +111,9 @@ export async function startVisaApplication(formData: FormData): Promise<void> {
     .maybeSingle();
   if (!visaType) redirect("/visa");
 
-  // A nationality chosen on the detail page before "Apply Now" seeds both
-  // the field itself and its resolved quote, so step 2 opens already
-  // agreeing with what the customer was just shown — not a separate value
-  // they have to re-enter and hope matches.
+  // A nationality chosen on the detail page seeds the field; the quote for it
+  // (price, fee, documents) is stamped by visa_applications_draft_integrity.
   const nationality = formData.get("nationality")?.toString().trim().toUpperCase();
-  const resolved = nationality
-    ? (await supabase.rpc("resolve_visa_pricing", { p_visa_type_id: visaType.id, p_nationality_code: nationality })).data?.[0]
-    : null;
 
   const { data: application, error } = await supabase
     .from("visa_applications")
@@ -131,16 +126,6 @@ export async function startVisaApplication(formData: FormData): Promise<void> {
       currency: visaType.currency,
       contact_details: { email: user.email ?? "", mobile: user.phone ?? "" },
       ...(nationality ? { traveler_details: { nationality } } : {}),
-      ...(resolved
-        ? {
-            resolved_price: resolved.price,
-            resolved_processing_fee: resolved.processing_fee,
-            resolved_processing_days_min: resolved.processing_days_min,
-            resolved_processing_days_max: resolved.processing_days_max,
-            resolved_documents: resolved.required_documents,
-            resolved_eligibility_requirements: resolved.eligibility_requirements,
-          }
-        : {}),
     })
     .select("id")
     .single();
@@ -346,20 +331,9 @@ export async function savePersonalInfo(
 
   const d = parsed.data;
 
-  // Nationality is now known (or has changed) — freeze what this applicant
-  // is actually quoted and required to provide. Re-resolving on every save
-  // of this step (rather than only once) means correcting a typo'd
-  // nationality before submitting updates the quote; nothing re-resolves
-  // once the application leaves draft (RLS already blocks the customer from
-  // editing past that point), so a later rules edit can't reach back into
-  // an application already assessed against the old numbers.
-  const { data: resolvedRows } = await supabase.rpc("resolve_visa_pricing", {
-    p_visa_type_id: application.visa_type_id,
-    p_nationality_code: d.nationality,
-  });
-  const resolved = resolvedRows?.[0];
-
-  await supabase
+  // Saving nationality re-stamps the quote (price, fee, documents) server-side
+  // in visa_applications_draft_integrity; nothing re-resolves after submit.
+  const { error: saveError } = await supabase
     .from("visa_applications")
     .update({
       traveler_details: {
@@ -372,14 +346,9 @@ export async function savePersonalInfo(
       },
       contact_details: { email: d.email, mobile: d.mobile },
       current_step: Math.max(application.current_step, 3),
-      resolved_price: resolved?.price ?? null,
-      resolved_processing_fee: resolved?.processing_fee ?? null,
-      resolved_processing_days_min: resolved?.processing_days_min ?? null,
-      resolved_processing_days_max: resolved?.processing_days_max ?? null,
-      resolved_documents: resolved?.required_documents ?? null,
-      resolved_eligibility_requirements: resolved?.eligibility_requirements ?? null,
     })
     .eq("id", application.id);
+  if (saveError) return { error: saveError.message, values: formValues(formData) };
 
   // The primary applicant is also a member row so the member list is the
   // complete travelling party.
@@ -487,7 +456,7 @@ export async function uploadVisaDocument(
   );
   if (!application) return { error: "This application can no longer be edited." };
 
-  const slots = parseDocumentSlots(application.visa_type?.required_documents);
+  const slots = applicationDocumentSlots(application);
   const slot = slots.find((s) => s.key === parsed.data.slotKey);
   if (!slot) return { error: "Unknown document type." };
   const maxBytes = (slot.max_mb ?? 5) * 1024 * 1024 || MAX_UPLOAD_BYTES_DEFAULT;
@@ -565,7 +534,7 @@ export async function attachVaultDocument(
   );
   if (!application) return { error: "This application can no longer be edited." };
 
-  const slots = parseDocumentSlots(application.visa_type?.required_documents);
+  const slots = applicationDocumentSlots(application);
   const slot = slots.find((s) => s.key === parsed.data.slotKey);
   if (!slot) return { error: "Unknown document type." };
 
@@ -654,7 +623,7 @@ export async function continueFromDocuments(
   const { supabase, application } = await getEditableApplication(applicationId.data, user.id);
   if (!application) return { error: "This application can no longer be edited." };
 
-  const slots = parseDocumentSlots(application.visa_type?.required_documents);
+  const slots = applicationDocumentSlots(application);
   const uploadedKeys = new Set(application.documents.map((d) => d.document_type));
   const missing = slots.filter((s) => s.required && !uploadedKeys.has(s.key));
   if (missing.length > 0) {
@@ -723,50 +692,29 @@ export async function submitVisaApplication(
     return { error: `Please answer: ${unanswered.map((q) => q.label).join(", ")} — review step 3.` };
   }
 
-  // resolved_documents/price/fee were stamped in step 2 once nationality was
-  // known (see savePersonalInfo) — that snapshot is what this applicant was
-  // actually told to provide and quoted, not the visa type's raw default,
-  // which a nationality rule may have overridden.
-  const slots = parseDocumentSlots(application.resolved_documents ?? visaType.required_documents);
+  const slots = applicationDocumentSlots(application);
   const uploadedKeys = new Set(application.documents.map((d) => d.document_type));
   const missing = slots.filter((s) => s.required && !uploadedKeys.has(s.key));
   if (missing.length > 0) {
     return { error: `Missing documents: ${missing.map((m) => m.label).join(", ")}.` };
   }
 
-  const applicantCount =
-    application.applicant_type === "single" ? 1 : Math.max(application.members.length, 1);
-  const unitPrice = Number(application.resolved_price ?? visaType.price);
-  const total = unitPrice * applicantCount;
-  // Resolved once here, same as price — a later change to the rule or to
-  // visa_types.processing_fee must not retroactively change what this
-  // applicant was already quoted and billed.
-  const unitFee = Number(application.resolved_processing_fee ?? visaType.processing_fee ?? 0);
-  const feeAmount = unitFee * applicantCount;
-
-  const { error: updateError } = await supabase
-    .from("visa_applications")
-    .update({ price: total, fee_amount: feeAmount, current_step: 6 })
-    .eq("id", application.id);
-  if (updateError) return { error: updateError.message };
-
-  // Status moves only through set_visa_application_status — that is what puts
-  // the arrival in front of admins and confirms it to the applicant.
-  const { error: statusError } = await supabase.rpc("set_visa_application_status", {
-    p_application_id: application.id,
-    p_status: "submitted",
-  });
-  if (statusError) return { error: statusError.message };
+  // Price, fee, and the workflow snapshot are decided in SQL from the catalog
+  // — never from values this request carries.
+  const { data: billed, error: submitError } = await supabase
+    .rpc("submit_visa_application", { p_application_id: application.id })
+    .single();
+  if (submitError || !billed) return { error: submitError?.message ?? "Could not submit the application." };
 
   const order = await createOrderForBooking(supabase, {
     customerId: application.applicant_profile_id ?? user.id,
     bookedBy: user.id,
     agencyId: application.agency_id,
     agencyCustomerId: application.agency_customer_id,
-    currency: visaType.currency,
+    currency: billed.currency,
     itemType: "visa",
-    price: total,
-    feeAmount,
+    price: Number(billed.price),
+    feeAmount: Number(billed.fee_amount),
     visaApplicationId: application.id,
   });
 
@@ -821,25 +769,13 @@ export async function uploadRequestedDocument(
     .upload(storagePath, file, { contentType: file.type });
   if (uploadError) return { error: uploadError.message };
 
-  const { data: doc, error: docError } = await supabase
-    .from("visa_documents")
-    .insert({
-      application_id: parsed.data.applicationId,
-      document_type: `request:${request.title}`,
-      storage_path: storagePath,
-      uploaded_by: user.id,
-      file_name: file.name,
-      file_size: file.size,
-      content_type: file.type,
-    })
-    .select("id")
-    .single();
-  if (docError || !doc) return { error: docError?.message ?? "Upload failed." };
-
-  const { error: linkError } = await supabase
-    .from("visa_document_requests")
-    .update({ status: "uploaded", document_id: doc.id })
-    .eq("id", request.id);
+  const { error: linkError } = await supabase.rpc("visa_fulfil_document_request", {
+    p_request_id: request.id,
+    p_storage_path: storagePath,
+    p_file_name: file.name,
+    p_file_size: file.size,
+    p_content_type: file.type,
+  });
   if (linkError) return { error: linkError.message };
 
   revalidatePath(`/account/visa/${parsed.data.applicationId}`);
@@ -877,10 +813,9 @@ export async function replaceRejectedDocument(
     .upload(storagePath, file, { contentType: file.type });
   if (uploadError) return { error: uploadError.message };
 
-  // The swap, the ownership check, and the hand-back to review all happen in
-  // replace_rejected_visa_document — visa_documents has no update policy for
-  // the applicant, and widening one would also let them edit review fields.
-  const { error } = await supabase.rpc("replace_rejected_visa_document", {
+  // Inserts a new version; the rejected one is kept, with its reason. The
+  // ownership check and the hand-back to review happen in the RPC.
+  const { error } = await supabase.rpc("visa_replace_document", {
     p_document_id: parsed.data.documentId,
     p_storage_path: storagePath,
     p_file_name: file.name,
@@ -890,5 +825,26 @@ export async function replaceRejectedDocument(
   if (error) return { error: error.message };
 
   revalidatePath(`/account/visa/${parsed.data.applicationId}`);
+  return { error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Message STS about a submitted application
+// ---------------------------------------------------------------------------
+export async function sendVisaMessage(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({ applicationId: z.string().uuid(), body: z.string().trim().min(1, "Write a message.").max(4000) })
+    .safeParse({ applicationId: formData.get("applicationId"), body: formData.get("body") ?? "" });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("visa_send_message", {
+    p_application_id: parsed.data.applicationId,
+    p_body: parsed.data.body,
+  });
+  if (error) return { error: error.message };
+  revalidatePath(`/account/visa/${parsed.data.applicationId}`);
+  revalidatePath(`/admin/visa/${parsed.data.applicationId}`);
   return { error: null };
 }

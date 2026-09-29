@@ -52,7 +52,16 @@ export async function getMyVisaApplications() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("visa_applications")
-    .select("*, visa_type:visa_type_id (name, destination_country_code)")
+    .select(
+      `*,
+       visa_type:visa_type_id (name, destination_country_code),
+       documents:visa_documents (id, document_type, is_current, review_status, rejection_reason),
+       document_requests:visa_document_requests (id, title, status, requirement, due_date, description),
+       appointments:visa_appointments (id, status, appointment_type, scheduled_at, confirmation_number, biometrics_required,
+         centre:visa_application_centres (name, city, address, timezone, collection_hours)),
+       passports:visa_passports (id, status, holder_name, tracking_reference),
+       order_items (order:order_id (id, status, total, currency))`
+    )
     .order("created_at", { ascending: false });
   return data ?? [];
 }
@@ -117,7 +126,12 @@ export async function getApplicationDetail(applicationId: string) {
        members:visa_members (*),
        documents:visa_documents (*),
        history:visa_application_status_history (*),
-       document_requests:visa_document_requests (*)`
+       document_requests:visa_document_requests (*),
+       appointments:visa_appointments (*, centre:visa_application_centres (name, city, address, timezone, collection_hours, phone)),
+       passports:visa_passports (*),
+       decisions:visa_decisions (*),
+       events:visa_case_events (id, event_type, customer_summary, created_at),
+       messages:visa_case_messages (*)`
     )
     .eq("id", applicationId)
     .maybeSingle();
@@ -127,6 +141,9 @@ export async function getApplicationDetail(applicationId: string) {
   );
   data.history.sort((a, b) => a.created_at.localeCompare(b.created_at));
   data.document_requests.sort((a, b) => a.created_at.localeCompare(b.created_at));
+  data.appointments.sort((a, b) => b.scheduled_at.localeCompare(a.scheduled_at));
+  data.events.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  data.messages.sort((a, b) => a.created_at.localeCompare(b.created_at));
   return data;
 }
 

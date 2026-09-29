@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Building2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,9 +23,14 @@ export default async function AdminVisaCatalogPage() {
         <div>
           <h1 className="font-heading text-2xl font-semibold">Visa Catalog</h1>
         </div>
-        <Button render={<Link href="/admin/catalog/visa/new" />}>
-          <Plus /> Add visa type
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" render={<Link href="/admin/catalog/visa/centres" />}>
+            <Building2 /> Application centres
+          </Button>
+          <Button render={<Link href="/admin/catalog/visa/new" />}>
+            <Plus /> Add visa type
+          </Button>
+        </div>
       </div>
 
       <Card className="overflow-hidden py-0">

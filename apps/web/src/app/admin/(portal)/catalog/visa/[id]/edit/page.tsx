@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getVisaTypeAdmin, getVisaNationalityRulesAdmin } from "@/modules/admin/queries";
+import { getVisaTypeAdmin, getVisaNationalityRulesAdmin, getVisaCentresAdmin, getVisaTypeCentreIds } from "@/modules/admin/queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { VisaTypeEditor } from "../../visa-type-editor";
 import { NationalityRulesSection } from "../../nationality-rules-section";
@@ -19,11 +19,15 @@ export default async function EditVisaTypePage({ params }: { params: Promise<{ i
   const { id } = await params;
   const visaType = await getVisaTypeAdmin(id);
   if (!visaType) notFound();
-  const rules = await getVisaNationalityRulesAdmin(id);
+  const [rules, centres, selectedCentreIds] = await Promise.all([
+    getVisaNationalityRulesAdmin(id),
+    getVisaCentresAdmin(),
+    getVisaTypeCentreIds(id),
+  ]);
 
   return (
     <div className="space-y-6">
-      <VisaTypeEditor visaType={visaType} />
+      <VisaTypeEditor visaType={visaType} centres={centres} selectedCentreIds={selectedCentreIds} />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Nationality overrides</CardTitle>

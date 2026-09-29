@@ -81,7 +81,7 @@ export function ApplicationSummary({
                 <row.icon className="size-3.5" />
               </span>
               <div className="min-w-0">
-                <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{row.label}</dt>
+                <dt className="text-xs font-medium text-muted-foreground">{row.label}</dt>
                 <dd className="text-sm font-semibold text-foreground">{row.value}</dd>
               </div>
             </div>

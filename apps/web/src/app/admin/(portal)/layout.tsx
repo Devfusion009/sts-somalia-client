@@ -50,9 +50,15 @@ const NAV_GROUPS: PortalNavGroup[] = [
       { href: "/admin/queue", label: "Order Queue", icon: "bookings" },
       { href: "/admin/calendar", label: "Booking Calendar", icon: "calendar" },
       { href: "/admin/orders", label: "Orders & Payments", icon: "orders" },
-      { href: "/admin/visa", label: "Visa Applications", icon: "visa" },
       { href: "/admin/umrah/requests", label: "Private Umrah", icon: "bookings" },
       { href: "/admin/umrah/bookings", label: "Umrah Bookings", icon: "bookings" },
+    ],
+  },
+  {
+    label: "Visa Operations",
+    items: [
+      { href: "/admin/visa", label: "Visa Applications", icon: "visa" },
+      { href: "/admin/visa/appointments", label: "Visa Appointments", icon: "calendar" },
     ],
   },
   {
@@ -161,6 +167,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     "/admin/queue": navCounts.queue,
     "/admin/refunds": navCounts.refunds,
     "/admin/visa": navCounts.visa,
+    "/admin/visa/appointments": navCounts.visa_appointments,
     "/admin/umrah/requests": navCounts.umrah_requests,
     "/admin/applications": navCounts.partner_applications,
     // Requests waiting to be reviewed, plus approved ones waiting to be
