@@ -26,10 +26,7 @@ export function VisaTeaser() {
             <div className="absolute inset-0 -z-10 bg-[radial-gradient(70%_80%_at_100%_0%,rgba(45,212,180,0.18),transparent)]" aria-hidden />
             <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
               <div>
-                <p className="text-sm font-semibold tracking-[0.14em] text-sidebar-primary uppercase">
-                  Visa assistance
-                </p>
-                <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+                <h2 className="font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
                   Visas without the guesswork
                 </h2>
                 <p className="mt-4 max-w-lg text-lg leading-relaxed text-sidebar-foreground/70">

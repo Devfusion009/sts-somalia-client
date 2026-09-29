@@ -71,6 +71,12 @@ const visaTypeSchema = z.object({
   status: z.enum(["draft", "pending_review", "published", "suspended"]),
   processingMode: z.enum(["in_house", "partner"]),
   partnerProviderKey: z.string().optional(),
+  requiresAppointment: z.boolean(),
+  requiresBiometrics: z.boolean(),
+  requiresPhysicalPassport: z.boolean(),
+  passportDeliveryModes: z.array(z.enum(["counter", "courier", "third_party"])).min(1, "Offer at least one passport return option."),
+  internalSlaDays: z.coerce.number().int().min(0).max(60),
+  centreIds: z.array(z.string().uuid()),
 })
   .refine((data) => data.processingMode !== "partner" || !!data.partnerProviderKey, {
     message: "Choose which partner processes this visa type.",
@@ -129,6 +135,12 @@ function visaTypeInput(formData: FormData) {
     status: formData.get("status"),
     processingMode: formData.get("processingMode") ?? "in_house",
     partnerProviderKey: formData.get("partnerProviderKey") || undefined,
+    requiresAppointment: formData.get("requiresAppointment") === "on",
+    requiresBiometrics: formData.get("requiresBiometrics") === "on",
+    requiresPhysicalPassport: formData.get("requiresPhysicalPassport") === "on",
+    passportDeliveryModes: formData.getAll("passportDeliveryModes").map(String),
+    internalSlaDays: formData.get("internalSlaDays") || 2,
+    centreIds: formData.getAll("centreIds").map(String),
   };
 }
 
@@ -155,7 +167,26 @@ function visaTypeRow(data: z.infer<typeof visaTypeSchema>) {
     status: data.status as ListingStatus,
     processing_mode: data.processingMode,
     partner_provider_key: data.processingMode === "partner" ? (data.partnerProviderKey ?? null) : null,
+    requires_appointment: data.requiresAppointment,
+    requires_biometrics: data.requiresBiometrics,
+    requires_physical_passport: data.requiresPhysicalPassport,
+    passport_delivery_modes: data.passportDeliveryModes,
+    internal_sla_days: data.internalSlaDays,
   };
+}
+
+/** Replace a visa type's centre list (empty = every active centre is offered). */
+async function saveVisaTypeCentres(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  visaTypeId: string,
+  centreIds: string[]
+) {
+  await supabase.from("visa_type_centres").delete().eq("visa_type_id", visaTypeId);
+  if (centreIds.length > 0) {
+    await supabase
+      .from("visa_type_centres")
+      .insert(centreIds.map((centre_id) => ({ visa_type_id: visaTypeId, centre_id })));
+  }
 }
 
 export async function createVisaType(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -164,8 +195,9 @@ export async function createVisaType(_prev: ActionState, formData: FormData): Pr
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("visa_types").insert(visaTypeRow(parsed.data));
-  if (error) return { error: error.message };
+  const { data: created, error } = await supabase.from("visa_types").insert(visaTypeRow(parsed.data)).select("id").single();
+  if (error || !created) return { error: error?.message ?? "Could not create the visa type." };
+  await saveVisaTypeCentres(supabase, created.id, parsed.data.centreIds);
   revalidatePath("/admin/catalog/visa");
   redirect("/admin/catalog/visa");
 }
@@ -179,6 +211,7 @@ export async function updateVisaType(_prev: ActionState, formData: FormData): Pr
   const supabase = await createClient();
   const { error } = await supabase.from("visa_types").update(visaTypeRow(parsed.data)).eq("id", id);
   if (error) return { error: error.message };
+  await saveVisaTypeCentres(supabase, id, parsed.data.centreIds);
   revalidatePath("/admin/catalog/visa");
   revalidatePath(`/admin/catalog/visa/${id}/edit`);
   redirect("/admin/catalog/visa");

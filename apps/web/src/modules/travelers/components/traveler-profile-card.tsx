@@ -1,10 +1,9 @@
 "use client";
 
-import { CheckCircle2, IdCard } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -58,14 +57,7 @@ export function TravelerProfileCard({ traveler }: { traveler: TravelerProfile | 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <IdCard className="size-5 text-muted-foreground" />
-          Traveler &amp; passport details
-        </CardTitle>
-        <CardDescription>
-          Saved once and reused across visa applications, Umrah bookings and flight tickets, so you
-          don&apos;t retype it each time.
-        </CardDescription>
+        <CardTitle>Traveler &amp; passport details</CardTitle>
       </CardHeader>
       <CardContent>
         <form action={handleSubmit} className="space-y-4">

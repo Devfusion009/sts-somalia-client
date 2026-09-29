@@ -58,7 +58,7 @@ export function FeatureSplit({
         </Reveal>
 
         <Reveal delay={120} className={cn(reverse && "lg:order-1")}>
-          <p className="text-sm font-semibold tracking-[0.14em] text-primary uppercase">{eyebrow}</p>
+          <p className="text-sm font-semibold text-primary">{eyebrow}</p>
           <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
             {title}
           </h2>

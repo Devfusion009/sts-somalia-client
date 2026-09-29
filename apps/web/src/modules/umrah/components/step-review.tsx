@@ -113,37 +113,37 @@ export function StepReview({
         </header>
         <dl className="grid grid-cols-2 gap-4 p-4 text-sm sm:grid-cols-4">
           <div>
-            <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Travellers</dt>
+            <dt className="text-xs font-medium text-muted-foreground">Travellers</dt>
             <dd className="font-semibold text-foreground">{trip.numPilgrims}</dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Departure</dt>
+            <dt className="text-xs font-medium text-muted-foreground">Departure</dt>
             <dd className="font-semibold text-foreground">{formatDate(departureDate)}</dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Return</dt>
+            <dt className="text-xs font-medium text-muted-foreground">Return</dt>
             <dd className="font-semibold text-foreground">{formatDate(returnDate)}</dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Length</dt>
+            <dt className="text-xs font-medium text-muted-foreground">Length</dt>
             <dd className="font-semibold text-foreground">
               {duration} days / {Math.max(0, duration - 1)} nights
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Nights in Makkah</dt>
+            <dt className="text-xs font-medium text-muted-foreground">Nights in Makkah</dt>
             <dd className="font-semibold text-foreground">{trip.nightsMakkah}</dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Nights in Madinah</dt>
+            <dt className="text-xs font-medium text-muted-foreground">Nights in Madinah</dt>
             <dd className="font-semibold text-foreground">{trip.nightsMadinah}</dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Standard</dt>
+            <dt className="text-xs font-medium text-muted-foreground">Standard</dt>
             <dd className="font-semibold text-foreground">{UMRAH_TIER_LABELS[tier]}</dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Room type</dt>
+            <dt className="text-xs font-medium text-muted-foreground">Room type</dt>
             <dd className="font-semibold text-foreground">{ROOM_SHARING_LABELS[roomSharing]}</dd>
           </div>
         </dl>

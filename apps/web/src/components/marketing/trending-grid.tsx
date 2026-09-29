@@ -6,8 +6,8 @@ export type TrendingEntry = { name: string; image: string; href: string };
 
 /**
  * "Trending cities / countries" — a dense three-column grid of thin cards, each
- * a thumbnail beside a small "FLIGHTS TO" label and the place name. Matches the
- * reference's directory-style block that carries the page's SEO weight.
+ * a thumbnail beside the place name. Carries the page's SEO weight; the
+ * "flights to" framing lives once in the section title, not repeated per row.
  */
 export function TrendingGrid({
   title,
@@ -43,10 +43,7 @@ export function TrendingGrid({
                   />
                 </span>
                 <span className="flex min-w-0 flex-col justify-center px-3 py-2">
-                  <span className="text-[10px] font-semibold tracking-wider text-neutral-400 uppercase">
-                    Flights to
-                  </span>
-                  <span className="truncate font-heading text-sm font-bold text-neutral-900 transition-colors group-hover:text-primary">
+                  <span className="truncate font-heading text-base font-bold text-neutral-900 transition-colors group-hover:text-primary">
                     {entry.name}
                   </span>
                 </span>

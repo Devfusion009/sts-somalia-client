@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyVisaCustomer } from "@/modules/visa/notify";
 import { getActiveProviderConfig } from "@/lib/provider-runtime/credentials";
 import { mapPartnerStatus } from "@/modules/visa/partner/registry";
 import { parkForUnmappedPartnerStatus, parkForRefusedPartnerTransition } from "@/modules/visa/partner/sync";
@@ -98,6 +99,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
         p_application_id: application.id,
         p_status: mapped.status,
       });
+      if (!transitionError && (mapped.status === "approved" || mapped.status === "rejected")) {
+        await notifyVisaCustomer(
+          application.id,
+          "decision_recorded",
+          mapped.status === "approved" ? "Your visa was approved." : "Your visa application was refused."
+        );
+      }
       if (transitionError) {
         await parkForRefusedPartnerTransition(
           admin,

@@ -94,7 +94,7 @@ function StepHeading({ index, title }: { index?: number; title: string }) {
   return (
     <div>
       {index ? (
-        <p className="text-xs font-bold tracking-widest text-primary uppercase">Step {index} of 5</p>
+        <p className="text-xs font-bold text-primary">Step {index} of 5</p>
       ) : null}
       <h2 className="mt-1 font-heading text-xl font-bold sm:text-2xl">{title}</h2>
     </div>
@@ -955,7 +955,7 @@ function ReviewGrid({ rows }: { rows: Array<[string, string]> }) {
     <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
       {rows.map(([label, value]) => (
         <div key={label}>
-          <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
+          <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
           <dd className={cn("text-sm break-words", value ? "font-semibold text-foreground" : "text-muted-foreground/50")}>{value || "—"}</dd>
         </div>
       ))}

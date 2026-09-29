@@ -191,7 +191,7 @@ export default async function ApplicationViewPage({ params }: { params: Promise<
           <div key={label} className="flex min-w-0 items-start gap-2.5">
             <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
             <div className="min-w-0">
-              <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
+              <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
               <dd className="truncate text-sm font-semibold text-foreground">{value}</dd>
             </div>
           </div>

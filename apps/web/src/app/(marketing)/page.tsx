@@ -128,7 +128,6 @@ export default function HomePage() {
 
       <DestinationRail
         className="bg-muted/40"
-        eyebrow="Beyond the Horn"
         title="Trending international destinations"
         blurb="Planning to travel abroad? These are the international routes and packages our desk books most this season — Gulf city breaks, Türkiye and Egypt for shopping and medical trips, Malaysia for study, and Umrah year-round. Every package can be split apart or rebuilt around your dates, your budget and how many of you are travelling; tell us what you need and we price it properly rather than making you fit a fixed itinerary."
         cards={INTERNATIONAL}
@@ -136,7 +135,6 @@ export default function HomePage() {
       />
 
       <DestinationRail
-        eyebrow="Close to home"
         title="Trending Somalia and around destinations"
         blurb="Looking to travel without going far? Domestic and regional trips are designed for how people here actually move — family visits, business between Mogadishu, Hargeisa and Nairobi, medical travel to Addis and Nairobi, and coastal weekends at home. Short hops, familiar airlines, hotels we have physically checked, and a support desk in your timezone that answers in Somali."
         cards={REGIONAL}

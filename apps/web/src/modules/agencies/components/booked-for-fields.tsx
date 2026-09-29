@@ -20,7 +20,7 @@ export function BookedForFields({ customers }: { customers: BookedForCustomer[] 
 
   return (
     <div className="space-y-3 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3">
-      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
         <UserRound className="size-3.5" /> Agency booking
       </p>
       <div className="space-y-1.5">

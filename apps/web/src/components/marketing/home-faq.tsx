@@ -50,22 +50,32 @@ export const HOME_FAQS: Array<{ question: string; answer: string }> = [
   },
 ];
 
-export function HomeFaq() {
+/**
+ * Also used on section-specific pages (e.g. visa) with their own `faqs`/
+ * `title`/`lead` — the questions travellers ask about that one service are
+ * not the same ones they ask about the site overall, so reusing HOME_FAQS
+ * everywhere would answer things nobody on that page asked.
+ */
+export function HomeFaq({
+  faqs = HOME_FAQS,
+  title = "Before you ask — you're not the first",
+  lead = "The answers travellers ask us for most. Anything else, the support desk is one call away.",
+}: {
+  faqs?: Array<{ question: string; answer: string }>;
+  title?: string;
+  lead?: string;
+} = {}) {
   // Structured data is emitted by the page.
   return (
     <section className="bg-background py-16 sm:py-20 lg:py-24">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <Reveal>
-          <SectionHeading
-            eyebrow="Questions"
-            title="Before you ask — you're not the first"
-            lead="The answers travellers ask us for most. Anything else, the support desk is one call away."
-          />
+          <SectionHeading title={title} lead={lead} />
         </Reveal>
 
         <Reveal delay={100}>
           <div className="mt-12 divide-y divide-border rounded-2xl border border-border bg-card">
-            {HOME_FAQS.map((faq) => (
+            {faqs.map((faq) => (
               <details key={faq.question} className="group px-6 py-1">
                 <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-3 font-heading text-base font-semibold marker:hidden focus-visible:rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden">
                   {faq.question}

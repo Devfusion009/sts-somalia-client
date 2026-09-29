@@ -49,6 +49,19 @@ export function VisaStatusBadge({ status, className }: { status: string; classNa
   );
 }
 
+const DOCUMENT_BADGES: Record<string, { label: string; className: string }> = {
+  pending: { label: "Awaiting review", className: "bg-brand-gold/15 text-brand-gold" },
+  accepted: { label: "Verified", className: "bg-primary/10 text-primary" },
+  rejected: { label: "Rejected", className: "bg-destructive/10 text-destructive" },
+  missing: { label: "Missing", className: "bg-muted text-muted-foreground" },
+  replaced: { label: "Replaced", className: "bg-muted text-muted-foreground" },
+};
+
+export function DocumentStatusBadge({ status, className }: { status: string; className?: string }) {
+  const badge = DOCUMENT_BADGES[status] ?? DOCUMENT_BADGES.pending;
+  return <Badge className={cn("border-transparent font-medium", badge.className, className)}>{badge.label}</Badge>;
+}
+
 /**
  * The wide banner at the top of the apply/tracking pages: flag, visa name,
  * and the key facts strip (processing / validity / stay / price).

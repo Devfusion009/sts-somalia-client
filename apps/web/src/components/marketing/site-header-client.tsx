@@ -148,7 +148,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                       <div className="flex gap-8 p-4">
                         {section.columns.map((column) => (
                           <div key={column.heading} className="min-w-44">
-                            <p className="mb-2 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+                            <p className="mb-2 text-xs font-bold text-muted-foreground">
                               {column.heading}
                             </p>
                             <ul className="space-y-0.5">
@@ -372,10 +372,36 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
  */
 const useSearchRevealed = createScrollFlagStore(560, 460);
 
+type LocationPrediction = { id: string; text: string };
+
 export function HeaderSearch() {
   const router = useRouter();
   const pathname = usePathname();
   const [value, setValue] = useState("");
+  const [predictions, setPredictions] = useState<LocationPrediction[]>([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      if (value.trim().length < 2) {
+        setPredictions([]);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/places/autocomplete?input=${encodeURIComponent(value)}`);
+        const data = await res.json();
+        setPredictions(data.predictions ?? []);
+      } catch {
+        setPredictions([]);
+      }
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [value]);
+
   // Only the home page hides it initially — it already has a big hero search,
   // so this one reveals once that scrolls away. Everywhere else it's always up.
   const isHome = pathname === "/";
@@ -416,11 +442,33 @@ export function HeaderSearch() {
                 type="search"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
+                onFocus={() => setSuggestOpen(true)}
+                onBlur={() => setSuggestOpen(false)}
                 aria-label="Search destinations"
                 placeholder="Where do you want to go?"
                 autoComplete="off"
                 className="h-12 w-full rounded-l-xl rounded-r-none border border-r-0 border-input bg-card pr-3 pl-11 text-sm text-foreground outline-none transition-[height] duration-300 ease-out group-data-[condensed]/header:h-9 placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
               />
+              {suggestOpen && predictions.length > 0 ? (
+                <div className="absolute top-full left-0 z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-border bg-popover py-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10">
+                  {predictions.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setValue(p.text);
+                        setPredictions([]);
+                        setSuggestOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <PlaceIcon sx={{ fontSize: 16 }} className="shrink-0 text-muted-foreground" />
+                      <span className="truncate">{p.text}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
             <button
               type="submit"

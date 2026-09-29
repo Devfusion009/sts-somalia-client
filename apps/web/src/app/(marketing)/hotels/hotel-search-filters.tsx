@@ -18,7 +18,7 @@ export type HotelSearchValues = {
 };
 
 const CELL = "relative flex-1 px-4 py-2.5";
-const FIELD_LABEL = "flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-white/70 uppercase";
+const FIELD_LABEL = "flex items-center gap-1.5 text-xs font-semibold text-white/70";
 const FIELD_INPUT =
   "h-9 w-full border-0 bg-transparent p-0 text-sm font-medium text-white shadow-none outline-none placeholder:text-white/50 focus-visible:ring-0 dark:bg-transparent [&::-webkit-calendar-picker-indicator]:invert";
 

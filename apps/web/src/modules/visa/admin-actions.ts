@@ -3,26 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { requirePlatformAdmin } from "@/lib/auth/session";
+import { requireVisaPermission } from "./staff-auth";
+import { zonedLocalToUtc } from "./time";
+import { notifyVisaCustomer } from "./notify";
 import { getApplicationDetail } from "./queries";
 import { submitToPartner, syncPartnerStatus, mapPartnerStatus } from "./partner/registry";
 import { parkForUnmappedPartnerStatus, parkForRefusedPartnerTransition } from "./partner/sync";
-import { VISA_STATUS_LABELS } from "./schemas";
 import type { Json } from "@/lib/types/database.types";
 
 export type ActionState = { error: string | null } | null;
-
-const DECISION_STATUSES = [
-  "submitted",
-  "in_review",
-  "additional_info_required",
-  "ready_for_processing",
-  "processing",
-  "approved",
-  "rejected",
-  "issued",
-  "cancelled",
-] as const;
 
 function revalidateVisaViews(applicationId: string) {
   revalidatePath("/admin/visa");
@@ -30,51 +19,68 @@ function revalidateVisaViews(applicationId: string) {
   revalidatePath(`/account/visa/${applicationId}`);
 }
 
-/** Move an application through the workflow; the DB trigger logs history. */
-export async function adminSetVisaStatus(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const parsed = z
-    .object({
-      applicationId: z.string().uuid(),
-      status: z.enum(DECISION_STATUSES),
-      note: z.string().max(2000).optional(),
-    })
-    .safeParse({
-      applicationId: formData.get("applicationId"),
-      status: formData.get("status"),
-      note: formData.get("note")?.toString().trim() || undefined,
-    });
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
+/** "cannot clear x — y" style RPC exceptions → one plain sentence. */
+function rpcMessage(message: string) {
+  const text = message.replace(/^.*?ERROR:\s*/, "").trim();
+  return text.charAt(0).toUpperCase() + text.slice(1) + (/[.!?]$/.test(text) ? "" : ".");
+}
 
-  await requirePlatformAdmin();
+const applicationIdSchema = z.string().uuid();
+
+/** Submitted → document review. */
+export async function adminStartReview(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const applicationId = applicationIdSchema.safeParse(formData.get("applicationId"));
+  if (!applicationId.success) return { error: "Invalid application." };
+  await requireVisaPermission("visa.documents.review");
   const supabase = await createClient();
+  const { error } = await supabase.rpc("visa_start_review", { p_application_id: applicationId.data });
+  if (error) return { error: rpcMessage(error.message) };
+  revalidateVisaViews(applicationId.data);
+  return { error: null };
+}
 
-  // set_visa_application_status is the only writer of this column (a trigger
-  // rejects direct updates): it validates the transition, stamps the decision,
-  // carries the note onto the history row, and notifies the applicant, the
-  // agency, and — on arrival — admins.
-  const { error } = await supabase.rpc("set_visa_application_status", {
-    p_application_id: parsed.data.applicationId,
-    p_status: parsed.data.status,
-    p_note: parsed.data.note,
+/** Action required → back to review (or processing, when the chase happened there). */
+export async function adminResumeCase(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const applicationId = applicationIdSchema.safeParse(formData.get("applicationId"));
+  if (!applicationId.success) return { error: "Invalid application." };
+  await requireVisaPermission("visa.documents.review");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("visa_resume_case", {
+    p_application_id: applicationId.data,
+    p_note: formData.get("note")?.toString().trim() || undefined,
   });
-  if (error) {
-    // The status control only ever offers legal next states, so this should
-    // be unreachable in normal use — but if two admins race on the same
-    // application, translate the RPC's raw exception into the same wording
-    // rather than leaking Postgres error text into the console UI.
-    const transitionError = error.message.match(/cannot move from (\w+) to (\w+)/);
-    if (transitionError) {
-      const [, from, to] = transitionError;
-      return {
-        error: `This application moved to "${VISA_STATUS_LABELS[from] ?? from}" while you were viewing it — refresh to see valid next steps for "${VISA_STATUS_LABELS[to] ?? to}".`,
-      };
-    }
-    return { error: error.message };
-  }
+  if (error) return { error: rpcMessage(error.message) };
+  revalidateVisaViews(applicationId.data);
+  return { error: null };
+}
 
+/** Document review → ready for submission; refused while anything is outstanding. */
+export async function adminMarkReady(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const applicationId = applicationIdSchema.safeParse(formData.get("applicationId"));
+  if (!applicationId.success) return { error: "Invalid application." };
+  await requireVisaPermission("visa.documents.review");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("visa_mark_ready", {
+    p_application_id: applicationId.data,
+    p_note: formData.get("note")?.toString().trim() || undefined,
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  revalidateVisaViews(applicationId.data);
+  return { error: null };
+}
+
+export async function adminCancelCase(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({ applicationId: z.string().uuid(), reason: z.string().trim().min(5, "Enter a reason.") })
+    .safeParse({ applicationId: formData.get("applicationId"), reason: formData.get("reason") ?? "" });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  await requireVisaPermission("visa.case.cancel");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("visa_cancel_case", {
+    p_application_id: parsed.data.applicationId,
+    p_reason: parsed.data.reason,
+  });
+  if (error) return { error: rpcMessage(error.message) };
   revalidateVisaViews(parsed.data.applicationId);
   return { error: null };
 }
@@ -87,47 +93,41 @@ export async function adminRequestDocument(
   const parsed = z
     .object({
       applicationId: z.string().uuid(),
-      title: z.string().min(2, "Enter a document name."),
+      title: z.string().trim().min(2, "Enter a document name."),
       description: z.string().max(1000).optional(),
       requirement: z.enum(["required", "optional"]),
+      dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     })
     .safeParse({
       applicationId: formData.get("applicationId"),
       title: formData.get("title"),
       description: formData.get("description")?.toString().trim() || undefined,
       requirement: formData.get("requirement") ?? "required",
+      dueDate: formData.get("dueDate")?.toString().trim() || undefined,
     });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const admin = await requirePlatformAdmin();
+  await requireVisaPermission("visa.documents.request");
   const supabase = await createClient();
-
-  const { error } = await supabase.from("visa_document_requests").insert({
-    application_id: parsed.data.applicationId,
-    title: parsed.data.title,
-    description: parsed.data.description ?? null,
-    requirement: parsed.data.requirement,
-    requested_by: admin.id,
-  });
-  if (error) return { error: error.message };
-
-  // Legal from either 'submitted' or 'in_review' — asking for a document is
-  // itself the act of reviewing.
-  const { error: statusError } = await supabase.rpc("set_visa_application_status", {
+  const { error } = await supabase.rpc("visa_request_document", {
     p_application_id: parsed.data.applicationId,
-    p_status: "additional_info_required",
-    p_note: parsed.data.title,
+    p_title: parsed.data.title,
+    p_description: parsed.data.description,
+    p_requirement: parsed.data.requirement,
+    p_due_date: parsed.data.dueDate,
   });
-  if (statusError) return { error: statusError.message };
+  if (error) return { error: rpcMessage(error.message) };
+  if (parsed.data.requirement === "required") {
+    await notifyVisaCustomer(parsed.data.applicationId, "documents_requested", `Please upload: ${parsed.data.title}.`);
+  }
 
   revalidateVisaViews(parsed.data.applicationId);
   return { error: null };
 }
 
 /**
- * Accept or reject one uploaded document. A rejection carries the reason back
- * to the applicant and puts the application in front of them again; the
- * ready_for_processing trigger keeps it from being lodged until it is replaced.
+ * Accept or reject the current version of one document. A rejection puts the
+ * case back in front of the applicant; the RPC records where to resume.
  */
 export async function adminReviewDocument(
   _prev: ActionState,
@@ -147,171 +147,49 @@ export async function adminReviewDocument(
       reason: formData.get("reason")?.toString().trim() || undefined,
     });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-
-  const admin = await requirePlatformAdmin();
-  const supabase = await createClient();
-
-  const rejecting = parsed.data.decision === "reject";
-  if (rejecting && !parsed.data.reason) {
+  if (parsed.data.decision === "reject" && !parsed.data.reason) {
     return { error: "Enter what is wrong with this document." };
   }
 
-  // Accepting a rejected document without a new upload would clear the
-  // rejection with nothing behind it — the applicant has to replace the file
-  // (which resets review_status to 'pending') before it can go to 'accepted'.
-  if (!rejecting) {
-    const { data: document } = await supabase
-      .from("visa_documents")
-      .select("review_status")
-      .eq("id", parsed.data.documentId)
-      .maybeSingle();
-    if (document?.review_status === "rejected") {
-      return { error: "This document was rejected. The applicant must upload a replacement first." };
-    }
-  }
-
-  // A rejection that cannot move the application is a half-write: the document
-  // would be marked rejected while the status transition fails underneath it.
-  const { data: application } = await supabase
-    .from("visa_applications")
-    .select("status")
-    .eq("id", parsed.data.applicationId)
-    .maybeSingle();
-  const decided = ["approved", "rejected", "issued", "cancelled"].includes(application?.status ?? "");
-  if (rejecting && decided) {
-    return { error: "This application is already decided." };
-  }
-
-  const { error } = await supabase
-    .from("visa_documents")
-    .update({
-      review_status: rejecting ? "rejected" : "accepted",
-      rejection_reason: rejecting ? parsed.data.reason! : null,
-      reviewed_by: admin.id,
-      reviewed_at: new Date().toISOString(),
-    })
-    .eq("id", parsed.data.documentId)
-    .eq("application_id", parsed.data.applicationId);
-  if (error) return { error: error.message };
-
-  if (rejecting) {
-    // Legal from either 'submitted' or 'in_review' — rejecting a document is
-    // itself the act of reviewing.
-    const { error: statusError } = await supabase.rpc("set_visa_application_status", {
-      p_application_id: parsed.data.applicationId,
-      p_status: "additional_info_required",
-      p_note: parsed.data.reason,
-    });
-    if (statusError) return { error: statusError.message };
+  await requireVisaPermission("visa.documents.review");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("visa_review_document", {
+    p_document_id: parsed.data.documentId,
+    p_decision: parsed.data.decision,
+    p_reason: parsed.data.reason,
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  if (parsed.data.decision === "reject") {
+    await notifyVisaCustomer(parsed.data.applicationId, "documents_requested", `A document needs to be replaced: ${parsed.data.reason}`);
   }
 
   revalidateVisaViews(parsed.data.applicationId);
   return { error: null };
 }
 
-/**
- * Lodge an application with an embassy/consulate/authorised channel and move
- * it into 'processing' in one step — the guard trigger refuses the status
- * change unless this job's lodged_with/lodgement_reference are already
- * written, so the two always happen together.
- */
-export async function adminStartManualProcessing(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
+/** Append a staff-internal note (never shown to the applicant). */
+export async function adminAddInternalNote(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = z
-    .object({
-      applicationId: z.string().uuid(),
-      lodgedWith: z.string().min(2, "Enter who this was lodged with."),
-      lodgementReference: z.string().min(1, "Enter the lodgement reference."),
-      lodgementDate: z.string().min(1, "Enter the lodgement date."),
-      appointmentDate: z.string().optional(),
-    })
-    .safeParse({
-      applicationId: formData.get("applicationId"),
-      lodgedWith: formData.get("lodgedWith"),
-      lodgementReference: formData.get("lodgementReference"),
-      lodgementDate: formData.get("lodgementDate"),
-      appointmentDate: formData.get("appointmentDate")?.toString().trim() || undefined,
-    });
+    .object({ applicationId: z.string().uuid(), note: z.string().trim().min(1, "Enter a note.").max(4000) })
+    .safeParse({ applicationId: formData.get("applicationId"), note: formData.get("note") ?? "" });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const admin = await requirePlatformAdmin();
+  const admin = await requireVisaPermission("visa.notes.write");
   const supabase = await createClient();
-
-  // A re-lodge (an application that already came back once) supersedes its
-  // prior attempt rather than leaving two rows both claiming to be active.
-  await supabase
-    .from("visa_processing_jobs")
-    .update({ status: "superseded" })
-    .eq("application_id", parsed.data.applicationId)
-    .eq("status", "active");
-
-  const { error: jobError } = await supabase.from("visa_processing_jobs").insert({
+  const { error } = await supabase.from("visa_processing_notes").insert({
     application_id: parsed.data.applicationId,
-    route: "manual",
-    lodged_with: parsed.data.lodgedWith,
-    lodgement_reference: parsed.data.lodgementReference,
-    lodgement_date: parsed.data.lodgementDate,
-    appointment_date: parsed.data.appointmentDate || null,
+    note: parsed.data.note,
     created_by: admin.id,
   });
-  if (jobError) return { error: jobError.message };
-
-  const { error: statusError } = await supabase.rpc("set_visa_application_status", {
-    p_application_id: parsed.data.applicationId,
-    p_status: "processing",
-  });
-  if (statusError) return { error: statusError.message };
+  if (error) return { error: rpcMessage(error.message) };
 
   revalidateVisaViews(parsed.data.applicationId);
   return { error: null };
 }
 
-/** Record the appointment date on the active manual job once it's known. */
-export async function adminUpdateManualAppointment(formData: FormData): Promise<void> {
-  await requirePlatformAdmin();
-  const parsed = z
-    .object({ applicationId: z.string().uuid(), appointmentDate: z.string().min(1) })
-    .parse({
-      applicationId: formData.get("applicationId"),
-      appointmentDate: formData.get("appointmentDate"),
-    });
-
-  const supabase = await createClient();
-  await supabase
-    .from("visa_processing_jobs")
-    .update({ appointment_date: parsed.appointmentDate })
-    .eq("application_id", parsed.applicationId)
-    .eq("status", "active")
-    .eq("route", "manual");
-
-  revalidateVisaViews(parsed.applicationId);
-}
-
-/** Append a staff-internal note to an application's processing log. */
-export async function adminAddProcessingNote(formData: FormData): Promise<void> {
-  const admin = await requirePlatformAdmin();
-  const parsed = z
-    .object({ applicationId: z.string().uuid(), note: z.string().min(1, "Enter a note.") })
-    .parse({
-      applicationId: formData.get("applicationId"),
-      note: formData.get("note")?.toString().trim(),
-    });
-
-  const supabase = await createClient();
-  await supabase.from("visa_processing_notes").insert({
-    application_id: parsed.applicationId,
-    note: parsed.note,
-    created_by: admin.id,
-  });
-
-  revalidateVisaViews(parsed.applicationId);
-}
-
-/** Accept or waive a requested document; auto-advance once none are outstanding. */
+/** Mark a requested document received (accepting its upload) or waive it. */
 export async function adminResolveDocumentRequest(formData: FormData): Promise<void> {
-  await requirePlatformAdmin();
+  await requireVisaPermission("visa.documents.review");
   const parsed = z
     .object({
       requestId: z.string().uuid(),
@@ -325,34 +203,10 @@ export async function adminResolveDocumentRequest(formData: FormData): Promise<v
     });
 
   const supabase = await createClient();
-  await supabase
-    .from("visa_document_requests")
-    .update({ status: parsed.resolution })
-    .eq("id", parsed.requestId);
-
-  const { data: outstanding } = await supabase
-    .from("visa_document_requests")
-    .select("id")
-    .eq("application_id", parsed.applicationId)
-    .eq("requirement", "required")
-    .in("status", ["requested", "uploaded"]);
-  // Nothing outstanding puts the application back in front of a reviewer, who
-  // then clears it for processing. It used to jump straight to 'processing',
-  // which claimed the application had been lodged when nobody had lodged it.
-  if ((outstanding ?? []).length === 0) {
-    const { data: current } = await supabase
-      .from("visa_applications")
-      .select("status")
-      .eq("id", parsed.applicationId)
-      .maybeSingle();
-    if (current?.status === "additional_info_required") {
-      await supabase.rpc("set_visa_application_status", {
-        p_application_id: parsed.applicationId,
-        p_status: "in_review",
-      });
-    }
-  }
-
+  await supabase.rpc("visa_resolve_document_request", {
+    p_request_id: parsed.requestId,
+    p_resolution: parsed.resolution,
+  });
   revalidateVisaViews(parsed.applicationId);
 }
 
@@ -367,7 +221,7 @@ export async function adminUploadResultDocument(
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to upload." };
   if (file.size > 10 * 1024 * 1024) return { error: "Files must be 10MB or smaller." };
 
-  const admin = await requirePlatformAdmin();
+  await requireVisaPermission("visa.decision.record");
   const supabase = await createClient();
 
   const storagePath = `${applicationId.data}/visa-result-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
@@ -376,50 +230,450 @@ export async function adminUploadResultDocument(
     .upload(storagePath, file, { contentType: file.type || undefined });
   if (uploadError) return { error: uploadError.message };
 
-  const { error } = await supabase.from("visa_documents").insert({
-    application_id: applicationId.data,
-    document_type: "visa_result",
-    storage_path: storagePath,
-    uploaded_by: admin.id,
-    review_status: "accepted",
-    file_name: file.name,
-    file_size: file.size,
-    content_type: file.type || null,
+  const { error } = await supabase.rpc("visa_attach_result_document", {
+    p_application_id: applicationId.data,
+    p_storage_path: storagePath,
+    p_file_name: file.name,
+    p_file_size: file.size,
+    p_content_type: file.type || undefined,
   });
-  if (error) return { error: error.message };
+  if (error) {
+    await supabase.storage.from("visa-documents").remove([storagePath]);
+    return { error: rpcMessage(error.message) };
+  }
 
   revalidateVisaViews(applicationId.data);
   return { error: null };
 }
 
 // ---------------------------------------------------------------------------
-// Partner processing — hand an application off to whichever partner the
-// application's visa type is configured for (visa_types.partner_provider_key).
+// Staff files (decision letter, submission receipt, collection authorisation)
 // ---------------------------------------------------------------------------
+type StaffDocType = "decision_letter" | "submission_receipt" | "passport_authorization";
+const STAFF_FILE_TYPES = ["application/pdf", "image/jpeg", "image/png"];
 
-/**
- * Submits, records the attempt as a processing job either way, and — on
- * success — moves the application into 'processing' through the same door
- * every status change goes through. A failure is recorded, not swallowed:
- * the application stays exactly where it was, and the manual workspace
- * (always rendered alongside this one) is the honest fallback — nothing
- * here decides for staff that the partner attempt is retryable or not.
- */
-export async function adminSubmitToPartner(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
+async function uploadStaffFile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  applicationId: string,
+  type: StaffDocType,
+  file: FormDataEntryValue | null
+): Promise<{ id: string | null; error: string | null }> {
+  if (!(file instanceof File) || file.size === 0) return { id: null, error: null };
+  if (!STAFF_FILE_TYPES.includes(file.type)) return { id: null, error: "Only PDF, JPG, or PNG files are accepted." };
+  if (file.size > 10 * 1024 * 1024) return { id: null, error: "Files must be 10MB or smaller." };
+
+  const path = `${applicationId}/${type}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
+  const { error: uploadError } = await supabase.storage.from("visa-documents").upload(path, file, { contentType: file.type });
+  if (uploadError) return { id: null, error: uploadError.message };
+
+  const { data, error } = await supabase.rpc("visa_attach_staff_document", {
+    p_application_id: applicationId,
+    p_document_type: type,
+    p_storage_path: path,
+    p_file_name: file.name,
+    p_file_size: file.size,
+    p_content_type: file.type,
+  });
+  if (error || !data) {
+    await supabase.storage.from("visa-documents").remove([path]);
+    return { id: null, error: rpcMessage(error?.message ?? "Upload failed") };
+  }
+  return { id: data, error: null };
+}
+
+const optionalText = (v: FormDataEntryValue | null) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+
+// ---------------------------------------------------------------------------
+// Appointments
+// ---------------------------------------------------------------------------
+async function centreTimezone(supabase: Awaited<ReturnType<typeof createClient>>, centreId: string) {
+  const { data } = await supabase.from("visa_application_centres").select("timezone").eq("id", centreId).maybeSingle();
+  return data?.timezone ?? "Africa/Mogadishu";
+}
+
+export async function adminBookAppointment(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      centreId: z.string().uuid("Choose a centre."),
+      type: z.enum(["submission", "biometrics", "interview", "collection"]),
+      scheduledAt: z.string().min(1, "Choose a date and time."),
+      memberId: z.string().uuid().optional(),
+    })
+    .safeParse({
+      applicationId: formData.get("applicationId"),
+      centreId: formData.get("centreId"),
+      type: formData.get("type"),
+      scheduledAt: formData.get("scheduledAt"),
+      memberId: optionalText(formData.get("memberId")),
+    });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireVisaPermission("visa.appointments.manage");
+  const supabase = await createClient();
+  const scheduledAt = zonedLocalToUtc(parsed.data.scheduledAt, await centreTimezone(supabase, parsed.data.centreId));
+  if (!scheduledAt) return { error: "Choose a date and time." };
+
+  const { error } = await supabase.rpc("visa_book_appointment", {
+    p_application_id: parsed.data.applicationId,
+    p_centre_id: parsed.data.centreId,
+    p_type: parsed.data.type,
+    p_scheduled_at: scheduledAt,
+    p_confirmation: optionalText(formData.get("confirmation")),
+    p_biometrics_required: formData.get("biometricsRequired") === "on",
+    p_member_id: parsed.data.memberId,
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  await notifyVisaCustomer(parsed.data.applicationId, "appointment_booked", "Your appointment details are in your account.");
+  revalidateVisaViews(parsed.data.applicationId);
+  return { error: null };
+}
+
+export async function adminRescheduleAppointment(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      appointmentId: z.string().uuid(),
+      centreId: z.string().uuid(),
+      scheduledAt: z.string().min(1, "Choose a date and time."),
+      reason: z.string().trim().min(3, "Enter a reason."),
+    })
+    .safeParse({
+      applicationId: formData.get("applicationId"),
+      appointmentId: formData.get("appointmentId"),
+      centreId: formData.get("centreId"),
+      scheduledAt: formData.get("scheduledAt"),
+      reason: formData.get("reason") ?? "",
+    });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireVisaPermission("visa.appointments.manage");
+  const supabase = await createClient();
+  const scheduledAt = zonedLocalToUtc(parsed.data.scheduledAt, await centreTimezone(supabase, parsed.data.centreId));
+  if (!scheduledAt) return { error: "Choose a date and time." };
+
+  const { error } = await supabase.rpc("visa_reschedule_appointment", {
+    p_appointment_id: parsed.data.appointmentId,
+    p_scheduled_at: scheduledAt,
+    p_reason: parsed.data.reason,
+    p_confirmation: optionalText(formData.get("confirmation")),
+    p_centre_id: parsed.data.centreId,
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  await notifyVisaCustomer(parsed.data.applicationId, "appointment_booked", "Your appointment was moved. The new time is in your account.");
+  revalidateVisaViews(parsed.data.applicationId);
+  return { error: null };
+}
+
+export async function adminCancelAppointment(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      appointmentId: z.string().uuid(),
+      reason: z.string().trim().min(3, "Enter a reason."),
+    })
+    .safeParse({
+      applicationId: formData.get("applicationId"),
+      appointmentId: formData.get("appointmentId"),
+      reason: formData.get("reason") ?? "",
+    });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireVisaPermission("visa.appointments.manage");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("visa_cancel_appointment", {
+    p_appointment_id: parsed.data.appointmentId,
+    p_reason: parsed.data.reason,
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  revalidateVisaViews(parsed.data.applicationId);
+  return { error: null };
+}
+
+export async function adminRecordAppointmentOutcome(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      appointmentId: z.string().uuid(),
+      outcome: z.enum(["attended", "no_show"]),
+    })
+    .safeParse({
+      applicationId: formData.get("applicationId"),
+      appointmentId: formData.get("appointmentId"),
+      outcome: formData.get("outcome"),
+    });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireVisaPermission("visa.appointments.manage");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("visa_record_appointment_outcome", {
+    p_appointment_id: parsed.data.appointmentId,
+    p_outcome: parsed.data.outcome,
+    p_biometrics_completed: formData.get("biometricsCompleted") === "on",
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  revalidateVisaViews(parsed.data.applicationId);
+  revalidatePath("/admin/visa/appointments");
+  return { error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Submission + processing
+// ---------------------------------------------------------------------------
+export async function adminRecordSubmission(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      centreId: z.string().uuid().optional(),
+      lodgedWith: z.string().trim().optional(),
+      reference: z.string().trim().min(1, "Enter the submission reference."),
+      submittedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the submission date."),
+      appointmentId: z.string().uuid().optional(),
+    })
+    .safeParse({
+      applicationId: formData.get("applicationId"),
+      centreId: optionalText(formData.get("centreId")),
+      lodgedWith: optionalText(formData.get("lodgedWith")),
+      reference: formData.get("reference") ?? "",
+      submittedOn: formData.get("submittedOn") ?? "",
+      appointmentId: optionalText(formData.get("appointmentId")),
+    });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!parsed.data.centreId && !parsed.data.lodgedWith) return { error: "Choose a centre or enter where it was lodged." };
+
+  await requireVisaPermission("visa.submission.record");
+  const supabase = await createClient();
+  const receipt = await uploadStaffFile(supabase, parsed.data.applicationId, "submission_receipt", formData.get("receipt"));
+  if (receipt.error) return { error: receipt.error };
+
+  const { error } = await supabase.rpc("visa_record_submission", {
+    p_application_id: parsed.data.applicationId,
+    p_lodged_with: parsed.data.lodgedWith ?? "",
+    p_reference: parsed.data.reference,
+    p_submitted_on: parsed.data.submittedOn,
+    p_centre_id: parsed.data.centreId,
+    p_appointment_id: parsed.data.appointmentId,
+    p_receipt_document_id: receipt.id ?? undefined,
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  revalidateVisaViews(parsed.data.applicationId);
+  return { error: null };
+}
+
+export async function adminUpdateSubmission(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      centreStatus: z.enum(["accepted", "returned_for_correction"]),
+      reason: z.string().trim().optional(),
+    })
+    .safeParse({
+      applicationId: formData.get("applicationId"),
+      centreStatus: formData.get("centreStatus"),
+      reason: optionalText(formData.get("reason")),
+    });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireVisaPermission("visa.submission.record");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("visa_update_submission", {
+    p_application_id: parsed.data.applicationId,
+    p_centre_status: parsed.data.centreStatus,
+    p_reason: parsed.data.reason,
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  revalidateVisaViews(parsed.data.applicationId);
+  return { error: null };
+}
+
+export async function adminRecordProcessingUpdate(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      stage: z.enum(["in_centre", "in_authority", "awaiting_decision"]),
+    })
+    .safeParse({ applicationId: formData.get("applicationId"), stage: formData.get("stage") });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireVisaPermission("visa.processing.update");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("visa_record_processing_update", {
+    p_application_id: parsed.data.applicationId,
+    p_processing_stage: parsed.data.stage,
+    p_note: optionalText(formData.get("note")),
+    p_customer_note: optionalText(formData.get("customerNote")),
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  revalidateVisaViews(parsed.data.applicationId);
+  return { error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Decisions
+// ---------------------------------------------------------------------------
+export async function adminRecordDecision(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      outcome: z.enum(["approved", "refused"]),
+      authority: z.string().trim().min(2, "Enter the issuing authority."),
+      reference: z.string().trim().optional(),
+      decisionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the decision date."),
+      notes: z.string().trim().max(2000).optional(),
+    })
+    .safeParse({
+      applicationId: formData.get("applicationId"),
+      outcome: formData.get("outcome"),
+      authority: formData.get("authority") ?? "",
+      reference: optionalText(formData.get("reference")),
+      decisionDate: formData.get("decisionDate") ?? "",
+      notes: optionalText(formData.get("notes")),
+    });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireVisaPermission("visa.decision.record");
+  const supabase = await createClient();
+  const letter = await uploadStaffFile(supabase, parsed.data.applicationId, "decision_letter", formData.get("letter"));
+  if (letter.error) return { error: letter.error };
+  if (!parsed.data.reference && !letter.id) return { error: "Enter the authority's reference or attach the decision letter." };
+
+  const { error } = await supabase.rpc("visa_record_decision", {
+    p_application_id: parsed.data.applicationId,
+    p_outcome: parsed.data.outcome,
+    p_authority: parsed.data.authority,
+    p_reference: parsed.data.reference,
+    p_decision_date: parsed.data.decisionDate,
+    p_letter_document_id: letter.id ?? undefined,
+    p_notes: parsed.data.notes,
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  await notifyVisaCustomer(
+    parsed.data.applicationId,
+    "decision_recorded",
+    parsed.data.outcome === "approved" ? "Your visa was approved." : "Your visa application was refused."
+  );
+  revalidateVisaViews(parsed.data.applicationId);
+  return { error: null };
+}
+
+export async function adminCorrectDecision(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      decisionId: z.string().uuid(),
+      outcome: z.enum(["approved", "refused"]),
+      reason: z.string().trim().min(10, "Explain the correction (at least 10 characters)."),
+      reference: z.string().trim().optional(),
+      decisionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    })
+    .safeParse({
+      applicationId: formData.get("applicationId"),
+      decisionId: formData.get("decisionId"),
+      outcome: formData.get("outcome"),
+      reason: formData.get("reason") ?? "",
+      reference: optionalText(formData.get("reference")),
+      decisionDate: optionalText(formData.get("decisionDate")),
+    });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireVisaPermission("visa.decision.correct");
+  const supabase = await createClient();
+  const letter = await uploadStaffFile(supabase, parsed.data.applicationId, "decision_letter", formData.get("letter"));
+  if (letter.error) return { error: letter.error };
+
+  const { error } = await supabase.rpc("correct_visa_decision", {
+    p_decision_id: parsed.data.decisionId,
+    p_outcome: parsed.data.outcome,
+    p_reason: parsed.data.reason,
+    p_reference: parsed.data.reference,
+    p_decision_date: parsed.data.decisionDate,
+    p_letter_document_id: letter.id ?? undefined,
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  await notifyVisaCustomer(
+    parsed.data.applicationId,
+    "decision_recorded",
+    parsed.data.outcome === "approved" ? "The decision was corrected: approved." : "The decision was corrected: refused."
+  );
+  revalidateVisaViews(parsed.data.applicationId);
+  return { error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Passports
+// ---------------------------------------------------------------------------
+export async function adminRecordPassportEvent(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      passportId: z.string().uuid(),
+      toStatus: z.enum([
+        "with_applicant",
+        "with_sts",
+        "with_centre",
+        "in_transit",
+        "ready_for_collection",
+        "out_for_delivery",
+        "delivered",
+        "collected",
+      ]),
+      deliveryMode: z.enum(["counter", "courier", "third_party"]).optional(),
+    })
+    .safeParse({
+      applicationId: formData.get("applicationId"),
+      passportId: formData.get("passportId"),
+      toStatus: formData.get("toStatus"),
+      deliveryMode: optionalText(formData.get("deliveryMode")),
+    });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireVisaPermission("visa.passport.manage");
+  const supabase = await createClient();
+  const authorization = await uploadStaffFile(
+    supabase,
+    parsed.data.applicationId,
+    "passport_authorization",
+    formData.get("authorization")
+  );
+  if (authorization.error) return { error: authorization.error };
+
+  const { error } = await supabase.rpc("visa_record_passport_event", {
+    p_passport_id: parsed.data.passportId,
+    p_to_status: parsed.data.toStatus,
+    p_delivery_mode: parsed.data.deliveryMode,
+    p_reference: optionalText(formData.get("reference")),
+    p_collector_name: optionalText(formData.get("collectorName")),
+    p_authorization_document_id: authorization.id ?? undefined,
+    p_note: optionalText(formData.get("note")),
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  if (parsed.data.toStatus === "ready_for_collection" || parsed.data.toStatus === "out_for_delivery") {
+    await notifyVisaCustomer(
+      parsed.data.applicationId,
+      "passport_ready",
+      parsed.data.toStatus === "ready_for_collection" ? "Your passport is ready for collection." : "Your passport is out for delivery."
+    );
+  }
+  revalidateVisaViews(parsed.data.applicationId);
+  return { error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Partner processing — hand the case to the visa type's configured partner.
+// A failure is recorded on the case and the manual lodgement stays available.
+// ---------------------------------------------------------------------------
+export async function adminSubmitToPartner(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const applicationId = z.string().uuid().safeParse(formData.get("applicationId"));
   if (!applicationId.success) return { error: "Invalid application." };
 
-  const admin = await requirePlatformAdmin();
+  await requireVisaPermission("visa.submission.record");
   const application = await getApplicationDetail(applicationId.data);
   if (!application) return { error: "Application not found." };
   if (application.visa_type?.processing_mode !== "partner" || !application.visa_type.partner_provider_key) {
     return { error: "This visa type isn't configured for partner processing." };
   }
   if (application.status !== "ready_for_processing") {
-    return { error: "Clear this application for processing before submitting it to a partner." };
+    return { error: "Mark the application ready for submission first." };
   }
   const providerKey = application.visa_type.partner_provider_key;
 
@@ -427,75 +681,34 @@ export async function adminSubmitToPartner(
   const result = await submitToPartner(providerKey, { application });
 
   if (result.type === "error") {
-    await supabase.from("visa_processing_jobs").insert({
-      application_id: applicationId.data,
-      route: "partner",
-      provider_key: providerKey,
-      status: "failed",
-      failure_reason: result.message,
-      created_by: admin.id,
-    });
-    // Surfaced in the notes feed under the manual fallback card, which is
-    // always rendered next to partner processing — staff see why they're
-    // being offered it, not just that they are.
-    await supabase.from("visa_processing_notes").insert({
-      application_id: applicationId.data,
-      note: `Partner submission (${providerKey}) failed: ${result.message}`,
-      created_by: admin.id,
+    await supabase.rpc("visa_record_partner_failure", {
+      p_application_id: applicationId.data,
+      p_provider_key: providerKey,
+      p_reason: result.message,
     });
     revalidateVisaViews(applicationId.data);
     return { error: result.message };
   }
 
-  await supabase
-    .from("visa_processing_jobs")
-    .update({ status: "superseded" })
-    .eq("application_id", applicationId.data)
-    .eq("status", "active");
-
-  const { error: jobError } = await supabase.from("visa_processing_jobs").insert({
-    application_id: applicationId.data,
-    route: "partner",
-    provider_key: providerKey,
-    partner_ref: result.partnerRef,
-    partner_status: result.status ?? null,
-    partner_last_synced_at: new Date().toISOString(),
-    created_by: admin.id,
-  });
-  if (jobError) return { error: jobError.message };
-
-  // Mirrored onto visa_applications too — PartnerControl reads its display
-  // data from there, unchanged since before this milestone.
-  await supabase
-    .from("visa_applications")
-    .update({
-      partner_provider_key: providerKey,
-      partner_ref: result.partnerRef,
-      partner_status: result.status ?? null,
-      partner_last_synced_at: new Date().toISOString(),
-    })
-    .eq("id", applicationId.data);
-
-  const { error: statusError } = await supabase.rpc("set_visa_application_status", {
+  const { error } = await supabase.rpc("visa_record_partner_submission", {
     p_application_id: applicationId.data,
-    p_status: "processing",
+    p_provider_key: providerKey,
+    p_partner_ref: result.partnerRef,
+    p_partner_status: result.status ?? undefined,
   });
-  if (statusError) return { error: statusError.message };
+  if (error) return { error: rpcMessage(error.message) };
 
   revalidateVisaViews(applicationId.data);
   return { error: null };
 }
 
 /**
- * Pulls the latest status from the partner. A changed status is mapped onto
- * our own status and driven through set_visa_application_status — the exact
- * transition an admin picking a status from the dropdown would make, just
- * triggered by what the partner reported rather than a human's judgment. An
- * unmapped status parks the application (modules/visa/partner/sync.ts)
- * instead of guessing.
+ * Pulls the partner's latest status. The raw status is always recorded; a
+ * changed one is mapped and applied (approved / refused become a
+ * partner-sourced decision). Unmapped or refused updates are parked for staff.
  */
 export async function adminSyncPartnerStatus(formData: FormData): Promise<void> {
-  await requirePlatformAdmin();
+  await requireVisaPermission("visa.submission.record");
   const applicationId = z.string().uuid().parse(formData.get("applicationId"));
 
   const supabase = await createClient();
@@ -517,21 +730,16 @@ export async function adminSyncPartnerStatus(formData: FormData): Promise<void> 
   }
 
   const rawPayload = result.raw ? (JSON.parse(JSON.stringify(result.raw)) as Json) : null;
-  await supabase
-    .from("visa_applications")
-    .update({ partner_status: result.status, partner_raw_payload: rawPayload, partner_last_synced_at: new Date().toISOString() })
-    .eq("id", applicationId);
-  await supabase
-    .from("visa_processing_jobs")
-    .update({ partner_status: result.status, partner_raw_payload: rawPayload, partner_last_synced_at: new Date().toISOString() })
-    .eq("application_id", applicationId)
-    .eq("status", "active")
-    .eq("route", "partner");
+  await supabase.rpc("visa_record_partner_status", {
+    p_application_id: applicationId,
+    p_partner_status: result.status,
+    p_raw: rawPayload ?? undefined,
+  });
 
   if (result.status !== application.partner_status) {
     const mapped = await mapPartnerStatus(application.partner_provider_key, result.status);
     if (mapped.type === "mapped") {
-      const { error: transitionError } = await supabase.rpc("set_visa_application_status", {
+      const { error: transitionError } = await supabase.rpc("visa_sync_partner_status", {
         p_application_id: applicationId,
         p_status: mapped.status,
       });
@@ -557,4 +765,70 @@ export async function adminSyncPartnerStatus(formData: FormData): Promise<void> 
   }
 
   revalidateVisaViews(applicationId);
+}
+
+// ---------------------------------------------------------------------------
+// Ownership
+// ---------------------------------------------------------------------------
+export async function adminAssignCase(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({ applicationId: z.string().uuid(), assignee: z.union([z.string().uuid(), z.literal("")]) })
+    .safeParse({ applicationId: formData.get("applicationId"), assignee: formData.get("assignee") ?? "" });
+  if (!parsed.success) return { error: "Choose a staff member." };
+
+  await requireVisaPermission("visa.assign");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("visa_assign_case", {
+    p_application_id: parsed.data.applicationId,
+    p_assignee: parsed.data.assignee || (null as unknown as string),
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  revalidateVisaViews(parsed.data.applicationId);
+  return { error: null };
+}
+
+export async function adminClaimCase(formData: FormData): Promise<void> {
+  const applicationId = z.string().uuid().parse(formData.get("applicationId"));
+  await requireVisaPermission("visa.applications.edit");
+  const supabase = await createClient();
+  await supabase.rpc("visa_claim_case", { p_application_id: applicationId });
+  revalidateVisaViews(applicationId);
+}
+
+export async function adminSetCasePriority(formData: FormData): Promise<void> {
+  const parsed = z
+    .object({ applicationId: z.string().uuid(), priority: z.enum(["normal", "urgent"]) })
+    .parse({ applicationId: formData.get("applicationId"), priority: formData.get("priority") });
+  await requireVisaPermission("visa.assign");
+  const supabase = await createClient();
+  await supabase.rpc("visa_set_case_priority", {
+    p_application_id: parsed.applicationId,
+    p_priority: parsed.priority,
+  });
+  revalidateVisaViews(parsed.applicationId);
+}
+
+// ---------------------------------------------------------------------------
+// Messages (visible to the applicant — internal notes stay in notes)
+// ---------------------------------------------------------------------------
+export async function adminSendMessage(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = z
+    .object({ applicationId: z.string().uuid(), body: z.string().trim().min(1, "Write a message.").max(4000) })
+    .safeParse({ applicationId: formData.get("applicationId"), body: formData.get("body") ?? "" });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireVisaPermission("visa.messages.send");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("visa_send_message", {
+    p_application_id: parsed.data.applicationId,
+    p_body: parsed.data.body,
+  });
+  if (error) return { error: rpcMessage(error.message) };
+  await notifyVisaCustomer(
+    parsed.data.applicationId,
+    "message",
+    parsed.data.body.length > 200 ? `${parsed.data.body.slice(0, 197)}…` : parsed.data.body
+  );
+  revalidateVisaViews(parsed.data.applicationId);
+  return { error: null };
 }

@@ -97,19 +97,19 @@ export default async function DeskOrderPage({
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg bg-secondary/40 px-4 py-3 sm:grid-cols-4">
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Net</dt>
+          <dt className="text-xs text-muted-foreground">Net</dt>
           <dd className="font-medium tabular-nums">
             {order.currency} {Number(order.subtotal).toFixed(0)}
           </dd>
         </div>
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Your margin</dt>
+          <dt className="text-xs text-muted-foreground">Your margin</dt>
           <dd className="font-medium tabular-nums">
             {order.currency} {Number(order.markup_amount ?? 0).toFixed(0)}
           </dd>
         </div>
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          <dt className="text-xs text-muted-foreground">
             Customer pays
           </dt>
           <dd className="font-semibold tabular-nums">
@@ -117,7 +117,7 @@ export default async function DeskOrderPage({
           </dd>
         </div>
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Balance</dt>
+          <dt className="text-xs text-muted-foreground">Balance</dt>
           <dd className="font-semibold tabular-nums">
             {awaitingPrice ? "On request" : `${order.currency} ${balance.toFixed(0)}`}
           </dd>

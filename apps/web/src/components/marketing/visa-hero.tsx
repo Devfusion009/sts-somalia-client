@@ -181,8 +181,7 @@ export function VisaProcess() {
       <section className="bg-background py-14 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <FadeIn>
-            <p className="text-sm font-semibold tracking-[0.14em] text-primary uppercase">Before you apply</p>
-            <h2 className="mt-2 font-heading text-2xl font-bold tracking-tight sm:text-3xl">
+            <h2 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
               What you&rsquo;ll usually need
             </h2>
             <p className="mt-3 max-w-2xl text-muted-foreground">

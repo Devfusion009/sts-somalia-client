@@ -90,6 +90,18 @@ export function parseDocumentSlots(raw: unknown): DocumentSlot[] {
   });
 }
 
+/**
+ * The slots this application must fill: the nationality-resolved list when
+ * one was stamped, otherwise the visa type's default. Matches
+ * _visa_required_slots() in SQL.
+ */
+export function applicationDocumentSlots(app: {
+  resolved_documents?: unknown;
+  visa_type?: { required_documents?: unknown } | null;
+}): DocumentSlot[] {
+  return parseDocumentSlots(app.resolved_documents ?? app.visa_type?.required_documents);
+}
+
 /** One country-specific extra question from visa_types.application_questions. */
 export type ApplicationQuestion = {
   key: string;
@@ -129,23 +141,4 @@ export const VISA_STATUS_LABELS: Record<string, string> = {
   rejected: "Rejected",
   issued: "Visa Issued",
   cancelled: "Cancelled",
-};
-
-/**
- * Legal next statuses per current status — mirrors the transition graph
- * enforced in apply_visa_status_transition_internal (supabase migration
- * 20260909000001_visa_review_fixes.sql). Keep the two in sync: this list is
- * what the admin UI offers, the SQL function is what actually enforces it.
- */
-export const VISA_STATUS_TRANSITIONS: Record<string, string[]> = {
-  draft: ["submitted"],
-  submitted: ["in_review", "additional_info_required", "cancelled"],
-  in_review: ["additional_info_required", "ready_for_processing", "rejected", "cancelled"],
-  additional_info_required: ["in_review", "cancelled"],
-  ready_for_processing: ["additional_info_required", "processing", "cancelled"],
-  processing: ["additional_info_required", "approved", "rejected", "cancelled"],
-  approved: ["issued"],
-  rejected: [],
-  issued: [],
-  cancelled: [],
 };

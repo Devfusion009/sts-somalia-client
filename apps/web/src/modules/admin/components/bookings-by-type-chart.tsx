@@ -16,6 +16,7 @@ const chartConfig = {
   flight: { label: "Flights", color: "var(--chart-2)" },
   visa: { label: "Visa", color: "var(--chart-3)" },
   umrah: { label: "Umrah", color: "var(--chart-4)" },
+  hall: { label: "Halls", color: "var(--chart-5)" },
 } satisfies ChartConfig;
 
 export function BookingsByTypeChart({ data }: { data: { type: string; label: string; count: number }[] }) {

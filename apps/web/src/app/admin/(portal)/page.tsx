@@ -13,7 +13,6 @@ import {
   Download,
   ArrowUpRight,
   ArrowDownRight,
-  ArrowRight,
   BellRing,
   Send,
   Eye,
@@ -47,7 +46,7 @@ import {
   getAgentLeaderboard,
   getStatCardTrends,
 } from "@/modules/admin/queries";
-import { VISA_STATUS_LABELS } from "@/modules/visa/schemas";
+import { VISA_STAGE_LABELS, type VisaStage } from "@/modules/visa/workflow";
 import { RevenueTrendChart } from "@/modules/admin/components/revenue-trend-chart";
 import { BookingsByTypeChart } from "@/modules/admin/components/bookings-by-type-chart";
 import { UsersByRoleChart } from "@/modules/admin/components/users-by-role-chart";
@@ -110,6 +109,19 @@ const ITEM_TYPE_TONE: Record<string, Tone> = {
   visa: "blue",
   umrah: "gold",
   hall: "orange",
+};
+
+/** Pipeline stage → the Applications queue that lists it. */
+const VISA_STAGE_QUEUE: Record<string, string> = {
+  submitted: "new",
+  in_review: "document_review",
+  additional_info_required: "customer_action",
+  ready_for_processing: "ready_for_submission",
+  processing: "processing",
+  approved: "approved",
+  issued: "issued",
+  rejected: "refused",
+  cancelled: "cancelled",
 };
 
 /** Pipeline order — where a visa application sits in its lifecycle, not object key order. */
@@ -451,12 +463,12 @@ export default async function AdminDashboardPage({
             {VISA_PIPELINE_STAGES.filter((status) => (visaStats.byStatus[status] ?? 0) > 0).map((status) => (
               <Link
                 key={status}
-                href={`/admin/visa?status=${status}`}
+                href={`/admin/visa?queue=${VISA_STAGE_QUEUE[status] ?? "all"}`}
                 className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <IconChip icon={VISA_STAGE_ICON[status]} tone={VISA_STAGE_TONE[status]} />
-                  <p className="truncate text-sm font-medium">{VISA_STATUS_LABELS[status]}</p>
+                  <p className="truncate text-sm font-medium">{VISA_STAGE_LABELS[status as VisaStage]}</p>
                 </div>
                 <span className="shrink-0 text-sm font-semibold tabular-nums">{visaStats.byStatus[status]}</span>
               </Link>
@@ -562,7 +574,6 @@ function DeltaPill({ change }: { change: number }) {
 
 function StatCard({
   icon: Icon,
-  tone,
   label,
   value,
   change,
@@ -570,41 +581,38 @@ function StatCard({
   href,
 }: {
   icon: LucideIcon;
-  tone: Tone;
+  /** Retained for callers; the card no longer paints a tinted icon tile. */
+  tone?: Tone;
   label: string;
   value: string | number;
   change?: number | null;
   series?: number[];
-  /** Where "View all" takes the admin to review the underlying records — e.g. the users table, the filtered order list. Omit to render the card without the link. */
+  /** Makes the whole card a link to the underlying records — e.g. the users table, the filtered order list. */
   href?: string;
 }) {
   const positive = (change ?? 0) >= 0;
-  return (
-    <Card className={CARD}>
-      {/* Two right-aligned slots stacked down the card: the delta pill sits
-          with the label, the sparkline with the value it summarises. "View
-          all" is a third row rather than crowding either of those. */}
-      <CardContent className="flex flex-1 flex-col justify-between gap-2.5">
+  const body = (
+    <Card className={cn(CARD, "h-full", href && "transition-shadow group-hover:shadow-md")}>
+      <CardContent className="flex flex-1 flex-col justify-between gap-3">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <IconChip icon={Icon} tone={tone} />
-            <p className="text-xs leading-tight font-medium text-muted-foreground">{label}</p>
-          </div>
+          <p className="flex min-w-0 items-center gap-1.5 text-xs leading-tight font-medium text-muted-foreground">
+            <Icon className="size-3.5 shrink-0" />
+            <span className="truncate">{label}</span>
+          </p>
           {change !== null && change !== undefined ? <DeltaPill change={change} /> : null}
         </div>
         <div className="flex items-end justify-between gap-2">
-          <p className="font-heading text-[26px] leading-none font-bold tracking-tight tabular-nums">{value}</p>
+          <p className="font-heading text-[26px] leading-none font-semibold tracking-tight tabular-nums">{value}</p>
           {series && series.length > 1 ? <Sparkline data={series} positive={positive} /> : null}
         </div>
-        {href ? (
-          <Link
-            href={href}
-            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-          >
-            View all <ArrowRight className="size-3" />
-          </Link>
-        ) : null}
       </CardContent>
     </Card>
+  );
+  return href ? (
+    <Link href={href} aria-label={label} className="group block h-full rounded-xl focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none">
+      {body}
+    </Link>
+  ) : (
+    body
   );
 }

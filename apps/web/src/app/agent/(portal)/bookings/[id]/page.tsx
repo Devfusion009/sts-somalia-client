@@ -160,23 +160,23 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg bg-secondary/40 px-4 py-3 sm:grid-cols-4">
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Net</dt>
+          <dt className="text-xs text-muted-foreground">Net</dt>
           <dd className="font-medium tabular-nums">{money(Number(order.subtotal), order.currency)}</dd>
         </div>
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Your margin</dt>
+          <dt className="text-xs text-muted-foreground">Your margin</dt>
           <dd className="font-medium tabular-nums">
             {money(Number(order.markup_amount ?? 0), order.currency)}
           </dd>
         </div>
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Customer pays</dt>
+          <dt className="text-xs text-muted-foreground">Customer pays</dt>
           <dd className="font-semibold tabular-nums">
             {awaitingPrice ? "On request" : money(total, order.currency)}
           </dd>
         </div>
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Balance</dt>
+          <dt className="text-xs text-muted-foreground">Balance</dt>
           <dd className="font-semibold tabular-nums">
             {awaitingPrice ? "On request" : money(balance, order.currency)}
           </dd>

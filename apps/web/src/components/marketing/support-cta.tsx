@@ -20,8 +20,7 @@ export function SupportCta() {
 
       <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:px-8">
         <Reveal>
-          <p className="text-sm font-semibold tracking-[0.14em] text-teal-300 uppercase">Talk first, book after</p>
-          <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-balance text-white sm:text-4xl">
+          <h2 className="font-heading text-3xl font-bold tracking-tight text-balance text-white sm:text-4xl lg:text-5xl">
             Talk to a real person before you book
           </h2>
           <p className="mt-4 max-w-lg text-lg leading-relaxed text-white/85">

@@ -300,7 +300,11 @@ function ChartLegendContent({
         .filter((item) => item.type !== "none")
         .map((item, index) => {
           const key = `${nameKey ?? item.dataKey ?? "value"}`
-          const itemConfig = getPayloadConfigFromPayload(config, item, key)
+          // Recharts 3 legend payloads for a Pie carry the slice name in
+          // `value`, not under `nameKey`, so fall back to it.
+          const itemConfig =
+            getPayloadConfigFromPayload(config, item, key) ??
+            (typeof item.value === "string" ? config[item.value] : undefined)
 
           return (
             <div
@@ -319,7 +323,7 @@ function ChartLegendContent({
                   }}
                 />
               )}
-              {itemConfig?.label}
+              {itemConfig?.label ?? item.value}
             </div>
           )
         })}

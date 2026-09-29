@@ -40,6 +40,7 @@ import {
   FileClock,
   RotateCcw,
   ChevronDown,
+  ChevronsUpDown,
   CalendarRange,
   Images,
   Star,
@@ -117,41 +118,6 @@ export type PortalNavItem = { href: string; label: string; icon: PortalIconName;
 export type PortalNavGroup = { label: string; items: PortalNavItem[] };
 export type PortalAccent = "customer" | "agent" | "admin" | "manager";
 
-// Per-portal identity marker — a refinement of the shared shell, not a
-// redesign. Same rounded-card/icon-in-a-circle visual language throughout;
-// only the accent color changes so B2C, agent, and admin read as distinct
-// products at a glance rather than one shell with swapped labels.
-const ACCENT_STYLES: Record<PortalAccent, { bar: string; badge: string; iconBg: string; activeText: string; ring: string }> = {
-  customer: {
-    bar: "bg-primary",
-    badge: "border-primary/25 bg-primary/10 text-primary",
-    iconBg: "bg-sidebar-primary",
-    activeText: "text-primary",
-    ring: "ring-primary/20",
-  },
-  agent: {
-    bar: "bg-amber-500",
-    badge: "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-    iconBg: "bg-amber-500",
-    activeText: "text-amber-600 dark:text-amber-400",
-    ring: "ring-amber-500/20",
-  },
-  admin: {
-    bar: "bg-blue-500",
-    badge: "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-400",
-    iconBg: "bg-blue-500",
-    activeText: "text-blue-600 dark:text-blue-400",
-    ring: "ring-blue-500/20",
-  },
-  manager: {
-    bar: "bg-teal-500",
-    badge: "border-teal-500/25 bg-teal-500/10 text-teal-700 dark:text-teal-400",
-    iconBg: "bg-teal-600",
-    activeText: "text-teal-600 dark:text-teal-400",
-    ring: "ring-teal-500/20",
-  },
-};
-
 /**
  * Nav groups as an accordion — collapsed by default, except the group
  * containing the active page. Portals with 15+ items across 4 groups
@@ -170,14 +136,11 @@ const ACCENT_STYLES: Record<PortalAccent, { bar: string; badge: string; iconBg: 
 function NavGroups({
   navGroups,
   activeHref,
-  accent,
 }: {
   navGroups: PortalNavGroup[];
   activeHref: string | undefined;
-  accent: PortalAccent;
 }) {
   const { state } = useSidebar();
-  const styles = ACCENT_STYLES[accent];
 
   // Both sides normalised: nav items carry the canonical "/admin/..." path
   // while the address bar shows the proxy-rewritten "/..." on a portal
@@ -238,7 +201,7 @@ function NavGroups({
                   type="button"
                   onClick={() => toggleGroup(group.label)}
                   aria-expanded={isOpen}
-                  className="flex w-full items-center justify-between gap-2 rounded-md transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+                  className="flex w-full items-center justify-between gap-2 rounded-md text-[11px] font-medium text-sidebar-foreground/50 transition-colors hover:text-sidebar-foreground"
                 />
               }
             >
@@ -256,20 +219,17 @@ function NavGroups({
                         <SidebarMenuButton
                           isActive={active}
                           tooltip={item.label}
-                          // The base variant only flat-tints the background on
-                          // active — an accent-colored left rail + tinted icon
-                          // is what makes the active item read as "you are
-                          // here" rather than "this happens to be gray".
+                          // Active = filled row, white label, brand-teal icon.
                           className={cn(
-                            "border-l-2 border-transparent pl-[calc(0.5rem-2px)]",
-                            active && `border-current ${styles.activeText} [&_svg]:text-current`
+                            "text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 [&_svg]:text-sidebar-foreground/60",
+                            active && "[&_svg]:text-sidebar-primary"
                           )}
                           render={<Link href={item.href} />}
                         >
                           <Icon />
                           <span>{item.label}</span>
                           {item.badge ? (
-                            <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:top-0.5 group-data-[collapsible=icon]:right-0.5">
+                            <span className="ml-auto flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-sidebar-primary px-1.5 text-[10px] font-semibold text-sidebar-primary-foreground tabular-nums group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:top-0.5 group-data-[collapsible=icon]:right-0.5">
                               {item.badge > 99 ? "99+" : item.badge}
                             </span>
                           ) : null}
@@ -330,7 +290,6 @@ export function PortalShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const styles = ACCENT_STYLES[accent];
   // The sidebar's own brand mark: like Stripe's or Shopify's dashboard logo,
   // it returns to this portal's own home, never out to the public site — an
   // operator console is a separate product from the B2C site, not a section
@@ -371,7 +330,7 @@ export function PortalShell({
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" render={<Link href={dashboardHref} />}>
-                <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg p-1 ${brandLogoUrl ? "bg-white" : styles.iconBg}`}>
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white p-1">
                   {brandLogoUrl ? (
                     // Agency's own uploaded logo — a Supabase Storage URL, not a
                     // static local asset, so next/image (which needs the remote
@@ -383,15 +342,15 @@ export function PortalShell({
                   )}
                 </span>
                 <div className="flex flex-col leading-tight">
-                  <span className="font-heading font-semibold">STS Somalia</span>
-                  <span className="text-xs text-sidebar-foreground/70">{portalName}</span>
+                  <span className="font-heading font-semibold text-white">STS Somalia</span>
+                  <span className="text-xs text-sidebar-foreground/60">{portalName}</span>
                 </div>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
-          <NavGroups navGroups={navGroups} activeHref={activeHref} accent={accent} />
+          <NavGroups navGroups={navGroups} activeHref={activeHref} />
           {/* An exit hatch, not a destination — separated from real nav items
               and deliberately muted so it doesn't compete with them. A hotel
               manager's portal isn't a reskinned view of the public site the
@@ -399,13 +358,12 @@ export function PortalShell({
               offer here. */}
           {accent !== "manager" ? (
             <SidebarGroup className="mt-auto">
-              <Separator className="mb-2 group-data-[collapsible=icon]:hidden" />
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       tooltip="Back to website"
-                      className="text-sidebar-foreground/60 hover:text-sidebar-foreground [&_svg]:size-3.5"
+                      className="text-sidebar-foreground/55 hover:text-sidebar-foreground [&_svg]:size-3.5"
                       render={<Link href={websiteHref} />}
                     >
                       <ExternalLink />
@@ -418,7 +376,6 @@ export function PortalShell({
           ) : null}
         </SidebarContent>
         <SidebarFooter>
-          <Separator className="mb-2" />
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
@@ -426,22 +383,23 @@ export function PortalShell({
                   render={
                     <SidebarMenuButton
                       size="lg"
-                      className="flex items-center gap-2.5 rounded-lg bg-sidebar-accent/50 px-2.5 py-2 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:px-0"
+                      className="flex items-center gap-2.5 rounded-lg border border-sidebar-border px-2 py-2 hover:bg-sidebar-accent/60 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:px-0"
                     />
                   }
                 >
-                  <Avatar className={`size-9 shrink-0 ring-2 ${styles.ring}`}>
-                    <AvatarFallback className="text-xs font-semibold">{initials(profileName, profileEmail)}</AvatarFallback>
+                  <Avatar className="size-8 shrink-0">
+                    <AvatarFallback className="bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">
+                      {initials(profileName, profileEmail)}
+                    </AvatarFallback>
                   </Avatar>
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5 group-data-[collapsible=icon]:hidden">
-                    <span className="truncate text-sm leading-none font-medium">{profileName || "Account"}</span>
-                    <Badge variant="outline" className={`w-fit text-[10px] ${styles.badge}`}>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">
+                    <span className="truncate text-sm leading-none font-medium text-white">{profileName || "Account"}</span>
+                    <span className="truncate text-[11px] leading-none text-sidebar-foreground/60">
                       {roleLabel}
-                    </Badge>
-                    {accountCode ? (
-                      <span className="truncate text-[10px] text-sidebar-foreground/50">{accountCode}</span>
-                    ) : null}
+                      {accountCode ? ` · ${accountCode}` : ""}
+                    </span>
                   </div>
+                  <ChevronsUpDown className="size-3.5 shrink-0 text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" side="top" className="w-64">
                   <DropdownMenuGroup>
@@ -491,21 +449,13 @@ export function PortalShell({
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <div className={`h-0.5 w-full shrink-0 ${styles.bar}`} aria-hidden />
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3 sm:px-4">
-          <SidebarTrigger />
-          <Separator orientation="vertical" className="h-5" />
-          <span className="truncate text-sm font-medium text-muted-foreground">{portalName}</span>
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            {headerExtra}
-            {accent !== "customer" ? (
-              <Badge variant="outline" className={`hidden text-[10px] tracking-wide uppercase sm:inline-flex ${styles.badge}`}>
-                {accent === "admin" ? "Operator console" : accent === "manager" ? "Hotel console" : "Agent workspace"}
-              </Badge>
-            ) : null}
-          </div>
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur-md sm:px-5">
+          <SidebarTrigger className="text-muted-foreground" />
+          <Separator orientation="vertical" className="h-4" />
+          <span className="truncate text-sm font-medium">{portalName}</span>
+          <div className="ml-auto flex shrink-0 items-center gap-2">{headerExtra}</div>
         </header>
-        <div className="min-w-0 flex-1 space-y-6 p-4 sm:p-6">{children}</div>
+        <div className="mx-auto w-full max-w-[1480px] min-w-0 flex-1 space-y-6 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );

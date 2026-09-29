@@ -18,10 +18,7 @@ export function SeoProse() {
   return (
     <section className="bg-background py-16 sm:py-20 lg:py-24">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-        <p className="text-sm font-semibold tracking-[0.14em] text-primary uppercase">
-          Travel, done properly
-        </p>
-        <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        <h2 className="font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
           A full-service travel agency for Somalia — online
         </h2>
 

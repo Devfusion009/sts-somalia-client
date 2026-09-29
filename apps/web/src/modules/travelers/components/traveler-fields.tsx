@@ -162,7 +162,6 @@ export function TravelerFields({
         <Field
           label="Passport number"
           htmlFor={id("passportNumber")}
-          hint="Exactly as printed, including any letters."
         >
           <Input
             id={id("passportNumber")}

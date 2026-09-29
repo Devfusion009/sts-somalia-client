@@ -69,7 +69,7 @@ export function VisaCountryPicker() {
         </Button>
       </div>
 
-      <p className="mt-5 text-xs font-semibold tracking-wide text-sidebar-foreground/60 uppercase">
+      <p className="mt-5 text-xs font-semibold text-sidebar-foreground/60">
         Most requested
       </p>
       <div className="mt-2 flex flex-wrap gap-2">

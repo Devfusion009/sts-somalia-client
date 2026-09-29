@@ -65,24 +65,24 @@
    and price highlights so it stays special. Neutrals are teal-tinted rather
    than gray so even empty screens feel on-brand. */
 :root {
-  --background: #f8fbfa;
-  --foreground: #10312c;
+  --background: #f6f8f7;
+  --foreground: #0e2723;
   --card: #ffffff;
-  --card-foreground: #10312c;
+  --card-foreground: #0e2723;
   --popover: #ffffff;
-  --popover-foreground: #10312c;
+  --popover-foreground: #0e2723;
   --primary: #00947c;
   --primary-foreground: #ffffff;
-  --secondary: #eaf6f2;
+  --secondary: #eef5f2;
   --secondary-foreground: #0c4a40;
-  --muted: #eff5f3;
-  --muted-foreground: #5f7873;
-  --accent: #dcf2ea;
+  --muted: #f0f4f3;
+  --muted-foreground: #5a6f6b;
+  --accent: #e2f2ec;
   --accent-foreground: #0c4a40;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: #dfeae6;
-  --input: #d5e4df;
+  --border: #e2e9e7;
+  --input: #d4dfdb;
   --ring: #00947c;
   --brand-accent: #f4711c;
   --brand-accent-foreground: #ffffff;
@@ -92,13 +92,13 @@
   --chart-3: #0284c7;
   --chart-4: #7c3aed;
   --chart-5: #f59e0b;
-  --radius: 0.75rem;
-  --sidebar: #06231e;
-  --sidebar-foreground: #e6f5f0;
-  --sidebar-primary: #14ba9c;
+  --radius: 0.625rem;
+  --sidebar: #0b1f1c;
+  --sidebar-foreground: #b9cbc6;
+  --sidebar-primary: #2cc9a8;
   --sidebar-primary-foreground: #04211c;
-  --sidebar-accent: #0c3a32;
-  --sidebar-accent-foreground: #e6f5f0;
+  --sidebar-accent: #16302b;
+  --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #2dd4b4;
 }
@@ -196,9 +196,17 @@
   }
   html {
     @apply font-sans;
+    text-rendering: optimizeLegibility;
   }
   h1, h2, h3, h4 {
     @apply font-heading;
+    text-wrap: balance;
+  }
+  h1 {
+    letter-spacing: -0.015em;
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 22%, transparent);
   }
 }
 
@@ -235,4 +243,32 @@
   .animate-alert-pulse {
     animation: none;
   }
+}
+
+/* Route loading.tsx interstitial (e.g. /visa): stamp icon breathes gently,
+   progress bar sweeps to signal work is happening with no real percentage
+   to report. CSS-only so the fallback paints before any JS runs. */
+@keyframes stamp-thump {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+@keyframes progress-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(340%); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .animate-stamp-thump { animation: stamp-thump 1.6s ease-in-out infinite; }
+  .animate-progress-sweep { animation: progress-sweep 1.3s ease-in-out infinite; }
+}
+
+/* Native <select> (GET filter forms in the consoles): one chevron and one
+   field look everywhere instead of each browser's own control. Unlayered on
+   purpose so the chevron's padding wins over a utility like `px-3`. */
+select:not([multiple]):not([size]) {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235a6f6b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 0.9rem;
+  padding-inline-end: 2rem;
 }

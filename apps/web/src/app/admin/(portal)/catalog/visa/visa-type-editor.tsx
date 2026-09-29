@@ -56,7 +56,35 @@ function Section({ title, children }: { title: string; children: React.ReactNode
  * separated sections and normal page scroll is the right shape for this,
  * not a bigger dialog.
  */
-export function VisaTypeEditor({ visaType }: { visaType?: VisaType }) {
+type CentreOption = { id: string; name: string; city: string; is_active: boolean };
+
+const DELIVERY_OPTIONS = [
+  { value: "counter", label: "Counter collection" },
+  { value: "courier", label: "Courier" },
+  { value: "third_party", label: "Authorised third party" },
+];
+
+/** Checkbox rendered as a pill — a boolean capability in one click. */
+function TogglePill({ name, value, label, defaultChecked }: { name: string; value?: string; label: string; defaultChecked: boolean }) {
+  return (
+    <label className="cursor-pointer">
+      <input type="checkbox" name={name} value={value ?? "on"} defaultChecked={defaultChecked} className="peer sr-only" />
+      <span className="inline-flex rounded-full border border-border px-3.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
+        {label}
+      </span>
+    </label>
+  );
+}
+
+export function VisaTypeEditor({
+  visaType,
+  centres = [],
+  selectedCentreIds = [],
+}: {
+  visaType?: VisaType;
+  centres?: CentreOption[];
+  selectedCentreIds?: string[];
+}) {
   const isEdit = !!visaType;
   const action = isEdit ? updateVisaType : createVisaType;
   const [state, formAction] = useActionState(action, null);
@@ -118,7 +146,7 @@ export function VisaTypeEditor({ visaType }: { visaType?: VisaType }) {
             <Textarea id="description" name="description" defaultValue={visaType?.description ?? ""} rows={2} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="overview">Overview (shown on the detail page)</Label>
+            <Label htmlFor="overview">Overview</Label>
             <Textarea id="overview" name="overview" defaultValue={visaType?.overview ?? ""} rows={3} />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -157,11 +185,11 @@ export function VisaTypeEditor({ visaType }: { visaType?: VisaType }) {
         <Section title="Price &amp; processing">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="price">Price (charged to customer)</Label>
+              <Label htmlFor="price">Price</Label>
               <Input id="price" name="price" type="number" min={0} step="0.01" defaultValue={visaType?.price} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="processingFee">Processing fee (internal only — not shown to customer)</Label>
+              <Label htmlFor="processingFee">Internal processing fee</Label>
               <Input
                 id="processingFee"
                 name="processingFee"
@@ -247,6 +275,62 @@ export function VisaTypeEditor({ visaType }: { visaType?: VisaType }) {
           </div>
         </Section>
 
+        <Section title="Case workflow">
+          <div className="space-y-2">
+            <Label>Steps</Label>
+            <div className="flex flex-wrap gap-2">
+              <TogglePill name="requiresAppointment" label="Appointment" defaultChecked={visaType?.requires_appointment ?? false} />
+              <TogglePill name="requiresBiometrics" label="Biometrics" defaultChecked={visaType?.requires_biometrics ?? false} />
+              <TogglePill
+                name="requiresPhysicalPassport"
+                label="Physical passport"
+                defaultChecked={visaType?.requires_physical_passport ?? false}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Passport return</Label>
+            <div className="flex flex-wrap gap-2">
+              {DELIVERY_OPTIONS.map((o) => (
+                <TogglePill
+                  key={o.value}
+                  name="passportDeliveryModes"
+                  value={o.value}
+                  label={o.label}
+                  defaultChecked={(visaType?.passport_delivery_modes ?? ["counter"]).includes(o.value)}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="max-w-xs space-y-2">
+            <Label htmlFor="internalSlaDays">Internal handling target (days)</Label>
+            <Input
+              id="internalSlaDays"
+              name="internalSlaDays"
+              type="number"
+              min={0}
+              max={60}
+              defaultValue={visaType?.internal_sla_days ?? 2}
+            />
+          </div>
+          {centres.length > 0 ? (
+            <div className="space-y-2">
+              <Label>Application centres</Label>
+              <div className="flex flex-wrap gap-2">
+                {centres.map((c) => (
+                  <TogglePill
+                    key={c.id}
+                    name="centreIds"
+                    value={c.id}
+                    label={`${c.name} — ${c.city}${c.is_active ? "" : " (inactive)"}`}
+                    defaultChecked={selectedCentreIds.includes(c.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </Section>
+
         <Section title="Required documents">
           <DocumentSlotsField name="requiredDocuments" initialRows={documentSlotsToRows(visaType?.required_documents)} />
         </Section>
@@ -266,7 +350,7 @@ export function VisaTypeEditor({ visaType }: { visaType?: VisaType }) {
               name="eligibilityRequirements"
               rows={4}
               defaultValue={visaType?.eligibility_requirements ?? ""}
-              placeholder="Shown on the detail page so customers can check before they start applying."
+              placeholder="One requirement per line"
             />
           </div>
           <div className="space-y-2">
@@ -276,7 +360,7 @@ export function VisaTypeEditor({ visaType }: { visaType?: VisaType }) {
               name="termsAndConditions"
               rows={4}
               defaultValue={visaType?.terms_and_conditions ?? ""}
-              placeholder="Shown at Review with an “I agree” checkbox before the customer can submit."
+              placeholder="Optional"
             />
           </div>
         </Section>
@@ -289,7 +373,7 @@ export function VisaTypeEditor({ visaType }: { visaType?: VisaType }) {
               defaultChecked={visaType?.is_featured ?? false}
               className="size-4 accent-primary"
             />
-            Featured (shown under &ldquo;Popular destinations&rdquo;)
+            Featured
           </label>
           <div className="max-w-xs space-y-2">
             <Label htmlFor="status">Status</Label>
@@ -300,8 +384,8 @@ export function VisaTypeEditor({ visaType }: { visaType?: VisaType }) {
               <SelectContent>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="pending_review">Pending review</SelectItem>
-                <SelectItem value="published">Published — visible to customers</SelectItem>
-                <SelectItem value="suspended">Suspended — hidden from customers</SelectItem>
+                <SelectItem value="published">Published</SelectItem>
+                <SelectItem value="suspended">Suspended</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -25,7 +25,6 @@ export type RailCard = {
  */
 export function DestinationRail({
   id,
-  eyebrow,
   title,
   blurb,
   cards,
@@ -34,7 +33,6 @@ export function DestinationRail({
   priceLabel = "Starting from",
 }: {
   id?: string;
-  eyebrow?: string;
   title: string;
   blurb?: string;
   cards: RailCard[];
@@ -48,10 +46,7 @@ export function DestinationRail({
     <section id={id} className={cn("py-14 sm:py-16 lg:py-20", className)}>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <FadeIn>
-          {eyebrow ? (
-            <p className="text-sm font-semibold tracking-[0.14em] text-primary uppercase">{eyebrow}</p>
-          ) : null}
-          <h2 className="mt-2 font-heading text-2xl font-bold tracking-tight text-balance sm:text-3xl lg:text-4xl">
+          <h2 className="font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl lg:text-5xl">
             {title}
           </h2>
           {blurb ? (

@@ -2122,6 +2122,7 @@ export type Database = {
           status: Database["public"]["Enums"]["booking_status"]
           total_price: number
           updated_at: string
+          _allocate_hotel_booking: string | null
         }
         Insert: {
           agency_id?: string | null
@@ -3037,6 +3038,13 @@ export type Database = {
             columns: ["visa_application_id"]
             isOneToOne: false
             referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_visa_application_id_fkey"
+            columns: ["visa_application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
             referencedColumns: ["id"]
           },
         ]
@@ -4728,6 +4736,63 @@ export type Database = {
           },
         ]
       }
+      visa_application_centres: {
+        Row: {
+          address: string | null
+          appointment_url: string | null
+          city: string
+          collection_hours: string | null
+          country_code: string
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          provider: string | null
+          submission_hours: string | null
+          timezone: string
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          address?: string | null
+          appointment_url?: string | null
+          city: string
+          collection_hours?: string | null
+          country_code: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          provider?: string | null
+          submission_hours?: string | null
+          timezone?: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          address?: string | null
+          appointment_url?: string | null
+          city?: string
+          collection_hours?: string | null
+          country_code?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          provider?: string | null
+          submission_hours?: string | null
+          timezone?: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
       visa_application_status_history: {
         Row: {
           application_id: string
@@ -4762,6 +4827,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "visa_application_status_history_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "visa_application_status_history_changed_by_fkey"
             columns: ["changed_by"]
             isOneToOne: false
@@ -4788,6 +4860,7 @@ export type Database = {
           decided_by: string | null
           fee_amount: number
           id: string
+          info_return_stage: Database["public"]["Enums"]["visa_status"] | null
           partner_last_synced_at: string | null
           partner_provider_key: string | null
           partner_raw_payload: Json | null
@@ -4801,11 +4874,16 @@ export type Database = {
           resolved_processing_days_min: number | null
           resolved_processing_fee: number | null
           status: Database["public"]["Enums"]["visa_status"]
+          submitted_at: string | null
           submitted_by: string
           travel_details: Json
           traveler_details: Json
           updated_at: string
           visa_type_id: string
+          workflow: Json
+          _visa_create_passports: undefined | null
+          _visa_is_case_party: boolean | null
+          visa_case_attention: string | null
         }
         Insert: {
           admin_notes?: string | null
@@ -4824,6 +4902,7 @@ export type Database = {
           decided_by?: string | null
           fee_amount?: number
           id?: string
+          info_return_stage?: Database["public"]["Enums"]["visa_status"] | null
           partner_last_synced_at?: string | null
           partner_provider_key?: string | null
           partner_raw_payload?: Json | null
@@ -4837,11 +4916,13 @@ export type Database = {
           resolved_processing_days_min?: number | null
           resolved_processing_fee?: number | null
           status?: Database["public"]["Enums"]["visa_status"]
+          submitted_at?: string | null
           submitted_by: string
           travel_details?: Json
           traveler_details?: Json
           updated_at?: string
           visa_type_id: string
+          workflow?: Json
         }
         Update: {
           admin_notes?: string | null
@@ -4860,6 +4941,7 @@ export type Database = {
           decided_by?: string | null
           fee_amount?: number
           id?: string
+          info_return_stage?: Database["public"]["Enums"]["visa_status"] | null
           partner_last_synced_at?: string | null
           partner_provider_key?: string | null
           partner_raw_payload?: Json | null
@@ -4873,11 +4955,13 @@ export type Database = {
           resolved_processing_days_min?: number | null
           resolved_processing_fee?: number | null
           status?: Database["public"]["Enums"]["visa_status"]
+          submitted_at?: string | null
           submitted_by?: string
           travel_details?: Json
           traveler_details?: Json
           updated_at?: string
           visa_type_id?: string
+          workflow?: Json
         }
         Relationships: [
           {
@@ -4919,7 +5003,364 @@ export type Database = {
             foreignKeyName: "visa_applications_visa_type_id_fkey"
             columns: ["visa_type_id"]
             isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["visa_type_id"]
+          },
+          {
+            foreignKeyName: "visa_applications_visa_type_id_fkey"
+            columns: ["visa_type_id"]
+            isOneToOne: false
             referencedRelation: "visa_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visa_appointments: {
+        Row: {
+          application_id: string
+          appointment_type: string
+          biometrics_completed: boolean
+          biometrics_required: boolean
+          centre_id: string
+          confirmation_number: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          member_id: string | null
+          scheduled_at: string
+          status: string
+          status_changed_at: string | null
+          status_reason: string | null
+          supersedes_id: string | null
+        }
+        Insert: {
+          application_id: string
+          appointment_type: string
+          biometrics_completed?: boolean
+          biometrics_required?: boolean
+          centre_id: string
+          confirmation_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          member_id?: string | null
+          scheduled_at: string
+          status?: string
+          status_changed_at?: string | null
+          status_reason?: string | null
+          supersedes_id?: string | null
+        }
+        Update: {
+          application_id?: string
+          appointment_type?: string
+          biometrics_completed?: boolean
+          biometrics_required?: boolean
+          centre_id?: string
+          confirmation_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          member_id?: string | null
+          scheduled_at?: string
+          status?: string
+          status_changed_at?: string | null
+          status_reason?: string | null
+          supersedes_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_appointments_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_appointments_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_appointments_centre_id_fkey"
+            columns: ["centre_id"]
+            isOneToOne: false
+            referencedRelation: "visa_application_centres"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_appointments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_appointments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "visa_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_appointments_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "visa_appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visa_case_events: {
+        Row: {
+          actor_id: string | null
+          actor_kind: string
+          actor_name: string | null
+          actor_permission: string | null
+          application_id: string
+          created_at: string
+          customer_summary: string | null
+          customer_visible: boolean
+          data: Json
+          event_type: string
+          from_stage: Database["public"]["Enums"]["visa_status"] | null
+          id: string
+          member_id: string | null
+          notify_customer: boolean
+          notify_staff: boolean
+          reason: string | null
+          summary: string
+          to_stage: Database["public"]["Enums"]["visa_status"] | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_kind: string
+          actor_name?: string | null
+          actor_permission?: string | null
+          application_id: string
+          created_at?: string
+          customer_summary?: string | null
+          customer_visible?: boolean
+          data?: Json
+          event_type: string
+          from_stage?: Database["public"]["Enums"]["visa_status"] | null
+          id?: string
+          member_id?: string | null
+          notify_customer?: boolean
+          notify_staff?: boolean
+          reason?: string | null
+          summary: string
+          to_stage?: Database["public"]["Enums"]["visa_status"] | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_kind?: string
+          actor_name?: string | null
+          actor_permission?: string | null
+          application_id?: string
+          created_at?: string
+          customer_summary?: string | null
+          customer_visible?: boolean
+          data?: Json
+          event_type?: string
+          from_stage?: Database["public"]["Enums"]["visa_status"] | null
+          id?: string
+          member_id?: string | null
+          notify_customer?: boolean
+          notify_staff?: boolean
+          reason?: string | null
+          summary?: string
+          to_stage?: Database["public"]["Enums"]["visa_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_case_events_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_case_events_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visa_case_messages: {
+        Row: {
+          application_id: string
+          author_id: string | null
+          author_kind: string
+          author_name: string | null
+          body: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          application_id: string
+          author_id?: string | null
+          author_kind: string
+          author_name?: string | null
+          body: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          application_id?: string
+          author_id?: string | null
+          author_kind?: string
+          author_name?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_case_messages_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_case_messages_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visa_case_ops: {
+        Row: {
+          application_id: string
+          assigned_to: string | null
+          priority: string
+          sla_due_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          assigned_to?: string | null
+          priority?: string
+          sla_due_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          assigned_to?: string | null
+          priority?: string
+          sla_due_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_case_ops_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_case_ops_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_case_ops_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visa_decisions: {
+        Row: {
+          application_id: string
+          authority: string
+          authority_reference: string | null
+          correction_reason: string | null
+          decision_date: string
+          id: string
+          letter_document_id: string | null
+          notes: string | null
+          outcome: string
+          recorded_at: string
+          recorded_by: string | null
+          source: string
+          supersedes_id: string | null
+        }
+        Insert: {
+          application_id: string
+          authority: string
+          authority_reference?: string | null
+          correction_reason?: string | null
+          decision_date: string
+          id?: string
+          letter_document_id?: string | null
+          notes?: string | null
+          outcome: string
+          recorded_at?: string
+          recorded_by?: string | null
+          source?: string
+          supersedes_id?: string | null
+        }
+        Update: {
+          application_id?: string
+          authority?: string
+          authority_reference?: string | null
+          correction_reason?: string | null
+          decision_date?: string
+          id?: string
+          letter_document_id?: string | null
+          notes?: string | null
+          outcome?: string
+          recorded_at?: string
+          recorded_by?: string | null
+          source?: string
+          supersedes_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_decisions_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_decisions_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_decisions_letter_document_id_fkey"
+            columns: ["letter_document_id"]
+            isOneToOne: false
+            referencedRelation: "visa_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_decisions_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_decisions_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: true
+            referencedRelation: "visa_decisions"
             referencedColumns: ["id"]
           },
         ]
@@ -4930,9 +5371,12 @@ export type Database = {
           created_at: string
           description: string | null
           document_id: string | null
+          due_date: string | null
           id: string
           requested_by: string | null
           requirement: string
+          resolved_at: string | null
+          resolved_by: string | null
           status: string
           title: string
           updated_at: string
@@ -4942,9 +5386,12 @@ export type Database = {
           created_at?: string
           description?: string | null
           document_id?: string | null
+          due_date?: string | null
           id?: string
           requested_by?: string | null
           requirement?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -4954,9 +5401,12 @@ export type Database = {
           created_at?: string
           description?: string | null
           document_id?: string | null
+          due_date?: string | null
           id?: string
           requested_by?: string | null
           requirement?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -4967,6 +5417,13 @@ export type Database = {
             columns: ["application_id"]
             isOneToOne: false
             referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_document_requests_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
             referencedColumns: ["id"]
           },
           {
@@ -4983,6 +5440,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "visa_document_requests_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       visa_documents: {
@@ -4991,45 +5455,63 @@ export type Database = {
           content_type: string | null
           created_at: string
           document_type: string
+          expires_at: string | null
           file_name: string | null
           file_size: number | null
           id: string
+          is_current: boolean
+          member_id: string | null
           rejection_reason: string | null
+          request_id: string | null
           review_status: string
           reviewed_at: string | null
           reviewed_by: string | null
           storage_path: string
+          supersedes_id: string | null
           uploaded_by: string
+          version: number
         }
         Insert: {
           application_id: string
           content_type?: string | null
           created_at?: string
           document_type: string
+          expires_at?: string | null
           file_name?: string | null
           file_size?: number | null
           id?: string
+          is_current?: boolean
+          member_id?: string | null
           rejection_reason?: string | null
+          request_id?: string | null
           review_status?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           storage_path: string
+          supersedes_id?: string | null
           uploaded_by: string
+          version?: number
         }
         Update: {
           application_id?: string
           content_type?: string | null
           created_at?: string
           document_type?: string
+          expires_at?: string | null
           file_name?: string | null
           file_size?: number | null
           id?: string
+          is_current?: boolean
+          member_id?: string | null
           rejection_reason?: string | null
+          request_id?: string | null
           review_status?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           storage_path?: string
+          supersedes_id?: string | null
           uploaded_by?: string
+          version?: number
         }
         Relationships: [
           {
@@ -5040,10 +5522,38 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "visa_documents_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_documents_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "visa_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_documents_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "visa_document_requests"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "visa_documents_reviewed_by_fkey"
             columns: ["reviewed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_documents_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "visa_documents"
             referencedColumns: ["id"]
           },
           {
@@ -5106,6 +5616,13 @@ export type Database = {
             referencedRelation: "visa_applications"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "visa_members_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["id"]
+          },
         ]
       }
       visa_nationality_rules: {
@@ -5153,7 +5670,149 @@ export type Database = {
             foreignKeyName: "visa_nationality_rules_visa_type_id_fkey"
             columns: ["visa_type_id"]
             isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["visa_type_id"]
+          },
+          {
+            foreignKeyName: "visa_nationality_rules_visa_type_id_fkey"
+            columns: ["visa_type_id"]
+            isOneToOne: false
             referencedRelation: "visa_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visa_passport_events: {
+        Row: {
+          actor_id: string | null
+          application_id: string
+          created_at: string
+          delivery_mode: string | null
+          from_status: string | null
+          id: string
+          note: string | null
+          passport_id: string
+          reference: string | null
+          to_status: string
+        }
+        Insert: {
+          actor_id?: string | null
+          application_id: string
+          created_at?: string
+          delivery_mode?: string | null
+          from_status?: string | null
+          id?: string
+          note?: string | null
+          passport_id: string
+          reference?: string | null
+          to_status: string
+        }
+        Update: {
+          actor_id?: string | null
+          application_id?: string
+          created_at?: string
+          delivery_mode?: string | null
+          from_status?: string | null
+          id?: string
+          note?: string | null
+          passport_id?: string
+          reference?: string | null
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_passport_events_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_passport_events_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_passport_events_passport_id_fkey"
+            columns: ["passport_id"]
+            isOneToOne: false
+            referencedRelation: "visa_passports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visa_passports: {
+        Row: {
+          application_id: string
+          authorization_document_id: string | null
+          collector_name: string | null
+          courier_name: string | null
+          created_at: string
+          delivery_mode: string | null
+          holder_name: string | null
+          id: string
+          member_id: string | null
+          status: string
+          tracking_reference: string | null
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          authorization_document_id?: string | null
+          collector_name?: string | null
+          courier_name?: string | null
+          created_at?: string
+          delivery_mode?: string | null
+          holder_name?: string | null
+          id?: string
+          member_id?: string | null
+          status?: string
+          tracking_reference?: string | null
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          authorization_document_id?: string | null
+          collector_name?: string | null
+          courier_name?: string | null
+          created_at?: string
+          delivery_mode?: string | null
+          holder_name?: string | null
+          id?: string
+          member_id?: string | null
+          status?: string
+          tracking_reference?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_passports_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_passports_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_passports_authorization_document_id_fkey"
+            columns: ["authorization_document_id"]
+            isOneToOne: false
+            referencedRelation: "visa_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_passports_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "visa_members"
             referencedColumns: ["id"]
           },
         ]
@@ -5162,6 +5821,10 @@ export type Database = {
         Row: {
           application_id: string
           appointment_date: string | null
+          appointment_id: string | null
+          centre_id: string | null
+          centre_status: string
+          centre_status_at: string | null
           completed_at: string | null
           created_at: string
           created_by: string | null
@@ -5174,13 +5837,21 @@ export type Database = {
           partner_raw_payload: Json | null
           partner_ref: string | null
           partner_status: string | null
+          processing_stage: string
           provider_key: string | null
+          receipt_document_id: string | null
+          returned_reason: string | null
           route: string
           status: string
+          submitted_at: string | null
         }
         Insert: {
           application_id: string
           appointment_date?: string | null
+          appointment_id?: string | null
+          centre_id?: string | null
+          centre_status?: string
+          centre_status_at?: string | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
@@ -5193,13 +5864,21 @@ export type Database = {
           partner_raw_payload?: Json | null
           partner_ref?: string | null
           partner_status?: string | null
+          processing_stage?: string
           provider_key?: string | null
+          receipt_document_id?: string | null
+          returned_reason?: string | null
           route: string
           status?: string
+          submitted_at?: string | null
         }
         Update: {
           application_id?: string
           appointment_date?: string | null
+          appointment_id?: string | null
+          centre_id?: string | null
+          centre_status?: string
+          centre_status_at?: string | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
@@ -5212,9 +5891,13 @@ export type Database = {
           partner_raw_payload?: Json | null
           partner_ref?: string | null
           partner_status?: string | null
+          processing_stage?: string
           provider_key?: string | null
+          receipt_document_id?: string | null
+          returned_reason?: string | null
           route?: string
           status?: string
+          submitted_at?: string | null
         }
         Relationships: [
           {
@@ -5225,10 +5908,38 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "visa_processing_jobs_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_processing_jobs_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "visa_appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_processing_jobs_centre_id_fkey"
+            columns: ["centre_id"]
+            isOneToOne: false
+            referencedRelation: "visa_application_centres"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "visa_processing_jobs_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_processing_jobs_receipt_document_id_fkey"
+            columns: ["receipt_document_id"]
+            isOneToOne: false
+            referencedRelation: "visa_documents"
             referencedColumns: ["id"]
           },
         ]
@@ -5264,10 +5975,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "visa_processing_notes_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "visa_processing_notes_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visa_type_centres: {
+        Row: {
+          centre_id: string
+          visa_type_id: string
+        }
+        Insert: {
+          centre_id: string
+          visa_type_id: string
+        }
+        Update: {
+          centre_id?: string
+          visa_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_type_centres_centre_id_fkey"
+            columns: ["centre_id"]
+            isOneToOne: false
+            referencedRelation: "visa_application_centres"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_type_centres_visa_type_id_fkey"
+            columns: ["visa_type_id"]
+            isOneToOne: false
+            referencedRelation: "visa_case_queue"
+            referencedColumns: ["visa_type_id"]
+          },
+          {
+            foreignKeyName: "visa_type_centres_visa_type_id_fkey"
+            columns: ["visa_type_id"]
+            isOneToOne: false
+            referencedRelation: "visa_types"
             referencedColumns: ["id"]
           },
         ]
@@ -5282,16 +6037,21 @@ export type Database = {
           eligibility_requirements: string | null
           entry_type: string
           id: string
+          internal_sla_days: number
           is_featured: boolean
           name: string
           overview: string | null
           partner_provider_key: string | null
+          passport_delivery_modes: string[]
           price: number
           processing_days_max: number | null
           processing_days_min: number | null
           processing_fee: number | null
           processing_mode: Database["public"]["Enums"]["visa_processing_mode"]
           required_documents: Json
+          requires_appointment: boolean
+          requires_biometrics: boolean
+          requires_physical_passport: boolean
           status: Database["public"]["Enums"]["listing_status"]
           stay_days: number | null
           terms_and_conditions: string | null
@@ -5308,16 +6068,21 @@ export type Database = {
           eligibility_requirements?: string | null
           entry_type?: string
           id?: string
+          internal_sla_days?: number
           is_featured?: boolean
           name: string
           overview?: string | null
           partner_provider_key?: string | null
+          passport_delivery_modes?: string[]
           price: number
           processing_days_max?: number | null
           processing_days_min?: number | null
           processing_fee?: number | null
           processing_mode?: Database["public"]["Enums"]["visa_processing_mode"]
           required_documents?: Json
+          requires_appointment?: boolean
+          requires_biometrics?: boolean
+          requires_physical_passport?: boolean
           status?: Database["public"]["Enums"]["listing_status"]
           stay_days?: number | null
           terms_and_conditions?: string | null
@@ -5334,16 +6099,21 @@ export type Database = {
           eligibility_requirements?: string | null
           entry_type?: string
           id?: string
+          internal_sla_days?: number
           is_featured?: boolean
           name?: string
           overview?: string | null
           partner_provider_key?: string | null
+          passport_delivery_modes?: string[]
           price?: number
           processing_days_max?: number | null
           processing_days_min?: number | null
           processing_fee?: number | null
           processing_mode?: Database["public"]["Enums"]["visa_processing_mode"]
           required_documents?: Json
+          requires_appointment?: boolean
+          requires_biometrics?: boolean
+          requires_physical_passport?: boolean
           status?: Database["public"]["Enums"]["listing_status"]
           stay_days?: number | null
           terms_and_conditions?: string | null
@@ -5355,7 +6125,63 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      visa_case_queue: {
+        Row: {
+          agency_id: string | null
+          applicant_email: string | null
+          applicant_name: string | null
+          applicant_type: string | null
+          application_ref: string | null
+          appointment_attended: boolean | null
+          assigned_to: string | null
+          assignee_name: string | null
+          attention: string | null
+          centre_status: string | null
+          created_at: string | null
+          decision_outcome: string | null
+          destination_country_code: string | null
+          docs_pending: number | null
+          docs_rejected: number | null
+          docs_required: number | null
+          docs_total: number | null
+          docs_verified: number | null
+          id: string | null
+          last_activity_at: string | null
+          next_appointment_at: string | null
+          open_requests: number | null
+          passports_outstanding: number | null
+          passports_returned: number | null
+          passports_total: number | null
+          payment_state: string | null
+          priority: string | null
+          processing_stage: string | null
+          requires_appointment: boolean | null
+          requires_passport: boolean | null
+          search_text: string | null
+          sla_due_at: string | null
+          stage_entered_at: string | null
+          status: Database["public"]["Enums"]["visa_status"] | null
+          submitted_at: string | null
+          visa_type_id: string | null
+          visa_type_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visa_applications_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visa_case_ops_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       _allocate_hotel_booking: {
@@ -5373,6 +6199,158 @@ export type Database = {
       _umrah_reserve_seats: {
         Args: { p_departure_id: string; p_seats: number }
         Returns: undefined
+      }
+      _visa_apply_partner_status: {
+        Args: {
+          p_application_id: string
+          p_status: Database["public"]["Enums"]["visa_status"]
+        }
+        Returns: Database["public"]["Enums"]["visa_status"]
+      }
+      _visa_appointment_label: { Args: { p_type: string }; Returns: string }
+      _visa_appointment_when: {
+        Args: { p_at: string; p_centre: string }
+        Returns: string
+      }
+      _visa_assert_uploaded: {
+        Args: {
+          app: Database["public"]["Tables"]["visa_applications"]["Row"]
+          p_storage_path: string
+        }
+        Returns: undefined
+      }
+      _visa_create_passports: {
+        Args: { app: Database["public"]["Tables"]["visa_applications"]["Row"] }
+        Returns: undefined
+      }
+      _visa_customer_blockers: {
+        Args: { p_application_id: string }
+        Returns: string
+      }
+      _visa_document_label: {
+        Args: { p_application_id: string; p_document_type: string }
+        Returns: string
+      }
+      _visa_insert_decision: {
+        Args: {
+          app: Database["public"]["Tables"]["visa_applications"]["Row"]
+          p_authority: string
+          p_decision_date: string
+          p_letter_document_id: string
+          p_notes: string
+          p_outcome: string
+          p_reason?: string
+          p_reference: string
+          p_source: string
+          p_supersedes?: string
+        }
+        Returns: string
+      }
+      _visa_is_case_party: {
+        Args: { app: Database["public"]["Tables"]["visa_applications"]["Row"] }
+        Returns: boolean
+      }
+      _visa_log_event: {
+        Args: {
+          p_actor_kind?: string
+          p_application_id: string
+          p_customer_summary?: string
+          p_data?: Json
+          p_from?: Database["public"]["Enums"]["visa_status"]
+          p_member?: string
+          p_notify_customer?: boolean
+          p_notify_staff?: boolean
+          p_permission?: string
+          p_reason?: string
+          p_summary: string
+          p_to?: Database["public"]["Enums"]["visa_status"]
+          p_type: string
+        }
+        Returns: string
+      }
+      _visa_open_case: {
+        Args: { p_application_id: string }
+        Returns: {
+          admin_notes: string | null
+          agency_customer_id: string | null
+          agency_id: string | null
+          applicant_notes: string | null
+          applicant_profile_id: string | null
+          applicant_type: string
+          application_ref: string
+          contact_details: Json
+          created_at: string
+          currency: string
+          current_step: number
+          custom_answers: Json
+          decided_at: string | null
+          decided_by: string | null
+          fee_amount: number
+          id: string
+          info_return_stage: Database["public"]["Enums"]["visa_status"] | null
+          partner_last_synced_at: string | null
+          partner_provider_key: string | null
+          partner_raw_payload: Json | null
+          partner_ref: string | null
+          partner_status: string | null
+          price: number
+          resolved_documents: Json | null
+          resolved_eligibility_requirements: string | null
+          resolved_price: number | null
+          resolved_processing_days_max: number | null
+          resolved_processing_days_min: number | null
+          resolved_processing_fee: number | null
+          status: Database["public"]["Enums"]["visa_status"]
+          submitted_at: string | null
+          submitted_by: string
+          travel_details: Json
+          traveler_details: Json
+          updated_at: string
+          visa_type_id: string
+          workflow: Json
+        }
+        SetofOptions: {
+          from: "*"
+          to: "visa_applications"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _visa_request_customer_action: {
+        Args: {
+          app: Database["public"]["Tables"]["visa_applications"]["Row"]
+          p_note: string
+          p_permission: string
+        }
+        Returns: undefined
+      }
+      _visa_require: { Args: { p_perm: string }; Returns: undefined }
+      _visa_required_slots: {
+        Args: { p_application_id: string }
+        Returns: {
+          slot_key: string
+          slot_label: string
+        }[]
+      }
+      _visa_set_stage: {
+        Args: {
+          p_application_id: string
+          p_bypass_map?: boolean
+          p_customer_summary?: string
+          p_note?: string
+          p_notify?: boolean
+          p_permission?: string
+          p_to: Database["public"]["Enums"]["visa_status"]
+        }
+        Returns: Database["public"]["Enums"]["visa_status"]
+      }
+      _visa_submission_blocker: {
+        Args: { p_application_id: string }
+        Returns: string
+      }
+      _visa_trusted_writer: {
+        Args: { p_application_id: string }
+        Returns: boolean
       }
       add_hotel_manager: {
         Args: { p_email: string; p_hotel_id: string; p_permissions?: string[] }
@@ -5392,8 +6370,11 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      admin_nav_counts: { Args: never; Returns: Json }
-      admin_payout_queue_totals: { Args: never; Returns: Json }
+      admin_nav_counts: { Args: Record<PropertyKey, never>; Returns: Json }
+      admin_payout_queue_totals: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       agency_earnings_summary: {
         Args: { target_agency_id: string }
         Returns: Json
@@ -5487,6 +6468,18 @@ export type Database = {
         Args: { target_order_id: string }
         Returns: undefined
       }
+      correct_visa_decision: {
+        Args: {
+          p_authority?: string
+          p_decision_date?: string
+          p_decision_id: string
+          p_letter_document_id?: string
+          p_outcome: string
+          p_reason: string
+          p_reference?: string
+        }
+        Returns: string
+      }
       credit_agency_wallet_internal: {
         Args: {
           actor?: string
@@ -5499,11 +6492,11 @@ export type Database = {
         Returns: string
       }
       current_role: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
-      expire_stale_holds: { Args: never; Returns: number }
+      expire_stale_holds: { Args: Record<PropertyKey, never>; Returns: number }
       fail_agency_payout_request: {
         Args: { p_reason: string; p_request_id: string }
         Returns: undefined
@@ -5512,16 +6505,43 @@ export type Database = {
         Args: { p_reason?: string; p_request_id: string }
         Returns: undefined
       }
-      generate_affiliate_application_ref: { Args: never; Returns: string }
-      generate_agency_application_ref: { Args: never; Returns: string }
-      generate_agent_code: { Args: never; Returns: string }
-      generate_hall_booking_ref: { Args: never; Returns: string }
-      generate_hotel_partner_application_ref: { Args: never; Returns: string }
-      generate_invoice_number: { Args: never; Returns: string }
-      generate_order_number: { Args: never; Returns: string }
-      generate_umrah_request_ref: { Args: never; Returns: string }
-      generate_venue_partner_application_ref: { Args: never; Returns: string }
-      generate_visa_application_ref: { Args: never; Returns: string }
+      generate_affiliate_application_ref: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_agency_application_ref: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_agent_code: { Args: Record<PropertyKey, never>; Returns: string }
+      generate_hall_booking_ref: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_hotel_partner_application_ref: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_invoice_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_order_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_umrah_request_ref: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_venue_partner_application_ref: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_visa_application_ref: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_venue_occupied_ranges: {
         Args: { from_date: string; target_venue_id: string; to_date: string }
         Returns: {
@@ -5602,7 +6622,7 @@ export type Database = {
           price_override: number
         }[]
       }
-      is_admin: { Args: never; Returns: boolean }
+      is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_affiliate_owner: {
         Args: { target_affiliate_id: string }
         Returns: boolean
@@ -5641,7 +6661,10 @@ export type Database = {
         }
         Returns: undefined
       }
-      my_operable_hotel_ids: { Args: never; Returns: string[] }
+      my_operable_hotel_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
       notify_admins_application_updated: {
         Args: { p_application_id: string; p_kind: string }
         Returns: undefined
@@ -5699,16 +6722,6 @@ export type Database = {
       remove_hotel_manager: {
         Args: { p_manager_id: string }
         Returns: undefined
-      }
-      replace_rejected_visa_document: {
-        Args: {
-          p_content_type?: string
-          p_document_id: string
-          p_file_name?: string
-          p_file_size?: number
-          p_storage_path: string
-        }
-        Returns: string
       }
       request_agency_markup_change: {
         Args: {
@@ -5818,14 +6831,6 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["umrah_fulfillment_stage"]
       }
-      set_visa_application_status: {
-        Args: {
-          p_application_id: string
-          p_note?: string
-          p_status: Database["public"]["Enums"]["visa_status"]
-        }
-        Returns: Database["public"]["Enums"]["visa_status"]
-      }
       settle_agency_payout_request: {
         Args: {
           p_method?: string
@@ -5844,6 +6849,14 @@ export type Database = {
         Args: { target_profile_id: string }
         Returns: boolean
       }
+      submit_visa_application: {
+        Args: { p_application_id: string }
+        Returns: {
+          currency: string
+          fee_amount: number
+          price: number
+        }[]
+      }
       umrah_booking_holds_seats: {
         Args: {
           p_kind: string
@@ -5858,6 +6871,268 @@ export type Database = {
       visa_application_outstanding_items: {
         Args: { p_application_id: string }
         Returns: string
+      }
+      visa_assign_case: {
+        Args: { p_application_id: string; p_assignee: string }
+        Returns: undefined
+      }
+      visa_attach_result_document: {
+        Args: {
+          p_application_id: string
+          p_content_type?: string
+          p_file_name?: string
+          p_file_size?: number
+          p_storage_path: string
+        }
+        Returns: string
+      }
+      visa_attach_staff_document: {
+        Args: {
+          p_application_id: string
+          p_content_type?: string
+          p_document_type: string
+          p_file_name?: string
+          p_file_size?: number
+          p_storage_path: string
+        }
+        Returns: string
+      }
+      visa_book_appointment: {
+        Args: {
+          p_application_id: string
+          p_biometrics_required?: boolean
+          p_centre_id: string
+          p_confirmation?: string
+          p_member_id?: string
+          p_scheduled_at: string
+          p_type: string
+        }
+        Returns: string
+      }
+      visa_cancel_appointment: {
+        Args: { p_appointment_id: string; p_reason: string }
+        Returns: undefined
+      }
+      visa_cancel_case: {
+        Args: { p_application_id: string; p_reason: string }
+        Returns: undefined
+      }
+      visa_case_attention: {
+        Args: { app: Database["public"]["Tables"]["visa_applications"]["Row"] }
+        Returns: string
+      }
+      visa_case_readiness: {
+        Args: { p_application_id: string }
+        Returns: {
+          applies: boolean
+          detail: string
+          key: string
+          label: string
+          ok: boolean
+        }[]
+      }
+      visa_claim_case: {
+        Args: { p_application_id: string }
+        Returns: undefined
+      }
+      visa_current_decision: {
+        Args: { p_application_id: string }
+        Returns: {
+          application_id: string
+          authority: string
+          authority_reference: string | null
+          correction_reason: string | null
+          decision_date: string
+          id: string
+          letter_document_id: string | null
+          notes: string | null
+          outcome: string
+          recorded_at: string
+          recorded_by: string | null
+          source: string
+          supersedes_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "visa_decisions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      visa_fulfil_document_request: {
+        Args: {
+          p_content_type?: string
+          p_file_name?: string
+          p_file_size?: number
+          p_request_id: string
+          p_storage_path: string
+        }
+        Returns: string
+      }
+      visa_log_document_access: {
+        Args: { p_document_id: string }
+        Returns: string
+      }
+      visa_mark_ready: {
+        Args: { p_application_id: string; p_note?: string }
+        Returns: undefined
+      }
+      visa_payment_state: {
+        Args: { p_application_id: string }
+        Returns: string
+      }
+      visa_queue_counts: { Args: Record<PropertyKey, never>; Returns: Json }
+      visa_record_appointment_outcome: {
+        Args: {
+          p_appointment_id: string
+          p_biometrics_completed?: boolean
+          p_outcome: string
+        }
+        Returns: undefined
+      }
+      visa_record_decision: {
+        Args: {
+          p_application_id: string
+          p_authority: string
+          p_decision_date?: string
+          p_letter_document_id?: string
+          p_notes?: string
+          p_outcome: string
+          p_reference?: string
+        }
+        Returns: string
+      }
+      visa_record_partner_failure: {
+        Args: {
+          p_application_id: string
+          p_provider_key: string
+          p_reason: string
+        }
+        Returns: undefined
+      }
+      visa_record_partner_status: {
+        Args: {
+          p_application_id: string
+          p_partner_status: string
+          p_raw?: Json
+        }
+        Returns: undefined
+      }
+      visa_record_partner_submission: {
+        Args: {
+          p_application_id: string
+          p_partner_ref: string
+          p_partner_status?: string
+          p_provider_key: string
+        }
+        Returns: string
+      }
+      visa_record_passport_event: {
+        Args: {
+          p_authorization_document_id?: string
+          p_collector_name?: string
+          p_delivery_mode?: string
+          p_note?: string
+          p_passport_id: string
+          p_reference?: string
+          p_to_status: string
+        }
+        Returns: undefined
+      }
+      visa_record_processing_update: {
+        Args: {
+          p_application_id: string
+          p_customer_note?: string
+          p_note?: string
+          p_processing_stage: string
+        }
+        Returns: undefined
+      }
+      visa_record_submission: {
+        Args: {
+          p_application_id: string
+          p_appointment_id?: string
+          p_centre_id?: string
+          p_lodged_with: string
+          p_receipt_document_id?: string
+          p_reference: string
+          p_submitted_on?: string
+        }
+        Returns: string
+      }
+      visa_replace_document: {
+        Args: {
+          p_content_type?: string
+          p_document_id: string
+          p_file_name?: string
+          p_file_size?: number
+          p_storage_path: string
+        }
+        Returns: string
+      }
+      visa_request_document: {
+        Args: {
+          p_application_id: string
+          p_description?: string
+          p_due_date?: string
+          p_requirement?: string
+          p_title: string
+        }
+        Returns: string
+      }
+      visa_reschedule_appointment: {
+        Args: {
+          p_appointment_id: string
+          p_centre_id?: string
+          p_confirmation?: string
+          p_reason: string
+          p_scheduled_at: string
+        }
+        Returns: string
+      }
+      visa_resolve_document_request: {
+        Args: { p_reason?: string; p_request_id: string; p_resolution: string }
+        Returns: undefined
+      }
+      visa_resume_case: {
+        Args: { p_application_id: string; p_note?: string }
+        Returns: Database["public"]["Enums"]["visa_status"]
+      }
+      visa_review_document: {
+        Args: { p_decision: string; p_document_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      visa_send_message: {
+        Args: { p_application_id: string; p_body: string }
+        Returns: string
+      }
+      visa_set_case_priority: {
+        Args: { p_application_id: string; p_priority: string }
+        Returns: undefined
+      }
+      visa_staff_can: { Args: { p_perm: string }; Returns: boolean }
+      visa_stage_label: {
+        Args: { p_status: Database["public"]["Enums"]["visa_status"] }
+        Returns: string
+      }
+      visa_start_review: {
+        Args: { p_application_id: string }
+        Returns: undefined
+      }
+      visa_sync_partner_status: {
+        Args: {
+          p_application_id: string
+          p_status: Database["public"]["Enums"]["visa_status"]
+        }
+        Returns: Database["public"]["Enums"]["visa_status"]
+      }
+      visa_update_submission: {
+        Args: {
+          p_application_id: string
+          p_centre_status: string
+          p_reason?: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
@@ -5901,11 +7176,7 @@ export type Database = {
       commission_entry_status: "pending" | "confirmed" | "paid_out" | "reversed"
       conversion_status: "pending" | "approved" | "paid" | "reversed"
       deletion_request_status:
-        | "requested"
-        | "in_review"
-        | "completed"
-        | "rejected"
-        | "withdrawn"
+        "requested" | "in_review" | "completed" | "rejected" | "withdrawn"
       hotel_room_unit_status: "active" | "out_of_order" | "inactive"
       invoice_status: "draft" | "issued" | "paid" | "void"
       listing_status: "draft" | "pending_review" | "published" | "suspended"
@@ -5931,12 +7202,7 @@ export type Database = {
         | "refunded"
         | "partially_refunded"
       payout_request_status:
-        | "pending"
-        | "approved"
-        | "processing"
-        | "rejected"
-        | "failed"
-        | "paid"
+        "pending" | "approved" | "processing" | "rejected" | "failed" | "paid"
       payout_status: "pending" | "processing" | "paid" | "failed"
       pilgrim_gender: "male" | "female"
       refund_request_status: "pending" | "approved" | "rejected"
@@ -5962,10 +7228,7 @@ export type Database = {
         | "documents_ready"
         | "completed"
       umrah_price_unit:
-        | "per_person"
-        | "per_person_per_night"
-        | "per_night"
-        | "per_booking"
+        "per_person" | "per_person_per_night" | "per_night" | "per_booking"
       umrah_service_category:
         | "hotel_makkah"
         | "hotel_madinah"
@@ -6009,12 +7272,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6036,13 +7299,12 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6061,13 +7323,12 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6086,13 +7347,12 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6105,11 +7365,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6274,4 +7534,3 @@ export const Constants = {
     },
   },
 } as const
-

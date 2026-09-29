@@ -10,7 +10,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -25,77 +24,19 @@ import {
 } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
 import {
-  adminSetVisaStatus,
   adminRequestDocument,
   adminUploadResultDocument,
   adminSubmitToPartner,
   adminSyncPartnerStatus,
 } from "@/modules/visa/admin-actions";
-import { VISA_STATUS_LABELS, VISA_STATUS_TRANSITIONS } from "@/modules/visa/schemas";
 
-/** Status transition control: pick a status, add an optional customer-visible note. */
-export function StatusControl({
+export function RequestDocumentDialog({
   applicationId,
-  currentStatus,
+  trigger = "outline",
 }: {
   applicationId: string;
-  currentStatus: string;
+  trigger?: "outline" | "secondary";
 }) {
-  const [state, formAction] = useActionState(adminSetVisaStatus, null);
-  // Only what apply_visa_status_transition_internal actually allows from here —
-  // offering the rest just to have the RPC reject them isn't a workflow.
-  const nextStatuses = VISA_STATUS_TRANSITIONS[currentStatus] ?? [];
-  const [status, setStatus] = useState(nextStatuses[0] ?? "");
-
-  if (nextStatuses.length === 0) {
-    return <p className="text-sm text-muted-foreground">No further status changes from here.</p>;
-  }
-
-  return (
-    <form action={formAction} className="space-y-3">
-      <input type="hidden" name="applicationId" value={applicationId} />
-      <input type="hidden" name="status" value={status} />
-      <div className="space-y-1.5">
-        <Label>Move to status</Label>
-        <Select
-          value={status}
-          onValueChange={(v) => setStatus(v as string)}
-          items={nextStatuses.map((s) => ({ value: s, label: VISA_STATUS_LABELS[s] ?? s }))}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {nextStatuses.map((s) => (
-              <SelectItem key={s} value={s}>
-                {VISA_STATUS_LABELS[s] ?? s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="status-note">Note (shown on the customer&apos;s timeline)</Label>
-        <Textarea
-          id="status-note"
-          name="note"
-          rows={2}
-          placeholder="e.g. Application forwarded to the immigration authority."
-        />
-      </div>
-      {state?.error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      ) : null}
-      <SubmitButton pendingText="Updating…" className="w-full">
-        Update Status
-      </SubmitButton>
-    </form>
-  );
-}
-
-export function RequestDocumentDialog({ applicationId }: { applicationId: string }) {
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(adminRequestDocument, null);
 
@@ -109,18 +50,14 @@ export function RequestDocumentDialog({ applicationId }: { applicationId: string
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+      <DialogTrigger render={<Button variant={trigger} size="sm" />}>
         <FilePlus2 /> Request document
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <form action={formAction}>
           <input type="hidden" name="applicationId" value={applicationId} />
           <DialogHeader>
-            <DialogTitle>Request an additional document</DialogTitle>
-            <DialogDescription>
-              The applicant is notified and the application moves to &ldquo;Additional
-              Documents&rdquo;.
-            </DialogDescription>
+            <DialogTitle>Request a document</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-1.5">
@@ -128,20 +65,33 @@ export function RequestDocumentDialog({ applicationId }: { applicationId: string
               <Input id="req-title" name="title" placeholder="e.g. Bank Statement (Last 3 Months)" required />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="req-desc">Instructions (optional)</Label>
-              <Textarea id="req-desc" name="description" rows={2} />
+              <Label htmlFor="req-desc">Instructions</Label>
+              <Textarea id="req-desc" name="description" rows={2} placeholder="Optional" />
             </div>
-            <div className="space-y-1.5">
-              <Label>Requirement</Label>
-              <Select name="requirement" defaultValue="required">
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="required">Required</SelectItem>
-                  <SelectItem value="optional">Optional</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Requirement</Label>
+                <Select
+                  name="requirement"
+                  defaultValue="required"
+                  items={[
+                    { value: "required", label: "Required" },
+                    { value: "optional", label: "Optional" },
+                  ]}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="required">Required</SelectItem>
+                    <SelectItem value="optional">Optional</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="req-due">Due by</Label>
+                <Input id="req-due" name="dueDate" type="date" min={new Date().toISOString().slice(0, 10)} />
+              </div>
             </div>
             {state?.error ? (
               <Alert variant="destructive">

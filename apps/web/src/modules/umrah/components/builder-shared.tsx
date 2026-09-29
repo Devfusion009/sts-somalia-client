@@ -41,7 +41,7 @@ export function BuilderStepper({
 }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-      <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
+      <p className="text-xs font-bold text-muted-foreground">
         Private Umrah
       </p>
       <ol className="mt-4 space-y-1">
@@ -149,7 +149,7 @@ export function PriceSummary({
 
   return (
     <div className={cn("rounded-2xl border border-border bg-card p-5 shadow-xs", className)}>
-      <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
+      <p className="text-xs font-bold text-muted-foreground">
         Your Umrah price
       </p>
       <p className="mt-1 text-xs text-muted-foreground">

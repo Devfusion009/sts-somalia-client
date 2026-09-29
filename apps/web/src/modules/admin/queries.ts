@@ -296,6 +296,24 @@ export async function getVisaTypeAdmin(id: string) {
   return data;
 }
 
+/** Application centres for the catalog and the booking forms. */
+export async function getVisaCentresAdmin() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("visa_application_centres")
+    .select("*, visa_type_centres (visa_type_id)")
+    .order("is_active", { ascending: false })
+    .order("country_code")
+    .order("name");
+  return data ?? [];
+}
+
+export async function getVisaTypeCentreIds(visaTypeId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase.from("visa_type_centres").select("centre_id").eq("visa_type_id", visaTypeId);
+  return (data ?? []).map((r) => r.centre_id);
+}
+
 export async function getVisaNationalityRulesAdmin(visaTypeId: string) {
   const supabase = await createClient();
   const { data } = await supabase
@@ -446,52 +464,6 @@ export async function getTopHotels(limit = 5) {
 // ---------------------------------------------------------------------------
 // Visa application management
 // ---------------------------------------------------------------------------
-/** True once STS has actually been paid — the line an unpaid submission must cross before it's staff-actionable (locked decision D2). */
-export function isVisaOrderPaid(orderStatus: string | null | undefined) {
-  return orderStatus === "paid" || orderStatus === "partially_paid";
-}
-
-export async function getVisaApplicationsAdmin(status?: string) {
-  const supabase = await createClient();
-  let query = supabase
-    .from("visa_applications")
-    .select(
-      "id, application_ref, applicant_type, status, price, currency, created_at, traveler_details, contact_details, visa_type:visa_type_id(name, destination_country_code), order_items(order:order_id(status))"
-    )
-    .neq("status", "draft")
-    .order("created_at", { ascending: false })
-    .limit(300);
-  if (status) query = query.eq("status", status as never);
-  const { data } = await query;
-  return (data ?? []).map((row) => ({
-    ...row,
-    orderStatus: row.order_items[0]?.order?.status ?? null,
-  }));
-}
-
-export async function getVisaApplicationAdmin(id: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("visa_applications")
-    .select(
-      `*,
-       visa_type:visa_type_id (*),
-       submitter:profiles!visa_applications_submitted_by_fkey (full_name, email),
-       members:visa_members (*),
-       documents:visa_documents (*),
-       history:visa_application_status_history (*),
-       document_requests:visa_document_requests (*)`
-    )
-    .eq("id", id)
-    .maybeSingle();
-  if (!data) return null;
-  data.members.sort(
-    (a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order
-  );
-  data.history.sort((a, b) => a.created_at.localeCompare(b.created_at));
-  data.document_requests.sort((a, b) => a.created_at.localeCompare(b.created_at));
-  return data;
-}
 
 /**
  * Which workspace an application belongs in (manual or partner), plus its

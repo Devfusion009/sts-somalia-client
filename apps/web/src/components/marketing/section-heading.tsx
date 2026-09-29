@@ -1,13 +1,13 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Shared band header: eyebrow → H2 → one-line lead, with an optional
- * right-aligned action (e.g. "View all →"). Centered for full-width bands,
- * left-aligned (with the action on the right) for list/grid bands.
- * `tone="dark"` variants sit on `bg-sidebar` bands.
+ * Shared band header: H2 → one-line lead, with an optional right-aligned
+ * action (e.g. "View all →"). Centered for full-width bands, left-aligned
+ * (with the action on the right) for list/grid bands. `tone="dark"` variants
+ * sit on `bg-sidebar` bands. No eyebrow label — every caller's eyebrow string
+ * duplicated the title next to it, so it was cut rather than replaced.
  */
 export function SectionHeading({
-  eyebrow,
   title,
   lead,
   action,
@@ -15,7 +15,6 @@ export function SectionHeading({
   tone = "light",
   className,
 }: {
-  eyebrow: string;
   title: string;
   lead?: string;
   action?: React.ReactNode;
@@ -35,17 +34,10 @@ export function SectionHeading({
       )}
     >
       <div className={cn("max-w-2xl", align === "center" && "mx-auto")}>
-        <p
-          className={cn(
-            "text-sm font-semibold tracking-[0.14em] uppercase",
-            dark ? "text-sidebar-primary" : "text-primary"
-          )}
-        >
-          {eyebrow}
-        </p>
         <h2
           className={cn(
-            "mt-3 font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl",
+            "font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl",
+            align === "center" && "lg:text-5xl",
             dark ? "text-sidebar-foreground" : "text-foreground"
           )}
         >

@@ -119,9 +119,9 @@ const FLOWS = [
 
 /** Reassurance under the fork, for the visitor still hesitating between them. */
 const TRUST_STRIP = [
-  { icon: BadgeCheck, label: "Licensed & Reliable" },
-  { icon: Lock, label: "Secure Payments" },
-  { icon: Headset, label: "24/7 Support" },
+  { icon: BadgeCheck, label: "ISO 9001:2015 certified" },
+  { icon: Lock, label: "EVC Plus, bank transfer or card" },
+  { icon: Headset, label: "24/7 support in Somali" },
 ];
 
 const BUILDABLE = [
@@ -269,7 +269,7 @@ export default async function UmrahPage() {
 
                 <p
                   className={cn(
-                    "mt-10 text-xs font-bold tracking-widest uppercase",
+                    "mt-10 text-xs font-bold",
                     flow.theme.eyebrow
                   )}
                 >
@@ -317,11 +317,7 @@ export default async function UmrahPage() {
         </div>
 
         <div className="mt-10 text-center">
-          <p className="flex items-center justify-center gap-2 font-semibold">
-            <ShieldCheck className="size-5 text-primary" />
-            Trusted by thousands of pilgrims worldwide
-          </p>
-          <ul className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-muted-foreground">
+          <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-muted-foreground">
             {TRUST_STRIP.map((item, i) => (
               <li
                 key={item.label}
