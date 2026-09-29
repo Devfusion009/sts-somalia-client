@@ -1,19 +1,10 @@
 import { requireUser } from "@/lib/auth/session";
 import { getServerTrpc } from "@/lib/trpc/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatTile } from "@/components/dashboard/stat-tile";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-3xl">{value}</CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0 text-sm text-muted-foreground">{label}</CardContent>
-    </Card>
-  );
-}
 
 export default async function AffiliateDashboardPage() {
   const profile = await requireUser();
@@ -69,16 +60,16 @@ export default async function AffiliateDashboardPage() {
       </Card>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Total clicks" value={totalClicks} />
-        <StatCard label="Total earned" value={`$${totalEarned.toFixed(2)}`} />
-        <StatCard label="Total paid out" value={`$${totalPaidOut.toFixed(2)}`} />
-        <StatCard label="Links created" value={links.length} />
+        <StatTile label="Total clicks" value={totalClicks} />
+        <StatTile label="Total earned" value={`$${totalEarned.toFixed(2)}`} />
+        <StatTile label="Total paid out" value={`$${totalPaidOut.toFixed(2)}`} />
+        <StatTile label="Links created" value={links.length} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Pending conversions" value={pendingConversions} />
-        <StatCard label="Approved conversions" value={approvedConversions} />
-        <StatCard label="Paid conversions" value={paidConversions} />
+        <StatTile label="Pending conversions" value={pendingConversions} />
+        <StatTile label="Approved conversions" value={approvedConversions} />
+        <StatTile label="Paid conversions" value={paidConversions} />
       </div>
     </div>
   );

@@ -54,7 +54,7 @@ export function MarkupChange({
   return (
     <div className={cn("flex items-center gap-3", className)}>
       <div className="min-w-28 rounded-lg border border-border bg-muted/40 px-4 py-2 text-center">
-        <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">{currentLabel}</p>
+        <p className="text-xs font-medium text-muted-foreground">{currentLabel}</p>
         <p className="text-xl font-semibold text-muted-foreground">
           {effective ? markupLabel(effective.markup_type, effective.value) : "No rule"}
         </p>
@@ -66,7 +66,7 @@ export function MarkupChange({
           isRemove ? "border-destructive/30 bg-destructive/5" : "border-primary/30 bg-primary/5"
         )}
       >
-        <p className={cn("text-[10px] font-medium tracking-wide uppercase", isRemove ? "text-destructive" : "text-primary")}>
+        <p className={cn("text-xs font-medium", isRemove ? "text-destructive" : "text-primary")}>
           Requested
         </p>
         <p className={cn("text-2xl font-bold", isRemove ? "text-destructive" : "text-primary")}>

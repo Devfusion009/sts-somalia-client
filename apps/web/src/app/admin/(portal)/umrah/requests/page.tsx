@@ -143,7 +143,7 @@ export default async function AdminUmrahRequestsPage() {
                   </div>
 
                   <div className="rounded-lg border border-border bg-secondary/30 p-3">
-                    <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
+                    <p className="text-xs font-bold text-muted-foreground">
                       What they chose
                     </p>
                     <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">

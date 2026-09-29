@@ -16,6 +16,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { StatTile } from "@/components/dashboard/stat-tile";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,7 +108,6 @@ export default async function AdminOrdersPage({
         <h1 className="font-heading text-2xl font-semibold">Orders &amp; Payments</h1>
       </div>
 
-      {/* The three numbers an operator opens this page to check. */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile icon={Receipt} label="Orders" value={String(orders.length)} />
         <StatTile
@@ -414,42 +414,3 @@ export default async function AdminOrdersPage({
   );
 }
 
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "warn" | "accent";
-}) {
-  return (
-    <Card>
-      <CardContent className="flex items-center gap-3 p-4">
-        <span
-          className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-lg",
-            tone === "warn"
-              ? "bg-brand-gold/15 text-brand-gold"
-              : tone === "accent"
-                ? "bg-brand-accent/15 text-brand-accent"
-                : "bg-secondary text-primary"
-          )}
-        >
-          <Icon className="size-5" />
-        </span>
-        <div className="min-w-0">
-          <p className="font-heading text-xl font-bold tabular-nums">{value}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {label}
-            {hint ? ` · ${hint}` : ""}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}

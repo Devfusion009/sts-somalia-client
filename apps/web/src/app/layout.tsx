@@ -80,7 +80,9 @@ const amiri = Amiri({
 });
 
 /**
- * African display face, used on the Somalia/East Africa hero slide only.
+ * African display face, used on the Somalia/East Africa hero slide and on
+ * the season-picker's per-season headline (season-picker.tsx) — both content
+ * genuinely about Somalia's own calendar and geography.
  *
  * ADLaM Display is drawn for the ADLaM script — an alphabet invented in Guinea
  * in the 1980s by Abdoulaye and Ibrahima Barry so Pular/Fulani could be written

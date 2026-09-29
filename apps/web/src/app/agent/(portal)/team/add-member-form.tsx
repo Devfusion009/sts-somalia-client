@@ -67,7 +67,7 @@ export function AddMemberForm() {
               Role <span className="text-destructive">*</span>
             </Label>
             <select id="role" name="role" defaultValue="booking_staff" className={selectClass}>
-              <option value="admin">Admin — full control except can't remove the owner</option>
+              <option value="admin">Admin — full control except can&apos;t remove the owner</option>
               <option value="booking_staff">Booking Staff — can book & spend the wallet</option>
               <option value="accountant">Accountant — financial visibility, no booking</option>
               <option value="viewer">Viewer — read-only</option>

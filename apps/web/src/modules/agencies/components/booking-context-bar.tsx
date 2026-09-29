@@ -28,7 +28,7 @@ export function BookingContextBar({
           {isGroup ? <Users className="size-4" /> : <UserRound className="size-4" />}
         </span>
         <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Booking for</p>
+          <p className="text-xs text-muted-foreground">Booking for</p>
           {isGroup ? (
             <>
               <p className="font-medium leading-tight">{customers.length} customers</p>
@@ -58,7 +58,7 @@ export function BookingContextBar({
 
       <div className="flex items-center gap-5">
         <div className="text-right">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Available</p>
+          <p className="text-xs text-muted-foreground">Available</p>
           <p className="font-semibold tabular-nums leading-tight">
             {currency} {available.toFixed(0)}
           </p>

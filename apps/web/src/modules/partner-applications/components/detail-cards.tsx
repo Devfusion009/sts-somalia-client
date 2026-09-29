@@ -111,7 +111,7 @@ export function DetailGrid({ rows, compact }: { rows: Array<[string, string]>; c
     <dl className={cn("grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2", !compact && "lg:grid-cols-3")}>
       {visible.map(([label, value]) => (
         <div key={label} className="min-w-0">
-          <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
+          <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
           <dd className={cn("text-sm break-words", value === "—" ? "text-muted-foreground/50" : "font-semibold text-foreground")}>{value}</dd>
         </div>
       ))}
@@ -164,7 +164,7 @@ export function RoomTypesList({ roomTypes }: { roomTypes: unknown }) {
 export function FullWidthField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="sm:col-span-2 lg:col-span-3">
-      <p className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
+      <p className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</p>
       {children}
     </div>
   );
@@ -430,7 +430,7 @@ export function AffiliateDetailCards({ details, elevated }: { details: Details; 
             ]}
           />
           <div>
-            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Promotion Plan</p>
+            <p className="text-xs font-medium text-muted-foreground">Promotion Plan</p>
             <p className={cn("text-sm break-words", s(d.promotionPlan) === "—" ? "text-muted-foreground/50" : "font-semibold text-foreground")}>
               {s(d.promotionPlan)}
             </p>

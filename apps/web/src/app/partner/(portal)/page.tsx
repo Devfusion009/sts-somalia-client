@@ -8,6 +8,7 @@ import {
   getPartnerStats,
   getRecentPartnerBookings,
 } from "@/modules/hotels/partner-queries";
+import { StatTile } from "@/components/dashboard/stat-tile";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import type { LucideIcon } from "lucide-react";
 
 const BOOKING_BADGE: Record<string, string> = {
   pending: "bg-brand-gold/15 text-brand-gold",
@@ -63,16 +63,16 @@ export default async function PartnerDashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <StatCard icon={Building2} label="Hotels" value={String(stats.hotelCount)} />
-        <StatCard icon={BedDouble} label="Rooms" value={String(stats.roomCount)} />
-        <StatCard icon={Ticket} label="Total bookings" value={String(stats.bookingCount)} />
-        <StatCard
+        <StatTile icon={Building2} label="Hotels" value={String(stats.hotelCount)} />
+        <StatTile icon={BedDouble} label="Rooms" value={String(stats.roomCount)} />
+        <StatTile icon={Ticket} label="Total bookings" value={String(stats.bookingCount)} />
+        <StatTile
           icon={CalendarClock}
           label="Pending bookings"
           value={String(stats.pendingCount)}
-          highlight={stats.pendingCount > 0}
+          tone={stats.pendingCount > 0 ? "warn" : undefined}
         />
-        <StatCard
+        <StatTile
           icon={Wallet}
           label="Confirmed revenue"
           value={`${stats.revenueCurrency} ${stats.revenue.toFixed(0)}`}
@@ -138,33 +138,3 @@ export default async function PartnerDashboardPage() {
   );
 }
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  highlight,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
-  return (
-    <Card>
-      <CardContent className="flex items-center gap-3 p-4">
-        <span
-          className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-xl",
-            highlight ? "bg-brand-gold/15 text-brand-gold" : "bg-secondary text-primary"
-          )}
-        >
-          <Icon className="size-4.5" />
-        </span>
-        <div className="min-w-0">
-          <p className="truncate font-heading text-xl font-bold">{value}</p>
-          <p className="truncate text-xs text-muted-foreground">{label}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}

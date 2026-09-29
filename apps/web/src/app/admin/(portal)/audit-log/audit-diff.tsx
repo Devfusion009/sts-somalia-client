@@ -8,7 +8,7 @@ import type { Json } from "@/lib/types/database.types";
 function JsonBlock({ label, value }: { label: string; value: Json | null }) {
   return (
     <div className="min-w-0 flex-1">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="mb-1 text-xs font-semibold text-muted-foreground">
         {label}
       </p>
       <pre className="max-h-64 overflow-auto rounded-md bg-muted p-2.5 text-[11px] leading-relaxed">

@@ -75,7 +75,7 @@ function Stat({
 }) {
   return (
     <div className="p-4">
-      <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd
         className={cn(
           "mt-1 font-heading text-2xl font-bold tabular-nums",

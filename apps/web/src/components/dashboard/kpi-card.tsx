@@ -6,18 +6,16 @@ import { cn } from "@/lib/utils";
 import { Sparkline } from "./sparkline";
 
 /**
- * Icon-in-a-soft-circle stat card (the agent/admin portal's existing visual
- * language) extended with an optional period-over-period delta, a trend
- * sparkline, and a footer slot for a breakdown line (e.g. markup vs.
- * commission). Server-renderable — only the Sparkline it wraps needs to be
- * a Client Component.
+ * Stat card: label with a small muted icon, value, optional period-over-period
+ * delta, trend sparkline, and a footer slot for a breakdown line (e.g. markup
+ * vs. commission). Server-renderable — only the Sparkline it wraps needs to
+ * be a Client Component.
  */
 export function KpiCard({
   icon: Icon,
   label,
   value,
   sub,
-  tint,
   change,
   series,
   href,
@@ -27,7 +25,8 @@ export function KpiCard({
   label: string;
   value: string;
   sub?: string;
-  tint: string;
+  /** Retained for callers; the card no longer paints a tinted icon tile. */
+  tint?: string;
   /** Percent change vs. the prior period of equal length. null = no baseline to compare against. */
   change?: number | null;
   series?: number[];
@@ -35,12 +34,15 @@ export function KpiCard({
   footer?: ReactNode;
 }) {
   const body = (
-    <Card className={cn("h-full", href && "transition-all group-hover:-translate-y-0.5 group-hover:shadow-md")}>
-      <CardContent className="flex flex-col gap-2 pt-6">
+    <Card className={cn("h-full", href && "transition-shadow group-hover:shadow-md")}>
+      <CardContent className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="mt-1 truncate font-heading text-2xl font-bold">{value}</p>
+            <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Icon className="size-3.5" />
+              {label}
+            </p>
+            <p className="mt-2 truncate font-heading text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
               {sub ? <p className="text-xs text-muted-foreground">{sub}</p> : null}
               {change === null || change === undefined ? null : change === 0 ? (
@@ -52,10 +54,7 @@ export function KpiCard({
               )}
             </div>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", tint)}>
-              <Icon className="size-4.5" />
-            </span>
+          <div className="flex shrink-0 flex-col items-end gap-2 self-end">
             {series && series.length > 1 ? <Sparkline data={series} positive={(change ?? 0) >= 0} /> : null}
           </div>
         </div>
