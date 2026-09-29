@@ -21,7 +21,6 @@ function Heading() {
   return (
     <SectionHeading
       align="left"
-      eyebrow="Stay well"
       title="Featured hotels"
       lead="Hand-checked properties with confirmed rates and real photos."
       action={

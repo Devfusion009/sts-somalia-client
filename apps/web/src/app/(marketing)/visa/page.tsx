@@ -25,6 +25,37 @@ import { HomeFaq } from "@/components/marketing/home-faq";
 
 export const metadata: Metadata = { title: "Visa Services" };
 
+const VISA_FAQS: Array<{ question: string; answer: string }> = [
+  {
+    question: "What documents do I need?",
+    answer:
+      "It depends on your destination and nationality. Once you pick a visa on this page, the exact document checklist for your case is shown before you start the application.",
+  },
+  {
+    question: "How long does processing take?",
+    answer:
+      "Processing time is set per destination and shown on that visa's page before you apply. Our desk reviews your documents before submission so nothing gets rejected for a fixable reason.",
+  },
+  {
+    question: "Can I apply for my family or a group in one application?",
+    answer:
+      "Yes — an application can cover a single traveller, a family, or a group, with each person's details entered once and tracked together.",
+  },
+  {
+    question: "What happens if a document I upload gets rejected?",
+    answer:
+      "Our desk flags exactly which document and why. You upload a replacement and review continues from there — the rest of your application stays as submitted.",
+  },
+  {
+    question: "Can I track my application after I submit it?",
+    answer: "Yes, from your account — status updates as our desk and the consulate move your case forward.",
+  },
+  {
+    question: "Are visa fees refundable?",
+    answer: "No. All visa fees are non-refundable once submitted, regardless of the consulate's decision.",
+  },
+];
+
 const TRUST_POINTS = [
   { icon: ShieldCheck, text: "Expert document review before submission" },
   { icon: Timer, text: "Real-time application tracking" },
@@ -150,7 +181,7 @@ export default async function VisaListPage({
                     </div>
                     <div className="absolute inset-x-0 -bottom-6 flex justify-center">
                       <div className="flex min-w-[4.5rem] flex-col items-center justify-center rounded-full border-4 border-background bg-primary px-3 py-1.5 text-center whitespace-nowrap text-primary-foreground shadow-lg transition-transform duration-300 group-hover:scale-105">
-                        <span className="text-[9px] leading-none font-semibold tracking-wide uppercase opacity-80">
+                        <span className="text-xs leading-none font-semibold opacity-80">
                           From
                         </span>
                         <span className="font-heading text-sm leading-tight font-bold">
@@ -186,7 +217,7 @@ export default async function VisaListPage({
                     <div className="flex items-start gap-4">
                       <span className="text-3xl leading-none">{countryFlag(visa.destination_country_code)}</span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                        <p className="text-xs font-medium text-muted-foreground">
                           {countryName(visa.destination_country_code)}
                         </p>
                         <h3 className="font-heading text-base font-bold">{visa.name}</h3>
@@ -203,7 +234,7 @@ export default async function VisaListPage({
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="text-[10px] text-muted-foreground uppercase">From</p>
+                        <p className="text-xs text-muted-foreground">From</p>
                         <p className="font-heading text-lg font-bold text-primary">
                           {fmtMoney(visa.price, visa.currency)}
                         </p>
@@ -251,7 +282,11 @@ export default async function VisaListPage({
       </section>
 
       <ReviewsRail />
-      <HomeFaq />
+      <HomeFaq
+        faqs={VISA_FAQS}
+        title="Before you apply — you're not the first"
+        lead="What travellers ask us most before starting a visa application. Anything else, the support desk is one call away."
+      />
     </div>
   );
 }

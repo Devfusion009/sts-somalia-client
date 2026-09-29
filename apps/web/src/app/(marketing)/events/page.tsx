@@ -192,7 +192,7 @@ export default async function EventsPage({
                         <div>
                           {Number(venue.base_price) > 0 ? (
                             <>
-                              <p className="text-[10px] text-muted-foreground uppercase">From</p>
+                              <p className="text-xs text-muted-foreground">From</p>
                               <p className="font-heading text-lg font-bold text-primary">
                                 {venue.currency} {Number(venue.base_price).toFixed(0)}
                                 <span className="text-xs font-normal text-muted-foreground">

@@ -18,7 +18,7 @@ const SLIDES = [
     eyebrow: "Gulf & Middle East",
     title: "Direct Fares to Dubai & Doha",
     subtitle: "Business trips and family visits, sorted in minutes",
-    priceLabel: "Starting @",
+    priceLabel: "From",
     price: "$240",
     priceSuffix: "one way",
     href: "/flights?origin=MGQ&destination=DXB",
@@ -45,7 +45,7 @@ const SLIDES = [
     eyebrow: "Umrah season",
     title: "Guided Umrah for Families & Groups",
     subtitle: "Flights, visa, hotels near the Haram and a guide throughout",
-    priceLabel: "Starting @",
+    priceLabel: "From",
     price: "$1,250",
     priceSuffix: "per pilgrim",
     href: "/umrah",
@@ -73,7 +73,7 @@ const SLIDES = [
     eyebrow: "Somalia & East Africa",
     title: "Seafront Stays Along the Somali Coast",
     subtitle: "Verified hotels at confirmed rates, booked in your own currency",
-    priceLabel: "Starting @",
+    priceLabel: "From",
     price: "$45",
     priceSuffix: "per night",
     href: "/hotels?city=Mogadishu",
@@ -103,7 +103,7 @@ const SLIDES = [
     eyebrow: "Turkey & Europe Gateway",
     title: "Fly to Istanbul, Direct",
     subtitle: "Turkish Airlines connections to Europe, sorted from Mogadishu",
-    priceLabel: "Starting @",
+    priceLabel: "From",
     price: "$320",
     priceSuffix: "one way",
     href: "/flights?origin=MGQ&destination=IST",
@@ -130,7 +130,7 @@ const SLIDES = [
     eyebrow: "East Africa Regional",
     title: "City Stays in Nairobi",
     subtitle: "Business trips and layovers, verified hotels near the CBD",
-    priceLabel: "Starting @",
+    priceLabel: "From",
     price: "$60",
     priceSuffix: "per night",
     href: "/hotels?city=Nairobi",
@@ -234,7 +234,7 @@ export function HeroCarousel() {
 
             <div className="relative z-10 mx-auto flex h-full max-w-7xl items-center justify-between gap-10 px-4 pt-14 pb-36 sm:px-6 lg:px-8 lg:pb-40">
               <div className="max-w-xl" aria-hidden={i !== index}>
-                <span className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wider text-white uppercase backdrop-blur-sm">
+                <span className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
                   {s.eyebrow}
                 </span>
 

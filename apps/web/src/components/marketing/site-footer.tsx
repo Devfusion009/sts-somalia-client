@@ -88,7 +88,7 @@ export function SiteFooter() {
         </div>
 
         <nav aria-label="Services">
-          <h2 className="text-sm font-semibold tracking-wider uppercase">Services</h2>
+          <h2 className="text-sm font-semibold">Services</h2>
           <ul className="mt-4 space-y-2.5">
             {NAV_LINKS.map((link) => (
               <li key={link.href}>
@@ -99,7 +99,7 @@ export function SiteFooter() {
         </nav>
 
         <nav aria-label="Partner with us">
-          <h2 className="text-sm font-semibold tracking-wider uppercase">Partner with us</h2>
+          <h2 className="text-sm font-semibold">Partner with us</h2>
           <ul className="mt-4 space-y-2.5">
             {PARTNER_LINKS.map((item) => (
               <li key={item.href}>
@@ -110,7 +110,7 @@ export function SiteFooter() {
         </nav>
 
         <nav aria-label="Company">
-          <h2 className="text-sm font-semibold tracking-wider uppercase">Company</h2>
+          <h2 className="text-sm font-semibold">Company</h2>
           <ul className="mt-4 space-y-2.5">
             {COMPANY_LINKS.map((link) => (
               <li key={link.href}>

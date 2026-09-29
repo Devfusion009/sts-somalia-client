@@ -33,7 +33,6 @@ function Heading() {
   return (
     <SectionHeading
       align="left"
-      eyebrow="Sacred journeys"
       title="Upcoming Umrah packages"
       lead="Flights, hotels, visa and guidance — one price, one group, zero guesswork."
       action={

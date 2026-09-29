@@ -100,7 +100,7 @@ function hotelFor(hotels: PackageCardHotel[], city: string) {
 function HotelLine({ label, hotel }: { label: string; hotel: PackageCardHotel }) {
   return (
     <div className="min-w-0 flex-1">
-      <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
         <Building2 className="size-3" /> {label}
       </p>
       {/* Wraps to two lines rather than truncating. In a four-up grid the
@@ -223,7 +223,7 @@ export function PackageCard({ pkg }: { pkg: PackageCardData }) {
 
           <div className="mt-auto flex items-end justify-between pt-2">
             <p className="text-sm">
-              <span className="block text-[10px] uppercase text-muted-foreground">Starting from</span>
+              <span className="block text-xs text-muted-foreground">Starting from</span>
               <span className="font-heading text-lg font-bold text-primary">
                 {pkg.currency} {pkg.base_price.toFixed(0)}
               </span>{" "}

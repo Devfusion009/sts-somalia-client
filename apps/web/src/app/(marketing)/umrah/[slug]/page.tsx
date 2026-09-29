@@ -148,7 +148,7 @@ export default async function UmrahPackagePage({
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {hotels.map((h) => (
               <div key={h.id} className="rounded-xl border border-border bg-card p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-xs font-semibold text-muted-foreground">
                   {CITY_LABELS[h.city] ?? h.city} Hotel
                 </p>
                 <p className="mt-0.5 font-heading text-base font-bold">

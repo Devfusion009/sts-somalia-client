@@ -5,7 +5,7 @@ import { InfiniteMovingRow } from "@/components/ui/aceternity/motion-primitives"
 import { VerifiedIcon } from "@/components/ui/mui-icons";
 const USPS = [
   "Licensed Somali travel agency",
-  "Safe, seamless travel for every age group",
+  "ISO 9001:2015 certified",
   "Fully customisable Umrah & holiday packages",
   "Local payment methods — EVC Plus, bank, card",
   "24/7 support from a Mogadishu-based team",

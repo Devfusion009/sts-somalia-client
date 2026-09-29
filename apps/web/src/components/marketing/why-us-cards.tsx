@@ -1,6 +1,4 @@
-
-
-import { FadeIn, SpotlightCard, StaggerGroup, StaggerItem } from "@/components/ui/aceternity/motion-primitives";
+import { StaggerGroup, StaggerItem } from "@/components/ui/aceternity/motion-primitives";
 
 import { BeachAccessIcon, Diversity3Icon, HandshakeIcon, SettingsSuggestIcon, ThumbUpAltIcon } from "@/components/ui/mui-icons";
 import type { SvgIconComponent } from "@/components/ui/mui-icons";
@@ -34,24 +32,20 @@ const PILLARS: Array<{ icon: SvgIconComponent; title: string; body: string }> = 
 
 export function WhyUsCards() {
   return (
-    <section id="about" className="scroll-mt-32 bg-muted/40 py-14 sm:py-16 lg:py-20">
+    <section id="about" className="scroll-mt-32 bg-sidebar py-14 text-sidebar-foreground sm:py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <FadeIn className="text-center">
-          <h2 className="mx-auto max-w-3xl font-heading text-2xl font-bold tracking-tight text-balance sm:text-3xl lg:text-4xl">
-            We have served thousands of travellers, and we are here for you
-          </h2>
-        </FadeIn>
+        <h2 className="font-heading text-2xl font-bold tracking-tight text-balance sm:text-3xl lg:text-4xl">
+          We have served thousands of travellers, and we are here for you
+        </h2>
 
-        <StaggerGroup className="mt-11 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        <StaggerGroup className="mt-11 grid grid-cols-1 gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
           {PILLARS.map((pillar) => (
-            <StaggerItem key={pillar.title} className="grid">
-              <SpotlightCard className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl">
-                <span className="grid size-14 place-items-center rounded-2xl bg-brand-accent/10 text-brand-accent">
-                  <pillar.icon sx={{ fontSize: 30 }} />
-                </span>
-                <h3 className="mt-5 font-heading text-base font-bold">{pillar.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{pillar.body}</p>
-              </SpotlightCard>
+            <StaggerItem key={pillar.title} className="flex gap-4">
+              <pillar.icon sx={{ fontSize: 28 }} className="shrink-0 text-brand-accent" />
+              <div>
+                <h3 className="font-heading text-base font-bold">{pillar.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-sidebar-foreground/70">{pillar.body}</p>
+              </div>
             </StaggerItem>
           ))}
         </StaggerGroup>

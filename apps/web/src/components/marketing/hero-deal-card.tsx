@@ -80,7 +80,7 @@ export function HeroDealCard({
 
         <div className="relative p-5">
           <div className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-2 text-xs font-bold tracking-wider text-white/80 uppercase">
+            <span className="flex items-center gap-2 text-xs font-bold text-white/80">
               {/* Solid tile, not a translucent one — a white glyph on bg-white/15
                   over a photo had almost no contrast at 16px. */}
               <span className="grid size-9 place-items-center rounded-lg bg-white text-sidebar shadow-md">
@@ -132,13 +132,13 @@ export function HeroDealCard({
           <dl className="flex gap-5">
             {deal.meta.map((item) => (
               <div key={item.label}>
-                <dt className="text-[10px] font-semibold tracking-wider text-white/50 uppercase">{item.label}</dt>
+                <dt className="text-xs font-semibold text-white/50">{item.label}</dt>
                 <dd className="mt-0.5 text-sm font-bold text-white">{item.value}</dd>
               </div>
             ))}
           </dl>
           <div className="text-right">
-            <p className="text-[10px] font-semibold tracking-wider text-white/50 uppercase">From</p>
+            <p className="text-xs font-semibold text-white/50">From</p>
             <p className="font-heading text-2xl leading-none font-extrabold text-brand-accent">{deal.price}</p>
             <p className="mt-0.5 text-[11px] text-white/60">{deal.priceSuffix}</p>
           </div>

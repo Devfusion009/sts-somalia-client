@@ -143,7 +143,7 @@ export default async function VisaDetailPage({
                 <row.icon className="size-4" />
               </span>
               <div className="min-w-0">
-                <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">{row.label}</p>
+                <p className="text-xs font-medium text-muted-foreground">{row.label}</p>
                 <p className="truncate text-sm font-bold">{row.value}</p>
               </div>
             </div>

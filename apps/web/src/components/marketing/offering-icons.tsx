@@ -45,7 +45,7 @@ function DrawIcon({
     <motion.svg
       viewBox="0 0 64 64"
       fill="none"
-      strokeWidth={2.2}
+      strokeWidth={3.1}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden

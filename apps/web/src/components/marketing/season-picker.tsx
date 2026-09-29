@@ -123,7 +123,9 @@ export function SeasonPicker() {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               className="rounded-2xl border border-border bg-card/80 p-7 backdrop-blur lg:col-span-4"
             >
-              <h3 className="font-heading text-2xl leading-tight font-bold text-balance">{season.headline}</h3>
+              <h3 className="font-african text-3xl leading-tight font-normal tracking-tight text-balance sm:text-4xl">
+                {season.headline}
+              </h3>
               <p className="mt-4 leading-relaxed text-muted-foreground">{season.blurb}</p>
             </motion.div>
           </AnimatePresence>

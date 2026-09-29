@@ -105,7 +105,7 @@ export default async function VenueDetailPage({
             <div className="rounded-xl bg-white/10 px-4 py-2 text-right backdrop-blur">
               {Number(venue.base_price) > 0 ? (
                 <>
-                  <p className="text-[10px] text-white/70 uppercase">From</p>
+                  <p className="text-xs text-white/70">From</p>
                   <p className="font-heading text-xl font-bold text-white">
                     {venue.currency} {Number(venue.base_price).toFixed(0)}
                     <span className="text-xs font-normal text-white/70">

@@ -130,8 +130,7 @@ export default function AboutPage() {
       <section className="bg-background pt-14 pb-16 sm:pt-20 lg:pt-24">
         <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:px-8">
           <FadeIn>
-            <p className="text-sm font-semibold tracking-[0.14em] text-primary uppercase">About us</p>
-            <h1 className="mt-4 font-heading text-4xl leading-[1.05] font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl">
+            <h1 className="font-heading text-4xl leading-[1.05] font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl">
               We plan.
               <br />
               You explore.
@@ -175,7 +174,7 @@ export default function AboutPage() {
             {ACCREDITORS.map((name) => (
               <li
                 key={name}
-                className="rounded-full border border-border bg-card px-4 py-2 font-heading text-xs font-bold tracking-wide text-muted-foreground uppercase"
+                className="rounded-full border border-border bg-card px-4 py-2 font-heading text-xs font-bold text-muted-foreground"
               >
                 {name}
               </li>
@@ -345,7 +344,7 @@ export default function AboutPage() {
       <section className="bg-sidebar py-16 text-sidebar-foreground sm:py-20">
         <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:px-8">
           <FadeIn>
-            <p className="text-sm font-semibold tracking-[0.14em] text-sidebar-primary uppercase">
+            <p className="text-sm font-semibold text-sidebar-primary">
               ISO 9001:2015 scope
             </p>
             <h2 className="mt-3 font-heading text-3xl font-bold tracking-tight text-balance text-white sm:text-4xl">
@@ -384,8 +383,7 @@ export default function AboutPage() {
       <section className="bg-background py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <FadeIn className="max-w-2xl">
-            <p className="text-sm font-semibold tracking-[0.14em] text-primary uppercase">On the ground</p>
-            <h2 className="mt-3 font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl">
+            <h2 className="font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl">
               We travel with our pilgrims
             </h2>
             <p className="mt-5 leading-relaxed text-muted-foreground">
@@ -418,8 +416,7 @@ export default function AboutPage() {
       <section id="offices" className="scroll-mt-32 bg-muted/40 py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <FadeIn className="max-w-2xl">
-            <p className="text-sm font-semibold tracking-[0.14em] text-primary uppercase">Our offices</p>
-            <h2 className="mt-3 font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl">
+            <h2 className="font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl">
               Two branches, one company
             </h2>
             <p className="mt-5 leading-relaxed text-muted-foreground">
@@ -441,7 +438,7 @@ export default function AboutPage() {
                       sizes="(max-width: 1024px) 100vw, 50vw"
                       className="object-cover"
                     />
-                    <span className="absolute top-4 left-4 rounded-full bg-brand-accent px-3 py-1.5 text-xs font-bold tracking-wide text-brand-accent-foreground uppercase shadow-lg">
+                    <span className="absolute top-4 left-4 rounded-full bg-brand-accent px-3 py-1.5 text-xs font-bold text-brand-accent-foreground shadow-lg">
                       {office.role}
                     </span>
                   </div>

@@ -396,7 +396,7 @@ function ServiceOptionCard({
       )}
     >
       {recommended ? (
-        <span className="absolute -top-2.5 left-4 flex items-center gap-1 rounded-full bg-brand-accent px-2 py-0.5 text-[10px] font-bold tracking-wide text-brand-accent-foreground uppercase">
+        <span className="absolute -top-2.5 left-4 flex items-center gap-1 rounded-full bg-brand-accent px-2 py-0.5 text-xs font-bold text-brand-accent-foreground">
           <Sparkles className="size-2.5" /> Recommended
         </span>
       ) : null}

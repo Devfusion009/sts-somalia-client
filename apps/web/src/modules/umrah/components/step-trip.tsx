@@ -356,7 +356,7 @@ function TripSummary({
 }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-      <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
+      <p className="text-xs font-bold text-muted-foreground">
         Your trip so far
       </p>
 
@@ -446,7 +446,7 @@ function TripStatTile({
       <span className="font-heading text-lg font-bold tabular-nums">
         {value}
       </span>
-      <span className="px-1 text-[9px] leading-tight font-semibold tracking-wide text-muted-foreground uppercase">
+      <span className="px-1 text-xs leading-tight font-semibold text-muted-foreground">
         {label}
       </span>
     </div>

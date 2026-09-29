@@ -250,7 +250,7 @@ export default async function PrivateUmrahPage({
 
         <aside>
           <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-            <p className="flex items-center gap-2 text-xs font-bold tracking-widest text-muted-foreground uppercase">
+            <p className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
               <ListChecks className="size-3.5" /> What you can choose
             </p>
             <ul className="mt-4 space-y-3">
