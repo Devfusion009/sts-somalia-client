@@ -1,7 +1,12 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getAllUsers } from "@/modules/admin/queries";
+import { getUsersPage } from "@/modules/admin/queries";
+import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Pager } from "@/components/dashboard/pager";
+import { parsePage } from "@/lib/pagination";
 import { accountRoleBadges } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
 import { UserStatusToggle } from "./user-status-toggle";
@@ -21,15 +26,32 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = 
   suspended: "destructive",
 };
 
-export default async function AdminUsersPage() {
-  const users = await getAllUsers();
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; q?: string }>;
+}) {
+  const sp = await searchParams;
+  const page = parsePage(sp.page);
+  const { rows: users, total } = await getUsersPage({ page, q: sp.q });
+  const hrefFor = (n: number) => `/users?${sp.q ? `q=${encodeURIComponent(sp.q)}&` : ""}page=${n}`;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <h1 className="font-heading text-2xl font-semibold">Users</h1>
-        <Badge variant="secondary">{users.length}</Badge>
+        <Badge variant="secondary">{total}</Badge>
       </div>
+
+      <form action="/admin/users" className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input name="q" defaultValue={sp.q} placeholder="Name or email" className="h-8 w-64 pl-8" aria-label="Search" />
+        </div>
+        <Button type="submit" size="sm" variant="outline">
+          Apply
+        </Button>
+      </form>
 
       <Card className="overflow-hidden py-0">
         <Table>
@@ -75,6 +97,8 @@ export default async function AdminUsersPage() {
           </TableBody>
         </Table>
       </Card>
+
+      <Pager page={page} total={total} hrefFor={hrefFor} />
     </div>
   );
 }

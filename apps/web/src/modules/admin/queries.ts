@@ -1,6 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { bucketKey, bucketLabel, enumerateBuckets } from "@/lib/date-range";
+import { pageRange, searchTerm } from "@/lib/pagination";
+import type { Database } from "@/lib/types/database.types";
 
 export async function getDashboardStats() {
   const supabase = await createClient();
@@ -268,20 +270,42 @@ export async function getAdminProfiles() {
  * One unbroken literal: supabase-js parses this string statically to type the
  * embeds, and a concatenated one collapses to GenericStringError.
  */
-export async function getAllOrders() {
+/**
+ * The slim version of every recent order — just what the filter chips, the
+ * counts and the stat tiles are computed from (status, total, whether a
+ * payment awaits a human, and the dates travel starts). The page filters this,
+ * then loads the full cards for only the 25 it will show.
+ */
+export async function getOrderIndex() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("orders")
+    .select(
+      "id, status, total, created_at, payments(status), order_items(item_type, hotel_booking:hotel_booking_id(check_in), flight_booking:flight_booking_id(depart_at), visa_application:visa_application_id(travel_details), umrah_booking:umrah_booking_id(departure:departure_id(departure_date)), hall_booking:hall_booking_id(start_date))"
+    )
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  return data ?? [];
+}
+
+export type OrderIndexRow = Awaited<ReturnType<typeof getOrderIndex>>[number];
+
+export async function getOrdersByIds(ids: string[]) {
+  if (ids.length === 0) return [];
   const supabase = await createClient();
   const { data } = await supabase
     .from("orders")
     .select(
       "id, order_number, status, currency, subtotal, discount_total, total, created_at, paid_at, notes, customer:profiles!orders_customer_id_fkey(full_name, email, phone), agency:agencies(name), agency_customer:agency_customer_id(full_name, phone), payments(id, provider, method_label, amount, currency, status, payer_phone, created_at), invoices(invoice_number, status), order_items(id, item_type, quantity, total_price, hotel_booking:hotel_booking_id(check_in, check_out, num_rooms, num_adults, status, hotel:hotel_id(name, city)), flight_booking:flight_booking_id(origin_iata, destination_iata, depart_at, return_at, status), visa_application:visa_application_id(application_ref, status, travel_details, visa_type:visa_type_id(name, destination_country_code)), umrah_booking:umrah_booking_id(num_pilgrims, status, package:package_id(name, duration_days), departure:departure_id(departure_date, return_date)), hall_booking:hall_booking_id(event_type, start_date, end_date, status, venue:venue_id(name, city)))"
     )
-    .order("created_at", { ascending: false })
-    .limit(200);
+    .in("id", ids);
 
-  return data ?? [];
+  // `in` has no order of its own; keep the caller's (newest first) ordering.
+  const position = new Map(ids.map((id, index) => [id, index]));
+  return (data ?? []).sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
 }
 
-export type AdminOrder = Awaited<ReturnType<typeof getAllOrders>>[number];
+export type AdminOrder = Awaited<ReturnType<typeof getOrdersByIds>>[number];
 
 export async function getVisaTypesAdmin() {
   const supabase = await createClient();
@@ -568,13 +592,29 @@ export async function getHallBookingsAdmin() {
 // ---------------------------------------------------------------------------
 // Hotel management (admin)
 // ---------------------------------------------------------------------------
-export async function getHotelsAdmin() {
+export type HotelListFilters = { page: number; q?: string; status?: string };
+
+/**
+ * One page of the hotels table: only the columns the table draws, the room
+ * count as an aggregate (not every room id), filtered and sorted in the
+ * database. `total` is the match count across all pages.
+ */
+export async function getHotelsAdmin({ page, q, status }: HotelListFilters) {
   const supabase = await createClient();
-  const { data } = await supabase
+  let query = supabase
     .from("hotels")
-    .select("*, hotel_rooms(id), partner:hotel_partners(name)")
+    .select("id, name, city, star_rating, status, booking_mode, partner:hotel_partners(name), hotel_rooms(count)", {
+      count: "exact",
+    })
     .order("created_at", { ascending: false });
-  return data ?? [];
+
+  const term = searchTerm(q);
+  if (term) query = query.or(`name.ilike.%${term}%,city.ilike.%${term}%`);
+  if (status) query = query.eq("status", status as Database["public"]["Enums"]["listing_status"]);
+
+  const { from, to } = pageRange(page);
+  const { data, count } = await query.range(from, to);
+  return { rows: data ?? [], total: count ?? 0 };
 }
 
 export async function getHotelByIdAdmin(hotelId: string) {
@@ -668,25 +708,35 @@ export async function getUpcomingHallBookings(limit = 5) {
  * types can't describe an aggregate embed, and an account belongs to a handful
  * of organisations at most.
  */
-export async function getAllUsers() {
+export type UserListFilters = { page: number; q?: string };
+
+/** One page of the users table, newest first, with membership counts as aggregates. */
+export async function getUsersPage({ page, q }: UserListFilters) {
   const supabase = await createClient();
-  const { data } = await supabase
+  let query = supabase
     .from("profiles")
     // One unbroken literal: supabase-js infers embedded-resource types by
     // statically parsing this string, and a concatenated one yields
     // GenericStringError instead of real columns (same trap documented on
     // queryApplications above).
     .select(
-      "id, full_name, email, role, is_platform_admin, status, created_at, agency_members(id), hotel_partner_members(id)"
+      "id, full_name, email, role, is_platform_admin, status, created_at, agency_members(count), hotel_partner_members(count)",
+      { count: "exact" }
     )
-    .order("created_at", { ascending: false })
-    .limit(500);
+    .order("created_at", { ascending: false });
 
-  return (data ?? []).map((user) => ({
+  const term = searchTerm(q);
+  if (term) query = query.or(`full_name.ilike.%${term}%,email.ilike.%${term}%`);
+
+  const { from, to } = pageRange(page);
+  const { data, count } = await query.range(from, to);
+
+  const rows = (data ?? []).map((user) => ({
     ...user,
-    agencyCount: user.agency_members?.length ?? 0,
-    hotelPartnerCount: user.hotel_partner_members?.length ?? 0,
+    agencyCount: user.agency_members?.[0]?.count ?? 0,
+    hotelPartnerCount: user.hotel_partner_members?.[0]?.count ?? 0,
   }));
+  return { rows, total: count ?? 0 };
 }
 
 /** Admin-only audit trail: every row-level change captured by the audit trigger. */

@@ -20,8 +20,10 @@ import { StatTile } from "@/components/dashboard/stat-tile";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getAllOrders } from "@/modules/admin/queries";
-import { describeOrderItem, travelWindow, travelLength, orderTravelStart } from "@/modules/admin/order-items";
+import { getOrderIndex, getOrdersByIds } from "@/modules/admin/queries";
+import { describeOrderItem, travelWindow, travelLength, orderTravelStart, indexTravelStart } from "@/modules/admin/order-items";
+import { Pager } from "@/components/dashboard/pager";
+import { ADMIN_PAGE_SIZE, parsePage } from "@/lib/pagination";
 import { OrderStatusSelect } from "./order-status-select";
 import { RecordPaymentDialog } from "./record-payment-dialog";
 import { ConfirmPaymentButton } from "./confirm-payment-button";
@@ -74,33 +76,39 @@ function money(amount: number | string, currency: string) {
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; page?: string }>;
 }) {
-  const { filter: filterParam } = await searchParams;
+  const { filter: filterParam, page: pageParam } = await searchParams;
   const filter = FILTERS.find((f) => f.key === filterParam)?.key ?? "all";
-  const orders = await getAllOrders();
+  const page = parsePage(pageParam);
+
+  // Filters, chip counts and the stat tiles come from the slim index; only the
+  // page of orders actually shown loads its full booking and payment detail.
+  const index = await getOrderIndex();
 
   const today = new Date().setHours(0, 0, 0, 0);
-  const needsAction = (o: (typeof orders)[number]) =>
-    o.payments.some((p) => p.status === "requires_action");
-  const departsWithin30Days = (o: (typeof orders)[number]) => {
-    const start = orderTravelStart(o);
+  const needsAction = (o: (typeof index)[number]) => o.payments.some((p) => p.status === "requires_action");
+  const departsWithin30Days = (o: (typeof index)[number]) => {
+    const start = indexTravelStart(o);
     if (!start) return false;
     const days = (new Date(start).setHours(0, 0, 0, 0) - today) / 86_400_000;
     return days >= 0 && days <= 30;
   };
 
-  const visible = orders.filter((o) => {
+  const matching = index.filter((o) => {
     if (filter === "all") return true;
     if (filter === "action") return needsAction(o);
     if (filter === "upcoming") return departsWithin30Days(o) && o.status !== "cancelled";
     return o.status === filter;
   });
 
-  const settled = orders.filter((o) => ["paid", "processing", "completed"].includes(o.status));
+  const settled = index.filter((o) => ["paid", "processing", "completed"].includes(o.status));
   const revenue = settled.reduce((sum, o) => sum + Number(o.total), 0);
-  const actionCount = orders.filter(needsAction).length;
-  const soonCount = orders.filter((o) => departsWithin30Days(o) && o.status !== "cancelled").length;
+  const actionCount = index.filter(needsAction).length;
+  const soonCount = index.filter((o) => departsWithin30Days(o) && o.status !== "cancelled").length;
+
+  const pageIds = matching.slice((page - 1) * ADMIN_PAGE_SIZE, page * ADMIN_PAGE_SIZE).map((o) => o.id);
+  const visible = await getOrdersByIds(pageIds);
 
   return (
     <div className="space-y-6">
@@ -109,7 +117,7 @@ export default async function AdminOrdersPage({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile icon={Receipt} label="Orders" value={String(orders.length)} />
+        <StatTile icon={Receipt} label="Orders" value={String(index.length)} />
         <StatTile
           icon={Wallet}
           label="Settled revenue"
@@ -136,12 +144,12 @@ export default async function AdminOrdersPage({
           const active = f.key === filter;
           const count =
             f.key === "all"
-              ? orders.length
+              ? index.length
               : f.key === "action"
                 ? actionCount
                 : f.key === "upcoming"
                   ? soonCount
-                  : orders.filter((o) => o.status === f.key).length;
+                  : index.filter((o) => o.status === f.key).length;
           return (
             <Link
               key={f.key}
@@ -171,7 +179,7 @@ export default async function AdminOrdersPage({
       {visible.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
-            <p className="text-sm font-medium">{orders.length === 0 ? "No orders yet." : "No orders match this filter."}</p>
+            <p className="text-sm font-medium">{index.length === 0 ? "No orders yet." : "No orders match this filter."}</p>
           </CardContent>
         </Card>
       ) : (
@@ -410,6 +418,8 @@ export default async function AdminOrdersPage({
           })}
         </div>
       )}
+
+      <Pager page={page} total={matching.length} hrefFor={(n) => `/orders?filter=${filter}&page=${n}`} />
     </div>
   );
 }

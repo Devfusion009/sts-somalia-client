@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Pager } from "@/components/dashboard/pager";
+import { parsePage } from "@/lib/pagination";
 import {
   Table,
   TableBody,
@@ -26,8 +29,32 @@ const HOTEL_STATUS_STYLES: Record<string, string> = {
   suspended: "bg-destructive/10 text-destructive",
 };
 
-export default async function AdminHotelsPage() {
-  const [hotels, partners] = await Promise.all([getHotelsAdmin(), getHotelPartnersForSelect()]);
+const STATUS_OPTIONS = [
+  { value: "published", label: "Published" },
+  { value: "draft", label: "Draft" },
+  { value: "pending_review", label: "Pending review" },
+  { value: "suspended", label: "Suspended" },
+] as const;
+
+export default async function AdminHotelsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; q?: string; status?: string }>;
+}) {
+  const sp = await searchParams;
+  const page = parsePage(sp.page);
+  const status = STATUS_OPTIONS.find((o) => o.value === sp.status)?.value;
+  const [{ rows: hotels, total }, partners] = await Promise.all([
+    getHotelsAdmin({ page, q: sp.q, status }),
+    getHotelPartnersForSelect(),
+  ]);
+  const hrefFor = (n: number) => {
+    const params = new URLSearchParams();
+    if (sp.q) params.set("q", sp.q);
+    if (status) params.set("status", status);
+    params.set("page", String(n));
+    return `/hotels?${params.toString()}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -40,6 +67,29 @@ export default async function AdminHotelsPage() {
           <HotelForm partners={partners} />
         </div>
       </div>
+
+      <form action="/admin/hotels" className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input name="q" defaultValue={sp.q} placeholder="Hotel or city" className="h-8 w-64 pl-8" aria-label="Search" />
+        </div>
+        <select
+          name="status"
+          defaultValue={status ?? ""}
+          aria-label="Status"
+          className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm dark:bg-input/30"
+        >
+          <option value="">Any status</option>
+          {STATUS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <Button type="submit" size="sm" variant="outline">
+          Apply
+        </Button>
+      </form>
 
       <Card className="overflow-hidden py-0">
         <Table>
@@ -58,7 +108,7 @@ export default async function AdminHotelsPage() {
             {hotels.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                  No hotels yet — add your first property.
+                  {sp.q || status ? "No hotels match." : "No hotels yet — add your first property."}
                 </TableCell>
               </TableRow>
             ) : (
@@ -72,7 +122,7 @@ export default async function AdminHotelsPage() {
                   </TableCell>
                   <TableCell>{hotel.city}</TableCell>
                   <TableCell>{hotel.star_rating ? `${hotel.star_rating}★` : "—"}</TableCell>
-                  <TableCell>{hotel.hotel_rooms?.length ?? 0}</TableCell>
+                  <TableCell>{hotel.hotel_rooms?.[0]?.count ?? 0}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {hotel.partner?.name ?? "STS (direct)"}
                   </TableCell>
@@ -97,6 +147,8 @@ export default async function AdminHotelsPage() {
           </TableBody>
         </Table>
       </Card>
+
+      <Pager page={page} total={total} hrefFor={hrefFor} />
     </div>
   );
 }

@@ -11,18 +11,35 @@ export type AppRole = Database["public"]["Enums"]["app_role"];
 /** Current signed-in user's profile, or null if not signed in. */
 export async function getCurrentProfile(): Promise<Profile | null> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
+  // The profile read does not depend on the token check, so the two overlap
+  // instead of running back to back (one network round trip saved on every
+  // authenticated page). The id used for the read comes from the cookie, so it
+  // is only trusted if getUser() — the authoritative check — agrees.
+  const claimedId = await sessionUserId(supabase);
+  const [{ data: { user } }, { data: profile }] = await Promise.all([
+    supabase.auth.getUser(),
+    claimedId
+      ? supabase.from("profiles").select("*").eq("id", claimedId).single()
+      : Promise.resolve({ data: null }),
+  ]);
+  if (!user || user.id !== claimedId) return null;
   return profile;
+}
+
+/** `sub` of the access token in the session cookie, unverified — only ever used to start a read early. */
+async function sessionUserId(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string | null> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const payload = session?.access_token.split(".")[1];
+  if (!payload) return null;
+  try {
+    const { sub } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { sub?: unknown };
+    return typeof sub === "string" ? sub : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
