@@ -24,6 +24,17 @@ export async function mfaChallengePending(): Promise<boolean> {
   return data.currentLevel === "aal1" && data.nextLevel === "aal2";
 }
 
+/**
+ * True if the signed-in user has at least one verified factor. Read from the
+ * session's assurance level — a local decode of the token — so it costs no
+ * round trip to Supabase Auth, unlike listVerifiedFactors().
+ */
+export async function hasVerifiedFactor(): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  return data?.nextLevel === "aal2";
+}
+
 /** Verified TOTP factors on the current user's account (for the security settings page). */
 export async function listVerifiedFactors() {
   const supabase = await createClient();

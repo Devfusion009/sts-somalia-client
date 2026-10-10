@@ -22,6 +22,9 @@ export async function getServerTrpc() {
       httpBatchLink({
         url: `${apiUrl()}/trpc`,
         headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+        // A slow or unreachable api must not hold a page render hostage:
+        // callers already treat a failed call as "no data".
+        fetch: (url, options) => fetch(url, { ...options, signal: AbortSignal.timeout(3000) }),
       }),
     ],
   });

@@ -102,9 +102,11 @@ export async function requirePlatformAdmin(): Promise<Profile> {
  * generic redirect is fine.
  */
 export async function requireUserForPortal(portal: PortalSubdomain): Promise<Profile> {
-  const profile = await getCurrentProfile();
+  // The MFA check reads the session, not the profile, so it overlaps the
+  // profile lookup instead of waiting behind it. Redirect order is unchanged.
+  const [profile, mfaPending] = await Promise.all([getCurrentProfile(), mfaChallengePending()]);
   if (!profile) redirect(portalLoginHref(portal));
-  if (await mfaChallengePending()) redirect("/login/verify-2fa");
+  if (mfaPending) redirect("/login/verify-2fa");
   return profile;
 }
 

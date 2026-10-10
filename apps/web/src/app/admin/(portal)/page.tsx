@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -55,6 +56,7 @@ import { B2BvsB2CChart } from "@/modules/admin/components/b2b-b2c-chart";
 import { Sparkline } from "@/components/dashboard/sparkline";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { resolveDateRange, percentChange } from "@/lib/date-range";
+import { PanelPairSkeleton, PanelSkeleton, StatRowSkeleton } from "@/components/dashboard/skeletons";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/auth/session";
 
@@ -173,44 +175,21 @@ export default async function AdminDashboardPage({
   const range = resolveDateRange(sp);
   const rangeQuery = `range=${range.key}${range.key === "custom" ? `&from=${sp.from}&to=${sp.to}` : ""}`;
 
-  const [
-    stats,
-    revenueTrend,
-    bookingsByType,
-    recentOrders,
-    topHotels,
-    visaStats,
-    upcomingHalls,
-    userGrowth,
-    b2bVsB2c,
-    leaderboard,
-    statTrends,
-  ] = await Promise.all([
-    getDashboardStats(),
-    getRevenueTrendRanged(range.from, range.to, range.granularity),
-    getBookingsByTypeRanged(range.from, range.to),
-    getRecentOrdersWithItems(6),
-    getTopHotels(5),
-    getVisaStatsAdmin(),
-    getUpcomingHallBookings(5),
-    getUserGrowth(range.from, range.to, range.granularity),
-    getB2BvsB2C(range.from, range.to),
-    getAgentLeaderboard(range.from, range.to, 10),
-    getStatCardTrends(range.from, range.to, range.previousFrom, range.previousTo, range.granularity),
-  ]);
-
-  const visaActive =
-    (visaStats.byStatus["submitted"] ?? 0) +
-    (visaStats.byStatus["in_review"] ?? 0) +
-    (visaStats.byStatus["additional_info_required"] ?? 0) +
-    (visaStats.byStatus["ready_for_processing"] ?? 0) +
-    (visaStats.byStatus["processing"] ?? 0);
-
-  const usersByRoleData = Object.entries(ROLE_CHART_LABELS).map(([role, label]) => ({
-    role,
-    label,
-    count: stats.usersByRole[role] ?? 0,
-  }));
+  // Every query starts now, in parallel, but nothing is awaited here: each
+  // section below awaits only what it draws and streams in on its own, so the
+  // header and skeletons paint immediately instead of after the slowest of
+  // eleven round trips to the database.
+  const statsP = getDashboardStats();
+  const trendsP = getStatCardTrends(range.from, range.to, range.previousFrom, range.previousTo, range.granularity);
+  const revenueTrendP = getRevenueTrendRanged(range.from, range.to, range.granularity);
+  const bookingsByTypeP = getBookingsByTypeRanged(range.from, range.to);
+  const userGrowthP = getUserGrowth(range.from, range.to, range.granularity);
+  const b2bVsB2cP = getB2BvsB2C(range.from, range.to);
+  const recentOrdersP = getRecentOrdersWithItems(6);
+  const topHotelsP = getTopHotels(5);
+  const leaderboardP = getAgentLeaderboard(range.from, range.to, 10);
+  const visaStatsP = getVisaStatsAdmin();
+  const upcomingHallsP = getUpcomingHallBookings(5);
 
   return (
     <div className="space-y-6">
@@ -219,6 +198,47 @@ export default async function AdminDashboardPage({
         <DateRangePicker currentKey={range.key} />
       </div>
 
+      <Suspense fallback={<StatRowSkeleton />}>
+        <StatsSection statsP={statsP} trendsP={trendsP} />
+      </Suspense>
+
+      <Suspense fallback={<PanelPairSkeleton />}>
+        <RevenueSection revenueTrendP={revenueTrendP} bookingsByTypeP={bookingsByTypeP} />
+      </Suspense>
+
+      <Suspense fallback={<PanelPairSkeleton />}>
+        <GrowthSection userGrowthP={userGrowthP} b2bVsB2cP={b2bVsB2cP} rangeQuery={rangeQuery} />
+      </Suspense>
+
+      <Suspense fallback={<PanelPairSkeleton rows={4} />}>
+        <OrdersSection recentOrdersP={recentOrdersP} topHotelsP={topHotelsP} />
+      </Suspense>
+
+      <Suspense fallback={<PanelSkeleton rows={4} />}>
+        <LeaderboardSection leaderboardP={leaderboardP} rangeQuery={rangeQuery} />
+      </Suspense>
+
+      <Suspense fallback={<PanelPairSkeleton rows={4} />}>
+        <VisaSection visaStatsP={visaStatsP} upcomingHallsP={upcomingHallsP} />
+      </Suspense>
+
+      <Suspense fallback={<PanelSkeleton />}>
+        <RolesSection statsP={statsP} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function StatsSection({
+  statsP,
+  trendsP,
+}: {
+  statsP: ReturnType<typeof getDashboardStats>;
+  trendsP: ReturnType<typeof getStatCardTrends>;
+}) {
+  const [stats, statTrends] = await Promise.all([statsP, trendsP]);
+  return (
+    <>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard
           icon={Users}
@@ -277,7 +297,19 @@ export default async function AdminDashboardPage({
           </CardContent>
         </Card>
       ) : null}
+    </>
+  );
+}
 
+async function RevenueSection({
+  revenueTrendP,
+  bookingsByTypeP,
+}: {
+  revenueTrendP: ReturnType<typeof getRevenueTrendRanged>;
+  bookingsByTypeP: ReturnType<typeof getBookingsByTypeRanged>;
+}) {
+  const [revenueTrend, bookingsByType] = await Promise.all([revenueTrendP, bookingsByTypeP]);
+  return (
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className={cn(CARD, "lg:col-span-3")}>
           <CardHeader>
@@ -297,7 +329,20 @@ export default async function AdminDashboardPage({
           </CardContent>
         </Card>
       </div>
+  );
+}
 
+async function GrowthSection({
+  userGrowthP,
+  b2bVsB2cP,
+  rangeQuery,
+}: {
+  userGrowthP: ReturnType<typeof getUserGrowth>;
+  b2bVsB2cP: ReturnType<typeof getB2BvsB2C>;
+  rangeQuery: string;
+}) {
+  const [userGrowth, b2bVsB2c] = await Promise.all([userGrowthP, b2bVsB2cP]);
+  return (
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className={cn(CARD, "lg:col-span-3")}>
           <CardHeader>
@@ -323,7 +368,18 @@ export default async function AdminDashboardPage({
           </CardContent>
         </Card>
       </div>
+  );
+}
 
+async function OrdersSection({
+  recentOrdersP,
+  topHotelsP,
+}: {
+  recentOrdersP: ReturnType<typeof getRecentOrdersWithItems>;
+  topHotelsP: ReturnType<typeof getTopHotels>;
+}) {
+  const [recentOrders, topHotels] = await Promise.all([recentOrdersP, topHotelsP]);
+  return (
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className={cn(CARD, "lg:col-span-3")}>
           <CardHeader>
@@ -400,7 +456,18 @@ export default async function AdminDashboardPage({
           </CardContent>
         </Card>
       </div>
+  );
+}
 
+async function LeaderboardSection({
+  leaderboardP,
+  rangeQuery,
+}: {
+  leaderboardP: ReturnType<typeof getAgentLeaderboard>;
+  rangeQuery: string;
+}) {
+  const leaderboard = await leaderboardP;
+  return (
       <Card className={CARD}>
         <CardHeader>
           <CardTitle>Agent leaderboard</CardTitle>
@@ -443,7 +510,24 @@ export default async function AdminDashboardPage({
           )}
         </CardContent>
       </Card>
+  );
+}
 
+async function VisaSection({
+  visaStatsP,
+  upcomingHallsP,
+}: {
+  visaStatsP: ReturnType<typeof getVisaStatsAdmin>;
+  upcomingHallsP: ReturnType<typeof getUpcomingHallBookings>;
+}) {
+  const [visaStats, upcomingHalls] = await Promise.all([visaStatsP, upcomingHallsP]);
+  const visaActive =
+    (visaStats.byStatus["submitted"] ?? 0) +
+    (visaStats.byStatus["in_review"] ?? 0) +
+    (visaStats.byStatus["additional_info_required"] ?? 0) +
+    (visaStats.byStatus["ready_for_processing"] ?? 0) +
+    (visaStats.byStatus["processing"] ?? 0);
+  return (
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className={cn(CARD, "lg:col-span-3")}>
           <CardHeader>
@@ -519,7 +603,17 @@ export default async function AdminDashboardPage({
           </CardContent>
         </Card>
       </div>
+  );
+}
 
+async function RolesSection({ statsP }: { statsP: ReturnType<typeof getDashboardStats> }) {
+  const stats = await statsP;
+  const usersByRoleData = Object.entries(ROLE_CHART_LABELS).map(([role, label]) => ({
+    role,
+    label,
+    count: stats.usersByRole[role] ?? 0,
+  }));
+  return (
       <Card className={CARD}>
         <CardHeader>
           <CardTitle>Users by role</CardTitle>
@@ -528,7 +622,6 @@ export default async function AdminDashboardPage({
           <UsersByRoleChart data={usersByRoleData} />
         </CardContent>
       </Card>
-    </div>
   );
 }
 

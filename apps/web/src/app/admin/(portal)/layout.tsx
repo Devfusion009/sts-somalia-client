@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { after } from "next/server";
 import { requireAdminPortalAccess } from "@/lib/auth/session";
-import { listVerifiedFactors } from "@/lib/auth/mfa";
+import { hasVerifiedFactor } from "@/lib/auth/mfa";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { createClient } from "@/lib/supabase/server";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
@@ -131,24 +132,28 @@ const REQUIRE_ADMIN_MFA = false;
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireAdminPortalAccess();
 
-  // Mandatory TOTP enrollment for the admin console: an account can hold
-  // is_platform_admin and still have zero verified factors (enrollment is
-  // opt-in everywhere else). Block every /admin route behind an inline
-  // enrollment prompt rather than redirecting to /admin/security — that
-  // route lives under this same layout, so a redirect would loop.
-  const factors = await listVerifiedFactors();
+  // Independent of each other, so they run together instead of as a chain of
+  // round trips: the layout re-runs on every 30s bell refresh, which made each
+  // extra serial hop a recurring cost, not a one-off.
+  const supabase = await createClient();
+  const trpc = await getServerTrpc();
 
   // Opportunistic reminder sweep — the real, always-on delivery path is the
-  // Vercel Cron at /api/cron/admin-event-reminders (see vercel.json), but
-  // that requires production deployment + a plan tier with a frequent
-  // enough schedule. Running the same idempotent check here means a due
-  // reminder fires the moment any admin loads any admin page, which is what
-  // makes this testable in local dev and resilient before/without cron
-  // configured at all.
-  const supabase = await createClient();
-  await fireDueEventReminders(supabase);
-  const trpc = await getServerTrpc();
-  const [notifications, contexts, { data: navCountsRaw }] = await Promise.all([
+  // Vercel Cron at /api/cron/admin-event-reminders (see vercel.json). This
+  // keeps due reminders firing the moment any admin loads a page (local dev,
+  // or before cron is configured) but runs after the response is sent, so
+  // the page never waits on it. Idempotent via reminder_sent_at.
+  // The client is built here, not inside the callback: a layout can't read
+  // cookies() from within after().
+  after(() => fireDueEventReminders(supabase));
+
+  const [mfaEnabled, notifications, contexts, { data: navCountsRaw }] = await Promise.all([
+    // Mandatory TOTP enrollment for the admin console: an account can hold
+    // is_platform_admin and still have zero verified factors (enrollment is
+    // opt-in everywhere else). Block every /admin route behind an inline
+    // enrollment prompt rather than redirecting to /admin/security — that
+    // route lives under this same layout, so a redirect would loop.
+    hasVerifiedFactor(),
     // apps/api is a separate deployment (not yet reachable from every
     // environment) — the rest of the admin portal has nothing to do with
     // notifications, so it shouldn't 500 just because that one dependency
@@ -202,7 +207,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       accent="admin"
       headerExtra={<AdminNotificationBell notifications={notifications} />}
     >
-      {REQUIRE_ADMIN_MFA && factors.length === 0 ? (
+      {REQUIRE_ADMIN_MFA && !mfaEnabled ? (
         <div className="mx-auto max-w-lg space-y-4 py-10 text-center">
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
             <ShieldAlert className="size-6" />
