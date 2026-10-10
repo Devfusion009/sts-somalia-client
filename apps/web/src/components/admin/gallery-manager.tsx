@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { AlertCircle, CloudUpload, ImageIcon, Star, Trash2, Film } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -46,19 +46,44 @@ export function GalleryManager({
   removeAction: (formData: FormData) => Promise<void>;
   setCoverAction: (formData: FormData) => Promise<void>;
 }) {
-  const [state, formAction, pending] = useActionState(uploadAction, null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  // One file per request: the server caps a request body, so a batch of phone
+  // photos (or one video) sent together was rejected before any validation ran.
+  function uploadFiles(files: File[]) {
+    setError(null);
+    startTransition(async () => {
+      let failure: string | null = null;
+      for (const [index, file] of files.entries()) {
+        setProgress({ done: index, total: files.length });
+        const formData = new FormData();
+        formData.set("id", id);
+        formData.append("files", file);
+        const result = await uploadAction(null, formData);
+        if (result?.error) {
+          failure = `${file.name}: ${result.error}`;
+          break;
+        }
+      }
+      setProgress(null);
+      setError(failure);
+      if (inputRef.current) inputRef.current.value = "";
+    });
+  }
 
   return (
     <div className="space-y-4">
-      {state?.error ? (
+      {error ? (
         <Alert variant="destructive">
           <AlertCircle />
-          <AlertDescription>{state.error}</AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
 
-      <form action={formAction}>
-        <input type="hidden" name="id" value={id} />
+      <div>
         <label
           className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed p-6 text-sm transition-colors ${
             pending
@@ -67,20 +92,25 @@ export function GalleryManager({
           }`}
         >
           <input
+            ref={inputRef}
             type="file"
-            name="files"
             accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
             multiple
             className="sr-only"
             disabled={pending}
             onChange={(e) => {
-              if (e.target.files?.length) e.currentTarget.form?.requestSubmit();
+              const files = Array.from(e.target.files ?? []);
+              if (files.length > 0) uploadFiles(files);
             }}
           />
           <CloudUpload className="size-5" />
-          {pending ? "Uploading…" : "Click to upload photos or video"}
+          {pending
+            ? progress && progress.total > 1
+              ? `Uploading ${progress.done + 1} of ${progress.total}…`
+              : "Uploading…"
+            : "Click to upload photos or video"}
         </label>
-      </form>
+      </div>
 
       {paths.length === 0 ? (
         <div className="flex flex-col items-center gap-1.5 rounded-lg border border-border py-10 text-center">

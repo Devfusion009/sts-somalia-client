@@ -54,9 +54,9 @@ const nextConfig: NextConfig = {
       // 5MB per-file limit the partner-application document upload already
       // enforces (src/modules/partner-applications/actions.ts), so real KYC
       // scans/photos above 1MB were rejected by Next.js itself before our
-      // own validation ever ran. Matches that 5MB cap with headroom for
-      // multipart overhead.
-      bodySizeLimit: "6mb",
+      // own validation ever ran. Sized for the largest single upload: the
+      // property gallery accepts videos up to 20MB, sent one file per request.
+      bodySizeLimit: "24mb",
     },
   },
 };
