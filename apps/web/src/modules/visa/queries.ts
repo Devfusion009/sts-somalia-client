@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { countrySearchText, normalizeSearchTerm } from "@/lib/countries";
+import { matchesDestination } from "./search";
 
 export async function getVisaTypes(filters: { country?: string; category?: string } = {}) {
   const supabase = await createClient();
@@ -16,8 +16,7 @@ export async function getVisaTypes(filters: { country?: string; category?: strin
   const visaTypes = data ?? [];
   if (!filters.country) return visaTypes;
 
-  const needle = normalizeSearchTerm(filters.country);
-  return visaTypes.filter((v) => countrySearchText(v.destination_country_code).includes(needle));
+  return visaTypes.filter((v) => matchesDestination(v.destination_country_code, filters.country!));
 }
 
 export async function getVisaTypeById(id: string) {

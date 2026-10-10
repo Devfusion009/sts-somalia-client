@@ -11,9 +11,7 @@ import {
   Clock3,
   CreditCard,
   FileCheck2,
-  Headset,
   Home,
-  MessageCircle,
   Send,
   ShieldCheck,
   Sparkles,
@@ -31,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { fmtMoney, processingText } from "@/modules/visa/components/visa-shared";
 import { SubmitButton } from "@/components/submit-button";
-import { whatsappLink } from "@/lib/whatsapp";
+import { VisaExpertCard } from "@/components/marketing/visa-expert-card";
 
 export async function generateMetadata({
   params,
@@ -274,21 +272,7 @@ export default async function VisaDetailPage({
               </ul>
             </div>
 
-            <a
-              href={whatsappLink(`Hello STS, I have a question about the ${visa.name}.`)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 rounded-2xl border border-border bg-secondary/50 p-4 transition-colors hover:bg-secondary"
-            >
-              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-card text-primary shadow-xs">
-                <Headset className="size-4.5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold">Need help with this visa?</span>
-                <span className="block text-xs text-muted-foreground">Chat with our visa desk on WhatsApp</span>
-              </span>
-              <MessageCircle className="size-4.5 shrink-0 text-primary" />
-            </a>
+            <VisaExpertCard visaName={visa.name} />
           </div>
         </div>
       </div>

@@ -6030,6 +6030,7 @@ export type Database = {
       visa_types: {
         Row: {
           application_questions: Json
+          cover_image: string | null
           created_at: string
           currency: string
           description: string | null
@@ -6061,6 +6062,7 @@ export type Database = {
         }
         Insert: {
           application_questions?: Json
+          cover_image?: string | null
           created_at?: string
           currency?: string
           description?: string | null
@@ -6092,6 +6094,7 @@ export type Database = {
         }
         Update: {
           application_questions?: Json
+          cover_image?: string | null
           created_at?: string
           currency?: string
           description?: string | null

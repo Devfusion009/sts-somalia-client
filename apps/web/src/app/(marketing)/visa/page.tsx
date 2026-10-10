@@ -5,21 +5,23 @@ import {
   ArrowRight,
   Clock3,
   Headset,
-  MapPin,
   ShieldCheck,
   Sparkles,
   Timer,
   Wallet,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getVisaTypes } from "@/modules/visa/queries";
 import { countryFlag, countryName } from "@/lib/countries";
 import { fmtMoney, processingText } from "@/modules/visa/components/visa-shared";
+import { visaCardImage } from "@/modules/visa/images";
+import { destinationOptions, matchesDestination } from "@/modules/visa/search";
+import { VisaDestinationSearch } from "@/components/marketing/visa-destination-search";
 import { VisaRequirementBadge } from "@/modules/visa/components/visa-requirement-badge";
 import { VisaHeroBanner, VisaProcess } from "@/components/marketing/visa-hero";
+import { VisaExpertCard } from "@/components/marketing/visa-expert-card";
 import { ReviewsRail } from "@/components/marketing/reviews-rail";
 import { HomeFaq } from "@/components/marketing/home-faq";
 
@@ -80,15 +82,6 @@ const PANEL_TINTS = [
   "from-teal-500/20 to-teal-500/5",
 ];
 
-const DESTINATION_PHOTOS: Record<string, string> = {
-  AE: "/marketing/dest-visa-ae.jpg",
-  TR: "/marketing/dest-visa-tr.jpg",
-  SA: "/marketing/dest-visa-sa.jpg",
-  EG: "/marketing/dest-visa-eg.png",
-  ET: "/marketing/dest-visa-et.jpg",
-  KE: "/marketing/dest-visa-ke.png",
-  MY: "/marketing/dest-visa-my.png",
-};
 
 export default async function VisaListPage({
   searchParams,
@@ -96,7 +89,11 @@ export default async function VisaListPage({
   searchParams: Promise<{ country?: string }>;
 }) {
   const { country } = await searchParams;
-  const visaTypes = await getVisaTypes({ country });
+  const allVisaTypes = await getVisaTypes();
+  const destinations = destinationOptions(allVisaTypes);
+  const visaTypes = country
+    ? allVisaTypes.filter((v) => matchesDestination(v.destination_country_code, country))
+    : allVisaTypes;
   const featured = !country ? visaTypes.filter((v) => v.is_featured) : [];
 
   return (
@@ -112,24 +109,7 @@ export default async function VisaListPage({
             We check every document against what the consulate actually requires — before it&apos;s submitted.
           </p>
 
-          <form className="mt-8 flex max-w-lg items-center gap-1.5 rounded-full bg-white p-1.5 pl-5 shadow-2xl">
-            <MapPin className="size-4 shrink-0 text-neutral-400" />
-            <Input
-              name="country"
-              autoComplete="off"
-              placeholder="Where are you going? UAE, Türkiye, Kenya…"
-              defaultValue={country}
-              aria-label="Destination country"
-              className="h-11 border-0 bg-transparent text-neutral-900 shadow-none placeholder:text-neutral-400 focus-visible:ring-0 dark:bg-transparent"
-            />
-            <button
-              type="submit"
-              aria-label="Search"
-              className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-gold text-neutral-900 transition-colors hover:bg-brand-gold/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-              <ArrowRight className="size-4.5" />
-            </button>
-          </form>
+          <VisaDestinationSearch destinations={destinations} defaultValue={country} />
 
           <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2 rounded-2xl bg-white/10 px-5 py-4 ring-1 ring-white/15 backdrop-blur-sm">
             {TRUST_POINTS.map((point) => (
@@ -149,7 +129,7 @@ export default async function VisaListPage({
             </div>
             <div className="mt-9 grid grid-cols-2 gap-x-5 gap-y-10 sm:grid-cols-3 lg:grid-cols-4">
               {featured.map((visa, i) => {
-                const photo = DESTINATION_PHOTOS[visa.destination_country_code];
+                const photo = visaCardImage(visa);
                 return (
                 <Link key={visa.id} href={`/visa/${visa.id}`} className="group block">
                   <div className="relative">
@@ -162,6 +142,7 @@ export default async function VisaListPage({
                           alt=""
                           fill
                           sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+                          unoptimized={!photo.startsWith("/")}
                           className="object-cover transition-transform duration-500 group-hover:scale-105"
                         />
                       ) : (
@@ -205,7 +186,7 @@ export default async function VisaListPage({
           </section>
         ) : null}
 
-        <section>
+        <section id="visa-results" className="scroll-mt-48">
           <h2 className="font-heading text-xl font-bold">
             {country ? `Results for "${country}"` : "All visa services"}
           </h2>
@@ -262,6 +243,9 @@ export default async function VisaListPage({
       </div>
 
       <VisaProcess />
+      <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6 sm:py-16 lg:px-8">
+        <VisaExpertCard wide />
+      </div>
 
       <section className="bg-background py-14 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

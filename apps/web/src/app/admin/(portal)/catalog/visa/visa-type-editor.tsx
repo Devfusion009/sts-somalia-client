@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
+import { ImageIcon } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,9 @@ import { SubmitButton } from "@/components/submit-button";
 import { createVisaType, updateVisaType } from "@/modules/admin/actions";
 import { documentSlotsToRows, applicationQuestionsToRows } from "@/modules/admin/visa-type-utils";
 import { providersByCategory } from "@/lib/provider-catalog";
-import { countryName } from "@/lib/countries";
+import { CountrySearchSelect } from "@/components/ui/country-select";
+import { COUNTRY_NAMES, countryName } from "@/lib/countries";
+import { visaCardImage, visaImageUrl } from "@/modules/visa/images";
 import type { Database } from "@/lib/types/database.types";
 import { DocumentSlotsField } from "./document-slots-field";
 import { ApplicationQuestionsField } from "./application-questions-field";
@@ -76,6 +79,50 @@ function TogglePill({ name, value, label, defaultChecked }: { name: string; valu
   );
 }
 
+/** Cover photo picker: previews what visitors will see and swaps in the chosen file before saving. */
+function CoverImageField({ visaType }: { visaType?: VisaType }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pickedRef = useRef<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+  const hasUpload = !!visaImageUrl(visaType?.cover_image);
+  const current = visaType ? visaCardImage(visaType) : null;
+  const preview = picked ?? current;
+
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div className="relative h-32 w-full overflow-hidden rounded-xl border border-border bg-muted sm:w-56">
+        {preview ? (
+          // eslint-disable-next-line @next/next/no-img-element -- blob: and bucket URLs, no optimizer
+          <img src={preview} alt="" className="size-full object-cover" />
+        ) : (
+          <span className="grid size-full place-items-center text-muted-foreground">
+            <ImageIcon className="size-7" />
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          ref={inputRef}
+          type="file"
+          name="coverImage"
+          accept="image/jpeg,image/png,image/webp"
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (pickedRef.current) URL.revokeObjectURL(pickedRef.current);
+            pickedRef.current = file ? URL.createObjectURL(file) : null;
+            setPicked(pickedRef.current);
+          }}
+        />
+        <Button type="button" variant="outline" onClick={() => inputRef.current?.click()}>
+          {preview ? "Replace image" : "Upload image"}
+        </Button>
+        {hasUpload ? <TogglePill name="removeCoverImage" label="Remove custom image" defaultChecked={false} /> : null}
+      </div>
+    </div>
+  );
+}
+
 export function VisaTypeEditor({
   visaType,
   centres = [],
@@ -123,13 +170,12 @@ export function VisaTypeEditor({
         <Section title="Basic information">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="destinationCountryCode">Country code (2 letters)</Label>
-              <Input
+              <Label htmlFor="destinationCountryCode">Country</Label>
+              <CountrySearchSelect
                 id="destinationCountryCode"
                 name="destinationCountryCode"
-                maxLength={2}
-                defaultValue={visaType?.destination_country_code}
-                required
+                defaultValue={visaType && visaType.destination_country_code in COUNTRY_NAMES ? visaType.destination_country_code : undefined}
+                placeholder="Search for a country"
               />
             </div>
             <div className="space-y-2">
@@ -180,6 +226,10 @@ export function VisaTypeEditor({
               </Select>
             </div>
           </div>
+        </Section>
+
+        <Section title="Cover image">
+          <CoverImageField visaType={visaType} />
         </Section>
 
         <Section title="Price &amp; processing">

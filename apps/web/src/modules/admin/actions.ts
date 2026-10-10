@@ -15,6 +15,7 @@ import { TARGETS } from "@/modules/admin/gallery-targets";
 import { repriceQuotedOrder } from "@/modules/orders/helpers";
 import { commaList, parseLinks, replacePropertyLinks } from "@/modules/hotels/listing-fields";
 import { sanitizeKey, parseDocumentSlotsJson } from "./visa-type-utils";
+import { COUNTRY_NAMES } from "@/lib/countries";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type ListingStatus = Database["public"]["Enums"]["listing_status"];
@@ -50,7 +51,10 @@ export async function updateOrderStatus(_prev: ActionState, formData: FormData):
 }
 
 const visaTypeSchema = z.object({
-  destinationCountryCode: z.string().min(2).max(2),
+  destinationCountryCode: z
+    .string()
+    .transform((code) => code.trim().toUpperCase())
+    .refine((code) => code in COUNTRY_NAMES, "Choose the destination country."),
   name: z.string().min(2),
   description: z.string().optional(),
   overview: z.string().optional(),
@@ -110,6 +114,55 @@ function parseApplicationQuestionsJson(input: string | undefined) {
       };
     })
     .filter((q) => q.label);
+}
+
+const VISA_IMAGE_EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+const MAX_VISA_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** The cover-image part of the visa form: a new file and/or a request to clear the current one. */
+function visaCoverInput(formData: FormData) {
+  const file = formData.get("coverImage");
+  return {
+    file: file instanceof File && file.size > 0 ? file : null,
+    remove: formData.get("removeCoverImage") === "on",
+  };
+}
+
+function validateVisaCover(file: File | null): string | null {
+  if (!file) return null;
+  if (!VISA_IMAGE_EXT[file.type]) return "Cover image must be a JPG, PNG, or WebP.";
+  if (file.size > MAX_VISA_IMAGE_BYTES) return "Cover image must be 5MB or smaller.";
+  return null;
+}
+
+/** Store a replacement cover (or clear it), then drop the object it replaces. Returns an error message, or null. */
+async function applyVisaCover(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  visaTypeId: string,
+  { file, remove }: ReturnType<typeof visaCoverInput>
+): Promise<string | null> {
+  if (!file && !remove) return null;
+
+  const { data: current } = await supabase.from("visa_types").select("cover_image").eq("id", visaTypeId).maybeSingle();
+  const previous = current?.cover_image ?? null;
+
+  let next: string | null = null;
+  if (file) {
+    next = `${visaTypeId}/${Date.now()}.${VISA_IMAGE_EXT[file.type]}`;
+    const { error: uploadError } = await supabase.storage.from("visa-images").upload(next, file, { contentType: file.type });
+    if (uploadError) return uploadError.message;
+  }
+
+  const { error } = await supabase.from("visa_types").update({ cover_image: next }).eq("id", visaTypeId);
+  if (error) {
+    if (next) await supabase.storage.from("visa-images").remove([next]);
+    return error.message;
+  }
+
+  if (previous && !previous.startsWith("http") && !previous.startsWith("/")) {
+    await supabase.storage.from("visa-images").remove([previous]);
+  }
+  return null;
 }
 
 function visaTypeInput(formData: FormData) {
@@ -193,13 +246,20 @@ export async function createVisaType(_prev: ActionState, formData: FormData): Pr
   await requirePlatformAdmin();
   const parsed = visaTypeSchema.safeParse(visaTypeInput(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const cover = visaCoverInput(formData);
+  const coverError = validateVisaCover(cover.file);
+  if (coverError) return { error: coverError };
 
   const supabase = await createClient();
   const { data: created, error } = await supabase.from("visa_types").insert(visaTypeRow(parsed.data)).select("id").single();
   if (error || !created) return { error: error?.message ?? "Could not create the visa type." };
   await saveVisaTypeCentres(supabase, created.id, parsed.data.centreIds);
+  const uploadError = await applyVisaCover(supabase, created.id, cover);
   revalidatePath("/admin/catalog/visa");
-  redirect("/admin/catalog/visa");
+  revalidatePath("/visa");
+  // The visa type exists at this point; reopen it so the image can be retried
+  // there instead of resubmitting this form and creating a duplicate.
+  redirect(uploadError ? `/admin/catalog/visa/${created.id}/edit` : "/admin/catalog/visa");
 }
 
 export async function updateVisaType(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -207,11 +267,17 @@ export async function updateVisaType(_prev: ActionState, formData: FormData): Pr
   const id = String(formData.get("id"));
   const parsed = visaTypeSchema.safeParse(visaTypeInput(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const cover = visaCoverInput(formData);
+  const coverError = validateVisaCover(cover.file);
+  if (coverError) return { error: coverError };
 
   const supabase = await createClient();
   const { error } = await supabase.from("visa_types").update(visaTypeRow(parsed.data)).eq("id", id);
   if (error) return { error: error.message };
   await saveVisaTypeCentres(supabase, id, parsed.data.centreIds);
+  const uploadError = await applyVisaCover(supabase, id, cover);
+  if (uploadError) return { error: uploadError };
+  revalidatePath("/visa");
   revalidatePath("/admin/catalog/visa");
   revalidatePath(`/admin/catalog/visa/${id}/edit`);
   redirect("/admin/catalog/visa");
