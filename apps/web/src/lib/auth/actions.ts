@@ -487,3 +487,15 @@ export async function signOutAction() {
   // site.
   redirect(rootOrigin() || "/");
 }
+
+/**
+ * Revokes every session for this user — other browsers and devices included —
+ * not just this one. For an operator who has lost a laptop or signed in on a
+ * shared machine.
+ */
+export async function signOutEverywhereAction() {
+  const supabase = await createClient();
+  await supabase.auth.signOut({ scope: "global" });
+  revalidatePath("/", "layout");
+  redirect(rootOrigin() || "/");
+}

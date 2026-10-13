@@ -206,6 +206,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       isPlatformAdmin={profile.is_platform_admin}
       accent="admin"
       headerExtra={<AdminNotificationBell notifications={notifications} />}
+      adminMenu={{
+        mfaEnabled,
+        supportEmail: process.env.SUPPORT_EMAIL ?? null,
+        buildSha: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+      }}
     >
       {REQUIRE_ADMIN_MFA && !mfaEnabled ? (
         <div className="mx-auto max-w-lg space-y-4 py-10 text-center">

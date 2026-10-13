@@ -740,7 +740,7 @@ export async function getUsersPage({ page, q }: UserListFilters) {
 }
 
 /** Admin-only audit trail: every row-level change captured by the audit trigger. */
-export async function getAuditLog(opts?: { entityType?: string; limit?: number }) {
+export async function getAuditLog(opts?: { entityType?: string; actorId?: string; limit?: number }) {
   const supabase = await createClient();
   let query = supabase
     .from("audit_logs")
@@ -748,6 +748,7 @@ export async function getAuditLog(opts?: { entityType?: string; limit?: number }
     .order("created_at", { ascending: false })
     .limit(opts?.limit ?? 100);
   if (opts?.entityType) query = query.eq("entity_type", opts.entityType);
+  if (opts?.actorId) query = query.eq("actor_id", opts.actorId);
   const { data } = await query;
   return data ?? [];
 }

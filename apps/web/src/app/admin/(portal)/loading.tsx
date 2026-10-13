@@ -1,5 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { PanelPairSkeleton, StatRowSkeleton } from "@/components/dashboard/skeletons";
+import { PanelPairSkeleton, StatRowSkeleton, TopProgressBar } from "@/components/dashboard/skeletons";
 
 /**
  * Fallback for every admin route while its server data resolves. The thin
@@ -9,9 +9,7 @@ import { PanelPairSkeleton, StatRowSkeleton } from "@/components/dashboard/skele
 export default function AdminLoading() {
   return (
     <div role="status" aria-busy="true" aria-label="Loading">
-      <div className="fixed inset-x-0 top-0 z-50 h-0.5 overflow-hidden bg-primary/15" aria-hidden>
-        <div className="animate-progress-sweep h-full w-1/4 rounded-full bg-primary" />
-      </div>
+      <TopProgressBar />
 
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">

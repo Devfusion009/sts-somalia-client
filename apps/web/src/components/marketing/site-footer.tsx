@@ -5,7 +5,7 @@ import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
 import { NAV_LINKS, PARTNER_LINKS } from "@/lib/nav-links";
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from "@/lib/marketing-nav";
 
-import { EmailIcon, FacebookIcon, InstagramIcon, LinkedInIcon, PhoneInTalkIcon, PlaceIcon, TikTokIcon, XIcon, YouTubeIcon } from "@/components/ui/mui-icons";
+import { EmailIcon, InstagramIcon, PhoneInTalkIcon, PlaceIcon, TikTokIcon } from "@/components/ui/mui-icons";
 import type { SvgIconComponent } from "@/components/ui/mui-icons";
 const COMPANY_LINKS = [
   { href: "/about", label: "About us" },
@@ -18,15 +18,12 @@ const COMPANY_LINKS = [
   { href: "/partner-terms", label: "Partner Terms" },
 ];
 
-/* LinkedIn/Facebook/YouTube/X are still placeholder handles — point these at
-   the real STS profiles once they exist. Instagram and TikTok are real. */
+/* Only profiles that exist are listed. LinkedIn, Facebook, YouTube and X were
+   pointing at each network's homepage, not an STS page — add them back here
+   (with the icon imports) once the real URLs exist. */
 const SOCIALS: Array<{ icon: SvgIconComponent; label: string; href: string }> = [
   { icon: InstagramIcon, label: "Instagram", href: "https://www.instagram.com/scouttravelsolution" },
   { icon: TikTokIcon, label: "TikTok", href: "https://www.tiktok.com/@scoutsts2" },
-  { icon: LinkedInIcon, label: "LinkedIn", href: "https://www.linkedin.com" },
-  { icon: FacebookIcon, label: "Facebook", href: "https://www.facebook.com" },
-  { icon: YouTubeIcon, label: "YouTube", href: "https://www.youtube.com" },
-  { icon: XIcon, label: "X", href: "https://x.com" },
 ];
 
 const LINK = "text-sm text-sidebar-foreground/70 transition-colors hover:text-sidebar-primary focus-visible:rounded focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none";
