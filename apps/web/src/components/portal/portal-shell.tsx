@@ -67,6 +67,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { signOutAction } from "@/lib/auth/actions";
+import { AdminAccountMenu, type AdminMenuInfo } from "@/components/portal/admin-account-menu";
 import { rootOrigin, stripPortalPrefix, portalHref } from "@/lib/subdomain";
 import { cn } from "@/lib/utils";
 import type { PartnerContext } from "@/modules/identity/queries";
@@ -269,6 +270,7 @@ export function PortalShell({
   brandLogoUrl,
   headerExtra,
   accountCode,
+  adminMenu,
   children,
 }: {
   portalName: string;
@@ -287,6 +289,8 @@ export function PortalShell({
   brandLogoUrl?: string | null;
   /** Optional content rendered in the top header, left of the accent badge — e.g. admin's notification bell. Unused by other portals. */
   headerExtra?: React.ReactNode;
+  /** Admin console only: replaces the account switcher with the operator's own account menu. */
+  adminMenu?: AdminMenuInfo;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -322,6 +326,30 @@ export function PortalShell({
       return currentPath === target || currentPath.startsWith(`${target}/`);
     })
     .sort((a, b) => b.length - a.length)[0];
+
+  const accountTrigger = (
+    <SidebarMenuButton
+      size="lg"
+      className="flex items-center gap-2.5 rounded-lg border border-sidebar-border px-2 py-2 hover:bg-sidebar-accent/60 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:px-0"
+    />
+  );
+  const accountTriggerContent = (
+    <>
+      <Avatar className="size-8 shrink-0">
+        <AvatarFallback className="bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">
+          {initials(profileName, profileEmail)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex min-w-0 flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">
+        <span className="truncate text-sm leading-none font-medium text-white">{profileName || "Account"}</span>
+        <span className="truncate text-[11px] leading-none text-sidebar-foreground/60">
+          {roleLabel}
+          {accountCode ? ` · ${accountCode}` : ""}
+        </span>
+      </div>
+      <ChevronsUpDown className="size-3.5 shrink-0 text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden" />
+    </>
+  );
 
   return (
     <SidebarProvider>
@@ -378,72 +406,57 @@ export function PortalShell({
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <SidebarMenuButton
-                      size="lg"
-                      className="flex items-center gap-2.5 rounded-lg border border-sidebar-border px-2 py-2 hover:bg-sidebar-accent/60 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:px-0"
-                    />
-                  }
-                >
-                  <Avatar className="size-8 shrink-0">
-                    <AvatarFallback className="bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">
-                      {initials(profileName, profileEmail)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">
-                    <span className="truncate text-sm leading-none font-medium text-white">{profileName || "Account"}</span>
-                    <span className="truncate text-[11px] leading-none text-sidebar-foreground/60">
-                      {roleLabel}
-                      {accountCode ? ` · ${accountCode}` : ""}
-                    </span>
-                  </div>
-                  <ChevronsUpDown className="size-3.5 shrink-0 text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" side="top" className="w-64">
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel>Switch account</DropdownMenuLabel>
-                  </DropdownMenuGroup>
-                  {/* A hotel manager has no B2C account behind it — see the
-                      rejection in signInAction. An agent's role fully
-                      replaces "customer" on approval — see account/layout.tsx
-                      — so /account is a dead end for them too, unlike every
-                      other partner portal (hotel partner, affiliate, venue
-                      keep their dual Personal/partner access). */}
-                  {accent !== "manager" && accent !== "agent" ? (
-                    <DropdownMenuItem render={<Link href={rootOrigin() ? `${rootOrigin()}/account` : "/account"} />}>
-                      <User /> Personal Account
-                    </DropdownMenuItem>
-                  ) : null}
-                  {isPlatformAdmin ? (
-                    <DropdownMenuItem render={<Link href={portalHref("admin")} />}>
-                      <ShieldCheck /> Admin Console
-                    </DropdownMenuItem>
-                  ) : null}
-                  {contexts.map((c) => (
-                    <DropdownMenuItem key={c.type} render={<Link href={c.href} />}>
-                      <LayoutDashboard />
-                      <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                        <span className="truncate">
-                          {c.name} <span className="text-muted-foreground">· {c.label}</span>
+              {accent === "admin" && adminMenu ? (
+                <AdminAccountMenu trigger={accountTrigger} name={profileName} email={profileEmail} info={adminMenu}>
+                  {accountTriggerContent}
+                </AdminAccountMenu>
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger render={accountTrigger}>{accountTriggerContent}</DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" side="top" className="w-64">
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>Switch account</DropdownMenuLabel>
+                    </DropdownMenuGroup>
+                    {/* A hotel manager has no B2C account behind it — see the
+                        rejection in signInAction. An agent's role fully
+                        replaces "customer" on approval — see account/layout.tsx
+                        — so /account is a dead end for them too, unlike every
+                        other partner portal (hotel partner, affiliate, venue
+                        keep their dual Personal/partner access). */}
+                    {accent !== "manager" && accent !== "agent" ? (
+                      <DropdownMenuItem render={<Link href={rootOrigin() ? `${rootOrigin()}/account` : "/account"} />}>
+                        <User /> Personal Account
+                      </DropdownMenuItem>
+                    ) : null}
+                    {isPlatformAdmin ? (
+                      <DropdownMenuItem render={<Link href={portalHref("admin")} />}>
+                        <ShieldCheck /> Admin Console
+                      </DropdownMenuItem>
+                    ) : null}
+                    {contexts.map((c) => (
+                      <DropdownMenuItem key={c.type} render={<Link href={c.href} />}>
+                        <LayoutDashboard />
+                        <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                          <span className="truncate">
+                            {c.name} <span className="text-muted-foreground">· {c.label}</span>
+                          </span>
+                          {c.status && c.status !== "live" ? (
+                            <Badge variant="outline" className="shrink-0 text-[10px] capitalize">
+                              {c.status}
+                            </Badge>
+                          ) : null}
                         </span>
-                        {c.status && c.status !== "live" ? (
-                          <Badge variant="outline" className="shrink-0 text-[10px] capitalize">
-                            {c.status}
-                          </Badge>
-                        ) : null}
-                      </span>
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  <form action={signOutAction}>
-                    <DropdownMenuItem variant="destructive" render={<button type="submit" className="w-full" />}>
-                      <LogOut /> Sign out
-                    </DropdownMenuItem>
-                  </form>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <form action={signOutAction}>
+                      <DropdownMenuItem variant="destructive" render={<button type="submit" className="w-full" />}>
+                        <LogOut /> Sign out
+                      </DropdownMenuItem>
+                    </form>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>

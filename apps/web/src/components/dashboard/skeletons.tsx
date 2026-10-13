@@ -61,3 +61,12 @@ export function PanelPairSkeleton({ rows }: { rows?: number }) {
     </div>
   );
 }
+
+/** Thin indeterminate bar pinned to the top of the viewport while a route loads. */
+export function TopProgressBar() {
+  return (
+    <div className="fixed inset-x-0 top-0 z-50 h-0.5 overflow-hidden bg-primary/15" aria-hidden>
+      <div className="animate-progress-sweep h-full w-1/4 rounded-full bg-primary" />
+    </div>
+  );
+}

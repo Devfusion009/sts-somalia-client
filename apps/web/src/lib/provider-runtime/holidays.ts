@@ -27,6 +27,11 @@ const HOLIDAYS_API_URL = process.env.HOLIDAYS_API_URL ?? "https://date.nager.at/
 const HOLIDAYS_COUNTRY_CODE = process.env.HOLIDAYS_COUNTRY_CODE ?? "SO";
 const ISLAMIC_HOLIDAYS_API_URL = process.env.ISLAMIC_HOLIDAYS_API_URL ?? "https://api.aladhan.com/v1";
 
+// Both providers are free third-party APIs the calendar page waits on. A slow
+// one must cost the holiday markers, not the whole page: on timeout the
+// existing catch returns no holidays for that source.
+const EXTERNAL_TIMEOUT_MS = 2500;
+
 type NagerHoliday = { date: string; name: string; localName: string };
 
 async function fetchCivilHolidaysForYear(year: number): Promise<PublicHoliday[]> {
@@ -36,6 +41,7 @@ async function fetchCivilHolidaysForYear(year: number): Promise<PublicHoliday[]>
       // staleness is a non-issue, and this keeps a month of calendar page
       // loads from hammering a free public API.
       next: { revalidate: 60 * 60 * 24 },
+      signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS),
     });
     if (!res.ok) return [];
     const payload = (await res.json()) as NagerHoliday[];
@@ -70,6 +76,7 @@ async function fetchIslamicHolidaysForMonth(year: number, month: number): Promis
   try {
     const res = await fetch(`${ISLAMIC_HOLIDAYS_API_URL}/gToHCalendar/${month}/${year}`, {
       next: { revalidate: 60 * 60 * 24 },
+      signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS),
     });
     if (!res.ok) return [];
     const payload = (await res.json()) as { data?: AladhanCalendarDay[] };

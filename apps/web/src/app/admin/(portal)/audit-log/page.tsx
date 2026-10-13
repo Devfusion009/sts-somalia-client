@@ -23,13 +23,14 @@ const ACTION_STYLES: Record<string, string> = {
 export default async function AuditLogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ entityType?: string }>;
+  searchParams: Promise<{ entityType?: string; actor?: string }>;
 }) {
-  await requirePlatformAdmin();
-  const { entityType } = await searchParams;
+  const profile = await requirePlatformAdmin();
+  const { entityType, actor } = await searchParams;
+  const mine = actor === "me";
 
   const [entries, entityTypes] = await Promise.all([
-    getAuditLog({ entityType }),
+    getAuditLog({ entityType, actorId: mine ? profile.id : undefined }),
     getAuditLogEntityTypes(),
   ]);
 
@@ -44,12 +45,22 @@ export default async function AuditLogPage({
         <Link
           href="/admin/audit-log"
           className={`rounded-full border px-3 py-1 text-xs font-medium ${
-            !entityType
+            !entityType && !mine
               ? "border-primary bg-primary/10 text-primary"
               : "border-border text-muted-foreground hover:text-foreground"
           }`}
         >
           All
+        </Link>
+        <Link
+          href="/admin/audit-log?actor=me"
+          className={`rounded-full border px-3 py-1 text-xs font-medium ${
+            mine
+              ? "border-primary bg-primary/10 text-primary"
+              : "border-border text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          My activity
         </Link>
         {entityTypes.map((type) => (
           <Link

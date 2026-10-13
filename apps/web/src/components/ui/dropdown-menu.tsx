@@ -84,12 +84,11 @@ function DropdownMenuItem({
   inset?: boolean
   variant?: "default" | "destructive"
 }) {
-  // Mirrors Button's nativeButton auto-detection: default to whatever
-  // matches the actual `render` target instead of Base UI's static default,
-  // which mismatches as soon as a caller renders a real <button> (e.g. to
-  // submit an enclosing form) or a non-button element like a Link.
+  // Default to whatever matches the actual rendered element: a menu item is
+  // a <div> unless `render` swaps in something else, so only a real <button>
+  // (e.g. submitting an enclosing form) counts as native.
   const isNativeRenderTarget =
-    !render || (typeof render === "object" && "type" in render && render.type === "button")
+    typeof render === "object" && render !== null && "type" in render && render.type === "button"
 
   return (
     <MenuPrimitive.Item
