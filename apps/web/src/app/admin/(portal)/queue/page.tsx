@@ -1,10 +1,12 @@
-import { formatDistanceToNow } from "date-fns";
-import { BedDouble, PartyPopper, Inbox, Landmark, Briefcase } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { BedDouble, PartyPopper, Inbox, Landmark, Briefcase, CalendarDays } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getBookingQueue } from "@/modules/admin/queue-queries";
 import { QueueEntryActions, PriceQuoteForm } from "./queue-actions";
+
+const formatQueueDate = (iso: string) => format(new Date(`${iso}T00:00:00`), "EEE d MMM yyyy");
 
 export const metadata = { title: "Order Queue | Admin Console" };
 
@@ -15,6 +17,10 @@ export const metadata = { title: "Order Queue | Admin Console" };
 export default async function OrderQueuePage() {
   const queue = await getBookingQueue();
   const waitlisted = queue.filter((q) => q.status === "waitlisted").length;
+  // Rank is arrival order (oldest = #1); the list itself stays newest first.
+  const rankById = new Map(
+    [...queue].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((q, n) => [q.id, n + 1])
+  );
   const agencyCount = queue.filter((q) => q.channel === "b2b").length;
 
   return (
@@ -39,7 +45,7 @@ export default async function OrderQueuePage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {queue.map((entry, i) => (
+          {queue.map((entry) => (
             <Card
               key={`${entry.kind}-${entry.id}`}
               className={cn(
@@ -53,7 +59,7 @@ export default async function OrderQueuePage() {
             >
               <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="font-heading text-lg font-bold text-muted-foreground/60">#{i + 1}</span>
+                  <span className="font-heading text-lg font-bold text-muted-foreground/60">#{rankById.get(entry.id)}</span>
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     {entry.kind === "hotel" ? (
                       <BedDouble className="size-5" />
@@ -79,6 +85,13 @@ export default async function OrderQueuePage() {
                         <Badge variant="secondary">New request</Badge>
                       )}
                     </p>
+                    {entry.dates ? (
+                      <p className="my-1 inline-flex items-center gap-2 rounded-md bg-primary px-2.5 py-1 text-sm font-semibold text-primary-foreground">
+                        <CalendarDays className="size-4" />
+                        {formatQueueDate(entry.dates.from)}
+                        {entry.dates.to ? ` → ${formatQueueDate(entry.dates.to)}` : ""}
+                      </p>
+                    ) : null}
                     <p className="truncate text-sm text-muted-foreground">{entry.subtitle}</p>
                     {entry.channel === "b2b" ? (
                       <p className="text-xs text-muted-foreground">

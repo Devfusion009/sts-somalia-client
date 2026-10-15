@@ -6,6 +6,14 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { SubmitButton } from "@/components/submit-button";
 import { nextHotelBookingMoves } from "@/modules/hotels/booking-transitions";
 import type { ActionState } from "@/lib/auth/actions";
+import { toast } from "sonner";
+
+const MOVE_MESSAGES: Record<string, string> = {
+  confirmed: "Booking confirmed.",
+  cancelled: "Booking cancelled.",
+  completed: "Stay completed.",
+  no_show: "Marked as no-show.",
+};
 
 /**
  * The decision buttons for one hotel booking: only the moves its status
@@ -27,7 +35,14 @@ export function BookingMoveActions({
   today: string;
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
 }) {
-  const [state, formAction] = useActionState(action, null);
+  // Toast from the call itself: the row can re-render without these buttons
+  // the moment the decision lands.
+  const [state, formAction] = useActionState(async (prev: ActionState, formData: FormData) => {
+    const result = await action(prev, formData);
+    if (result?.error) toast.error(result.error, { position: "top-center" });
+    else toast.success(MOVE_MESSAGES[String(formData.get("status"))] ?? "Saved.", { position: "top-center" });
+    return result;
+  }, null);
   const moves = nextHotelBookingMoves(status, checkIn, today);
 
   if (moves.length === 0) return null;

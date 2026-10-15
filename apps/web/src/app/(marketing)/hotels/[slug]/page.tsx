@@ -4,7 +4,9 @@ import Link from "next/link";
 import {
   BedDouble,
   ChevronRight,
+  Clock,
   Home,
+  Mail,
   MapPin,
   Phone,
   Ruler,
@@ -34,6 +36,19 @@ export async function generateMetadata({
   const { slug } = await params;
   const hotel = await getHotelBySlug(slug);
   return { title: hotel?.name ?? "Hotel" };
+}
+
+/** "14:00:00" from the database → "14:00". */
+function clockTime(value: string | null) {
+  return value ? value.slice(0, 5) : null;
+}
+
+/** "+252907700000" → "+252 907 700 000"; anything that is not a bare +digits number is shown as typed. */
+function displayPhone(value: string) {
+  const m = /^\+(\d{3})(\d+)$/.exec(value.replace(/[\s-]/g, ""));
+  if (!m) return value;
+  const groups = m[2].match(/.{1,3}/g) ?? [];
+  return `+${m[1]} ${groups.join(" ")}`;
 }
 
 /** "Very good" wording bands, same thresholds Reviews.com/Booking-style scores use. */
@@ -155,6 +170,15 @@ export default async function HotelDetailPage({
                   );
                 })}
               </div>
+            </div>
+          ) : null}
+
+          {hotel.policies ? (
+            <div className="mt-6">
+              <h2 className="font-heading text-lg font-bold">Hotel policies</h2>
+              <p className="mt-3 max-w-3xl whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                {hotel.policies}
+              </p>
             </div>
           ) : null}
 
@@ -350,8 +374,27 @@ export default async function HotelDetailPage({
                     href={`tel:${hotel.phone}`}
                     className="flex items-center gap-2 text-muted-foreground hover:text-primary"
                   >
-                    <Phone className="size-4" /> {hotel.phone}
+                    <Phone className="size-4" /> {displayPhone(hotel.phone)}
                   </a>
+                ) : null}
+                {hotel.contact_email ? (
+                  <a
+                    href={`mailto:${hotel.contact_email}`}
+                    className="flex items-center gap-2 break-all text-muted-foreground hover:text-primary"
+                  >
+                    <Mail className="size-4 shrink-0" /> {hotel.contact_email}
+                  </a>
+                ) : null}
+                {hotel.check_in_time || hotel.check_out_time ? (
+                  <p className="flex items-center gap-2 text-muted-foreground">
+                    <Clock className="size-4 shrink-0" />
+                    {[
+                      clockTime(hotel.check_in_time) ? `Check-in ${clockTime(hotel.check_in_time)}` : null,
+                      clockTime(hotel.check_out_time) ? `Check-out ${clockTime(hotel.check_out_time)}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
                 ) : null}
               </div>
 

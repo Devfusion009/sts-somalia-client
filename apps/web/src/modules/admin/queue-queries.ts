@@ -17,6 +17,8 @@ export type QueueEntry = {
   displaced: boolean;
   title: string;
   subtitle: string;
+  /** Stay / event / departure window, shown as a highlighted chip. */
+  dates: { from: string; to: string | null } | null;
   /**
    * On a B2B request this is the agency staffer who placed it, not the guest:
    * every vertical stamps customer_id with the booking agent's own profile.
@@ -123,7 +125,8 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
         agencyName: agency?.name ?? null,
         displaced: b.displaced_by !== null,
         title: hotel?.name ?? "Hotel booking",
-        subtitle: `${room?.name ?? "Room"} · ${b.check_in} → ${b.check_out} · ${b.num_rooms} room${b.num_rooms > 1 ? "s" : ""}, ${b.num_adults} adult${b.num_adults > 1 ? "s" : ""}`,
+        dates: { from: b.check_in, to: b.check_out },
+        subtitle: `${room?.name ?? "Room"} · ${b.num_rooms} room${b.num_rooms > 1 ? "s" : ""}, ${b.num_adults} adult${b.num_adults > 1 ? "s" : ""}`,
         customerName: customer?.full_name ?? null,
         customerEmail: customer?.email ?? null,
         travellerName: travellerByBooking.get(b.id) ?? null,
@@ -144,7 +147,8 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
         agencyName: agency?.name ?? null,
         displaced: b.displaced_by !== null,
         title: venue?.name ?? "Hall booking",
-        subtitle: `${b.event_name ?? b.event_type} · ${b.start_date}${b.end_date && b.end_date !== b.start_date ? ` → ${b.end_date}` : ""}${b.expected_guests ? ` · ${b.expected_guests} guests` : ""}`,
+        dates: { from: b.start_date, to: b.end_date && b.end_date !== b.start_date ? b.end_date : null },
+        subtitle: `${b.event_name ?? b.event_type}${b.expected_guests ? ` · ${b.expected_guests} guests` : ""}`,
         customerName: customer?.full_name ?? null,
         customerEmail: customer?.email ?? null,
         travellerName: travellerByBooking.get(b.id) ?? null,
@@ -171,9 +175,8 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
         agencyName: agency?.name ?? null,
         displaced: false,
         title: `Private Umrah · ${request?.reference ?? "request"}`,
-        subtitle: `${request?.tier ?? "custom"} · ${
-          request?.departure_date ?? "dates to confirm"
-        } · ${b.num_pilgrims} traveller${b.num_pilgrims > 1 ? "s" : ""} · ${
+        dates: request?.departure_date ? { from: request.departure_date, to: null } : null,
+        subtitle: `${request?.tier ?? "custom"} · ${b.num_pilgrims} traveller${b.num_pilgrims > 1 ? "s" : ""} · ${
           request ? `${request.nights_makkah}N Makkah / ${request.nights_madinah}N Madinah` : ""
         }`,
         customerName: customer?.full_name ?? null,

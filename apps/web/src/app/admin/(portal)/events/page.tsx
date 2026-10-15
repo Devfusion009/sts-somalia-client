@@ -12,7 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getVenuesAdmin, getHallBookingsAdmin } from "@/modules/admin/queries";
+import { MapPin, Users, ImageOff, Settings2 } from "lucide-react";
+import { getVenuesAdmin, getVenueCitiesAdmin, getHallBookingsAdmin } from "@/modules/admin/queries";
+import { venueImageUrls } from "@/modules/events/images";
+import { VenueFilters } from "./venue-filters";
 import { VenueForm } from "./venue-form";
 import { HallBookingStatusSelect, HallBookingPriceForm } from "./hall-booking-controls";
 import { cn } from "@/lib/utils";
@@ -33,26 +36,58 @@ const BOOKING_STATUS_STYLES: Record<string, string> = {
   cancelled: "bg-destructive/10 text-destructive",
 };
 
-export default async function AdminEventsPage() {
-  const [venues, bookings] = await Promise.all([getVenuesAdmin(), getHallBookingsAdmin()]);
+export default async function AdminEventsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; status?: string; city?: string }>;
+}) {
+  const sp = await searchParams;
+  const [venues, { cities, total, published }, bookings] = await Promise.all([
+    getVenuesAdmin(sp),
+    getVenueCitiesAdmin(),
+    getHallBookingsAdmin(),
+  ]);
+  const awaiting = bookings.filter((b) => b.status === "pending").length;
+  const filtered = Boolean(sp.q || sp.status || sp.city);
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold">Events &amp; Halls</h1>
-        </div>
+        <h1 className="font-heading text-2xl font-semibold">Events &amp; Halls</h1>
         <VenueForm />
       </div>
 
-      <section className="space-y-3">
-        <h2 className="font-heading text-lg font-semibold">Venues</h2>
+      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border sm:grid-cols-4">
+        {[
+          { label: "Venues", value: total },
+          { label: "Published", value: published },
+          { label: "Towns", value: cities.length },
+          { label: "Awaiting decision", value: awaiting },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-secondary/40 px-5 py-4">
+            <dt className="text-xs font-medium text-muted-foreground">{stat.label}</dt>
+            <dd className="mt-1 font-heading text-2xl font-bold">{stat.value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <section className="space-y-4">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-heading text-lg font-semibold">Venues</h2>
+          {filtered ? (
+            <span className="text-sm text-muted-foreground">
+              {venues.length} of {total}
+            </span>
+          ) : null}
+        </div>
+        <VenueFilters cities={cities} />
+
         <Card className="overflow-hidden py-0">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Venue</TableHead>
-                <TableHead>City</TableHead>
+                <TableHead>Town</TableHead>
                 <TableHead>Capacity</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Status</TableHead>
@@ -62,55 +97,101 @@ export default async function AdminEventsPage() {
             <TableBody>
               {venues.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                    No venues yet — add your first hall.
+                  <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
+                    {filtered ? "No venues match." : "No venues yet."}
                   </TableCell>
                 </TableRow>
               ) : (
-                venues.map((venue) => (
-                  <TableRow key={venue.id}>
-                    <TableCell>
-                      <p className="font-medium">{venue.name}</p>
-                      {venue.tagline ? (
-                        <p className="text-xs text-muted-foreground">{venue.tagline}</p>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>{venue.city}</TableCell>
-                    <TableCell>
-                      {venue.capacity_seated ? `${venue.capacity_seated} seated` : "—"}
-                      {venue.capacity_standing ? ` · ${venue.capacity_standing} standing` : ""}
-                    </TableCell>
-                    <TableCell>
-                      {venue.currency} {Number(venue.base_price).toFixed(0)}{" "}
-                      <span className="text-xs text-muted-foreground">
-                        {venue.price_unit.replace("per_", "/ ")}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={cn(
-                          "border-transparent capitalize",
-                          VENUE_STATUS_STYLES[venue.status] ?? "bg-muted text-muted-foreground"
+                venues.map((venue) => {
+                  const cover = venueImageUrls(venue.images)[0];
+                  return (
+                    <TableRow key={venue.id} className="group">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          {cover ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={cover} alt="" className="h-12 w-16 shrink-0 rounded-md object-cover" />
+                          ) : (
+                            <span className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                              <ImageOff className="size-4" />
+                            </span>
+                          )}
+                          <div className="min-w-0">
+                            <Link
+                              href={`/admin/events/${venue.id}`}
+                              className="font-medium hover:text-primary hover:underline"
+                            >
+                              {venue.name}
+                            </Link>
+                            {venue.tagline ? (
+                              <p className="max-w-xs truncate text-xs text-muted-foreground">{venue.tagline}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center gap-1.5">
+                          <MapPin className="size-3.5 text-muted-foreground" />
+                          {venue.city}
+                        </span>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {venue.capacity_seated || venue.capacity_standing ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Users className="size-3.5 text-muted-foreground" />
+                            {venue.capacity_seated ? `${venue.capacity_seated} seated` : ""}
+                            {venue.capacity_seated && venue.capacity_standing ? " · " : ""}
+                            {venue.capacity_standing ? `${venue.capacity_standing} standing` : ""}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
                         )}
-                      >
-                        {venue.status.replace("_", " ")}
-                      </Badge>
-                      {venue.is_featured ? (
-                        <Badge className="ml-1.5 border-transparent bg-brand-accent/10 text-brand-accent">
-                          Featured
-                        </Badge>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1.5">
-                        <Button size="sm" variant="outline" className="gap-1.5" render={<Link href={`/admin/events/${venue.id}`} />}>
-                          Photos &amp; reviews
-                        </Button>
-                        <VenueForm venue={venue} />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {Number(venue.base_price) > 0 ? (
+                          <>
+                            <span className="font-semibold">
+                              {venue.currency} {Number(venue.base_price).toFixed(0)}
+                            </span>{" "}
+                            <span className="text-xs text-muted-foreground">
+                              {venue.price_unit.replace("per_", "/ ")}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">Not set</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1.5">
+                          <Badge
+                            className={cn(
+                              "border-transparent capitalize",
+                              VENUE_STATUS_STYLES[venue.status] ?? "bg-muted text-muted-foreground"
+                            )}
+                          >
+                            {venue.status.replace("_", " ")}
+                          </Badge>
+                          {venue.is_featured ? (
+                            <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Featured</Badge>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 whitespace-nowrap"
+                            render={<Link href={`/admin/events/${venue.id}`} />}
+                          >
+                            <Settings2 className="size-3.5" /> Manage
+                          </Button>
+                          <VenueForm venue={venue} />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>

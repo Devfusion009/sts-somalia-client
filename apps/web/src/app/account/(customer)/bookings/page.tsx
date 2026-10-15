@@ -84,9 +84,6 @@ export default async function AccountBookingsPage({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold">My Bookings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Every hotel, flight, visa, Umrah and event hall booking you&apos;ve made.
-          </p>
         </div>
 
         {/* Trips vs flat list. Trips is the default because anything booked in
@@ -186,7 +183,18 @@ export default async function AccountBookingsPage({
                     ) : null}
                   </div>
                   <div className="flex items-center gap-3">
-                    <StatusBadge status={trip.orderStatus} />
+                    <StatusBadge
+                      status={
+                        trip.orderStatus === "pending_payment" &&
+                        trip.bookings.some(
+                          (b) => (b.type === "hotel" || b.type === "hall") && (b.status === "pending" || b.status === "waitlisted")
+                        )
+                          ? trip.bookings.some((b) => (b.type === "hotel" || b.type === "hall") && b.status === "waitlisted")
+                            ? "waitlisted"
+                            : "awaiting_confirmation"
+                          : trip.orderStatus
+                      }
+                    />
                     <span className="font-semibold">{formatMoney(trip.total, trip.currency)}</span>
                     <Button
                       size="sm"

@@ -92,6 +92,12 @@ export async function getAgencyCalendarBookings(agencyId: string, from: string, 
   return getCalendarBookingsForRange(from, to, agencyId);
 }
 
+/**
+ * Only bookings that are real: held or paid. Cancelled, refunded, failed,
+ * no-show and waitlisted rows never occupy the calendar.
+ */
+const LIVE_STATUSES = ["pending", "confirmed", "completed"] as const;
+
 async function getCalendarBookingsForRange(from: string, to: string, agencyId?: string): Promise<CalendarBookingEvent[]> {
   const supabase = await createClient();
 
@@ -102,6 +108,7 @@ async function getCalendarBookingsForRange(from: string, to: string, agencyId?: 
        hotel:hotel_id (name, city, address_line),
        customer:customer_id (full_name, email, phone)`
     )
+    .in("status", LIVE_STATUSES)
     .lte("check_in", to)
     .gte("check_out", from);
   let flightQuery = supabase
@@ -110,6 +117,7 @@ async function getCalendarBookingsForRange(from: string, to: string, agencyId?: 
       `id, origin_iata, destination_iata, depart_at, return_at, trip_type, cabin_class, status, total_price, currency,
        customer:customer_id (full_name, email, phone)`
     )
+    .in("status", LIVE_STATUSES)
     .gte("depart_at", `${from}T00:00:00Z`)
     .lte("depart_at", `${to}T23:59:59Z`);
   let umrahQuery = supabase
@@ -120,8 +128,21 @@ async function getCalendarBookingsForRange(from: string, to: string, agencyId?: 
        departure:departure_id!inner (departure_date, return_date),
        customer:customer_id (full_name, email, phone)`
     )
+    .in("status", LIVE_STATUSES)
     .lte("departure.departure_date", to)
     .gte("departure.return_date", from);
+  // Private Umrah has no scheduled departure: its dates live on the custom
+  // request, and the stay length is the Makkah + Madinah nights.
+  let privateUmrahQuery = supabase
+    .from("umrah_bookings")
+    .select(
+      `id, num_pilgrims, special_requests, status, total_price, currency,
+       request:custom_request_id!inner (reference, tier, departure_date, nights_makkah, nights_madinah),
+       customer:customer_id (full_name, email, phone)`
+    )
+    .in("status", LIVE_STATUSES)
+    .not("request.departure_date", "is", null)
+    .lte("request.departure_date", to);
   let hallQuery = supabase
     .from("hall_bookings")
     .select(
@@ -129,6 +150,7 @@ async function getCalendarBookingsForRange(from: string, to: string, agencyId?: 
        venue:venue_id (name, city, address),
        customer:customer_id (full_name, email, phone)`
     )
+    .in("status", LIVE_STATUSES)
     .lte("start_date", to)
     .gte("end_date", from);
 
@@ -136,15 +158,22 @@ async function getCalendarBookingsForRange(from: string, to: string, agencyId?: 
     hotelQuery = hotelQuery.eq("agency_id", agencyId);
     flightQuery = flightQuery.eq("agency_id", agencyId);
     umrahQuery = umrahQuery.eq("agency_id", agencyId);
+    privateUmrahQuery = privateUmrahQuery.eq("agency_id", agencyId);
     hallQuery = hallQuery.eq("agency_id", agencyId);
   }
 
-  const [hotelRes, flightRes, umrahRes, hallRes] = await Promise.all([hotelQuery, flightQuery, umrahQuery, hallQuery]);
+  const [hotelRes, flightRes, umrahRes, privateUmrahRes, hallRes] = await Promise.all([
+    hotelQuery,
+    flightQuery,
+    umrahQuery,
+    privateUmrahQuery,
+    hallQuery,
+  ]);
 
   const contacts = await getAgencyCustomerContacts(supabase, {
     hotel: (hotelRes.data ?? []).map((b) => b.id),
     flight: (flightRes.data ?? []).map((b) => b.id),
-    umrah: (umrahRes.data ?? []).map((b) => b.id),
+    umrah: [...(umrahRes.data ?? []), ...(privateUmrahRes.data ?? [])].map((b) => b.id),
     hall: (hallRes.data ?? []).map((b) => b.id),
   });
 
@@ -217,6 +246,35 @@ async function getCalendarBookingsForRange(from: string, to: string, agencyId?: 
       detail: [
         { label: "Pilgrims", value: String(b.num_pilgrims) },
         { label: "Special requests", value: b.special_requests ?? "—" },
+      ],
+    });
+  }
+
+  for (const b of privateUmrahRes.data ?? []) {
+    const r = b.request;
+    if (!r?.departure_date) continue;
+    const start = new Date(`${r.departure_date}T00:00:00Z`);
+    const end = new Date(start.getTime() + (r.nights_makkah + r.nights_madinah) * 86_400_000);
+    const endDate = end.toISOString().slice(0, 10);
+    if (endDate < from) continue;
+    const contact = contacts.umrah.get(b.id);
+    events.push({
+      id: b.id,
+      kind: "umrah",
+      title: `Private Umrah · ${r.reference}`,
+      location: "Makkah & Madinah, Saudi Arabia",
+      startDate: r.departure_date,
+      endDate,
+      status: b.status,
+      price: Number(b.total_price),
+      currency: b.currency,
+      customerName: contact?.full_name ?? b.customer?.full_name ?? null,
+      customerEmail: contact?.email ?? b.customer?.email ?? null,
+      customerPhone: contact?.phone ?? b.customer?.phone ?? null,
+      detail: [
+        { label: "Pilgrims", value: String(b.num_pilgrims) },
+        { label: "Stay", value: `${r.nights_makkah}N Makkah · ${r.nights_madinah}N Madinah` },
+        { label: "Package", value: r.tier },
       ],
     });
   }

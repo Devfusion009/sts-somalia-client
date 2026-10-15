@@ -62,6 +62,8 @@ export function RoomNightsTable({ nights, currency }: { nights: RoomNight[]; cur
         <TableHeader>
           <TableRow>
             <TableHead>Night</TableHead>
+            <TableHead className="text-right">Confirmed</TableHead>
+            <TableHead className="text-right">On request</TableHead>
             <TableHead className="text-right">Left</TableHead>
             <TableHead className="text-right">Rate</TableHead>
           </TableRow>
@@ -69,7 +71,7 @@ export function RoomNightsTable({ nights, currency }: { nights: RoomNight[]; cur
         <TableBody>
           {filtered.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={3} className="text-center text-sm text-muted-foreground">
+              <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
                 No nights in range.
               </TableCell>
             </TableRow>
@@ -83,13 +85,22 @@ export function RoomNightsTable({ nights, currency }: { nights: RoomNight[]; cur
             return (
               <TableRow key={n.night}>
                 <TableCell className="font-medium">{format(new Date(`${n.night}T00:00:00`), "EEE d MMM")}</TableCell>
-                <TableCell className="text-right" title={detail}>
+                <TableCell className="text-right tabular-nums">
+                  {n.confirmed > 0 ? <span className="font-semibold text-primary">{n.confirmed}</span> : <span className="text-muted-foreground">0</span>}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {n.pending > 0 ? <span className="font-semibold text-brand-gold">{n.pending}</span> : <span className="text-muted-foreground">0</span>}
+                </TableCell>
+                <TableCell className="text-right tabular-nums" title={detail}>
                   {n.capacity === null ? (
                     <span className="text-muted-foreground">—</span>
                   ) : n.available !== null && n.available <= 0 ? (
-                    <Badge variant="destructive">Sold out</Badge>
+                    <Badge variant="destructive">0/{n.capacity}</Badge>
                   ) : (
-                    <span className={cn(low && "font-semibold text-brand-gold")}>{n.available}</span>
+                    <span className={cn(low && "font-semibold text-brand-gold")}>
+                      {n.available}
+                      <span className="text-muted-foreground">/{n.capacity}</span>
+                    </span>
                   )}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">

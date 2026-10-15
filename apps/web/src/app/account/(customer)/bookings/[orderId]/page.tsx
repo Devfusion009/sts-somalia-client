@@ -209,6 +209,15 @@ export default async function BookingDetailPage({
   const hotelStatus = (hotelItem?.hotel_booking as { status?: string } | null)?.status ?? null;
   const hallItem = order.order_items.find((i) => i.item_type === "hall");
   const hallStatus = (hallItem?.hall_booking as { status?: string } | null)?.status ?? null;
+  // An unpaid order whose hotel/hall request is still undecided can't be paid
+  // yet, so the header names the real step instead of "pending payment".
+  const requestStatus = [hotelStatus, hallStatus].find((s) => s === "pending" || s === "waitlisted");
+  const headerStatus =
+    order.status === "pending_payment" && requestStatus
+      ? requestStatus === "waitlisted"
+        ? "waitlisted"
+        : "awaiting_confirmation"
+      : order.status;
 
   return (
     <div className="space-y-6">
@@ -240,7 +249,7 @@ export default async function BookingDetailPage({
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <StatusBadge status={order.status} />
+            <StatusBadge status={headerStatus} />
             <span className="font-heading text-xl font-bold">
               {formatMoney(order.total, order.currency)}
             </span>

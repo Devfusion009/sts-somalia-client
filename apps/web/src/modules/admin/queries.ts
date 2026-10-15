@@ -558,13 +558,34 @@ export async function getVisaStatsAdmin() {
 // ---------------------------------------------------------------------------
 // Events & halls management
 // ---------------------------------------------------------------------------
-export async function getVenuesAdmin() {
+export async function getVenuesAdmin({ q, status, city }: { q?: string; status?: string; city?: string } = {}) {
   const supabase = await createClient();
-  const { data } = await supabase
+  let query = supabase
     .from("event_venues")
     .select("*, property_links(label, url, sort_order)")
-    .order("created_at", { ascending: false });
+    .order("city", { ascending: true })
+    .order("name", { ascending: true });
+
+  const term = searchTerm(q);
+  if (term) query = query.or(`name.ilike.%${term}%,city.ilike.%${term}%,tagline.ilike.%${term}%,address.ilike.%${term}%`);
+  if (status) query = query.eq("status", status as Database["public"]["Enums"]["listing_status"]);
+  if (city) query = query.eq("city", city);
+
+  const { data } = await query;
   return data ?? [];
+}
+
+/** Every town with a venue, for the city filter; independent of the active filters. */
+export async function getVenueCitiesAdmin() {
+  const supabase = await createClient();
+  const { data } = await supabase.from("event_venues").select("city, status");
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) counts.set(row.city, (counts.get(row.city) ?? 0) + 1);
+  return {
+    cities: [...counts.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, count]) => ({ name, count })),
+    total: data?.length ?? 0,
+    published: (data ?? []).filter((r) => r.status === "published").length,
+  };
 }
 
 export async function getVenueByIdAdmin(venueId: string) {

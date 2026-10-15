@@ -217,7 +217,7 @@ export function AdminEventCalendar({
             const dayAdminEvents = adminEventsForDay(day);
             const inMonth = isSameMonth(day, monthStart);
             const shownHolidays = dayHolidays.slice(0, 2);
-            const remainingAfterHolidays = Math.max(0, 3 - shownHolidays.length);
+            const remainingAfterHolidays = Math.max(0, 5 - shownHolidays.length);
             const shownAdminEvents = dayAdminEvents.slice(0, remainingAfterHolidays);
             const remainingSlots = Math.max(0, remainingAfterHolidays - shownAdminEvents.length);
             const shownEvents = dayEvents.slice(0, remainingSlots);
@@ -236,7 +236,7 @@ export function AdminEventCalendar({
                 type="button"
                 onClick={() => (hasItems ? setSelectedDay(day) : undefined)}
                 className={cn(
-                  "flex min-h-24 flex-col gap-1 bg-background p-1.5 text-left transition-colors",
+                  "flex min-h-32 flex-col gap-1 bg-background p-1.5 text-left transition-colors",
                   !inMonth && "bg-muted/30 text-muted-foreground/50",
                   hasItems && "cursor-pointer hover:bg-accent"
                 )}
@@ -271,26 +271,35 @@ export function AdminEventCalendar({
                     </span>
                   ))}
                   {shownEvents.map((e) => {
-                    // Purpose first, customer second: a bare customer name
-                    // repeated across a multi-day booking's whole date range
-                    // (e.g. a 7-night Umrah trip) reads as unrelated same-name
-                    // entries with no way to tell what was booked without
-                    // opening the day. The kind icon + label makes the type
-                    // legible at a glance and ties the repeated cells together
-                    // as one booking spanning the week.
                     const meta = KIND_META[e.kind];
                     const Icon = meta.icon;
+                    const key = format(day, "yyyy-MM-dd");
+                    const marker = e.startDate === key ? "In" : e.endDate === key && e.endDate !== e.startDate ? "Out" : null;
                     return (
                       <span
                         key={`${e.kind}-${e.id}`}
-                        className="flex items-center gap-1 truncate text-[10px] font-medium text-foreground"
-                        title={`${meta.label} — ${e.title}${e.customerName ? ` (${e.customerName})` : ""}`}
+                        className={cn(
+                          "flex min-w-0 flex-col rounded border-l-2 px-1 py-0.5 leading-tight",
+                          meta.chip,
+                          e.status === "pending" && "border-dashed opacity-80",
+                          // Check-out morning: the room is free that night.
+                          e.kind === "hotel" && marker === "Out" && "opacity-50"
+                        )}
+                        style={{ borderLeftColor: "currentColor" }}
+                        title={`${meta.label} — ${e.title}${e.customerName ? ` (${e.customerName})` : ""} · ${e.status}`}
                       >
-                        <Icon className={cn("size-2.5 shrink-0", meta.iconColor)} />
-                        <span className="truncate">
-                          {meta.label}
-                          {e.customerName ? ` · ${e.customerName}` : ""}
+                        <span className="flex items-center gap-1 text-[10px] font-semibold">
+                          <Icon className="size-2.5 shrink-0" />
+                          <span className="truncate">{e.title}</span>
+                          {marker ? (
+                            <span className="ml-auto shrink-0 rounded bg-foreground/10 px-1 text-[9px] font-bold uppercase">
+                              {marker}
+                            </span>
+                          ) : null}
                         </span>
+                        {e.customerName ? (
+                          <span className="truncate text-[9px] font-medium text-foreground/70">{e.customerName}</span>
+                        ) : null}
                       </span>
                     );
                   })}

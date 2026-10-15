@@ -15,6 +15,25 @@ import {
   updateUmrahRequestPrice,
 } from "@/modules/umrah/service-admin-actions";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { toast } from "sonner";
+import type { ActionState } from "@/lib/auth/actions";
+
+/**
+ * Wraps a server action so success raises a toast from the call itself — the
+ * queue row unmounts as soon as the decision lands, so an effect on the
+ * returned state would never get to run.
+ */
+function withToast(
+  action: (prev: ActionState, formData: FormData) => Promise<ActionState>,
+  message: (formData: FormData) => string
+) {
+  return async (prev: ActionState, formData: FormData) => {
+    const result = await action(prev, formData);
+    if (result?.error) toast.error(result.error, { position: "top-center" });
+    else toast.success(message(formData), { position: "top-center" });
+    return result;
+  };
+}
 
 export type QueueKind = "hotel" | "hall" | "umrah";
 
@@ -38,8 +57,14 @@ const PRICE_ACTIONS = {
  */
 export function QueueEntryActions({ kind, bookingId }: { kind: QueueKind; bookingId: string }) {
   const action = STATUS_ACTIONS[kind];
-  const [confirmState, confirmAction] = useActionState(action, null);
-  const [declineState, declineAction] = useActionState(action, null);
+  const [confirmState, confirmAction] = useActionState(
+    withToast(action, () => "Booking confirmed."),
+    null
+  );
+  const [declineState, declineAction] = useActionState(
+    withToast(action, () => "Request declined."),
+    null
+  );
   const error = confirmState?.error ?? declineState?.error;
 
   return (
@@ -90,7 +115,10 @@ export function PriceQuoteForm({
   currency: string;
 }) {
   const action = PRICE_ACTIONS[kind];
-  const [state, formAction] = useActionState(action, null);
+  const [state, formAction] = useActionState(
+    withToast(action, (fd) => `Price set to ${currency} ${Number(fd.get("price")).toFixed(2)}.`),
+    null
+  );
 
   return (
     <form action={formAction} className="flex flex-col items-end gap-1">
