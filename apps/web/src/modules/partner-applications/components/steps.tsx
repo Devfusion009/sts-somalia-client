@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Building2,
   Check,
-  CloudUpload,
   FileBadge2,
   FileCheck2,
   FileText,
@@ -94,6 +93,7 @@ import {
 } from "../config";
 import type { ApplicationRow, DocumentRef, DocumentReview } from "../queries";
 import { partnerLogoUrl } from "../logo-url";
+import { FileField } from "@/components/ui/upload";
 
 type AppRow = ApplicationRow;
 
@@ -1011,10 +1011,9 @@ function DocUploadRow({
   review?: DocumentReview;
   iconIndex: number;
 }) {
-  const [state, formAction, pending] = useActionState(uploadApplicationDocument, null);
+  const [state, formAction] = useActionState(uploadApplicationDocument, null);
   const [expiryState, expiryAction, expiryPending] = useActionState(updateDocumentExpiry, null);
   const [expiry, setExpiry] = useState(existing?.expiry ?? "");
-  const [fileError, setFileError] = useState<string | null>(null);
   const removeFormRef = useRef<HTMLFormElement>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const isExpired = slot.expiryField && expiry && new Date(expiry) < new Date(new Date().toDateString());
@@ -1139,40 +1138,20 @@ function DocUploadRow({
           <input type="hidden" name="docKey" value={slot.key} />
           <input type="hidden" name="docLabel" value={slot.label} />
           <input type="hidden" name="expiry" value={expiry} />
-          <label
-            className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed p-4 text-sm transition-colors ${
-              pending ? "border-primary/40 bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:bg-accent"
-            }`}
-          >
-            <input
-              type="file"
-              name="file"
-              accept="application/pdf"
-              required
-              className="sr-only"
-              disabled={pending}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const problem = checkUploadFile(file);
-                if (problem) {
-                  setFileError(problem);
-                  e.target.value = "";
-                  return;
-                }
-                setFileError(null);
-                e.currentTarget.form?.requestSubmit();
-              }}
-            />
-            <CloudUpload className="size-4 shrink-0" />
-            {pending ? "Uploading…" : isRejected ? "Choose a replacement file" : "Click to choose a file — uploads automatically"}
-          </label>
+          <FileField
+            name="file"
+            accept="application/pdf"
+            required
+            autoSubmit
+            validate={checkUploadFile}
+            label={isRejected ? "Drop a replacement PDF" : "Drop a PDF"}
+          />
         </form>
       ) : null}
-      {fileError ?? state?.error ? (
+      {state?.error ? (
         <Alert variant="destructive" className="mt-2">
           <AlertCircle />
-          <AlertDescription>{fileError ?? state?.error}</AlertDescription>
+          <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       ) : null}
     </div>

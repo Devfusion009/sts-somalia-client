@@ -28,6 +28,7 @@ import {
   type UmrahServiceCategory,
   type UmrahTier,
 } from "@/modules/umrah/services";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 export type AdminService = {
   id: string;
@@ -306,14 +307,16 @@ export function EditServiceForm({ service }: { service: AdminService }) {
         </Button>
         <form action={deleteUmrahService}>
           <input type="hidden" name="serviceId" value={service.id} />
-          <SubmitButton
+          <ConfirmButton
+            title="Delete this service?"
+            description={service.name}
+            aria-label="Delete service"
             variant="ghost"
             size="sm"
-            pendingText="Deleting…"
             className="text-destructive hover:text-destructive"
           >
             <Trash2 className="size-3.5" />
-          </SubmitButton>
+          </ConfirmButton>
         </form>
       </div>
     );

@@ -21,7 +21,7 @@ function formatDate(value: string | null) {
 }
 
 /**
- * Private Umrah requests waiting on a human, oldest first.
+ * Private Umrah requests waiting on a human, newest first.
  *
  * These are quoted, not open-ended: the customer has already seen and agreed
  * a total built from the service catalog. What still needs a person is

@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
 import { getHotelForEdit } from "@/modules/hotels/partner-queries";
 import { getRoomTypes } from "@/modules/hotels/room-types";
-import { getHotelAvailability } from "@/modules/hotels/availability";
+import { getHotelAvailability, todayIso } from "@/modules/hotels/availability";
 import { AvailabilityBoard } from "@/modules/hotels/components/availability-board";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,8 +21,19 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = 
   suspended: "destructive",
 };
 
-export default async function ManagerRoomsPage({ params }: { params: Promise<{ hotelId: string }> }) {
+function boardFrom(raw: string | undefined) {
+  return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : todayIso();
+}
+
+export default async function ManagerRoomsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ hotelId: string }>;
+  searchParams: Promise<{ from?: string }>;
+}) {
   const { hotelId } = await params;
+  const from = boardFrom((await searchParams).from);
   const profile = await requireUser();
   const managed = await getMyManagedHotel(profile.id, hotelId);
   if (!managed) notFound();
@@ -30,25 +41,24 @@ export default async function ManagerRoomsPage({ params }: { params: Promise<{ h
   const hotel = await getHotelForEdit(hotelId, [hotelId]);
   if (!hotel) notFound();
   const roomTypes = await getRoomTypes();
-  const availability = await getHotelAvailability(hotelId, { days: 14 });
+  const availability = await getHotelAvailability(hotelId, { from, days: 7 });
 
   const canEditRooms = hasPermission(managed, "rooms");
   const canSetAvailability = hasPermission(managed, "availability");
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle>Availability</CardTitle>
-          <span className="text-xs text-muted-foreground">Next 14 nights · A agency · C customer</span>
-        </CardHeader>
-        <CardContent>
-          <AvailabilityBoard
-            rooms={availability}
-            roomHref={canSetAvailability ? (roomId) => `/manager/${hotel.id}/rooms/${roomId}` : undefined}
-          />
-        </CardContent>
-      </Card>
+      <section className="space-y-3">
+        <h2 className="font-heading text-base font-semibold">Availability</h2>
+        <AvailabilityBoard
+          rooms={availability}
+          from={from}
+          days={7}
+          today={todayIso()}
+          roomHref={canSetAvailability ? (roomId) => `/manager/${hotel.id}/rooms/${roomId}` : undefined}
+          rangeHref={(start) => `/manager/${hotel.id}/rooms?from=${start}`}
+        />
+      </section>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">

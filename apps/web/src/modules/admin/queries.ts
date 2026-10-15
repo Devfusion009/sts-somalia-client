@@ -53,17 +53,17 @@ export async function getPendingApplications() {
       .from("agency_applications")
       .select("id, agency_name, status, created_at, applicant:profiles!agency_applications_applicant_id_fkey(full_name, email)")
       .eq("status", "pending")
-      .order("created_at", { ascending: true }),
+      .order("created_at", { ascending: false }),
     supabase
       .from("hotel_partner_applications")
       .select("id, business_name, status, created_at, applicant:profiles!hotel_partner_applications_applicant_id_fkey(full_name, email)")
       .eq("status", "pending")
-      .order("created_at", { ascending: true }),
+      .order("created_at", { ascending: false }),
     supabase
       .from("affiliate_applications")
       .select("id, notes, status, created_at, applicant:profiles!affiliate_applications_applicant_id_fkey(full_name, email)")
       .eq("status", "pending")
-      .order("created_at", { ascending: true }),
+      .order("created_at", { ascending: false }),
   ]);
 
   return {
@@ -148,7 +148,7 @@ async function queryApplications(
     query = query.or(`reference_number.ilike.%${filters.search}%,${nameCol}.ilike.%${filters.search}%`);
   }
 
-  const { data } = await query.order("status", { ascending: true }).order("created_at", { ascending: true });
+  const { data } = await query.order("status", { ascending: true }).order("created_at", { ascending: false });
   return (data ?? []) as unknown as ApplicationQueueRow[];
 }
 

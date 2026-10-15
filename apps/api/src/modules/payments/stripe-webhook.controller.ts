@@ -3,6 +3,7 @@ import type { RawBodyRequest } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { AdminSupabaseService } from "../../infra/supabase/admin-supabase.service";
+import { getPaymentGateways } from "../../infra/payment-config";
 
 /**
  * Direct port of apps/web's app/api/payments/stripe/webhook/route.ts.
@@ -25,7 +26,7 @@ export class StripeWebhookController {
 
   @Post("webhook")
   async handleWebhook(@Req() request: RawBodyRequest<Request>, @Res() response: Response) {
-    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+    const secret = (await getPaymentGateways()).stripe?.webhookSecret;
     if (!secret) {
       return response.status(HttpStatus.SERVICE_UNAVAILABLE).json({ error: "Webhook not configured" });
     }

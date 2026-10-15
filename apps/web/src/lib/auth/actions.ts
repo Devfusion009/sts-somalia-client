@@ -80,7 +80,7 @@ export async function signInAction(
     // account of its own behind it, unlike agent/affiliate/hotel_partner/
     // venue_partner below (each its own B2C account that also applied for a
     // program). The manager half is checked against the real hotel_managers
-    // row rather than profile.role (hasActiveHotelManagerRow, below): an
+    // row rather than profile.role (hasActiveManagerRow, below — hotel and venue seats): an
     // account assigned as manager by any path that skips the admin
     // promotion RPC (seed data, notably) never gets that role column
     // bumped, and this used to be two separate checks that each missed a
@@ -89,7 +89,7 @@ export async function signInAction(
     // admin — before being written as one condition here. 2026-08-23: a
     // manager reached the customer site via the account switcher and could
     // switch back into a "My Account" view that isn't really theirs.
-    if (profile?.is_platform_admin || (await hasActiveHotelManagerRow(supabase, user.id))) {
+    if (profile?.is_platform_admin || (await hasActiveManagerRow(supabase, user.id))) {
       await supabase.auth.signOut();
       return { error: "Incorrect email or password." };
     }
@@ -135,15 +135,6 @@ export async function signInAction(
 
 type PortalKind = PortalSubdomain;
 
-const PORTAL_LOGIN_META: Record<PortalKind, { audienceError: string }> = {
-  agent: { audienceError: "This account doesn't have agent access." },
-  admin: { audienceError: "This account doesn't have admin access." },
-  manager: { audienceError: "This account doesn't have hotel manager access." },
-  affiliate: { audienceError: "This account doesn't have affiliate access." },
-  partner: { audienceError: "This account doesn't have hotel partner access." },
-  venue: { audienceError: "This account doesn't have venue partner access." },
-};
-
 /**
  * Default post-login destination for signInToPortalAction — deliberately a
  * RELATIVE path ("/admin", "/agent"), not portalHref()'s absolute
@@ -180,18 +171,16 @@ async function hasActiveAgencyMembership(
   return !!data;
 }
 
-async function hasActiveHotelManagerRow(
+/** An active hotel_managers OR venue_managers seat — the manager portal's audience. */
+async function hasActiveManagerRow(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string
 ): Promise<boolean> {
-  const { data } = await supabase
-    .from("hotel_managers")
-    .select("hotel_id")
-    .eq("profile_id", userId)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
-  return !!data;
+  const [{ data: hotel }, { data: venue }] = await Promise.all([
+    supabase.from("hotel_managers").select("hotel_id").eq("profile_id", userId).eq("status", "active").limit(1).maybeSingle(),
+    supabase.from("venue_managers").select("venue_id").eq("profile_id", userId).eq("status", "active").limit(1).maybeSingle(),
+  ]);
+  return !!hotel || !!venue;
 }
 
 async function hasAffiliateRow(
@@ -268,7 +257,7 @@ async function holdsPortalAudience(
     case "agent":
       return hasActiveAgencyMembership(supabase, userId);
     case "manager":
-      return hasActiveHotelManagerRow(supabase, userId);
+      return hasActiveManagerRow(supabase, userId);
     case "affiliate":
       return hasAffiliateRow(supabase, userId);
     case "partner":
@@ -319,7 +308,7 @@ async function signInToPortalAction(
     // as a silent failure — sign back out before surfacing the error so the
     // account isn't left half-authenticated into a portal it can't use.
     await supabase.auth.signOut();
-    return { error: PORTAL_LOGIN_META[portal].audienceError };
+    return { error: "Incorrect email or password." };
   }
 
   const redirectTo = formData.get("redirect_to");

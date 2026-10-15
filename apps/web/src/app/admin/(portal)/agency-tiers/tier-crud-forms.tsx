@@ -14,6 +14,7 @@ import {
 } from "@/modules/agencies/tier-actions";
 import type { ActionState } from "@/lib/auth/actions";
 import type { AgencyTier } from "@/modules/agencies/queries";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 function FormStatus({ state }: { state: ActionState }) {
   if (!state) return null;
@@ -147,14 +148,15 @@ export function DeleteTierForm({ tierId }: { tierId: string }) {
           <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       ) : null}
-      <Button
-        type="submit"
+      <ConfirmButton
+        title="Delete this tier?"
+        aria-label="Delete tier"
         variant="ghost"
         size="icon"
         className="size-8 text-destructive hover:text-destructive"
       >
         <Trash2 className="size-3.5" />
-      </Button>
+      </ConfirmButton>
     </form>
   );
 }

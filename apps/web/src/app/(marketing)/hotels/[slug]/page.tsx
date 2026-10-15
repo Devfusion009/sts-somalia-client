@@ -20,6 +20,9 @@ import { PropertyReviews } from "@/components/property-reviews";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { todayIso } from "@/modules/hotels/availability";
 import { BookingForm } from "./booking-form";
 import { HotelGallery } from "./hotel-gallery";
 
@@ -162,6 +165,26 @@ export default async function HotelDetailPage({
                 {rooms.length} room type{rooms.length === 1 ? "" : "s"}
               </p>
             </div>
+
+            <form
+              action={`/hotels/${slug}`}
+              method="get"
+              className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4"
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor="stay-checkIn">Check-in</Label>
+                <Input id="stay-checkIn" name="checkIn" type="date" min={todayIso()} defaultValue={checkIn} required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="stay-checkOut">Check-out</Label>
+                <Input id="stay-checkOut" name="checkOut" type="date" min={checkIn || todayIso()} defaultValue={checkOut} required />
+              </div>
+              <div className="w-24 space-y-1.5">
+                <Label htmlFor="stay-guests">Guests</Label>
+                <Input id="stay-guests" name="guests" type="number" min={1} max={30} defaultValue={guests || "2"} />
+              </div>
+              <Button type="submit">Check availability</Button>
+            </form>
 
             {rooms.length > 0 ? (
               <div className="mt-4 space-y-4">

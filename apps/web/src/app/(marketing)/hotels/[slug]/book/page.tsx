@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BedDouble, Building2, ChevronRight, Home, MapPin, Ruler, ShieldCheck, Star, Users } from "lucide-react";
 import { getHotelBySlug } from "@/modules/hotels/queries";
+import { getStayQuote } from "@/modules/hotels/booking-actions";
 import { hotelImageUrls, amenityLabel } from "@/modules/hotels/images";
 import { MediaPlaceholder } from "@/components/media-placeholder";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,8 @@ export default async function HotelBookingReviewPage({
 
   const room = hotel.hotel_rooms.find((r) => r.id === roomId && r.status === "published");
   if (!room) redirect(`/hotels/${slug}`);
+
+  const stayQuote = checkIn && checkOut ? await getStayQuote(room.id, checkIn, checkOut) : null;
 
   const bookingMode = hotel.booking_mode === "instant" ? "instant" : "manual";
   const hotelImage = hotelImageUrls(hotel.images)[0];
@@ -136,6 +139,8 @@ export default async function HotelBookingReviewPage({
           hotelSummary={hotelSummary}
           roomSummary={roomSummary}
           bookedForSlot={<AgencyBookingSlot />}
+          initialUnitsLeft={stayQuote?.unitsLeft ?? null}
+          initialPricePerRoom={stayQuote?.pricePerRoom ?? null}
         />
       </div>
     </div>

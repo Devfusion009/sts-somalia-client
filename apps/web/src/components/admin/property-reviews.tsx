@@ -5,10 +5,10 @@ import { Star, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
 import { createPropertyReview, deletePropertyReview } from "@/modules/admin/actions";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 type Review = {
   id: string;
@@ -54,9 +54,16 @@ export function PropertyReviews({
                   <input type="hidden" name="reviewId" value={review.id} />
                   {hotelId ? <input type="hidden" name="hotelId" value={hotelId} /> : null}
                   {venueId ? <input type="hidden" name="venueId" value={venueId} /> : null}
-                  <Button type="submit" size="sm" variant="ghost" className="h-7 px-2 text-destructive hover:text-destructive">
+                  <ConfirmButton
+                    title="Delete this review?"
+                    description={review.author_name}
+                    aria-label="Delete review"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-destructive hover:text-destructive"
+                  >
                     <Trash2 className="size-3.5" />
-                  </Button>
+                  </ConfirmButton>
                 </form>
               </div>
             </li>

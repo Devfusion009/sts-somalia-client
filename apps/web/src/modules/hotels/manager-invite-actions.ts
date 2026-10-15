@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
 import { MANAGER_PERMISSION_KEYS, isManagerPermission } from "@/modules/hotels/manager-permissions";
+import { deliverManagerCredentials, generateTempPassword } from "@/modules/identity/manager-credentials";
 
 /**
  * One implementation for assigning/managing a hotel's managers, called by
@@ -24,23 +25,6 @@ async function requireCanManageHotelManagers(hotelId: string): Promise<void> {
   if (error || !data) {
     throw new Error("You don't have permission to manage this hotel's managers.");
   }
-}
-
-function generateTempPassword(): string {
-  const raw = crypto.randomUUID().replace(/-/g, "");
-  return `Sts-${raw.slice(0, 8)}-${raw.slice(8, 12)}`;
-}
-
-/**
- * The one seam for handing a manager their credentials. Today there is no
- * outbound email, so it returns the password for the caller to relay out of
- * band and the UI shows it exactly once. When Resend credentials land,
- * sending the password (or better, an invite/reset link) from here flips
- * every credential path — create and reset — to email delivery in one place;
- * return `password: null` then and the UI stops rendering it.
- */
-async function deliverManagerCredentials(_email: string, password: string): Promise<{ password: string | null }> {
-  return { password };
 }
 
 function permissionsFrom(formData: FormData): string[] {

@@ -17,7 +17,7 @@ import { StepServices } from "@/modules/umrah/components/step-services";
 import { StepPilgrims } from "@/modules/umrah/components/step-pilgrims";
 import { StepReview } from "@/modules/umrah/components/step-review";
 import { AgencyBookingSlot } from "@/modules/agencies/components/agency-booking-slot";
-import { SubmitButton } from "@/components/submit-button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 export const metadata: Metadata = { title: "Build your private Umrah" };
 
@@ -109,14 +109,15 @@ export default async function PrivateUmrahBuilderPage({
 
           <form action={discardUmrahCustomRequest}>
             <input type="hidden" name="requestId" value={requestId} />
-            <SubmitButton
+            <ConfirmButton
+              title="Discard this trip?"
+              confirmLabel="Discard"
               variant="ghost"
               size="sm"
-              pendingText="Discarding…"
               className="w-full gap-1.5 text-muted-foreground hover:text-destructive"
             >
               <Trash2 className="size-3.5" /> Discard this trip
-            </SubmitButton>
+            </ConfirmButton>
           </form>
         </aside>
 

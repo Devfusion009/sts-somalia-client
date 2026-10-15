@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
 import { addRoomUnit, setRoomUnitStatus, deleteRoomUnit } from "@/modules/hotels/room-unit-actions";
 import { cn } from "@/lib/utils";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 type RoomUnit = {
   id: string;
@@ -92,9 +93,16 @@ export function RoomUnitsManager({
                     </form>
                     <form action={deleteRoomUnit}>
                       <input type="hidden" name="unitId" value={unit.id} />
-                      <Button type="submit" size="icon" variant="ghost" className="size-7 text-muted-foreground hover:text-destructive">
+                      <ConfirmButton
+                        title="Delete this room?"
+                        description={unit.room_number}
+                        aria-label="Delete room"
+                        size="icon"
+                        variant="ghost"
+                        className="size-7 text-muted-foreground hover:text-destructive"
+                      >
                         <Trash2 className="size-3.5" />
-                      </Button>
+                      </ConfirmButton>
                     </form>
                   </>
                 ) : null}

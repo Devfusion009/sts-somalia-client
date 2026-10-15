@@ -29,6 +29,7 @@ import {
   adminSubmitToPartner,
   adminSyncPartnerStatus,
 } from "@/modules/visa/admin-actions";
+import { UploadStatus } from "@/components/ui/upload";
 
 export function RequestDocumentDialog({
   applicationId,
@@ -116,6 +117,7 @@ export function ResultUpload({ applicationId }: { applicationId: string }) {
   const [state, formAction, pending] = useActionState(adminUploadResultDocument, null);
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [chosen, setChosen] = useState<File | null>(null);
 
   return (
     <form ref={formRef} action={formAction} className="space-y-1.5">
@@ -126,7 +128,10 @@ export function ResultUpload({ applicationId }: { applicationId: string }) {
         name="file"
         accept=".pdf,.jpg,.jpeg,.png"
         className="sr-only"
-        onChange={() => formRef.current?.requestSubmit()}
+        onChange={(e) => {
+          setChosen(e.target.files?.[0] ?? null);
+          formRef.current?.requestSubmit();
+        }}
       />
       <Button
         type="button"
@@ -139,6 +144,7 @@ export function ResultUpload({ applicationId }: { applicationId: string }) {
         {pending ? "Uploading…" : "Upload visa document"}
       </Button>
       {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
+      <UploadStatus file={chosen} pending={pending} error={state?.error} className="w-full min-w-60" />
     </form>
   );
 }

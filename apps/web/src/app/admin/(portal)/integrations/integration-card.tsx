@@ -111,20 +111,12 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
                 {provider.selfServe ? "Self-serve" : "Requires approval"}
               </Badge>
             </div>
-            <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">{provider.description}</p>
           </div>
 
           <div className="flex shrink-0 items-center gap-2.5">
-            <div className="text-right">
-              <Label htmlFor={`active-${provider.key}`} className="text-sm font-medium">
-                Active
-              </Label>
-              {/* A disabled switch with no stated reason is the single most
-                  confusing thing on this page — say why it can't be flipped. */}
-              {!status.hasCredentials ? (
-                <p className="text-xs text-muted-foreground">Save a key first</p>
-              ) : null}
-            </div>
+            <Label htmlFor={`active-${provider.key}`} className="text-sm font-medium">
+              Active
+            </Label>
             <Switch
               id={`active-${provider.key}`}
               checked={isActive}

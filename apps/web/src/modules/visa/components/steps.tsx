@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  CloudUpload,
   FileText,
   Info,
   MapPin,
@@ -67,6 +66,8 @@ import {
 } from "@/modules/visa/actions";
 import { RELATIONSHIPS, parseDocumentSlots, parseApplicationQuestions, type DocumentSlot } from "@/modules/visa/schemas";
 import type { WizardApplication } from "@/modules/visa/queries";
+import { FileField } from "@/components/ui/upload";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 /* ------------------------------------------------------------------------- */
 /* Shared bits                                                               */
@@ -458,14 +459,16 @@ export function StepApplicantType({
                             <form action={removeVisaMember}>
                               <input type="hidden" name="memberId" value={member.id} />
                               <input type="hidden" name="applicationId" value={application.id} />
-                              <Button
-                                type="submit"
+                              <ConfirmButton
+                                title="Remove this traveller?"
+                                description={member.full_name}
+                                confirmLabel="Remove"
                                 variant="ghost"
                                 size="icon-sm"
                                 aria-label="Remove member"
                               >
                                 <Trash2 className="size-3.5 text-destructive" />
-                              </Button>
+                              </ConfirmButton>
                             </form>
                           ) : null}
                         </span>
@@ -754,10 +757,8 @@ function UploadSlot({
   existing?: WizardApplication["documents"][number];
   vaultOptions: VaultOption[];
 }) {
-  const [state, formAction, pending] = useActionState(uploadVisaDocument, null);
+  const [state, formAction] = useActionState(uploadVisaDocument, null);
   const [attachState, attachAction, attaching] = useActionState(attachVaultDocument, null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // Documents whose saved type matches this slot float to the top; the rest
   // stay selectable because slot keys are per-visa-type free text and won't
@@ -789,46 +790,29 @@ function UploadSlot({
           <form action={removeVisaDocument}>
             <input type="hidden" name="documentId" value={existing.id} />
             <input type="hidden" name="applicationId" value={applicationId} />
-            <Button type="submit" variant="ghost" size="icon-sm" aria-label={`Remove ${slot.label}`}>
+            <ConfirmButton
+              title="Remove this document?"
+              description={existing.file_name ?? slot.label}
+              confirmLabel="Remove"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Remove ${slot.label}`}
+            >
               <X className="size-3.5" />
-            </Button>
+            </ConfirmButton>
           </form>
         </div>
       ) : (
-        <form ref={formRef} action={formAction}>
+        <form action={formAction}>
           <input type="hidden" name="applicationId" value={applicationId} />
           <input type="hidden" name="slotKey" value={slot.key} />
-          <input
-            ref={inputRef}
-            type="file"
+          <FileField
             name="file"
             accept=".jpg,.jpeg,.png,.pdf"
-            className="sr-only"
-            onChange={() => formRef.current?.requestSubmit()}
+            maxBytes={(slot.max_mb ?? 5) * 1024 * 1024}
+            autoSubmit
+            label="Drop JPG, PNG or PDF"
           />
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => inputRef.current?.click()}
-            className={cn(
-              "flex w-full flex-col items-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors",
-              pending
-                ? "border-primary/40 bg-primary/5"
-                : "border-border hover:border-primary/50 hover:bg-secondary/40"
-            )}
-          >
-            <CloudUpload className={cn("size-6", pending ? "animate-pulse text-primary" : "text-muted-foreground")} />
-            <span className="text-sm font-medium">
-              {pending ? "Uploading…" : (
-                <>
-                  Drag &amp; drop or <span className="text-primary">browse</span>
-                </>
-              )}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              JPG, PNG, PDF (Max. {slot.max_mb ?? 5}MB)
-            </span>
-          </button>
           {state?.error ? <p className="mt-1.5 text-xs text-destructive">{state.error}</p> : null}
         </form>
       )}

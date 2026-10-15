@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 type EnrolledFactor = { id: string; friendly_name: string | null };
 
@@ -158,15 +159,17 @@ export function MfaSettings({ factors }: { factors: EnrolledFactor[] }) {
             {factors.map((f) => (
               <div key={f.id} className="flex items-center justify-between rounded-lg border border-border p-3">
                 <span className="text-sm font-medium">{f.friendly_name ?? "Authenticator App"}</span>
-                <Button
+                <ConfirmButton
+                  title="Remove this authenticator?"
+                  confirmLabel="Remove"
                   variant="outline"
                   size="sm"
                   className="gap-1.5 text-destructive hover:text-destructive"
-                  onClick={() => removeFactor(f.id)}
+                  onConfirm={() => removeFactor(f.id)}
                   disabled={pending}
                 >
                   <Trash2 className="size-3.5" /> Remove
-                </Button>
+                </ConfirmButton>
               </div>
             ))}
           </div>

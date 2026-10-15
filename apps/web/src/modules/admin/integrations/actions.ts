@@ -5,7 +5,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { encryptCredentials, decryptCredentials } from "@/lib/integrations-crypto";
-import { getProvider } from "@/lib/provider-catalog";
+import { EXCLUSIVE_PROVIDER_GROUPS, getProvider } from "@/lib/provider-catalog";
+import { testRazorpayConnection, testStripeConnection } from "@/lib/provider-runtime/payments-test";
 import { testDuffelConnection } from "@/lib/provider-runtime/duffel";
 import { testHotelbedsConnection } from "@/lib/provider-runtime/hotelbeds";
 import { testZylalabsVisaConnection } from "@/lib/provider-runtime/visa-check";
@@ -151,6 +152,12 @@ export async function setIntegrationActive(providerKey: string, isActive: boolea
   }
 
   await upsertRow(providerKey, { is_active: isActive });
+
+  // Card payments run through a single processor: switching one on switches its rival off.
+  if (isActive) {
+    const rivals = EXCLUSIVE_PROVIDER_GROUPS.find((group) => group.includes(providerKey))?.filter((k) => k !== providerKey) ?? [];
+    for (const rival of rivals) await upsertRow(rival, { is_active: false });
+  }
   revalidatePath(PATH);
 }
 
@@ -170,6 +177,10 @@ const TEST_FN: Record<
   string,
   (creds: Record<string, string>, config: Record<string, unknown>) => Promise<{ ok: boolean; message: string }>
 > = {
+  stripe: (creds) => testStripeConnection(creds.secret_key),
+  razorpay: (creds) => testRazorpayConnection(creds.key_id, creds.key_secret),
+  waafi: async () => ({ ok: true, message: "Credentials saved. WaafiPay has no read-only check." }),
+  edahab: async () => ({ ok: true, message: "Credentials saved. eDahab has no read-only check." }),
   duffel: (creds) => testDuffelConnection(creds.api_key),
   hotelbeds: (creds) => testHotelbedsConnection(creds.api_key, creds.api_secret),
   zylalabs_visa: (creds) => testZylalabsVisaConnection(creds.api_key),

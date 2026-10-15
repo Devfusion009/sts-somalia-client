@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
@@ -19,6 +20,7 @@ export function ProgramLanding({
   steps,
   faqNote,
   loginHref,
+  image,
 }: {
   eyebrow: string;
   icon: LucideIcon;
@@ -31,6 +33,8 @@ export function ProgramLanding({
   faqNote?: string;
   /** For programs with a dedicated portal login (e.g. /agent/login) — shows an "already registered" link instead of the generic apply-then-login copy. */
   loginHref?: string;
+  /** Photo shown under the hero call to action. */
+  image?: { src: string; alt: string };
 }) {
   return (
     <div>
@@ -66,6 +70,11 @@ export function ProgramLanding({
               Already have an account? You&apos;ll be asked to log in, then land right back here to apply.
             </p>
           )}
+          {image ? (
+            <div className="relative mx-auto mt-12 aspect-video w-full max-w-4xl overflow-hidden rounded-2xl shadow-xl ring-1 ring-foreground/10">
+              <Image src={image.src} alt={image.alt} fill priority sizes="(min-width: 896px) 896px, 100vw" className="object-cover" />
+            </div>
+          ) : null}
         </div>
       </section>
 

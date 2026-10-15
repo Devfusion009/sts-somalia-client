@@ -5,29 +5,25 @@ import { ArrowRight } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { getHotelByIdAdmin, getHotelBookingsForHotel, getHotelPartnersForSelect } from "@/modules/admin/queries";
 import { getRoomTypes } from "@/modules/hotels/room-types";
-import { getHotelAvailability } from "@/modules/hotels/availability";
+import { getHotelAvailability, todayIso } from "@/modules/hotels/availability";
 import { AvailabilityBoard } from "@/modules/hotels/components/availability-board";
 import { getHotelManagers } from "@/modules/hotels/manager-queries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { GalleryManager } from "@/components/admin/gallery-manager";
 import { PropertyReviews } from "@/components/admin/property-reviews";
 import { uploadHotelImages, removeHotelImage, setHotelCoverImage } from "@/modules/admin/property-gallery-actions";
 import { HotelForm } from "../hotel-form";
 import { RoomDialog } from "./room-form";
 import { HotelManagersSection } from "@/modules/hotels/components/manager-form";
-import { HotelBookingStatusSelect, HotelBookingPriceForm } from "../hotel-booking-controls";
+import { HotelBookingPriceForm } from "../hotel-booking-controls";
+import { BookingMoveActions } from "@/modules/hotels/components/booking-move-actions";
+import { updateHotelBookingStatus } from "@/modules/admin/actions";
 import { pipelineStatus, PIPELINE_STATUS_STYLES } from "@/modules/bookings/pipeline-status";
 import { cn } from "@/lib/utils";
+import { HotelLogo } from "@/modules/hotels/components/hotel-logo";
 
 export const metadata: Metadata = { title: "Manage Hotel" };
 
@@ -62,15 +58,26 @@ function Divider() {
   );
 }
 
-export default async function AdminHotelDetailPage({ params }: { params: Promise<{ id: string }> }) {
+function boardFrom(raw: string | undefined) {
+  return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : todayIso();
+}
+
+export default async function AdminHotelDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
+}) {
   const { id } = await params;
+  const from = boardFrom((await searchParams).from);
   const hotel = await getHotelByIdAdmin(id);
   if (!hotel) notFound();
   const bookings = await getHotelBookingsForHotel(id);
   const roomTypes = await getRoomTypes();
   const partners = await getHotelPartnersForSelect();
   const managers = await getHotelManagers(id);
-  const availability = await getHotelAvailability(id, { days: 14 });
+  const availability = await getHotelAvailability(id, { from, days: 7 });
 
   const images = Array.isArray(hotel.images) ? hotel.images.filter((p): p is string => typeof p === "string") : [];
 
@@ -80,23 +87,33 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <BackLink href="/admin/hotels" label="All hotels" className="mb-3" />
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="font-heading text-2xl font-semibold tracking-tight">{hotel.name}</h1>
-              <Badge className={cn("border-transparent capitalize", HOTEL_STATUS_STYLES[hotel.status] ?? "bg-muted text-muted-foreground")}>
-                {hotel.status.replace("_", " ")}
-              </Badge>
-            </div>
-            <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-              <span>{hotel.city}</span>
-              <Divider />
-              <span>{hotel.partner?.name ?? "STS (direct)"}</span>
-              {hotel.star_rating ? (
-                <>
+            <div className="flex items-center gap-4">
+              <HotelLogo path={hotel.logo_path} />
+              <div>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="font-heading text-2xl font-semibold tracking-tight">{hotel.name}</h1>
+                  <Badge
+                    className={cn(
+                      "border-transparent capitalize",
+                      HOTEL_STATUS_STYLES[hotel.status] ?? "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {hotel.status.replace("_", " ")}
+                  </Badge>
+                </div>
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+                  <span>{hotel.city}</span>
                   <Divider />
-                  <span>{hotel.star_rating}★</span>
-                </>
-              ) : null}
-            </p>
+                  <span>{hotel.partner?.name ?? "STS (direct)"}</span>
+                  {hotel.star_rating ? (
+                    <>
+                      <Divider />
+                      <span>{hotel.star_rating}★</span>
+                    </>
+                  ) : null}
+                </p>
+              </div>
+            </div>
           </div>
           <HotelForm hotel={hotel} partners={partners} />
         </div>
@@ -166,15 +183,15 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-heading text-base font-semibold">Availability</h2>
-          <span className="text-xs text-muted-foreground">Next 14 nights · A agency · C customer</span>
-        </div>
-        <Card className="py-3">
-          <CardContent className="px-3">
-            <AvailabilityBoard rooms={availability} roomHref={(roomId) => `/admin/hotels/${hotel.id}/rooms/${roomId}`} />
-          </CardContent>
-        </Card>
+        <h2 className="font-heading text-base font-semibold">Availability</h2>
+        <AvailabilityBoard
+          rooms={availability}
+          from={from}
+          days={7}
+          today={todayIso()}
+          roomHref={(roomId) => `/admin/hotels/${hotel.id}/rooms/${roomId}`}
+          rangeHref={(start) => `/admin/hotels/${hotel.id}?from=${start}`}
+        />
       </section>
 
       <section className="space-y-3">
@@ -214,7 +231,9 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
                     </TableCell>
                     <TableCell>
                       {room.total_units === null ? (
-                        <Badge variant="outline" className="text-muted-foreground">Not set</Badge>
+                        <Badge variant="outline" className="text-muted-foreground">
+                          Not set
+                        </Badge>
                       ) : (
                         room.total_units
                       )}
@@ -224,7 +243,12 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
                       {room.base_price > 0 ? `${room.currency} ${Number(room.base_price).toFixed(0)}` : "On request"}
                     </TableCell>
                     <TableCell>
-                      <Badge className={cn("border-transparent capitalize", ROOM_STATUS_STYLES[room.status] ?? "bg-muted text-muted-foreground")}>
+                      <Badge
+                        className={cn(
+                          "border-transparent capitalize",
+                          ROOM_STATUS_STYLES[room.status] ?? "bg-muted text-muted-foreground",
+                        )}
+                      >
                         {room.status.replace("_", " ")}
                       </Badge>
                     </TableCell>
@@ -260,7 +284,7 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
                 <TableHead>Dates</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Pipeline</TableHead>
-                <TableHead className="text-right">Status</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -284,13 +308,23 @@ export default async function AdminHotelDetailPage({ params }: { params: Promise
                         {booking.check_in} → {booking.check_out}
                       </TableCell>
                       <TableCell>
-                        <HotelBookingPriceForm bookingId={booking.id} price={Number(booking.total_price)} currency={booking.currency} />
+                        <HotelBookingPriceForm
+                          bookingId={booking.id}
+                          price={Number(booking.total_price)}
+                          currency={booking.currency}
+                        />
                       </TableCell>
                       <TableCell>
                         <Badge className={cn("border-transparent", PIPELINE_STATUS_STYLES[stage])}>{stage}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <HotelBookingStatusSelect bookingId={booking.id} status={booking.status} />
+                        <BookingMoveActions
+                          bookingId={booking.id}
+                          status={booking.status}
+                          checkIn={booking.check_in}
+                          today={todayIso()}
+                          action={updateHotelBookingStatus}
+                        />
                       </TableCell>
                     </TableRow>
                   );

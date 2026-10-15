@@ -101,6 +101,7 @@ const NAV_GROUPS: PortalNavGroup[] = [
       { href: "/admin/users", label: "Users", icon: "team" },
       { href: "/admin/security", label: "Security", icon: "security" },
       { href: "/admin/integrations", label: "Integrations", icon: "integrations" },
+      { href: "/admin/site-settings", label: "Site settings", icon: "settings" },
       { href: "/admin/audit-log", label: "Audit Log", icon: "audit" },
     ],
   },

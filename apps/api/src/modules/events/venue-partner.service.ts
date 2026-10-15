@@ -96,7 +96,7 @@ export class VenuePartnerService {
     return data;
   }
 
-  /** Booking requests across all of this partner's venues, oldest-first — needs join typing, uses db(). */
+  /** Booking requests across all of this partner's venues, newest first — needs join typing, uses db(). */
   async getVenueBookings(partnerId: string) {
     const { data: venues } = await this.rls.get().from("event_venues").select("id").eq("partner_id", partnerId);
     const venueIds = (venues ?? []).map((v) => v.id);
@@ -105,10 +105,10 @@ export class VenuePartnerService {
     const { data } = await this.db()
       .from("hall_bookings")
       .select(
-        "id, booking_ref, event_type, event_name, start_date, end_date, start_time, end_time, expected_guests, setup_requirements, price, currency, status, created_at, venue:event_venues(name), customer:profiles!hall_bookings_customer_id_fkey(full_name, email, phone)"
+        "id, booking_ref, event_type, event_name, start_date, end_date, start_time, end_time, expected_guests, setup_requirements, price, currency, status, created_at, contact_name, contact_phone, contact_email, venue:event_venues(name), customer:profiles!hall_bookings_customer_id_fkey(full_name, email, phone)"
       )
       .in("venue_id", venueIds)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: false });
     return data ?? [];
   }
 

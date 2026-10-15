@@ -73,6 +73,7 @@ export default async function ManagerHotelLayout({
       isPlatformAdmin={profile.is_platform_admin}
       accent="manager"
       brandLogoUrl={hotelLogoUrl(managed.hotel.logo_path)}
+      brandName={managed.hotel.name}
     >
       {children}
     </PortalShell>

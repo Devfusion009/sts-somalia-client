@@ -40,6 +40,7 @@ import type { PublicHoliday } from "@/lib/provider-runtime/holidays";
 import type { AdminCalendarEvent } from "@/modules/admin/calendar-events";
 import { deleteAdminCalendarEvent } from "@/modules/admin/calendar-event-actions";
 import { AdminEventForm } from "./admin-event-form";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -345,9 +346,16 @@ export function AdminEventCalendar({
                     <AdminEventForm event={e} />
                     <form action={deleteAdminCalendarEvent}>
                       <input type="hidden" name="id" value={e.id} />
-                      <Button type="submit" size="icon" variant="outline" className="size-8 text-destructive hover:text-destructive">
+                      <ConfirmButton
+                        title="Delete this event?"
+                        description={e.title}
+                        aria-label="Delete event"
+                        size="icon"
+                        variant="outline"
+                        className="size-8 text-destructive hover:text-destructive"
+                      >
                         <Trash2 className="size-3.5" />
-                      </Button>
+                      </ConfirmButton>
                     </form>
                   </div>
                 </div>

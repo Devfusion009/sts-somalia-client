@@ -33,6 +33,7 @@ import {
   TrendingDown,
   TrendingUp,
   Plug,
+  SlidersHorizontal,
   FileText,
   BadgePlus,
   CirclePlus,
@@ -101,6 +102,7 @@ export const PORTAL_ICONS = {
   broadcast: Megaphone,
   aging: TrendingDown,
   integrations: Plug,
+  settings: SlidersHorizontal,
   invoice: FileText,
   bank: Landmark,
   "credit-note": BadgePlus,
@@ -268,6 +270,7 @@ export function PortalShell({
   isPlatformAdmin = false,
   accent = "customer",
   brandLogoUrl,
+  brandName,
   headerExtra,
   accountCode,
   adminMenu,
@@ -287,6 +290,8 @@ export function PortalShell({
   accent?: PortalAccent;
   /** Agency's own uploaded logo (agent portal only) — replaces the STS icon in the sidebar header so the portal reads as the agency's own, not just a reskinned STS shell. Falls back to /logo-icon.png when unset. */
   brandLogoUrl?: string | null;
+  /** Replaces "STS Somalia" in the sidebar header when the portal belongs to one business (a hotel manager's hotel). */
+  brandName?: string;
   /** Optional content rendered in the top header, left of the accent badge — e.g. admin's notification bell. Unused by other portals. */
   headerExtra?: React.ReactNode;
   /** Admin console only: replaces the account switcher with the operator's own account menu. */
@@ -370,7 +375,7 @@ export function PortalShell({
                   )}
                 </span>
                 <div className="flex flex-col leading-tight">
-                  <span className="font-heading font-semibold text-white">STS Somalia</span>
+                  <span className="truncate font-heading font-semibold text-white">{brandName ?? "STS Somalia"}</span>
                   <span className="text-xs text-sidebar-foreground/60">{portalName}</span>
                 </div>
               </SidebarMenuButton>

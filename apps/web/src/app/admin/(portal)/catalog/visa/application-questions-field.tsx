@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EMPTY_APPLICATION_QUESTION_ROW, type ApplicationQuestionRow } from "@/modules/admin/visa-type-utils";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 function sanitizeKey(input: string) {
   return input.toLowerCase().replace(/[^a-z0-9_]+/g, "_");
@@ -80,15 +81,31 @@ export function ApplicationQuestionsField({ name, initialRows }: { name: string;
                 <Label className="text-xs text-muted-foreground">Options (comma separated)</Label>
                 <Input value={row.options} placeholder="Yes, No, Not applicable" onChange={(e) => update(i, { options: e.target.value })} />
               </div>
-              <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setRows(rows.filter((_, idx) => idx !== i))}>
+              <ConfirmButton
+                title="Remove this question?"
+                confirmLabel="Remove"
+                aria-label="Remove question"
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                onConfirm={() => setRows(rows.filter((_, idx) => idx !== i))}
+              >
                 <Trash2 className="size-3.5" />
-              </Button>
+              </ConfirmButton>
             </div>
           ) : (
             <div className="flex justify-end">
-              <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setRows(rows.filter((_, idx) => idx !== i))}>
+              <ConfirmButton
+                title="Remove this question?"
+                confirmLabel="Remove"
+                aria-label="Remove question"
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                onConfirm={() => setRows(rows.filter((_, idx) => idx !== i))}
+              >
                 <Trash2 className="size-3.5" />
-              </Button>
+              </ConfirmButton>
             </div>
           )}
         </div>

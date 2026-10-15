@@ -7,6 +7,7 @@ export const metadata: Metadata = { title: "Join the Affiliate Program" };
 export default function AffiliatesLandingPage() {
   return (
     <ProgramLanding
+      image={{ src: "/marketing/partner-affiliate.webp", alt: "A content creator working on a laptop in a café" }}
       eyebrow="Affiliate Program"
       icon={HandCoins}
       title="Join the Affiliate Program"

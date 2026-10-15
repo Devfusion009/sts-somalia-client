@@ -1,5 +1,12 @@
 import type { PaymentMethodDef, InitiationResult } from "@sts/shared-types";
-import { getIntegrations } from "../../infra/integrations";
+import {
+  getPaymentGateways,
+  type EdahabGateway,
+  type PaymentGateways,
+  type RazorpayGateway,
+  type StripeGateway,
+  type WaafiGateway,
+} from "../../infra/payment-config";
 
 /**
  * Direct port of apps/web's modules/payments/providers.ts. Gateway adapters
@@ -17,24 +24,27 @@ export type InitiationInput = {
 };
 
 export async function initiateWithProvider(input: InitiationInput): Promise<InitiationResult> {
+  const gateways = await getPaymentGateways();
+  const missing: InitiationResult = { type: "error", message: "That payment method is not available." };
   switch (input.method.provider) {
     case "test":
       return { type: "success", providerRef: `test_${input.paymentId}` };
     case "manual":
-      return initiateManual(input);
+      return initiateManual(input, gateways);
     case "stripe":
-      return initiateStripe(input);
+      return gateways.stripe ? initiateStripe(input, gateways.stripe, gateways.siteUrl) : missing;
+    case "razorpay":
+      return gateways.razorpay ? initiateRazorpay(input, gateways.razorpay, gateways.siteUrl) : missing;
     case "waafi":
-      return initiateWaafi(input);
+      return gateways.waafi ? initiateWaafi(input, gateways.waafi) : missing;
     case "edahab":
-      return initiateEdahab(input);
+      return gateways.edahab ? initiateEdahab(input, gateways.edahab) : missing;
     case "wallet":
       return { type: "error", message: "Agency balance payments settle directly, not via a gateway." };
   }
 }
 
-function initiateManual(input: InitiationInput): InitiationResult {
-  const { bankTransfer } = getIntegrations();
+function initiateManual(input: InitiationInput, { bankTransfer }: PaymentGateways): InitiationResult {
   if (input.method.id === "bank_transfer") {
     return {
       type: "instructions",
@@ -54,8 +64,7 @@ function initiateManual(input: InitiationInput): InitiationResult {
   };
 }
 
-async function initiateStripe(input: InitiationInput): Promise<InitiationResult> {
-  const { siteUrl } = getIntegrations();
+async function initiateStripe(input: InitiationInput, gateway: StripeGateway, siteUrl: string): Promise<InitiationResult> {
   const params = new URLSearchParams({
     mode: "payment",
     "line_items[0][price_data][currency]": input.currency.toLowerCase(),
@@ -72,7 +81,7 @@ async function initiateStripe(input: InitiationInput): Promise<InitiationResult>
   const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+      Authorization: `Bearer ${gateway.secretKey}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: params,
@@ -84,7 +93,33 @@ async function initiateStripe(input: InitiationInput): Promise<InitiationResult>
   return { type: "redirect", url: session.url, providerRef: session.id };
 }
 
-async function initiateWaafi(input: InitiationInput): Promise<InitiationResult> {
+/** Razorpay payment link — the customer pays on Razorpay's hosted page and the webhook settles the payment. */
+async function initiateRazorpay(input: InitiationInput, gateway: RazorpayGateway, siteUrl: string): Promise<InitiationResult> {
+  const res = await fetch("https://api.razorpay.com/v1/payment_links", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${gateway.keyId}:${gateway.keySecret}`).toString("base64")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount: Math.round(input.amount * 100),
+      currency: input.currency.toUpperCase(),
+      accept_partial: false,
+      reference_id: input.paymentId,
+      description: input.description.slice(0, 2000),
+      callback_url: `${siteUrl}/checkout/${input.orderId}/success`,
+      callback_method: "get",
+      notes: { order_id: input.orderId, payment_id: input.paymentId },
+    }),
+  });
+  const link = (await res.json()) as { id?: string; short_url?: string; error?: { description?: string } };
+  if (!res.ok || !link.short_url) {
+    return { type: "error", message: link.error?.description ?? "Could not start card payment." };
+  }
+  return { type: "redirect", url: link.short_url, providerRef: link.id };
+}
+
+async function initiateWaafi(input: InitiationInput, gateway: WaafiGateway): Promise<InitiationResult> {
   const body = {
     schemaVersion: "1.0",
     requestId: input.paymentId,
@@ -92,9 +127,9 @@ async function initiateWaafi(input: InitiationInput): Promise<InitiationResult> 
     channelName: "WEB",
     serviceName: "API_PURCHASE",
     serviceParams: {
-      merchantUid: process.env.WAAFI_MERCHANT_UID,
-      apiUserId: process.env.WAAFI_API_USER_ID,
-      apiKey: process.env.WAAFI_API_KEY,
+      merchantUid: gateway.merchantUid,
+      apiUserId: gateway.apiUserId,
+      apiKey: gateway.apiKey,
       paymentMethod: "MWALLET_ACCOUNT",
       payerInfo: { accountNo: input.payerPhone },
       transactionInfo: {
@@ -107,7 +142,7 @@ async function initiateWaafi(input: InitiationInput): Promise<InitiationResult> 
     },
   };
 
-  const res = await fetch(process.env.WAAFI_API_URL ?? "https://api.waafipay.net/asm", {
+  const res = await fetch(gateway.apiUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -123,16 +158,16 @@ async function initiateWaafi(input: InitiationInput): Promise<InitiationResult> 
   return { type: "error", message: payload.responseMsg ?? "The mobile money payment was not approved." };
 }
 
-async function initiateEdahab(input: InitiationInput): Promise<InitiationResult> {
+async function initiateEdahab(input: InitiationInput, gateway: EdahabGateway): Promise<InitiationResult> {
   const body = {
-    apiKey: process.env.EDAHAB_API_KEY,
+    apiKey: gateway.apiKey,
     edahabNumber: input.payerPhone,
     amount: input.amount,
-    agentCode: process.env.EDAHAB_AGENT_CODE,
+    agentCode: gateway.agentCode,
     currency: input.currency,
     description: input.description,
   };
-  const res = await fetch(process.env.EDAHAB_API_URL ?? "https://edahab.net/api/api/issueinvoice", {
+  const res = await fetch(gateway.apiUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

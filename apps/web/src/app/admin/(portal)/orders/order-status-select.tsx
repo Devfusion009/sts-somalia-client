@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { startTransition, useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ui/confirm-button";
 import { updateOrderStatus } from "@/modules/admin/actions";
 import type { Database } from "@/lib/types/database.types";
 
@@ -25,28 +26,50 @@ export function OrderStatusSelect({ orderId, status }: { orderId: string; status
     if (state?.error) toast.error(state.error);
   }, [state]);
 
+  const [value, setValue] = useState<OrderStatus>(status);
+  const [asking, setAsking] = useState<OrderStatus | null>(null);
+
+  function commit(next: OrderStatus) {
+    setValue(next);
+    const formData = new FormData();
+    formData.set("orderId", orderId);
+    formData.set("status", next);
+    startTransition(() => formAction(formData));
+  }
+
   return (
-    <Select
-      defaultValue={status}
-      disabled={isPending}
-      onValueChange={(value) => {
-        if (!value) return;
-        const formData = new FormData();
-        formData.set("orderId", orderId);
-        formData.set("status", value);
-        formAction(formData);
-      }}
-    >
-      <SelectTrigger size="sm" className="w-[150px] capitalize">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {STATUSES.map((s) => (
-          <SelectItem key={s} value={s} className="capitalize">
-            {s.replace(/_/g, " ")}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <>
+      <Select
+        value={value}
+        disabled={isPending}
+        onValueChange={(next) => {
+          if (!next || next === value) return;
+          if (next === "cancelled" || next === "refunded") setAsking(next as OrderStatus);
+          else commit(next as OrderStatus);
+        }}
+      >
+        <SelectTrigger size="sm" className="w-[150px] capitalize">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {STATUSES.map((s) => (
+            <SelectItem key={s} value={s} className="capitalize">
+              {s.replace(/_/g, " ")}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <ConfirmDialog
+        open={asking !== null}
+        onOpenChange={(open) => !open && setAsking(null)}
+        title={asking === "refunded" ? "Mark this order as refunded?" : "Cancel this order?"}
+        confirmLabel={asking === "refunded" ? "Mark refunded" : "Cancel order"}
+        icon="ban"
+        onConfirm={() => {
+          if (asking) commit(asking);
+          setAsking(null);
+        }}
+      />
+    </>
   );
 }

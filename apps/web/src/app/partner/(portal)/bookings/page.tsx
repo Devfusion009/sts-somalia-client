@@ -11,7 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { BookingStatusControl } from "./booking-status-control";
+import { BookingMoveActions } from "@/modules/hotels/components/booking-move-actions";
+import { updateBookingStatus } from "@/modules/hotels/partner-actions";
+import { todayIso } from "@/modules/hotels/availability";
 
 const STATUS_BADGE: Record<string, string> = {
   pending: "bg-brand-gold/15 text-brand-gold",
@@ -20,6 +22,7 @@ const STATUS_BADGE: Record<string, string> = {
   completed: "bg-primary/10 text-primary",
   cancelled: "bg-destructive/10 text-destructive",
   refunded: "bg-destructive/10 text-destructive",
+  no_show: "bg-muted text-muted-foreground",
 };
 
 export default async function PartnerBookingsPage() {
@@ -30,6 +33,8 @@ export default async function PartnerBookingsPage() {
     getPartnerBookings(scope.hotelIds),
     getMyBookingManageableHotelIds(profile.id, scope),
   ]);
+
+  const today = todayIso();
 
   return (
     <div className="space-y-6">
@@ -54,6 +59,7 @@ export default async function PartnerBookingsPage() {
                 <TableHead>Guests</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -75,13 +81,20 @@ export default async function PartnerBookingsPage() {
                     {b.currency} {b.total_price.toFixed(0)}
                   </TableCell>
                   <TableCell>
+                    <Badge className={cn("border-transparent capitalize", STATUS_BADGE[b.status] ?? "bg-muted text-muted-foreground")}>
+                      {b.status.replace(/_/g, " ")}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
                     {manageableHotelIds.has(b.hotel_id) ? (
-                      <BookingStatusControl bookingId={b.id} status={b.status} />
-                    ) : (
-                      <Badge className={cn("border-transparent capitalize", STATUS_BADGE[b.status] ?? "bg-muted text-muted-foreground")}>
-                        {b.status.replace(/_/g, " ")}
-                      </Badge>
-                    )}
+                      <BookingMoveActions
+                        bookingId={b.id}
+                        status={b.status}
+                        checkIn={b.check_in}
+                        today={today}
+                        action={updateBookingStatus}
+                      />
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))}

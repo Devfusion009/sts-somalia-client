@@ -23,7 +23,7 @@ function money(amount: number, currency: string) {
  * (unlike a multi-column stat grid) a single wide amount can never force a
  * whole row wider than the page.
  */
-export function WalletPaymentPanel({
+export async function WalletPaymentPanel({
   due,
   available,
   currency,
@@ -44,7 +44,7 @@ export function WalletPaymentPanel({
 }) {
   const shortfall = Math.max(due - available, 0);
   const remaining = available - due;
-  const options = getTopupOptions();
+  const options = await getTopupOptions();
 
   return (
     <Card className="overflow-hidden py-0">

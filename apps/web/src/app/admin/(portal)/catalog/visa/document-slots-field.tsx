@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EMPTY_DOCUMENT_SLOT_ROW, type DocumentSlotRow } from "@/modules/admin/visa-type-utils";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 /** Lowercase + underscores only — the server re-sanitizes regardless, this is just so the admin sees the real key as they type it. */
 function sanitizeKey(input: string) {
@@ -80,9 +81,17 @@ export function DocumentSlotsField({ name, initialRows }: { name: string; initia
                 onChange={(e) => update(i, { description: e.target.value })}
               />
             </div>
-            <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setRows(rows.filter((_, idx) => idx !== i))}>
+            <ConfirmButton
+              title="Remove this document slot?"
+              confirmLabel="Remove"
+              aria-label="Remove document slot"
+              variant="outline"
+              size="icon"
+              className="shrink-0"
+              onConfirm={() => setRows(rows.filter((_, idx) => idx !== i))}
+            >
               <Trash2 className="size-3.5" />
-            </Button>
+            </ConfirmButton>
           </div>
         </div>
       ))}

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getMyHotelScope } from "@/modules/hotels/partner-queries";
-import { uploadImages, removeImage, setCoverImage, type GalleryTarget } from "@/modules/admin/property-gallery-actions";
+import { uploadImages, removeImage, setCoverImage, type GalleryTarget, type GalleryUploadState } from "@/modules/admin/property-gallery-actions";
 import type { ActionState } from "@/lib/auth/actions";
 
 const TARGET: GalleryTarget = {
@@ -85,7 +85,7 @@ export async function attachRoomPhotos(roomId: string, photos: File[]): Promise<
   return uploadImages(ROOM_TARGET, form);
 }
 
-export async function uploadRoomImagesPartner(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function uploadRoomImagesPartner(_prev: ActionState, formData: FormData): Promise<GalleryUploadState> {
   const roomId = String(formData.get("id") ?? "");
   try {
     await requireRoomPhotoAccess(roomId);
@@ -107,7 +107,7 @@ export async function setRoomCoverImagePartner(formData: FormData): Promise<void
   return setCoverImage(ROOM_TARGET, formData);
 }
 
-export async function uploadHotelImagesPartner(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function uploadHotelImagesPartner(_prev: ActionState, formData: FormData): Promise<GalleryUploadState> {
   const hotelId = String(formData.get("id") ?? "");
   try {
     await requireHotelPhotoAccess(hotelId);

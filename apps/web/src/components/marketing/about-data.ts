@@ -29,31 +29,27 @@ export const CREDENTIALS: Credential[] = [
     key: "kenya-incorporation",
     label: "Certificate of Incorporation",
     issuer: "Registrar of Companies, Republic of Kenya",
-    detail:
-      "Scout Travel Solution Limited was incorporated under the Companies Act, 2015 as a private limited company.",
+    detail: "Private limited company under the Companies Act, 2015.",
     reference: "Incorporated 22 June 2022",
   },
   {
     key: "kenya-registry",
     label: "Company Registry Record",
     issuer: "Registrar of Companies, Republic of Kenya",
-    detail:
-      "Nominal share capital KES 100,000, divided into 100 ordinary shares of KES 1,000 each, on file with the Registrar of Companies.",
+    detail: "Share capital KES 100,000 in 100 ordinary shares of KES 1,000.",
     reference: "PVT-27USBRL7",
   },
   {
     key: "iata-tids",
     label: "IATA TIDS Accreditation",
     issuer: "International Air Transport Association",
-    detail:
-      "Certificate of Assignment recognising that the Mogadishu office meets IATA's professional standards for booking services offered to the travel industry.",
+    detail: "Certificate of Assignment for the Mogadishu office.",
   },
   {
     key: "iso-9001",
     label: "ISO 9001:2015 Certified",
     issuer: "TQC Cert",
-    detail:
-      "Our quality management system has been independently assessed as compliant with ISO 9001:2015, covering the full scope of services we sell.",
+    detail: "Quality management system certified across eight service lines.",
     reference: "Certificate TQC-25-1-1428",
     verify: true,
   },
@@ -61,26 +57,23 @@ export const CREDENTIALS: Credential[] = [
     key: "somalia-licence",
     label: "Commercial Licence",
     issuer: "Ministry of Commerce and Industry, Federal Republic of Somalia",
-    detail:
-      "Service licence issued to Scout Travel Solution Limited for Hajj and Umrah business activities.",
+    detail: "Service licence for Hajj and Umrah business activities.",
     reference: "Licence 030170",
-    validity: "Issued 1 Apr 2025 · valid to 2 Apr 2026",
+    validity: "Issued 1 April 2025",
   },
   {
     key: "satta",
     label: "SATTA Member",
     issuer: "Somali Association of Travel and Tourism Agents",
-    detail:
-      "Active member of Somalia's national travel and tourism agents' association.",
+    detail: "Active member.",
     validity: "Active to December 2026",
   },
   {
     key: "kata",
     label: "KATA Member",
     issuer: "Kenya Association of Travel Agents",
-    detail: "Member of the Kenya Association of Travel Agents.",
+    detail: "Member for 2026.",
     reference: "KATA/13000B/2025",
-    validity: "Valid for 2026",
     verify: true,
   },
 ];
@@ -112,8 +105,8 @@ export type Office = {
   phoneDisplay: string;
   phoneTel: string;
   email: string;
-  image: string;
-  alt: string;
+  /** Opens the address in Google Maps. */
+  mapsUrl: string;
 };
 
 /**
@@ -136,8 +129,7 @@ export const OFFICES: Office[] = [
     phoneDisplay: "+252 611 444 420",
     phoneTel: "tel:+252611444420",
     email: "info@scoutsts.com",
-    image: "/about/office-building.webp",
-    alt: "Sultan Business Park, the Mogadishu head office building",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Sultan+Business+Park+Waaberi+Mogadishu",
   },
   {
     key: "nairobi",
@@ -150,8 +142,7 @@ export const OFFICES: Office[] = [
     phoneDisplay: "+254 711 620 420",
     phoneTel: "tel:+254711620420",
     email: "info@scoutsts.com",
-    image: "/about/storefront.webp",
-    alt: "Scout Travel Solution branded reception and entrance",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Yare+Plaza+Eastleigh+Nairobi",
   },
 ];
 
@@ -159,26 +150,28 @@ export const OFFICES: Office[] = [
 export const PRINCIPLES = [
   {
     title: "Licensed before we sell",
-    body: "Hajj and Umrah are licensed activities in Somalia. We hold the Ministry of Commerce and Industry licence for them, and we don't sell what we aren't cleared to sell.",
+    body: "Hajj and Umrah are licensed activities in Somalia. We sell them under the Ministry of Commerce and Industry licence and nothing we aren't cleared to sell.",
   },
   {
-    title: "Audited, not asserted",
-    body: "Our quality management system is certified to ISO 9001:2015 by an independent body — covering ticketing, pilgrimage, hotels, insurance and recruitment alike.",
+    title: "Checked before you travel",
+    body: "Visas, flights, hotels and transport are arranged ahead of departure, so the itinerary you receive has been checked end to end.",
   },
   {
-    title: "Two countries, one company",
-    body: "Incorporated in Kenya and licensed in Somalia, so a booking made in Mogadishu is backed by a registered company with a traceable legal identity.",
+    title: "Reachable while you travel",
+    body: "Our guides travel with pilgrim groups and the Mogadishu desk stays on the phone for the length of your trip.",
   },
   {
-    title: "Accountable to our industry",
-    body: "Membership of SATTA in Somalia and KATA in Kenya means our conduct answers to the national travel-agent bodies in both markets.",
-  },
-  {
-    title: "We plan, you explore",
-    body: "Visas, flights, hotels and transport are arranged before you travel, so the itinerary you're handed is one that has already been checked end to end.",
-  },
-  {
-    title: "We care after departure",
-    body: "Our guides travel with pilgrim groups, and the Mogadishu desk stays reachable while you're away — not only while you're paying.",
+    title: "Answerable in two markets",
+    body: "Incorporated in Kenya, licensed in Somalia, and a member of both national travel-agent associations: SATTA and KATA.",
   },
 ];
+
+/** What a customer can book. Each line links to its own section of the site. */
+export const SERVICES = [
+  { key: "flights", title: "Flights", body: "Fares from hundreds of airlines, ticketed by an IATA TIDS-accredited desk.", href: "/flights" },
+  { key: "hotels", title: "Hotels", body: "Partner hotels across Somalia and East Africa, confirmed before you pay.", href: "/hotels" },
+  { key: "visa", title: "Visas", body: "Applications handled case by case, with document checks and status updates.", href: "/visa" },
+  { key: "umrah", title: "Hajj & Umrah", body: "Group and private packages under our Ministry of Commerce licence.", href: "/umrah" },
+  { key: "events", title: "Events & Halls", body: "Halls and venues across Somalia, booked with a confirmed price.", href: "/events" },
+  { key: "partners", title: "Partner programmes", body: "Agencies, hotels, venues and affiliates work with STS on partner terms.", href: "/partners" },
+] as const;

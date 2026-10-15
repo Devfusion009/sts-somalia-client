@@ -1,14 +1,23 @@
-import type { PaymentMethodDef } from "@sts/shared-types";
-import { getIntegrations } from "../../infra/integrations";
+import type { PaymentMethodDef, PaymentProvider } from "@sts/shared-types";
+import { getPaymentGateways } from "../../infra/payment-config";
 
 /**
  * Direct port of apps/web's modules/payments/registry.ts. The checkout
  * method list is derived, not configured — logic unchanged.
  */
-export function getAvailablePaymentMethods(opts?: {
+export async function getAvailablePaymentMethods(opts?: {
   agencyWallet?: { available: number; currency: string };
-}): PaymentMethodDef[] {
-  const { payments } = getIntegrations();
+}): Promise<PaymentMethodDef[]> {
+  const gateways = await getPaymentGateways();
+  const payments = {
+    stripe: !!gateways.stripe,
+    razorpay: !!gateways.razorpay,
+    waafi: !!gateways.waafi,
+    edahab: !!gateways.edahab,
+    testMode: gateways.testMode,
+  };
+  // One processor serves card payments; Stripe wins if both are connected.
+  const cardProvider: PaymentProvider | null = payments.stripe ? "stripe" : payments.razorpay ? "razorpay" : null;
   const methods: PaymentMethodDef[] = [];
 
   if (opts?.agencyWallet) {
@@ -24,16 +33,16 @@ export function getAvailablePaymentMethods(opts?: {
     });
   }
 
-  if (payments.stripe || payments.testMode) {
+  if (cardProvider || payments.testMode) {
     methods.push({
       id: "card",
       label: "Credit / Debit Card",
       description: "Pay securely using your card",
       kind: "card",
-      provider: payments.stripe ? "stripe" : "test",
+      provider: cardProvider ?? "test",
       badges: ["VISA", "Mastercard"],
       requiresPhone: false,
-      simulated: !payments.stripe,
+      simulated: !cardProvider,
     });
   }
 
@@ -92,6 +101,6 @@ export function getAvailablePaymentMethods(opts?: {
   return methods;
 }
 
-export function getPaymentMethod(id: string): PaymentMethodDef | undefined {
-  return getAvailablePaymentMethods().find((m) => m.id === id);
+export async function getPaymentMethod(id: string): Promise<PaymentMethodDef | undefined> {
+  return (await getAvailablePaymentMethods()).find((m) => m.id === id);
 }

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { getMyPartnerId, getMyPartner } from "@/modules/hotels/partner-queries";
 import { getMyManagedHotels } from "@/modules/hotels/manager-queries";
+import { getMyManagedVenues } from "@/modules/events/venue-manager-queries";
 import { getMyVenuePartnerId, getMyVenuePartner } from "@/modules/events/venue-partner-queries";
 import { getMyPartnerAccountId } from "@/modules/admin/partner-accounts";
 import { ACCOUNT_TYPE_LABEL, type PartnerAccountType, type PartnerAccountStatus } from "@/modules/admin/partner-account-shared";
@@ -10,7 +11,7 @@ import { portalHref } from "@/lib/subdomain";
 
 /**
  * True for an identity that exists purely inside a staff console — a
- * platform admin, or a hotel manager (an admin-assigned seat, not an
+ * platform admin, or a hotel/venue manager (an assigned seat, not an
  * account someone signed up with) — with no B2C account of its own behind
  * it. Every other role (agent, affiliate, hotel_partner, venue_partner,
  * plain customer) IS a real B2C account first and stays reachable there.
@@ -24,7 +25,8 @@ import { portalHref } from "@/lib/subdomain";
  */
 export async function isPortalOnlyIdentity(profile: { id: string; is_platform_admin: boolean }): Promise<boolean> {
   if (profile.is_platform_admin) return true;
-  return (await getMyManagedHotels(profile.id)).length > 0;
+  const [hotels, venues] = await Promise.all([getMyManagedHotels(profile.id), getMyManagedVenues(profile.id)]);
+  return hotels.length > 0 || venues.length > 0;
 }
 
 export type PartnerContext = {

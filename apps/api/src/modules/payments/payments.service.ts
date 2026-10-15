@@ -68,7 +68,7 @@ export class PaymentsService {
       return this.payFromAgencyWallet(userId, order, amount);
     }
 
-    const method = getPaymentMethod(input.methodId);
+    const method = await getPaymentMethod(input.methodId);
     if (!method) return { error: "That payment method is not available." };
     if (method.requiresPhone && !phonePattern.test(input.payerPhone ?? "")) {
       return { error: `Enter the ${method.label} mobile number to charge.` };

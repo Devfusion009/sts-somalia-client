@@ -96,17 +96,18 @@ export class EventsService {
       );
     }
 
-    const { data: clash } = await supabase
-      .from("hall_bookings")
-      .select("id")
-      .eq("venue_id", venue.id)
-      .lte("start_date", input.endDate)
-      .gte("end_date", input.startDate)
-      .in("status", ["pending", "confirmed"])
-      .limit(1)
-      .maybeSingle();
-    if (clash) {
-      throw new BadRequestException("These dates overlap an existing booking — contact us for alternatives.");
+    // security definer: sees every booking and blocked range at the venue,
+    // which the caller's own RLS can't. The insert trigger stays the
+    // authority under concurrency (it refuses instead of double-booking).
+    const { data: available } = await supabase.rpc("venue_slot_available", {
+      p_venue_id: venue.id,
+      p_start: input.startDate,
+      p_end: input.endDate,
+      p_from: input.startTime ?? undefined,
+      p_to: input.endTime ?? undefined,
+    });
+    if (available === false) {
+      throw new BadRequestException("These dates are no longer available at this venue — contact us for alternatives.");
     }
 
     const agencyId = await this.orders.getActiveAgencyId(userId);
@@ -186,7 +187,9 @@ export class EventsService {
     // total written above is a placeholder single-unit charge, not the real
     // price, so the caller must not let checkout proceed on it either.
     const requiresPriceConfirmation =
-      venue.price_unit === "per_person" || Number(venue.base_price) === 0 || priceBreakdown.needsTimes;
+      venue.price_unit === "per_person" ||
+      Number(venue.base_price) === 0 ||
+      priceBreakdown.needsTimes;
     return { orderId: order.id, requiresPriceConfirmation };
   }
 }

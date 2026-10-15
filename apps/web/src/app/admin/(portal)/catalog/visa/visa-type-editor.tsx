@@ -22,6 +22,7 @@ import { visaCardImage, visaImageUrl } from "@/modules/visa/images";
 import type { Database } from "@/lib/types/database.types";
 import { DocumentSlotsField } from "./document-slots-field";
 import { ApplicationQuestionsField } from "./application-questions-field";
+import { FileField } from "@/components/ui/upload";
 
 type VisaType = Database["public"]["Tables"]["visa_types"]["Row"];
 
@@ -81,7 +82,6 @@ function TogglePill({ name, value, label, defaultChecked }: { name: string; valu
 
 /** Cover photo picker: previews what visitors will see and swaps in the chosen file before saving. */
 function CoverImageField({ visaType }: { visaType?: VisaType }) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const pickedRef = useRef<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const hasUpload = !!visaImageUrl(visaType?.cover_image);
@@ -101,22 +101,18 @@ function CoverImageField({ visaType }: { visaType?: VisaType }) {
         )}
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <input
-          ref={inputRef}
-          type="file"
+        <FileField
           name="coverImage"
           accept="image/jpeg,image/png,image/webp"
-          className="sr-only"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
+          compact
+          label={preview ? "Replace image" : "Upload image"}
+          className="min-w-64"
+          onFilesChange={(files) => {
             if (pickedRef.current) URL.revokeObjectURL(pickedRef.current);
-            pickedRef.current = file ? URL.createObjectURL(file) : null;
+            pickedRef.current = files[0] ? URL.createObjectURL(files[0]) : null;
             setPicked(pickedRef.current);
           }}
         />
-        <Button type="button" variant="outline" onClick={() => inputRef.current?.click()}>
-          {preview ? "Replace image" : "Upload image"}
-        </Button>
         {hasUpload ? <TogglePill name="removeCoverImage" label="Remove custom image" defaultChecked={false} /> : null}
       </div>
     </div>

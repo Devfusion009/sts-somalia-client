@@ -7,6 +7,7 @@ export const metadata: Metadata = { title: "List Your Event Hall" };
 export default function VenuesLandingPage() {
   return (
     <ProgramLanding
+      image={{ src: "/marketing/partner-venue.webp", alt: "An event hall set for a wedding, with staff checking the layout" }}
       eyebrow="Venue Partners"
       icon={PartyPopper}
       title="List Your Event Hall"

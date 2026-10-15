@@ -45,7 +45,7 @@ export default async function AgentTopUpPage({ searchParams }: { searchParams: P
 
   const { status } = await searchParams;
   const canTopUp = membership.roleInAgency === "owner" || membership.roleInAgency === "admin";
-  const options = getTopupOptions();
+  const options = await getTopupOptions();
   const requests = await getAgencyTopupRequests(membership.agency.id);
 
   return (

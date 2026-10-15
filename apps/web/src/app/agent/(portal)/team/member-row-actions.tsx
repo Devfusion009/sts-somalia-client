@@ -3,8 +3,8 @@
 import { useActionState } from "react";
 import { AlertCircle } from "lucide-react";
 import { SubmitButton } from "@/components/submit-button";
-import { Button } from "@/components/ui/button";
 import { updateTeamMemberRole, removeTeamMember } from "@/modules/agencies/team-actions";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 const ROLES = [
   { value: "admin", label: "Admin" },
@@ -47,9 +47,15 @@ export function MemberRowActions({
       </form>
       <form action={removeTeamMember}>
         <input type="hidden" name="memberId" value={memberId} />
-        <Button type="submit" size="sm" variant="ghost" className="text-destructive hover:text-destructive">
+        <ConfirmButton
+          title="Remove this team member?"
+          confirmLabel="Remove"
+          size="sm"
+          variant="ghost"
+          className="text-destructive hover:text-destructive"
+        >
           Remove
-        </Button>
+        </ConfirmButton>
       </form>
     </div>
   );

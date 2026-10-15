@@ -23,6 +23,7 @@ import {
   type FulfillmentActionState,
 } from "@/modules/umrah/fulfillment-admin-actions";
 import { UMRAH_DOC_TYPES, UMRAH_DOC_TYPE_LABELS, UMRAH_STAGE_LABELS, type UmrahStage } from "../stages";
+import { FileField } from "@/components/ui/upload";
 
 const selectClass =
   "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
@@ -119,13 +120,7 @@ export function DocumentUploadForm({
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="docFile">File</Label>
-        <Input
-          id="docFile"
-          name="file"
-          type="file"
-          accept="application/pdf,image/jpeg,image/png,image/webp"
-          required
-        />
+        <FileField id="docFile" name="file" accept="application/pdf,image/jpeg,image/png,image/webp" required />
       </div>
       <SubmitButton pendingText="Uploading…">
         <Upload /> Upload

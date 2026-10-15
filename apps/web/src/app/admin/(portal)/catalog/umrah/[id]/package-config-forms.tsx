@@ -3,7 +3,6 @@
 import { useActionState } from "react";
 import { AlertCircle, CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +18,7 @@ import {
   setUmrahPackageAgencies,
 } from "@/modules/umrah/admin-actions";
 import { sharingLabel } from "@/modules/umrah/images";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 const selectClass =
   "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
@@ -75,9 +75,9 @@ export function HotelsManager({ packageId, hotels }: { packageId: string; hotels
               <form action={deleteUmrahHotel}>
                 <input type="hidden" name="packageId" value={packageId} />
                 <input type="hidden" name="hotelRowId" value={h.id} />
-                <Button type="submit" size="sm" variant="ghost" className="text-destructive hover:text-destructive">
+                <ConfirmButton title="Remove this hotel?" confirmLabel="Remove" aria-label="Remove hotel" size="sm" variant="ghost" className="text-destructive hover:text-destructive">
                   <Trash2 className="size-3.5" />
-                </Button>
+                </ConfirmButton>
               </form>
             </div>
           ))}
@@ -166,9 +166,9 @@ export function ItineraryManager({
               <form action={deleteUmrahItineraryDay}>
                 <input type="hidden" name="packageId" value={packageId} />
                 <input type="hidden" name="dayId" value={d.id} />
-                <Button type="submit" size="sm" variant="ghost" className="text-destructive hover:text-destructive">
+                <ConfirmButton title="Delete this itinerary day?" aria-label="Delete day" size="sm" variant="ghost" className="text-destructive hover:text-destructive">
                   <Trash2 className="size-3.5" />
-                </Button>
+                </ConfirmButton>
               </form>
             </li>
           ))}
@@ -241,9 +241,9 @@ export function PricingManager({
                 <form action={deleteUmrahPricing}>
                   <input type="hidden" name="packageId" value={packageId} />
                   <input type="hidden" name="pricingId" value={r.id} />
-                  <Button type="submit" size="sm" variant="ghost" className="text-destructive hover:text-destructive">
+                  <ConfirmButton title="Delete this price?" aria-label="Delete price" size="sm" variant="ghost" className="text-destructive hover:text-destructive">
                     <Trash2 className="size-3.5" />
-                  </Button>
+                  </ConfirmButton>
                 </form>
               </div>
             </div>

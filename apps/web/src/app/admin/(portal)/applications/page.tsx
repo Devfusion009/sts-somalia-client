@@ -335,7 +335,7 @@ export default async function AdminApplicationsPage({
       if (sort === "status") {
         const rank = (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9);
         if (rank !== 0) return rank;
-        return new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime();
+        return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
       }
       const diff = new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime();
       return sort === "oldest" ? diff : -diff;

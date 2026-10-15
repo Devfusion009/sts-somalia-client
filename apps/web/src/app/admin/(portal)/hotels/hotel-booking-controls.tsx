@@ -1,58 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { updateHotelBookingStatus, updateHotelBookingPrice } from "@/modules/admin/actions";
-import type { Database } from "@/lib/types/database.types";
-
-type BookingStatus = Database["public"]["Enums"]["booking_status"];
-
-const STATUSES: BookingStatus[] = [
-  "pending",
-  "waitlisted",
-  "confirmed",
-  "completed",
-  "cancelled",
-  "refunded",
-  "no_show",
-];
-
-/** Same shape as HallBookingStatusSelect (events/hall-booking-controls.tsx), pointed at the hotel-booking actions instead. */
-export function HotelBookingStatusSelect({ bookingId, status }: { bookingId: string; status: BookingStatus }) {
-  const [state, formAction] = useActionState(updateHotelBookingStatus, null);
-  const [value, setValue] = useState<BookingStatus>(status);
-
-  return (
-    <form action={formAction} className="flex items-center justify-end gap-1.5">
-      <input type="hidden" name="bookingId" value={bookingId} />
-      <input type="hidden" name="status" value={value} />
-      <Select value={value} onValueChange={(v) => setValue(v as BookingStatus)}>
-        <SelectTrigger size="sm" className="w-[130px] capitalize">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {STATUSES.map((s) => (
-            <SelectItem key={s} value={s} className="capitalize">
-              {s.replace("_", " ")}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Button size="sm" variant="outline" type="submit" disabled={value === status}>
-        Save
-      </Button>
-      {state?.error ? <span className="text-xs text-destructive">{state.error}</span> : null}
-    </form>
-  );
-}
+import { updateHotelBookingPrice } from "@/modules/admin/actions";
 
 export function HotelBookingPriceForm({ bookingId, price, currency }: { bookingId: string; price: number; currency: string }) {
   const [state, formAction] = useActionState(updateHotelBookingPrice, null);

@@ -14,6 +14,7 @@ import {
   updateUmrahBookingStatus,
   updateUmrahRequestPrice,
 } from "@/modules/umrah/service-admin-actions";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 export type QueueKind = "hotel" | "hall" | "umrah";
 
@@ -54,9 +55,16 @@ export function QueueEntryActions({ kind, bookingId }: { kind: QueueKind; bookin
         <form action={declineAction}>
           <input type="hidden" name="bookingId" value={bookingId} />
           <input type="hidden" name="status" value="cancelled" />
-          <SubmitButton size="sm" variant="outline" pendingText="Declining…" className="gap-1 text-destructive hover:text-destructive">
+          <ConfirmButton
+            title="Decline this request?"
+            confirmLabel="Decline"
+            icon="x"
+            size="sm"
+            variant="outline"
+            className="gap-1 text-destructive hover:text-destructive"
+          >
             <X className="size-3.5" /> Decline
-          </SubmitButton>
+          </ConfirmButton>
         </form>
       </div>
       {error ? <p className="max-w-64 text-right text-xs text-destructive">{error}</p> : null}

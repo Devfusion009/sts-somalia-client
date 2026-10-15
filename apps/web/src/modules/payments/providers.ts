@@ -1,5 +1,5 @@
 import "server-only";
-import { getIntegrations } from "@/lib/integrations";
+import { getPaymentGateways, type EdahabGateway, type PaymentGateways, type RazorpayGateway, type StripeGateway, type WaafiGateway } from "@/lib/provider-runtime/payments";
 import { portalOrigin } from "@/lib/subdomain";
 import type { PaymentMethodDef } from "./registry";
 
@@ -50,7 +50,7 @@ export type InitiationResult =
   | { type: "error"; message: string };
 
 export async function initiateWithProvider(input: InitiationInput): Promise<InitiationResult> {
-  const { siteUrl } = getIntegrations();
+  const { siteUrl } = await getPaymentGateways();
   return chargeWithProvider({
     recordId: input.paymentId,
     reference: input.orderNumber,
@@ -80,7 +80,7 @@ export type TopupInitiationInput = {
  * arrived (see review_agency_topup).
  */
 export async function initiateTopupWithProvider(input: TopupInitiationInput): Promise<InitiationResult> {
-  const { siteUrl } = getIntegrations();
+  const { siteUrl } = await getPaymentGateways();
   if (input.method.provider === "manual" || input.method.provider === "wallet") {
     return { type: "error", message: "That method is confirmed by STS, not by a gateway." };
   }
@@ -106,17 +106,21 @@ export async function initiateTopupWithProvider(input: TopupInitiationInput): Pr
 }
 
 async function chargeWithProvider(input: GatewayCharge): Promise<InitiationResult> {
+  const gateways = await getPaymentGateways();
+  const missing: InitiationResult = { type: "error", message: "That payment method is not available." };
   switch (input.method.provider) {
     case "test":
       return { type: "success", providerRef: `test_${input.recordId}` };
     case "manual":
-      return initiateManual(input);
+      return initiateManual(input, gateways);
     case "stripe":
-      return initiateStripe(input);
+      return gateways.stripe ? initiateStripe(input, gateways.stripe) : missing;
+    case "razorpay":
+      return gateways.razorpay ? initiateRazorpay(input, gateways.razorpay) : missing;
     case "waafi":
-      return initiateWaafi(input);
+      return gateways.waafi ? initiateWaafi(input, gateways.waafi) : missing;
     case "edahab":
-      return initiateEdahab(input);
+      return gateways.edahab ? initiateEdahab(input, gateways.edahab) : missing;
     case "wallet":
       // Agency-balance payments never reach the adapter layer — they settle
       // synchronously in payFromAgencyWallet via the wallet SQL function.
@@ -124,8 +128,7 @@ async function chargeWithProvider(input: GatewayCharge): Promise<InitiationResul
   }
 }
 
-function initiateManual(input: GatewayCharge): InitiationResult {
-  const { bankTransfer } = getIntegrations();
+function initiateManual(input: GatewayCharge, { bankTransfer }: PaymentGateways): InitiationResult {
   if (input.method.id === "bank_transfer") {
     return {
       type: "instructions",
@@ -145,7 +148,7 @@ function initiateManual(input: GatewayCharge): InitiationResult {
   };
 }
 
-async function initiateStripe(input: GatewayCharge): Promise<InitiationResult> {
+async function initiateStripe(input: GatewayCharge, gateway: StripeGateway): Promise<InitiationResult> {
   const params = new URLSearchParams({
     mode: "payment",
     "line_items[0][price_data][currency]": input.currency.toLowerCase(),
@@ -161,7 +164,7 @@ async function initiateStripe(input: GatewayCharge): Promise<InitiationResult> {
   const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+      Authorization: `Bearer ${gateway.secretKey}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: params,
@@ -173,8 +176,34 @@ async function initiateStripe(input: GatewayCharge): Promise<InitiationResult> {
   return { type: "redirect", url: session.url, providerRef: session.id };
 }
 
+/** Razorpay payment link — the customer pays on Razorpay's hosted page and the webhook settles the record. */
+async function initiateRazorpay(input: GatewayCharge, gateway: RazorpayGateway): Promise<InitiationResult> {
+  const res = await fetch("https://api.razorpay.com/v1/payment_links", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${gateway.keyId}:${gateway.keySecret}`).toString("base64")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount: Math.round(input.amount * 100),
+      currency: input.currency.toUpperCase(),
+      accept_partial: false,
+      reference_id: input.recordId,
+      description: input.description.slice(0, 2000),
+      callback_url: input.successUrl,
+      callback_method: "get",
+      notes: input.metadata,
+    }),
+  });
+  const link = (await res.json()) as { id?: string; short_url?: string; error?: { description?: string } };
+  if (!res.ok || !link.short_url) {
+    return { type: "error", message: link.error?.description ?? "Could not start card payment." };
+  }
+  return { type: "redirect", url: link.short_url, providerRef: link.id };
+}
+
 /** WaafiPay wallet purchase (EVC Plus / ZAAD / Sahal) — pushes a USSD approval to the payer. */
-async function initiateWaafi(input: GatewayCharge): Promise<InitiationResult> {
+async function initiateWaafi(input: GatewayCharge, gateway: WaafiGateway): Promise<InitiationResult> {
   const body = {
     schemaVersion: "1.0",
     requestId: input.recordId,
@@ -182,9 +211,9 @@ async function initiateWaafi(input: GatewayCharge): Promise<InitiationResult> {
     channelName: "WEB",
     serviceName: "API_PURCHASE",
     serviceParams: {
-      merchantUid: process.env.WAAFI_MERCHANT_UID,
-      apiUserId: process.env.WAAFI_API_USER_ID,
-      apiKey: process.env.WAAFI_API_KEY,
+      merchantUid: gateway.merchantUid,
+      apiUserId: gateway.apiUserId,
+      apiKey: gateway.apiKey,
       paymentMethod: "MWALLET_ACCOUNT",
       payerInfo: { accountNo: input.payerPhone },
       transactionInfo: {
@@ -197,7 +226,7 @@ async function initiateWaafi(input: GatewayCharge): Promise<InitiationResult> {
     },
   };
 
-  const res = await fetch(process.env.WAAFI_API_URL ?? "https://api.waafipay.net/asm", {
+  const res = await fetch(gateway.apiUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -217,23 +246,20 @@ async function initiateWaafi(input: GatewayCharge): Promise<InitiationResult> {
 }
 
 /** eDahab invoice — customer approves it from the eDahab app/USSD menu. */
-async function initiateEdahab(input: GatewayCharge): Promise<InitiationResult> {
+async function initiateEdahab(input: GatewayCharge, gateway: EdahabGateway): Promise<InitiationResult> {
   const body = {
-    apiKey: process.env.EDAHAB_API_KEY,
+    apiKey: gateway.apiKey,
     edahabNumber: input.payerPhone,
     amount: input.amount,
-    agentCode: process.env.EDAHAB_AGENT_CODE,
+    agentCode: gateway.agentCode,
     currency: input.currency,
     description: input.description,
   };
-  const res = await fetch(
-    process.env.EDAHAB_API_URL ?? "https://edahab.net/api/api/issueinvoice",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }
-  );
+  const res = await fetch(gateway.apiUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
   const payload = (await res.json()) as {
     InvoiceStatus?: string;
     InvoiceId?: number;

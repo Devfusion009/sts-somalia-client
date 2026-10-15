@@ -22,7 +22,7 @@ type NotificationRow = {
 
 function targetHref(n: NotificationRow): string | null {
   if (ACTIONABLE_TYPES.has(n.type)) return "/account/become";
-  if (n.type === "booking_waitlisted") {
+  if (n.type === "booking_waitlisted" || n.type === "booking_confirmed" || n.type === "booking_declined") {
     const orderId = (n.data as { order_id?: string } | null)?.order_id;
     return orderId ? `/account/bookings/${orderId}` : "/account/bookings";
   }

@@ -44,7 +44,7 @@ export default async function AgentFinancePage() {
     getAgencyPayoutRequests(membership.agency.id),
     getAgencyTopupRequests(membership.agency.id),
   ]);
-  const options = getTopupOptions();
+  const options = await getTopupOptions();
   const pendingTopups = topups.filter((t) => t.status === "pending");
 
   const lastPayout = payouts[0] ?? null;

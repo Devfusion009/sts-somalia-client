@@ -54,10 +54,50 @@ function sanitizeFilename(name: string) {
  * storage if the row update then fails (same compensating-delete pattern as
  * uploadAgencyLogoAction).
  */
-export async function uploadUmrahImages(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function uploadUmrahImages(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState & { upload?: { path: string; signedUrl: string } }> {
   await requirePlatformAdmin();
   const packageId = String(formData.get("packageId") ?? "");
   if (!z.string().uuid().safeParse(packageId).success) return { error: "Unknown package." };
+
+  // Two-phase direct upload for the gallery (same protocol as
+  // property-gallery-actions.ts uploadImages): sign, browser PUT, commit.
+  const phase = formData.get("phase");
+  if (phase === "sign") {
+    const name = String(formData.get("name") ?? "");
+    const type = String(formData.get("type") ?? "");
+    const size = Number(formData.get("size") ?? 0);
+    if (!name || !ALLOWED_IMAGE_TYPES.includes(type)) return { error: "Only JPG, PNG, or WebP images are accepted." };
+    if (!Number.isFinite(size) || size <= 0 || size > MAX_IMAGE_BYTES) return { error: "Images must be 5 MB or smaller." };
+    const path = `${packageId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${sanitizeFilename(name)}`;
+    const supabase = await createClient();
+    const { data, error } = await supabase.storage.from("umrah-images").createSignedUploadUrl(path);
+    if (error || !data) return { error: error?.message ?? "Upload could not be started." };
+    return { error: null, upload: { path: data.path, signedUrl: data.signedUrl } };
+  }
+  if (phase === "commit") {
+    const path = String(formData.get("path") ?? "");
+    const prefix = `${packageId}/`;
+    if (!path.startsWith(prefix) || path.includes("..") || path.slice(prefix.length).includes("/")) {
+      return { error: "Unknown file." };
+    }
+    const supabase = await createClient();
+    const { data: stored } = await supabase.storage.from("umrah-images").exists(path);
+    if (!stored) return { error: "The file didn't finish uploading." };
+    const { data: pkg } = await supabase.from("umrah_packages").select("images").eq("id", packageId).maybeSingle();
+    if (!pkg) return { error: "Unknown package." };
+    const current = umrahImagePaths(pkg.images);
+    if (current.includes(path)) return { error: null };
+    const { error } = await supabase.from("umrah_packages").update({ images: [...current, path] }).eq("id", packageId);
+    if (error) {
+      await supabase.storage.from("umrah-images").remove([path]);
+      return { error: error.message };
+    }
+    revalidatePackage(packageId);
+    return { error: null };
+  }
 
   const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) return { error: "Choose at least one image." };

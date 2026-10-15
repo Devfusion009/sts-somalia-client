@@ -122,8 +122,7 @@ function optionalText(formData: FormData, key: string) {
  * default 'pending' matters beyond display: the allocator only ever displaces
  * pending requests, so a guest the hotel itself promised a room to can't be
  * bumped later by an agency booking. If the rooms went in the seconds since
- * the quote, the trigger lands it as 'waitlisted' instead, and that outcome
- * is returned rather than reported as a success.
+ * the quote, the trigger refuses the insert and its message is returned.
  */
 export async function createReservation(formData: FormData): Promise<ReservationResult> {
   const parsed = reservationSchema.safeParse({

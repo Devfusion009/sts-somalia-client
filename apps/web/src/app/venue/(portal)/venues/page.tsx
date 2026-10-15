@@ -3,7 +3,9 @@ import { getMyVenuePartnerId, getMyVenues } from "@/modules/events/venue-partner
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getManagersForVenues } from "@/modules/events/venue-manager-queries";
 import { VenuePartnerForm, type EditableVenue } from "./venue-partner-form";
+import { VenueManagersDialog } from "./venue-managers-dialog";
 
 export const metadata = { title: "My Venues" };
 
@@ -18,6 +20,7 @@ export default async function MyVenuesPage() {
   const profile = await requireUser();
   const partnerId = (await getMyVenuePartnerId(profile.id))!;
   const venues = await getMyVenues(partnerId);
+  const managers = await getManagersForVenues(venues.map((v) => v.id));
 
   return (
     <div className="space-y-6">
@@ -70,7 +73,10 @@ export default async function MyVenuesPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <VenuePartnerForm venue={venue as unknown as EditableVenue} />
+                    <div className="flex items-center justify-end gap-1">
+                      <VenueManagersDialog venueId={venue.id} venueName={venue.name} managers={managers.get(venue.id) ?? []} />
+                      <VenuePartnerForm venue={venue as unknown as EditableVenue} />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

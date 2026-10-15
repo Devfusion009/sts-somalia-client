@@ -5,8 +5,10 @@ import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
 import { NAV_LINKS, PARTNER_LINKS } from "@/lib/nav-links";
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from "@/lib/marketing-nav";
 
-import { EmailIcon, InstagramIcon, PhoneInTalkIcon, PlaceIcon, TikTokIcon } from "@/components/ui/mui-icons";
-import type { SvgIconComponent } from "@/components/ui/mui-icons";
+import { EmailIcon, PhoneInTalkIcon, PlaceIcon } from "@/components/ui/mui-icons";
+import { SOCIAL_ICONS } from "@/components/ui/social-icons";
+import { SOCIAL_PLATFORMS } from "@/lib/social-platforms";
+import { getSocialLinks } from "@/lib/site-settings";
 const COMPANY_LINKS = [
   { href: "/about", label: "About us" },
   { href: "/account", label: "My Account" },
@@ -18,17 +20,10 @@ const COMPANY_LINKS = [
   { href: "/partner-terms", label: "Partner Terms" },
 ];
 
-/* Only profiles that exist are listed. LinkedIn, Facebook, YouTube and X were
-   pointing at each network's homepage, not an STS page — add them back here
-   (with the icon imports) once the real URLs exist. */
-const SOCIALS: Array<{ icon: SvgIconComponent; label: string; href: string }> = [
-  { icon: InstagramIcon, label: "Instagram", href: "https://www.instagram.com/scouttravelsolution" },
-  { icon: TikTokIcon, label: "TikTok", href: "https://www.tiktok.com/@scoutsts2" },
-];
-
 const LINK = "text-sm text-sidebar-foreground/70 transition-colors hover:text-sidebar-primary focus-visible:rounded focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none";
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const socials = await getSocialLinks();
   return (
     <footer className="bg-sidebar text-sidebar-foreground">
       {/* Contact + newsletter */}
@@ -119,26 +114,31 @@ export function SiteFooter() {
       </div>
 
       {/* Social */}
-      <div className="border-t border-sidebar-border">
-        <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-4 py-7 sm:flex-row sm:justify-center sm:px-6 lg:px-8">
-          <span className="font-heading text-lg font-bold">Follow us</span>
-          <ul className="flex items-center gap-3">
-            {SOCIALS.map((social) => (
-              <li key={social.label}>
-                <a
-                  href={social.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={social.label}
-                  className="grid size-11 place-items-center rounded-full bg-white/10 text-sidebar-foreground transition-all duration-200 hover:scale-110 hover:bg-sidebar-primary hover:text-sidebar-primary-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
-                >
-                  <social.icon sx={{ fontSize: 20 }} />
-                </a>
-              </li>
-            ))}
-          </ul>
+      {socials.length > 0 ? (
+        <div className="border-t border-sidebar-border">
+          <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-4 py-7 sm:flex-row sm:justify-center sm:px-6 lg:px-8">
+            <span className="font-heading text-lg font-bold">Follow us</span>
+            <ul className="flex items-center gap-3">
+              {socials.map((social) => {
+                const Icon = SOCIAL_ICONS[social.platform];
+                return (
+                  <li key={social.platform}>
+                    <a
+                      href={social.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={SOCIAL_PLATFORMS[social.platform].label}
+                      className="grid size-11 place-items-center rounded-full bg-white/10 text-sidebar-foreground transition-all duration-200 hover:scale-110 hover:bg-sidebar-primary hover:text-sidebar-primary-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
+                    >
+                      <Icon sx={{ fontSize: 20 }} />
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Bottom bar */}
       <div className="border-t border-sidebar-border bg-black/20">

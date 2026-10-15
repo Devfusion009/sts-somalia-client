@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { HotelLogo } from "@/modules/hotels/components/hotel-logo";
 
 const INSIGHT_TIER = {
   low: {
@@ -153,24 +154,27 @@ export default async function ManagerDashboardPage({
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <div className="flex items-center gap-2.5">
-          <h1 className="font-heading text-2xl font-semibold">
-            {managed.hotel.name}
-          </h1>
-          <Badge
-            className={cn(
-              "border-transparent capitalize",
-              HOTEL_STATUS_BADGE[managed.hotel.status] ??
-                "bg-muted text-muted-foreground",
-            )}
-          >
-            {managed.hotel.status.replace(/_/g, " ")}
-          </Badge>
+      <div className="flex items-center gap-4">
+        <HotelLogo path={managed.hotel.logo_path} />
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="font-heading text-2xl font-semibold">
+              {managed.hotel.name}
+            </h1>
+            <Badge
+              className={cn(
+                "border-transparent capitalize",
+                HOTEL_STATUS_BADGE[managed.hotel.status] ??
+                  "bg-muted text-muted-foreground",
+              )}
+            >
+              {managed.hotel.status.replace(/_/g, " ")}
+            </Badge>
+          </div>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {managed.hotel.city}, {managed.hotel.country_code}
+          </p>
         </div>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {managed.hotel.city}, {managed.hotel.country_code}
-        </p>
       </div>
 
       {canEditBookings ? (

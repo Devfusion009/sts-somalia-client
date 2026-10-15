@@ -5,6 +5,7 @@ import { Plus, Trash2, PenLine, Check, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 /**
  * Single-select "multiple choice" card/pill picker — every one of the
@@ -217,15 +218,17 @@ export function RepeatableRows<T extends Record<string, string>>({
               }}
             />
           ))}
-          <Button
-            type="button"
+          <ConfirmButton
+            title="Remove this row?"
+            confirmLabel="Remove"
+            aria-label="Remove row"
             variant="outline"
             size="icon"
             className="shrink-0"
-            onClick={() => setRows(rows.filter((_, idx) => idx !== i))}
+            onConfirm={() => setRows(rows.filter((_, idx) => idx !== i))}
           >
             <Trash2 className="size-3.5" />
-          </Button>
+          </ConfirmButton>
         </div>
       ))}
       {rows.length < max ? (

@@ -7,14 +7,11 @@ import {
   Banknote,
   Check,
   CheckCircle2,
-  CloudUpload,
   Copy,
   CreditCard,
-  FileText,
   Landmark,
   Smartphone,
   Wallet,
-  X,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
@@ -24,6 +21,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { cn } from "@/lib/utils";
 import type { ActionState } from "@/lib/auth/actions";
 import { requestOfflineTopup, startOnlineTopup } from "@/modules/agencies/topup-actions";
+import { FileField } from "@/components/ui/upload";
 
 export type Method = {
   id: string;
@@ -47,12 +45,6 @@ const METHOD_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   sahal: Smartphone,
   edahab: Smartphone,
 };
-
-function formatFileSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function MethodPicker({
   methods,
@@ -184,85 +176,12 @@ function AmountField({ id, defaultValue }: { id: string; defaultValue?: number }
 }
 
 function ReceiptField() {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-
-  function applyFile(next: File | null) {
-    setFile(next);
-    if (!inputRef.current) return;
-    if (next) {
-      const transfer = new DataTransfer();
-      transfer.items.add(next);
-      inputRef.current.files = transfer.files;
-    } else {
-      inputRef.current.value = "";
-    }
-  }
-
   return (
     <div className="grid gap-2">
       <Label htmlFor="offline-proof">
         Receipt <span className="text-destructive">*</span>
       </Label>
-      <input
-        ref={inputRef}
-        id="offline-proof"
-        name="proof"
-        type="file"
-        accept={PROOF_ACCEPT}
-        required
-        className="sr-only"
-        onChange={(event) => applyFile(event.target.files?.[0] ?? null)}
-      />
-      {file ? (
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
-          <FileText className="size-4 shrink-0 text-muted-foreground" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium">{file.name}</p>
-            <p className="text-[11px] text-muted-foreground">{formatFileSize(file.size)}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => applyFile(null)}
-            aria-label="Remove receipt"
-            className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-          >
-            <X className="size-3.5" />
-          </button>
-        </div>
-      ) : (
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              inputRef.current?.click();
-            }
-          }}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setIsDragging(true);
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(event) => {
-            event.preventDefault();
-            setIsDragging(false);
-            const dropped = event.dataTransfer.files?.[0];
-            if (dropped) applyFile(dropped);
-          }}
-          className={cn(
-            "flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-dashed px-3 py-4 text-center transition-colors",
-            isDragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/30"
-          )}
-        >
-          <CloudUpload className="size-5 text-muted-foreground" />
-          <p className="text-xs font-medium">Drag and drop, or click to browse</p>
-          <p className="text-[11px] text-muted-foreground">JPG, PNG, WebP, or PDF — up to 5MB</p>
-        </div>
-      )}
+      <FileField id="offline-proof" name="proof" accept={PROOF_ACCEPT} maxBytes={5 * 1024 * 1024} required />
     </div>
   );
 }

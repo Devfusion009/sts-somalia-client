@@ -15,6 +15,7 @@ import {
   reviewAgencyPayoutRequest,
   settleAgencyPayoutRequest,
 } from "@/modules/agencies/admin-actions";
+import { FileField } from "@/components/ui/upload";
 
 type PendingEntry = {
   id: string;
@@ -226,7 +227,7 @@ export function PayoutRequestActions({
           </select>
           <Input name="reference" placeholder="Transfer reference" />
           <Input type="date" name={landed ? "paidAt" : "sentAt"} defaultValue={today()} max={today()} />
-          <Input type="file" name="proof" accept="image/jpeg,image/png,image/webp,application/pdf" />
+          <FileField name="proof" accept="image/jpeg,image/png,image/webp,application/pdf" label="Transfer proof" compact />
           <div className="space-y-1 text-xs">
             <label className="flex items-center gap-2">
               <input type="radio" checked={!landed} onChange={() => setLanded(false)} />

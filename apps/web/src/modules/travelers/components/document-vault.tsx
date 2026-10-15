@@ -48,6 +48,7 @@ import { apiUrl } from "@/lib/trpc/shared";
 import { createClient as createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { TRAVELER_DOCUMENT_TYPES } from "../schemas";
 import type { TravelerProfile, VaultDocument } from "../queries";
+import { FileField } from "@/components/ui/upload";
 
 /**
  * Plain REST multipart POST, not a tRPC mutation — tRPC doesn't carry
@@ -267,10 +268,9 @@ export function DocumentVault({
 
             <div className="space-y-2">
               <Label htmlFor="vault-file">File</Label>
-              <Input
+              <FileField
                 id="vault-file"
                 name="file"
-                type="file"
                 required
                 accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,image/jpeg,image/png,image/webp,image/heic,application/pdf"
               />

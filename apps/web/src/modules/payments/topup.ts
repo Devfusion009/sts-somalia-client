@@ -1,5 +1,5 @@
 import "server-only";
-import { getIntegrations } from "@/lib/integrations";
+import { getPaymentGateways } from "@/lib/provider-runtime/payments";
 import { getAvailablePaymentMethods, type PaymentMethodDef } from "./registry";
 
 /**
@@ -64,11 +64,11 @@ function isOnlineFundingMethod(method: PaymentMethodDef): boolean {
   return method.provider !== "manual" && method.provider !== "wallet";
 }
 
-export function getTopupOptions(): TopupOptions {
-  const { bankTransfer } = getIntegrations();
+export async function getTopupOptions(): Promise<TopupOptions> {
+  const { bankTransfer } = await getPaymentGateways();
   return {
     offline: OFFLINE_METHODS,
-    online: getAvailablePaymentMethods()
+    online: (await getAvailablePaymentMethods())
       .filter(isOnlineFundingMethod)
       .map((method) => ({
         id: method.id,

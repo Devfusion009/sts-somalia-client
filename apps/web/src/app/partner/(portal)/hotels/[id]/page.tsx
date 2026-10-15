@@ -7,7 +7,7 @@ import { getMyHotelScope, getHotelForEdit, getHotelFrontDesk } from "@/modules/h
 import { getHotelManagers } from "@/modules/hotels/manager-queries";
 import { hotelGuestNames } from "@/modules/orders/format";
 import { getRoomTypes } from "@/modules/hotels/room-types";
-import { getHotelAvailability } from "@/modules/hotels/availability";
+import { getHotelAvailability, todayIso } from "@/modules/hotels/availability";
 import { AvailabilityBoard } from "@/modules/hotels/components/availability-board";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,8 +32,19 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = 
   suspended: "destructive",
 };
 
-export default async function EditHotelPage({ params }: { params: Promise<{ id: string }> }) {
+function boardFrom(raw: string | undefined) {
+  return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : todayIso();
+}
+
+export default async function EditHotelPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
+}) {
   const { id } = await params;
+  const from = boardFrom((await searchParams).from);
   const profile = await requireUser();
   const scope = await getMyHotelScope(profile.id);
   const hotel = await getHotelForEdit(id, scope.hotelIds);
@@ -63,7 +74,7 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
   const images = Array.isArray(hotel.images) ? hotel.images.filter((p): p is string => typeof p === "string") : [];
   const frontDesk = await getHotelFrontDesk(id, scope.hotelIds);
   const managers = canEditHotel ? await getHotelManagers(id) : [];
-  const availability = await getHotelAvailability(id, { days: 14 });
+  const availability = await getHotelAvailability(id, { from, days: 7 });
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -156,15 +167,17 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle>Availability</CardTitle>
-          <span className="text-xs text-muted-foreground">Next 14 nights · A agency · C customer</span>
-        </CardHeader>
-        <CardContent>
-          <AvailabilityBoard rooms={availability} roomHref={(roomId) => `/partner/hotels/${hotel.id}/rooms/${roomId}`} />
-        </CardContent>
-      </Card>
+      <section className="space-y-3">
+        <h2 className="font-heading text-base font-semibold">Availability</h2>
+        <AvailabilityBoard
+          rooms={availability}
+          from={from}
+          days={7}
+          today={todayIso()}
+          roomHref={(roomId) => `/partner/hotels/${hotel.id}/rooms/${roomId}`}
+          rangeHref={(start) => `/partner/hotels/${hotel.id}?from=${start}`}
+        />
+      </section>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">

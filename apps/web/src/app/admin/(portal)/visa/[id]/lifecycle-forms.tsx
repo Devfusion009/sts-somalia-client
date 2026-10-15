@@ -36,6 +36,7 @@ import {
   PASSPORT_STATUS_LABELS,
   PROCESSING_STAGE_LABELS,
 } from "@/modules/visa/workflow";
+import { FileField } from "@/components/ui/upload";
 
 type Option = { value: string; label: string };
 
@@ -366,7 +367,7 @@ export function RecordSubmissionForm({
           </Field>
         ) : null}
         <Field label="Receipt" htmlFor="sub-receipt">
-          <Input id="sub-receipt" name="receipt" type="file" accept=".pdf,.jpg,.jpeg,.png" />
+          <FileField id="sub-receipt" name="receipt" accept=".pdf,.jpg,.jpeg,.png" compact />
         </Field>
       </div>
       <div className="flex items-center justify-between gap-3">
@@ -479,7 +480,7 @@ export function RecordDecisionForm({ applicationId, authority }: { applicationId
           <Input id="dec-date" name="decisionDate" type="date" max={todayIso()} defaultValue={todayIso()} required />
         </Field>
         <Field label="Decision letter" htmlFor="dec-letter">
-          <Input id="dec-letter" name="letter" type="file" accept=".pdf,.jpg,.jpeg,.png" />
+          <FileField id="dec-letter" name="letter" accept=".pdf,.jpg,.jpeg,.png" compact />
         </Field>
       </div>
       <Field label="Notes" htmlFor="dec-notes">
@@ -531,7 +532,7 @@ export function CorrectDecisionDialog({
             </Field>
           </div>
           <Field label="Decision letter" htmlFor="cor-letter">
-            <Input id="cor-letter" name="letter" type="file" accept=".pdf,.jpg,.jpeg,.png" />
+            <FileField id="cor-letter" name="letter" accept=".pdf,.jpg,.jpeg,.png" compact />
           </Field>
           <ErrorLine state={state} />
           <DialogFooter>
@@ -599,7 +600,7 @@ export function PassportMoveForm({
                 <Input id={`pp-col-${passportId}`} name="collectorName" required />
               </Field>
               <Field label="Signed authorisation" htmlFor={`pp-auth-${passportId}`}>
-                <Input id={`pp-auth-${passportId}`} name="authorization" type="file" accept=".pdf,.jpg,.jpeg,.png" required />
+                <FileField id={`pp-auth-${passportId}`} name="authorization" accept=".pdf,.jpg,.jpeg,.png" required compact />
               </Field>
             </div>
           ) : null}

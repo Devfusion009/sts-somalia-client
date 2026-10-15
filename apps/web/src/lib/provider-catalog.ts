@@ -1,4 +1,4 @@
-export type ProviderCategory = "flights" | "hotels" | "visa" | "visa_processing";
+export type ProviderCategory = "payments" | "flights" | "hotels" | "visa" | "visa_processing";
 
 export type ProviderCredentialField = {
   key: string;
@@ -16,6 +16,8 @@ export type ProviderDefinition = {
   docsUrl: string;
   signupUrl: string;
   credentialFields: ProviderCredentialField[];
+  /** Sub-heading inside a category tab, e.g. the card processors versus mobile money. */
+  group?: string;
 };
 
 /**
@@ -28,6 +30,64 @@ export type ProviderDefinition = {
  * activate" flow — noted here for anyone tempted to add them later.
  */
 export const PROVIDER_CATALOG: ProviderDefinition[] = [
+  {
+    key: "stripe",
+    category: "payments",
+    group: "Cards",
+    name: "Stripe",
+    description: "Card payments at checkout; funds settle to the connected Stripe account.",
+    selfServe: true,
+    docsUrl: "https://docs.stripe.com/keys",
+    signupUrl: "https://dashboard.stripe.com/register",
+    credentialFields: [
+      { key: "secret_key", label: "Secret key", placeholder: "sk_live_..." },
+      { key: "webhook_secret", label: "Webhook signing secret", placeholder: "whsec_..." },
+    ],
+  },
+  {
+    key: "razorpay",
+    category: "payments",
+    group: "Cards",
+    name: "Razorpay",
+    description: "Card payments at checkout; funds settle to the connected Razorpay account.",
+    selfServe: true,
+    docsUrl: "https://razorpay.com/docs/payments/dashboard/account-settings/api-keys/",
+    signupUrl: "https://dashboard.razorpay.com/signup",
+    credentialFields: [
+      { key: "key_id", label: "Key ID", placeholder: "rzp_live_..." },
+      { key: "key_secret", label: "Key secret" },
+      { key: "webhook_secret", label: "Webhook secret" },
+    ],
+  },
+  {
+    key: "waafi",
+    category: "payments",
+    group: "Mobile money",
+    name: "WaafiPay",
+    description: "EVC Plus, ZAAD and Sahal mobile money.",
+    selfServe: false,
+    docsUrl: "https://docs.waafipay.com/",
+    signupUrl: "https://waafipay.com/",
+    credentialFields: [
+      { key: "merchant_uid", label: "Merchant UID" },
+      { key: "api_user_id", label: "API user ID" },
+      { key: "api_key", label: "API key" },
+    ],
+  },
+  {
+    key: "edahab",
+    category: "payments",
+    group: "Mobile money",
+    name: "eDahab",
+    description: "Dahabshiil eDahab mobile money.",
+    selfServe: false,
+    docsUrl: "https://edahab.net/",
+    signupUrl: "https://edahab.net/",
+    credentialFields: [
+      { key: "api_key", label: "API key" },
+      { key: "agent_code", label: "Agent code" },
+    ],
+  },
   {
     key: "duffel",
     category: "flights",
@@ -90,6 +150,9 @@ export const PROVIDER_CATALOG: ProviderDefinition[] = [
 export function getProvider(key: string): ProviderDefinition | undefined {
   return PROVIDER_CATALOG.find((p) => p.key === key);
 }
+
+/** Providers that serve the same checkout slot; activating one switches the others off. */
+export const EXCLUSIVE_PROVIDER_GROUPS: string[][] = [["stripe", "razorpay"]];
 
 export function providersByCategory(category: ProviderCategory): ProviderDefinition[] {
   return PROVIDER_CATALOG.filter((p) => p.category === category);

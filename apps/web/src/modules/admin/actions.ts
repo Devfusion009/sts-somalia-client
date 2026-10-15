@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { phoneSchema } from "@/modules/partner-applications/schemas";
+import { applyHotelBookingMove } from "@/modules/hotels/booking-status";
 import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
@@ -653,6 +654,7 @@ export async function updateVenue(_prev: ActionState, formData: FormData): Promi
 
 const hallBookingStatuses = [
   "pending",
+  "waitlisted",
   "confirmed",
   "cancelled",
   "completed",
@@ -705,23 +707,15 @@ export async function updateHallBookingStatus(
   return { error: null };
 }
 
-const hotelBookingStatuses = [
-  "pending",
-  "waitlisted",
-  "confirmed",
-  "cancelled",
-  "completed",
-  "refunded",
-  "no_show",
-  "failed",
-] as const;
+const hotelBookingMoves = ["confirmed", "completed", "no_show", "cancelled"] as const;
 
 /**
- * Admin-side hotel booking status control for the manual-booking queue —
- * previously only the hotel partner could move a hotel booking's status.
- * Promoting a waitlisted booking runs the DB-side availability re-check
- * (reserve_inventory_on_waitlist_promotion), so a stale waitlist entry
- * whose nights are still full fails loudly here instead of double-booking.
+ * Admin-side hotel booking decision for the manual-booking queue. Promoting
+ * a waitlisted booking runs the DB-side availability re-check, so a stale
+ * waitlist entry whose nights are still full fails loudly here instead of
+ * double-booking. Allowed moves, the unpaid-order cancel and the guest
+ * notification are shared with the partner and manager consoles
+ * (applyHotelBookingMove, hotel_booking_decided).
  */
 export async function updateHotelBookingStatus(
   _prev: ActionState,
@@ -730,19 +724,15 @@ export async function updateHotelBookingStatus(
   await requirePlatformAdmin();
   const bookingId = String(formData.get("bookingId"));
   const status = String(formData.get("status"));
-  if (!hotelBookingStatuses.includes(status as (typeof hotelBookingStatuses)[number])) {
+  if (!hotelBookingMoves.includes(status as (typeof hotelBookingMoves)[number])) {
     return { error: "Invalid status." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("hotel_bookings")
-    .update({ status: status as (typeof hotelBookingStatuses)[number] })
-    .eq("id", bookingId);
-  if (error) return { error: error.message };
-  if (status === "cancelled") await cancelUnpaidOrderForBooking(supabase, "hotel_booking_id", bookingId);
+  const result = await applyHotelBookingMove(bookingId, status as (typeof hotelBookingMoves)[number]);
+  if (result.error) return result;
   revalidatePath("/admin/queue");
   revalidatePath("/admin/orders");
+  revalidatePath("/admin/hotels");
   return { error: null };
 }
 

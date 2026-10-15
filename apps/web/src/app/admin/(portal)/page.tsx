@@ -69,6 +69,7 @@ const ROLE_CHART_LABELS: Record<AppRole, string> = {
   agent: "Agents",
   hotel_partner: "Hotel Partners",
   hotel_manager: "Hotel Managers",
+  venue_manager: "Venue Managers",
   affiliate: "Affiliates",
   venue_partner: "Venue Partners",
   admin: "Admins",

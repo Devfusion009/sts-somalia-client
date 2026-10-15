@@ -42,7 +42,7 @@ function haystack(item: MarkupQueueItem): string {
 
 /**
  * Every pending markup request across all agencies, grouped by agency
- * (oldest first) inside a fixed-height scroll region, with a text filter
+ * (newest first) inside a fixed-height scroll region, with a text filter
  * over agency / service / requester / value so a long queue stays workable.
  */
 export function MarkupApprovalQueue({ items }: { items: MarkupQueueItem[] }) {

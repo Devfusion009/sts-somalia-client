@@ -14,6 +14,7 @@ export default function AgentsLandingPage() {
 
   return (
     <ProgramLanding
+      image={{ src: "/marketing/partner-agent.webp", alt: "A travel agent helping a family plan a trip at his desk" }}
       eyebrow="B2B Travel Agents"
       icon={Briefcase}
       title="Become a Travel Agent"

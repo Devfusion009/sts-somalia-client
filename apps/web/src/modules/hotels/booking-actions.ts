@@ -12,7 +12,45 @@ import {
   isDeskBooking,
 } from "@/modules/orders/helpers";
 import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
+import { todayIso } from "@/modules/hotels/availability";
 import { notifyPartnerOfBooking } from "@/lib/notifications/partner-booking-notify";
+
+const MAX_NIGHTS = 60;
+
+function nightsBetween(checkIn: string, checkOut: string) {
+  return Math.round(
+    (new Date(`${checkOut}T00:00:00Z`).getTime() - new Date(`${checkIn}T00:00:00Z`).getTime()) / 86_400_000,
+  );
+}
+
+/**
+ * What one room costs for the whole stay: each night's per-date rate when the
+ * hotel set one, else the base rate. The booking, the review page and the
+ * order all price from this, so the figure shown is the figure charged.
+ */
+async function stayPricePerRoom(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  room: { id: string; base_price: number },
+  checkIn: string,
+  checkOut: string,
+) {
+  const { data } = await supabase
+    .from("hotel_room_inventory")
+    .select("date, price_override")
+    .eq("room_id", room.id)
+    .gte("date", checkIn)
+    .lt("date", checkOut);
+  const overrides = new Map(
+    (data ?? []).filter((r) => r.price_override !== null).map((r) => [r.date, Number(r.price_override)]),
+  );
+  let total = 0;
+  const cursor = new Date(`${checkIn}T00:00:00Z`);
+  for (let i = 0; i < nightsBetween(checkIn, checkOut); i++) {
+    total += overrides.get(cursor.toISOString().slice(0, 10)) ?? room.base_price;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return total;
+}
 
 export type ActionState = {
   error: string | null;
@@ -67,7 +105,7 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
 
   const { data: room, error: roomError } = await supabase
     .from("hotel_rooms")
-    .select("id, hotel_id, base_price, currency, status, hotel:hotels(booking_mode)")
+    .select("id, hotel_id, base_price, currency, status, max_occupancy, hotel:hotels(booking_mode)")
     .eq("id", roomId)
     .eq("hotel_id", hotelId)
     .eq("status", "published")
@@ -76,35 +114,14 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
   if (roomError || !room) {
     return { error: "This room is no longer available." };
   }
+  if (checkIn < todayIso()) return { error: "Check-in can't be in the past." };
+  if (nightsBetween(checkIn, checkOut) > MAX_NIGHTS) return { error: `Stays are limited to ${MAX_NIGHTS} nights.` };
+  if (numAdults + numChildren > room.max_occupancy * numRooms) {
+    return { error: `This room holds up to ${room.max_occupancy} guests per room.` };
+  }
   const isManualHotel = (room.hotel as { booking_mode?: string } | null)?.booking_mode !== "instant";
 
-  const nights = Math.max(
-    1,
-    Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24))
-  );
-
-  // Nightly pricing honors the partner's per-date price_override — the same
-  // pattern Umrah departures already use (price_override ?? base_price).
-  // Before this, a partner setting a seasonal rate changed what their portal
-  // displayed but not what the customer was actually charged.
-  const { data: inventoryRows } = await supabase
-    .from("hotel_room_inventory")
-    .select("date, price_override")
-    .eq("room_id", room.id)
-    .gte("date", checkIn)
-    .lt("date", checkOut);
-  const overrideByDate = new Map(
-    (inventoryRows ?? [])
-      .filter((r) => r.price_override !== null)
-      .map((r) => [r.date, Number(r.price_override)])
-  );
-  let totalPrice = 0;
-  const cursor = new Date(`${checkIn}T00:00:00Z`);
-  for (let i = 0; i < nights; i++) {
-    const iso = cursor.toISOString().slice(0, 10);
-    totalPrice += (overrideByDate.get(iso) ?? room.base_price) * numRooms;
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
+  const totalPrice = (await stayPricePerRoom(supabase, room, checkIn, checkOut)) * numRooms;
 
   const agencyId = await getActiveAgencyId(supabase, profile.id);
   const access = await assertAgencyCanBookProduct(supabase, agencyId, "hotel");
@@ -128,10 +145,10 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
     currency: room.currency,
   };
 
-  // The database allocator decides the outcome: it seats the request when
-  // the nights have capacity, seats an agency request ahead of unconfirmed
-  // customer requests when they don't, and otherwise returns the row as
-  // 'waitlisted'. Staff work waitlisted requests from the admin queue.
+  // The database allocator is the final gate: it seats the request when the
+  // nights have capacity, seats an agency request ahead of unconfirmed
+  // customer requests when they don't, and otherwise refuses the insert with
+  // the rooms actually left — so no order exists for a stay nobody can host.
   const { data: booking, error: bookingError } = await supabase
     .from("hotel_bookings")
     .insert(bookingRow)
@@ -140,25 +157,6 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
 
   if (bookingError || !booking) {
     return { error: bookingError?.message ?? "Could not create booking." };
-  }
-  const waitlisted = booking.status === "waitlisted";
-
-  // Org-level email/WhatsApp to the owning partner (the in-app bell already
-  // reaches every partner staff member via the hotel_bookings insert
-  // trigger). Best-effort — never blocks the booking on a send failure, and
-  // skipped entirely for STS-managed hotels (partner_id null).
-  const { data: hotelWithPartner } = await supabase
-    .from("hotels")
-    .select("name, partner:hotel_partners(contact_email, contact_phone)")
-    .eq("id", room.hotel_id)
-    .maybeSingle();
-  if (hotelWithPartner?.partner) {
-    void notifyPartnerOfBooking({
-      partnerEmail: hotelWithPartner.partner.contact_email,
-      partnerPhone: hotelWithPartner.partner.contact_phone,
-      propertyName: hotelWithPartner.name,
-      summary: `${numRooms} room(s), ${checkIn} → ${checkOut}`,
-    }).catch(() => {});
   }
 
   // Holds are an agency-only entry point ("book now, decide later") — the
@@ -179,21 +177,33 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
       hold,
     });
   } catch (err) {
+    // No order, no booking: release the rooms the insert just held.
+    await supabase.from("hotel_bookings").update({ status: "cancelled" }).eq("id", booking.id);
     return { error: err instanceof Error ? err.message : "Could not create order." };
+  }
+
+  // Org-level email/WhatsApp to the owning partner (the in-app bell already
+  // reaches every partner staff member via the hotel_bookings insert
+  // trigger). Best-effort — never blocks the booking on a send failure, and
+  // skipped entirely for STS-managed hotels (partner_id null).
+  const { data: hotelWithPartner } = await supabase
+    .from("hotels")
+    .select("name, partner:hotel_partners(contact_email, contact_phone)")
+    .eq("id", room.hotel_id)
+    .maybeSingle();
+  if (hotelWithPartner?.partner) {
+    void notifyPartnerOfBooking({
+      partnerEmail: hotelWithPartner.partner.contact_email,
+      partnerPhone: hotelWithPartner.partner.contact_phone,
+      propertyName: hotelWithPartner.name,
+      summary: `${numRooms} room(s), ${checkIn} → ${checkOut}`,
+    }).catch(() => {});
   }
 
   // The desk keeps the agent in the portal for every outcome — its order
   // page reads the same waitlisted/requested/payable state off the order.
   if (isDeskBooking(formData, agencyId)) {
     return { error: null, destination: deskOrderPath(order.id), orderId: order.id };
-  }
-
-  // A waitlisted request has no confirmed room yet, so pushing the customer
-  // into payment would charge them for nights nobody has granted. They land
-  // on their booking's tracking page instead; checkout happens after staff
-  // confirm a slot.
-  if (waitlisted) {
-    redirect(`/account/bookings/${order.id}?waitlisted=1`);
   }
 
   // Manual-booking hotels (no live API): the booking is a REQUEST until STS
@@ -204,4 +214,34 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
   }
 
   redirect(`/checkout/${order.id}`);
+}
+
+/**
+ * Rooms left and the per-room price for a stay, for the booking form to
+ * refresh as the dates change. unitsLeft is null when the hotel hasn't set a
+ * room count. Both come from public reads, the same ones the hotel page uses.
+ */
+export async function getStayQuote(
+  roomId: string,
+  checkIn: string,
+  checkOut: string,
+): Promise<{ unitsLeft: number | null; pricePerRoom: number } | null> {
+  const ids = z.string().uuid().safeParse(roomId);
+  const dates = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+  if (!ids.success || !dates.safeParse(checkIn).success || !dates.safeParse(checkOut).success || checkOut <= checkIn) {
+    return null;
+  }
+  if (nightsBetween(checkIn, checkOut) > MAX_NIGHTS) return null;
+
+  const supabase = await createClient();
+  const [{ data: room }, { data: left }] = await Promise.all([
+    supabase.from("hotel_rooms").select("id, base_price").eq("id", ids.data).eq("status", "published").maybeSingle(),
+    supabase.rpc("room_units_left", { p_room_ids: [ids.data], p_check_in: checkIn, p_check_out: checkOut }),
+  ]);
+  if (!room) return null;
+  const row = left?.[0];
+  return {
+    unitsLeft: row ? Math.max(0, row.units_left) : null,
+    pricePerRoom: await stayPricePerRoom(supabase, room, checkIn, checkOut),
+  };
 }

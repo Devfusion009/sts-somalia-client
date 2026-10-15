@@ -1,15 +1,17 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPaymentGateways } from "@/lib/provider-runtime/payments";
 
 /**
  * Stripe webhook — settles card payments. Configure the endpoint in the
- * Stripe dashboard pointing at /api/payments/stripe/webhook and set
- * STRIPE_WEBHOOK_SECRET; without the secret the route refuses to process
+ * Stripe dashboard pointing at /api/payments/stripe/webhook and save the
+ * signing secret under Admin > Integrations > Payments (STRIPE_WEBHOOK_SECRET
+ * still works as a fallback); without a secret the route refuses to process
  * events rather than trusting unverified input.
  */
 export async function POST(request: Request) {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = (await getPaymentGateways()).stripe?.webhookSecret;
   if (!secret) {
     return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
   }

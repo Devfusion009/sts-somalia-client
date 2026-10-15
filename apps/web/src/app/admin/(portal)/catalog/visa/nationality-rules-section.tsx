@@ -24,6 +24,7 @@ import {
   deleteVisaNationalityRule,
 } from "@/modules/admin/visa-nationality-rule-actions";
 import type { Database } from "@/lib/types/database.types";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 type Rule = Database["public"]["Tables"]["visa_nationality_rules"]["Row"];
 
@@ -220,9 +221,9 @@ export function NationalityRulesSection({
                 <form action={deleteVisaNationalityRule}>
                   <input type="hidden" name="ruleId" value={rule.id} />
                   <input type="hidden" name="visaTypeId" value={visaTypeId} />
-                  <Button size="sm" variant="ghost" type="submit" className="gap-1 text-destructive">
+                  <ConfirmButton title="Delete this nationality rule?" size="sm" variant="ghost" className="gap-1 text-destructive">
                     <Trash2 className="size-3.5" /> Delete
-                  </Button>
+                  </ConfirmButton>
                 </form>
               </div>
             </div>

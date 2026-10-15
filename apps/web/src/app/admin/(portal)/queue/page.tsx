@@ -10,9 +10,7 @@ export const metadata = { title: "Order Queue | Admin Console" };
 
 /**
  * The manual-booking queue. Somali hotels and event halls have no booking
- * APIs — every request is confirmed by a human. Agency requests first, then
- * customers, oldest first within each: the same order the room allocator
- * seats them in, so position in this list IS the promise being kept.
+ * APIs — every request is confirmed by a human. Newest request first.
  */
 export default async function OrderQueuePage() {
   const queue = await getBookingQueue();

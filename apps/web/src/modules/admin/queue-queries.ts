@@ -2,12 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 
 /**
  * The manual-booking work queue: every hotel, hall and private-Umrah request
- * that still needs a human decision. Agency (B2B) requests come first, then
- * customers, oldest first within each — the same priority the database
- * allocator applies to room capacity, so what staff see matches what was
- * actually seated. Somali hotels and event halls have no APIs, and a private
- * Umrah is priced against dates STS has not yet held, so nothing here
- * confirms itself: staff work this list top-down.
+ * that still needs a human decision, newest first. Seating priority (agency
+ * over customer) is the database allocator's job and is already decided by
+ * the time a row lands here. Somali hotels and event halls have no APIs, and
+ * a private Umrah is priced against dates STS has not yet held, so nothing
+ * here confirms itself.
  */
 export type QueueEntry = {
   kind: "hotel" | "hall" | "umrah";
@@ -81,14 +80,14 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
         "id, check_in, check_out, num_rooms, num_adults, status, total_price, currency, created_at, channel, displaced_by, agency:agencies(name), hotel:hotels(name), room:hotel_rooms(name), customer:profiles!hotel_bookings_customer_id_fkey(full_name, email)"
       )
       .in("status", ["pending", "waitlisted"])
-      .order("created_at", { ascending: true }),
+      .order("created_at", { ascending: false }),
     supabase
       .from("hall_bookings")
       .select(
-        "id, event_type, event_name, start_date, end_date, expected_guests, status, price, currency, created_at, agency:agencies(name), venue:event_venues(name), customer:profiles!hall_bookings_customer_id_fkey(full_name, email)"
+        "id, event_type, event_name, start_date, end_date, expected_guests, status, price, currency, created_at, displaced_by, agency:agencies(name), venue:event_venues(name), customer:profiles!hall_bookings_customer_id_fkey(full_name, email)"
       )
-      .eq("status", "pending")
-      .order("created_at", { ascending: true }),
+      .in("status", ["pending", "waitlisted"])
+      .order("created_at", { ascending: false }),
     // booking_kind = 'private' only: a group booking is taken against a
     // scheduled departure with real seat inventory, so it is already
     // confirmed by construction and has nothing for staff to decide here.
@@ -99,7 +98,7 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
       )
       .eq("booking_kind", "private")
       .eq("status", "pending")
-      .order("created_at", { ascending: true }),
+      .order("created_at", { ascending: false }),
   ]);
 
   // Who the agency is actually booking for. It hangs off the order rather
@@ -143,7 +142,7 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
         id: b.id,
         channel: agency ? "b2b" : "b2c",
         agencyName: agency?.name ?? null,
-        displaced: false,
+        displaced: b.displaced_by !== null,
         title: venue?.name ?? "Hall booking",
         subtitle: `${b.event_name ?? b.event_type} · ${b.start_date}${b.end_date && b.end_date !== b.start_date ? ` → ${b.end_date}` : ""}${b.expected_guests ? ` · ${b.expected_guests} guests` : ""}`,
         customerName: customer?.full_name ?? null,
@@ -188,8 +187,5 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
     }),
   ];
 
-  return entries.sort((a, b) => {
-    if (a.channel !== b.channel) return a.channel === "b2b" ? -1 : 1;
-    return a.createdAt.localeCompare(b.createdAt);
-  });
+  return entries.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

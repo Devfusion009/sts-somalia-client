@@ -10,7 +10,7 @@ export const metadata = { title: "Booking Requests" };
 
 /**
  * The venue partner's manual-booking queue: every request for their halls,
- * oldest first (same first-come-first-served promise as the admin queue).
+ * newest first, same as the admin queue.
  * Confirming or declining here is the supplier's side of the workflow —
  * admin can also decide from the central Order Queue.
  */
@@ -42,8 +42,8 @@ export default async function VenueBookingsPage() {
               {b.expected_guests ? ` · ${b.expected_guests} guests` : ""}
             </p>
             <p className="text-xs text-muted-foreground">
-              {customer?.full_name ?? customer?.email ?? "Customer"}
-              {customer?.phone ? ` · ${customer.phone}` : ""} · requested{" "}
+              {b.contact_name ?? customer?.full_name ?? customer?.email ?? "Customer"}
+              {(b.contact_phone ?? customer?.phone) ? ` · ${b.contact_phone ?? customer?.phone}` : ""} · requested{" "}
               {formatDistanceToNow(new Date(b.created_at), { addSuffix: true })}
             </p>
             {b.setup_requirements ? (

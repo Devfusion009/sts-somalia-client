@@ -1,5 +1,5 @@
 import "server-only";
-import { getIntegrations } from "@/lib/integrations";
+import { getPaymentGateways } from "@/lib/provider-runtime/payments";
 
 /**
  * The checkout method list is derived, not configured: every method a
@@ -17,7 +17,7 @@ export type PaymentMethodId =
   | "bank_transfer"
   | "cash_office";
 
-export type PaymentProvider = "stripe" | "waafi" | "edahab" | "wallet" | "manual" | "test";
+export type PaymentProvider = "stripe" | "razorpay" | "waafi" | "edahab" | "wallet" | "manual" | "test";
 
 export type PaymentMethodDef = {
   id: PaymentMethodId;
@@ -32,11 +32,20 @@ export type PaymentMethodDef = {
   simulated: boolean;
 };
 
-export function getAvailablePaymentMethods(opts?: {
+export async function getAvailablePaymentMethods(opts?: {
   /** Present when the order belongs to the viewer's agency — enables pay-from-balance. */
   agencyWallet?: { available: number; currency: string };
-}): PaymentMethodDef[] {
-  const { payments } = getIntegrations();
+}): Promise<PaymentMethodDef[]> {
+  const gateways = await getPaymentGateways();
+  const payments = {
+    stripe: !!gateways.stripe,
+    razorpay: !!gateways.razorpay,
+    waafi: !!gateways.waafi,
+    edahab: !!gateways.edahab,
+    testMode: gateways.testMode,
+  };
+  // One processor serves card payments; Stripe wins if both are connected.
+  const cardProvider: PaymentProvider | null = payments.stripe ? "stripe" : payments.razorpay ? "razorpay" : null;
   const methods: PaymentMethodDef[] = [];
 
   if (opts?.agencyWallet) {
@@ -52,16 +61,16 @@ export function getAvailablePaymentMethods(opts?: {
     });
   }
 
-  if (payments.stripe || payments.testMode) {
+  if (cardProvider || payments.testMode) {
     methods.push({
       id: "card",
       label: "Credit / Debit Card",
       description: "Pay securely using your card",
       kind: "card",
-      provider: payments.stripe ? "stripe" : "test",
+      provider: cardProvider ?? "test",
       badges: ["VISA", "Mastercard"],
       requiresPhone: false,
-      simulated: !payments.stripe,
+      simulated: !cardProvider,
     });
   }
 
@@ -122,6 +131,6 @@ export function getAvailablePaymentMethods(opts?: {
   return methods;
 }
 
-export function getPaymentMethod(id: string): PaymentMethodDef | undefined {
-  return getAvailablePaymentMethods().find((m) => m.id === id);
+export async function getPaymentMethod(id: string): Promise<PaymentMethodDef | undefined> {
+  return (await getAvailablePaymentMethods()).find((m) => m.id === id);
 }

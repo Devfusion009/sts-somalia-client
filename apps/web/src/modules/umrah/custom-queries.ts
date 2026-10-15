@@ -89,8 +89,8 @@ export async function getUmrahCustomRequest(requestId: string) {
 }
 
 /**
- * Submitted private requests awaiting a decision, oldest first — the same
- * strict FIFO promise the manual hotel/hall queue makes.
+ * Submitted private requests awaiting a decision, newest first — same order
+ * as the manual hotel/hall queue.
  */
 export async function getSubmittedUmrahRequests() {
   const supabase = await createClient();
@@ -101,7 +101,7 @@ export async function getSubmittedUmrahRequests() {
        booking:umrah_bookings!umrah_bookings_custom_request_id_fkey(id, status, total_price, currency)`
     )
     .eq("status", "submitted")
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false });
 
   return (data ?? []).map((r) => ({
     ...r,

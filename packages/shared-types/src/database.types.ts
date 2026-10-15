@@ -1915,20 +1915,32 @@ export type Database = {
         Row: {
           admin_notes: string | null
           agency_id: string | null
+          allocated_at: string | null
           booked_by: string
           booking_ref: string
+          channel: string
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
           created_at: string
           currency: string
           customer_id: string
           customer_notes: string | null
+          displaced_at: string | null
+          displaced_by: string | null
           end_date: string
           end_time: string | null
           event_name: string | null
           event_type: string
           expected_guests: number | null
           id: string
+          paid_at: string | null
+          payment_method: string | null
+          payment_reference: string | null
           price: number
+          priority: number
           setup_requirements: string | null
+          source: string
           start_date: string
           start_time: string | null
           status: Database["public"]["Enums"]["booking_status"]
@@ -1938,20 +1950,32 @@ export type Database = {
         Insert: {
           admin_notes?: string | null
           agency_id?: string | null
+          allocated_at?: string | null
           booked_by: string
           booking_ref?: string
+          channel?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
           created_at?: string
           currency?: string
           customer_id: string
           customer_notes?: string | null
+          displaced_at?: string | null
+          displaced_by?: string | null
           end_date: string
           end_time?: string | null
           event_name?: string | null
           event_type: string
           expected_guests?: number | null
           id?: string
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
           price?: number
+          priority?: number
           setup_requirements?: string | null
+          source?: string
           start_date: string
           start_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
@@ -1961,20 +1985,32 @@ export type Database = {
         Update: {
           admin_notes?: string | null
           agency_id?: string | null
+          allocated_at?: string | null
           booked_by?: string
           booking_ref?: string
+          channel?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
           created_at?: string
           currency?: string
           customer_id?: string
           customer_notes?: string | null
+          displaced_at?: string | null
+          displaced_by?: string | null
           end_date?: string
           end_time?: string | null
           event_name?: string | null
           event_type?: string
           expected_guests?: number | null
           id?: string
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
           price?: number
+          priority?: number
           setup_requirements?: string | null
+          source?: string
           start_date?: string
           start_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
@@ -2001,6 +2037,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hall_bookings_displaced_by_fkey"
+            columns: ["displaced_by"]
+            isOneToOne: false
+            referencedRelation: "hall_bookings"
             referencedColumns: ["id"]
           },
           {
@@ -3505,6 +3548,38 @@ export type Database = {
           },
         ]
       }
+      platform_settings: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           agent_code: string | null
@@ -4570,6 +4645,103 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      venue_blocked_dates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date_end: string
+          date_start: string
+          id: string
+          reason: string | null
+          venue_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date_end: string
+          date_start: string
+          id?: string
+          reason?: string | null
+          venue_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date_end?: string
+          date_start?: string
+          id?: string
+          reason?: string | null
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_blocked_dates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_blocked_dates_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "event_venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venue_managers: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          permissions: string[]
+          profile_id: string
+          status: Database["public"]["Enums"]["member_status"]
+          venue_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          permissions?: string[]
+          profile_id: string
+          status?: Database["public"]["Enums"]["member_status"]
+          venue_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          permissions?: string[]
+          profile_id?: string
+          status?: Database["public"]["Enums"]["member_status"]
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_managers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_managers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_managers_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "event_venues"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       venue_partner_applications: {
         Row: {
@@ -6373,6 +6545,24 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      add_venue_manager: {
+        Args: { p_email: string; p_permissions?: string[]; p_venue_id: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          id: string
+          permissions: string[]
+          profile_id: string
+          status: Database["public"]["Enums"]["member_status"]
+          venue_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "venue_managers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_nav_counts: { Args: Record<PropertyKey, never>; Returns: Json }
       admin_payout_queue_totals: {
         Args: Record<PropertyKey, never>
@@ -6453,6 +6643,10 @@ export type Database = {
       can_access_order: { Args: { target_order_id: string }; Returns: boolean }
       can_manage_hotel_managers: {
         Args: { p_hotel_id: string }
+        Returns: boolean
+      }
+      can_manage_venue_managers: {
+        Args: { p_venue_id: string }
         Returns: boolean
       }
       cancel_agency_topup: {
@@ -6553,6 +6747,23 @@ export type Database = {
           status: Database["public"]["Enums"]["booking_status"]
         }[]
       }
+      hall_booking_holds_venue: {
+        Args: { p_status: Database["public"]["Enums"]["booking_status"] }
+        Returns: boolean
+      }
+      hall_slots_overlap: {
+        Args: {
+          a_end: string
+          a_from: string
+          a_start: string
+          a_to: string
+          b_end: string
+          b_from: string
+          b_start: string
+          b_to: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: { check_role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
@@ -6646,6 +6857,7 @@ export type Database = {
         Args: { target_partner_id: string }
         Returns: boolean
       }
+      is_venue_manager: { Args: { target_venue_id: string }; Returns: boolean }
       is_venue_partner_member: {
         Args: { target_partner_id: string }
         Returns: boolean
@@ -6723,6 +6935,10 @@ export type Database = {
         Returns: undefined
       }
       remove_hotel_manager: {
+        Args: { p_manager_id: string }
+        Returns: undefined
+      }
+      remove_venue_manager: {
         Args: { p_manager_id: string }
         Returns: undefined
       }
@@ -6870,6 +7086,24 @@ export type Database = {
       update_hotel_manager_permissions: {
         Args: { p_manager_id: string; p_permissions: string[] }
         Returns: undefined
+      }
+      update_venue_manager_permissions: {
+        Args: { p_manager_id: string; p_permissions: string[] }
+        Returns: undefined
+      }
+      venue_manager_has_permission: {
+        Args: { perm: string; target_venue_id: string }
+        Returns: boolean
+      }
+      venue_slot_available: {
+        Args: {
+          p_end: string
+          p_from?: string
+          p_start: string
+          p_to?: string
+          p_venue_id: string
+        }
+        Returns: boolean
       }
       visa_application_outstanding_items: {
         Args: { p_application_id: string }
@@ -7152,6 +7386,7 @@ export type Database = {
         | "admin"
         | "venue_partner"
         | "hotel_manager"
+        | "venue_manager"
       application_status:
         | "pending"
         | "approved"
@@ -7400,6 +7635,7 @@ export const Constants = {
         "admin",
         "venue_partner",
         "hotel_manager",
+        "venue_manager",
       ],
       application_status: [
         "pending",

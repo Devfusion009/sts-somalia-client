@@ -12,11 +12,15 @@ import {
 } from "@/components/ui/select";
 import { updateHallBookingStatus, updateHallBookingPrice } from "@/modules/admin/actions";
 import type { Database } from "@/lib/types/database.types";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 type BookingStatus = Database["public"]["Enums"]["booking_status"];
 
+const DESTRUCTIVE: BookingStatus[] = ["cancelled", "refunded", "no_show", "failed"];
+
 const STATUSES: BookingStatus[] = [
   "pending",
+  "waitlisted",
   "confirmed",
   "completed",
   "cancelled",
@@ -50,9 +54,22 @@ export function HallBookingStatusSelect({
           ))}
         </SelectContent>
       </Select>
-      <Button size="sm" variant="outline" type="submit" disabled={value === status}>
-        Save
-      </Button>
+      {DESTRUCTIVE.includes(value) ? (
+        <ConfirmButton
+          title={`Change status to ${value.replace(/_/g, " ")}?`}
+          confirmLabel="Save"
+          icon="ban"
+          size="sm"
+          variant="outline"
+          disabled={value === status}
+        >
+          Save
+        </ConfirmButton>
+      ) : (
+        <Button size="sm" variant="outline" type="submit" disabled={value === status}>
+          Save
+        </Button>
+      )}
       {state?.error ? <span className="text-xs text-destructive">{state.error}</span> : null}
     </form>
   );

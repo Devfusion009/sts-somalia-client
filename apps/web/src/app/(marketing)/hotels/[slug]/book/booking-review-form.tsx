@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Plus, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
-import { createHotelBooking } from "@/modules/hotels/booking-actions";
+import { createHotelBooking, getStayQuote } from "@/modules/hotels/booking-actions";
 import { cn } from "@/lib/utils";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -50,9 +50,22 @@ export function BookingReviewForm({
   hotelSummary,
   roomSummary,
   bookedForSlot,
+  initialUnitsLeft,
+  initialPricePerRoom,
 }: {
   hotelId: string;
-  room: { id: string; name: string; base_price: number; currency: string; max_occupancy: number };
+  room: {
+    id: string;
+    name: string;
+    base_price: number;
+    currency: string;
+    max_occupancy: number;
+    total_units: number | null;
+  };
+  /** Rooms left for the dates the page opened with; null when not tracked or no dates yet. */
+  initialUnitsLeft: number | null;
+  /** One room's price for the dates the page opened with, per-date rates included. */
+  initialPricePerRoom: number | null;
   /** 'manual': submit a request STS confirms by hand — no payment until confirmed. 'instant': pay at checkout. */
   bookingMode: "manual" | "instant";
   defaults: { checkIn?: string; checkOut?: string; guests?: string; numRooms?: string };
@@ -72,6 +85,38 @@ export function BookingReviewForm({
   const guestNamesRef = useRef<HTMLInputElement>(null);
   const MAX_GUEST_NAMES = 20;
 
+  // Rooms left for the chosen dates, re-read whenever they change. Keyed by
+  // the date pair so a stale answer for earlier dates is never shown.
+  const stayKey = checkIn && checkOut && checkOut > checkIn ? `${checkIn}|${checkOut}` : null;
+  const [units, setUnits] = useState<{ key: string | null; left: number | null; price: number | null }>({
+    key: defaults.checkIn && defaults.checkOut ? `${defaults.checkIn}|${defaults.checkOut}` : null,
+    left: initialUnitsLeft,
+    price: initialPricePerRoom,
+  });
+  useEffect(() => {
+    if (!stayKey || stayKey === units.key) return;
+    let live = true;
+    const [from, to] = stayKey.split("|");
+    getStayQuote(room.id, from, to)
+      .then((quote) => live && setUnits({ key: stayKey, left: quote?.unitsLeft ?? null, price: quote?.pricePerRoom ?? null }))
+      .catch(() => live && setUnits({ key: stayKey, left: null, price: null }));
+    return () => {
+      live = false;
+    };
+  }, [stayKey, units.key, room.id]);
+
+  const checking = stayKey !== null && units.key !== stayKey;
+  const unitsLeft = stayKey && !checking ? units.left : null;
+  const roomCap = Math.min(20, unitsLeft ?? room.total_units ?? 20);
+  const soldOut = unitsLeft === 0;
+  const overCap = !soldOut && numRooms > roomCap;
+  const roomsError = soldOut
+    ? "Sold out for these dates."
+    : overCap
+      ? `Only ${roomCap} room${roomCap === 1 ? "" : "s"} left${unitsLeft !== null ? " for these dates" : ""}.`
+      : null;
+  const blocked = checking || soldOut || overCap;
+
   function toggleRequest(option: string) {
     setSelectedRequests((prev) => (prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option]));
   }
@@ -81,10 +126,13 @@ export function BookingReviewForm({
   const nights = useMemo(() => nightsBetween(checkIn, checkOut), [checkIn, checkOut]);
   const isManual = bookingMode === "manual";
   const priceOnRequest = room.base_price === 0;
-  const total = nights > 0 && !priceOnRequest ? room.base_price * numRooms * nights : null;
+  // The server prices the stay night by night (per-date rates); base rate
+  // x nights only stands in until that answer arrives.
+  const pricePerRoom = stayKey && !checking && units.price !== null ? units.price : room.base_price * nights;
+  const total = nights > 0 && !priceOnRequest ? pricePerRoom * numRooms : null;
   const defaultAdults = Math.min(
     Math.max(Number.parseInt(defaults.guests ?? "2", 10) || 2, 1),
-    room.max_occupancy * 10
+    room.max_occupancy * numRooms
   );
 
   return (
@@ -153,11 +201,18 @@ export function BookingReviewForm({
                   name="numRooms"
                   type="number"
                   min={1}
-                  max={20}
+                  max={Math.max(1, roomCap)}
                   value={numRooms}
                   onChange={(e) => setNumRooms(Math.max(1, Number(e.target.value) || 1))}
+                  aria-invalid={roomsError ? true : undefined}
+                  aria-describedby={roomsError ? "numRooms-error" : undefined}
                   required
                 />
+                {roomsError ? (
+                  <p id="numRooms-error" className="flex items-center gap-1 text-xs font-medium text-destructive">
+                    <AlertCircle className="size-3.5 shrink-0" /> {roomsError}
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="numAdults">Adults</Label>
@@ -166,7 +221,7 @@ export function BookingReviewForm({
                   name="numAdults"
                   type="number"
                   min={1}
-                  max={room.max_occupancy * 10}
+                  max={room.max_occupancy * numRooms}
                   defaultValue={defaultAdults}
                   required
                 />
@@ -270,7 +325,6 @@ export function BookingReviewForm({
                   <Plus className="size-3.5" /> Add guest
                 </Button>
               ) : null}
-              <p className="text-xs text-muted-foreground">Helps the hotel prepare — you can also add this later.</p>
             </div>
           </CardContent>
         </Card>
@@ -296,7 +350,7 @@ export function BookingReviewForm({
                 <div className="flex items-baseline justify-between">
                   <span className="text-muted-foreground">Per night</span>
                   <span className="font-semibold tabular-nums">
-                    {room.currency} {room.base_price.toFixed(0)}
+                    {room.currency} {(nights > 0 ? pricePerRoom / nights : room.base_price).toFixed(0)}
                   </span>
                 </div>
                 <Separator />
@@ -323,26 +377,27 @@ export function BookingReviewForm({
             <div className="space-y-2 pt-2">
               {isManual ? (
                 <>
-                  <SubmitButton className="w-full" pendingText="Sending request…">
+                  <SubmitButton className="w-full" pendingText="Sending request…" disabled={blocked}>
                     Submit booking request
                   </SubmitButton>
-                  <p className="text-center text-xs text-muted-foreground">
-                    Confirmed manually by STS — you won&apos;t pay anything until it&apos;s confirmed.
-                  </p>
                 </>
               ) : (
                 <>
-                  <SubmitButton className="w-full" pendingText="Reserving…">
+                  <SubmitButton className="w-full" pendingText="Reserving…" disabled={blocked}>
                     Continue to payment
                   </SubmitButton>
                   {bookedForSlot ? (
-                    <SubmitButton name="intent" value="hold" variant="outline" className="w-full" pendingText="Holding…">
+                    <SubmitButton
+                      name="intent"
+                      value="hold"
+                      variant="outline"
+                      className="w-full"
+                      pendingText="Holding…"
+                      disabled={blocked}
+                    >
                       Hold for 24h without paying
                     </SubmitButton>
                   ) : null}
-                  <p className="text-center text-xs text-muted-foreground">
-                    You won&apos;t be charged yet — payment is completed on the next step.
-                  </p>
                 </>
               )}
             </div>

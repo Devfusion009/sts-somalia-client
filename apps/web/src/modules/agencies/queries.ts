@@ -542,7 +542,7 @@ export async function getAgencyMarkupRequests(agencyId: string) {
 export type AgencyMarkupRequest = Awaited<ReturnType<typeof getAgencyMarkupRequests>>[number];
 
 /**
- * Admin: every pending markup request across all agencies (oldest first),
+ * Admin: every pending markup request across all agencies (newest first),
  * plus the live rule each one would replace, keyed `${agency_id}:${scope}`
  * — the approval queue on /admin/agencies.
  */
@@ -552,7 +552,7 @@ export async function getPendingMarkupRequestsForAdmin() {
     .from("agency_markup_requests")
     .select("*, agency:agencies(id, name), requester:profiles!agency_markup_requests_requested_by_fkey(full_name, email)")
     .eq("status", "pending")
-    .order("requested_at", { ascending: true });
+    .order("requested_at", { ascending: false });
   const requests = data ?? [];
 
   const currentRules = new Map<string, { markup_type: string; value: number }>();
@@ -906,14 +906,14 @@ export async function getAgencyRefundableOrders(agencyId: string) {
   return data ?? [];
 }
 
-/** Admin: every pending refund request across all agencies, oldest first (a queue). */
+/** Admin: every pending refund request across all agencies, newest first. */
 export async function getPendingRefundRequestsForAdmin() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("agency_refund_requests")
     .select("*, agency:agency_id (name, contact_email), order:order_id (order_number), requester:requested_by (full_name, email)")
     .eq("status", "pending")
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false });
   return data ?? [];
 }
 

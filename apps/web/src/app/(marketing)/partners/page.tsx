@@ -7,6 +7,7 @@ export const metadata: Metadata = { title: "List Your Hotel" };
 export default function PartnersLandingPage() {
   return (
     <ProgramLanding
+      image={{ src: "/marketing/partner-hotel.webp", alt: "A hotel receptionist handing a key card to an arriving guest" }}
       eyebrow="Hotel Partners"
       icon={Building2}
       title="List Your Hotel"

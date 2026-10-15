@@ -8,12 +8,14 @@ import { GalleryManager } from "@/components/admin/gallery-manager";
 import { PropertyReviews } from "@/components/admin/property-reviews";
 import { uploadVenueImages, removeVenueImage, setVenueCoverImage } from "@/modules/admin/property-gallery-actions";
 import { VenueForm } from "../venue-form";
+import { getVenueManagers } from "@/modules/events/venue-manager-queries";
+import { VenueManagersSection } from "@/modules/hotels/components/manager-form";
 
 export const metadata: Metadata = { title: "Manage Venue" };
 
 export default async function AdminVenueDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const venue = await getVenueByIdAdmin(id);
+  const [venue, managers] = await Promise.all([getVenueByIdAdmin(id), getVenueManagers(id)]);
   if (!venue) notFound();
 
   const images = Array.isArray(venue.images) ? venue.images.filter((p): p is string => typeof p === "string") : [];
@@ -28,6 +30,12 @@ export default async function AdminVenueDetailPage({ params }: { params: Promise
         </div>
         <VenueForm venue={venue} />
       </div>
+
+      <Card>
+        <CardContent>
+          <VenueManagersSection venueId={venue.id} managers={managers} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

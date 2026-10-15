@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getMyPartnerId, getMyHotelScope, type HotelScope } from "@/modules/hotels/partner-queries";
 import { rememberRoomType } from "@/modules/hotels/room-types";
 import { attachRoomPhotos } from "@/modules/hotels/hotel-gallery-actions";
+import { applyHotelBookingMove } from "@/modules/hotels/booking-status";
 import { commaList, parseLinks, replacePropertyLinks } from "@/modules/hotels/listing-fields";
 import { phoneSchema } from "@/modules/partner-applications/schemas";
 import type { ActionState } from "@/lib/auth/actions";
@@ -373,7 +374,7 @@ export async function updateRoom(_prevState: ActionState, formData: FormData): P
 
 const bookingStatusSchema = z.object({
   bookingId: z.string().uuid(),
-  status: z.enum(["pending", "confirmed", "cancelled", "completed", "no_show"]),
+  status: z.enum(["confirmed", "cancelled", "completed", "no_show"]),
 });
 
 export async function updateBookingStatus(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -422,13 +423,10 @@ export async function updateBookingStatus(_prevState: ActionState, formData: For
     }
   }
 
-  const { error } = await supabase
-    .from("hotel_bookings")
-    .update({ status: parsed.data.status })
-    .eq("id", parsed.data.bookingId);
-
-  if (error) return { error: error.message };
+  const result = await applyHotelBookingMove(parsed.data.bookingId, parsed.data.status);
+  if (result.error) return result;
 
   revalidatePath("/partner/bookings");
+  revalidatePath(`/manager/${booking.hotel_id}`, "layout");
   return { error: null };
 }

@@ -797,7 +797,7 @@ export const paymentMethodIdValues = [
 ] as const;
 export type PaymentMethodId = (typeof paymentMethodIdValues)[number];
 
-export type PaymentProvider = "stripe" | "waafi" | "edahab" | "wallet" | "manual" | "test";
+export type PaymentProvider = "stripe" | "razorpay" | "waafi" | "edahab" | "wallet" | "manual" | "test";
 
 export type PaymentMethodDef = {
   id: PaymentMethodId;

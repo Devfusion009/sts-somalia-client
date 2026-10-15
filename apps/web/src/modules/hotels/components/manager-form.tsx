@@ -31,6 +31,39 @@ import {
   updateHotelManagerPermissions,
 } from "@/modules/hotels/manager-invite-actions";
 import { MANAGER_PERMISSIONS } from "@/modules/hotels/manager-permissions";
+import {
+  addVenueManager,
+  removeVenueManager,
+  resetVenueManagerPassword,
+  updateVenueManagerPermissions,
+} from "@/modules/events/venue-manager-invite-actions";
+import { VENUE_MANAGER_PERMISSIONS } from "@/modules/events/venue-manager-permissions";
+
+/**
+ * Hotels and venues share one assignment UI; each kind brings its own id
+ * field, permission registry and server actions (which authorize the caller
+ * in the database).
+ */
+const KINDS = {
+  hotel: {
+    idField: "hotelId",
+    permissions: MANAGER_PERMISSIONS,
+    add: addHotelManager,
+    update: updateHotelManagerPermissions,
+    remove: removeHotelManager,
+    reset: resetHotelManagerPassword,
+  },
+  venue: {
+    idField: "venueId",
+    permissions: VENUE_MANAGER_PERMISSIONS,
+    add: addVenueManager,
+    update: updateVenueManagerPermissions,
+    remove: removeVenueManager,
+    reset: resetVenueManagerPassword,
+  },
+} as const;
+
+type ManagerKind = keyof typeof KINDS;
 
 type Manager = {
   id: string;
@@ -66,11 +99,12 @@ function CredentialsOnce({ password }: { password: string }) {
   );
 }
 
-export function AddHotelManagerForm({ hotelId }: { hotelId: string }) {
-  const [state, formAction] = useActionState(addHotelManager, null);
+function AddManagerForm({ kind, propertyId }: { kind: ManagerKind; propertyId: string }) {
+  const config = KINDS[kind];
+  const [state, formAction] = useActionState(config.add, null);
   return (
     <form action={formAction} className="space-y-3 border-t border-border pt-4">
-      <input type="hidden" name="hotelId" value={hotelId} />
+      <input type="hidden" name={config.idField} value={propertyId} />
       <Label htmlFor="manager-email">Add a manager by email</Label>
       <div className="flex flex-wrap items-end gap-2">
         <Input id="manager-email" name="email" type="email" placeholder="Manager's email" className="min-w-56 flex-1" required />
@@ -80,7 +114,7 @@ export function AddHotelManagerForm({ hotelId }: { hotelId: string }) {
       </div>
 
       <div className="flex flex-wrap gap-x-5 gap-y-2">
-        {MANAGER_PERMISSIONS.map((perm) => (
+        {config.permissions.map((perm) => (
           <label key={perm.key} className="flex items-center gap-2 text-sm text-muted-foreground">
             <Checkbox name="permissions" value={perm.key} /> {perm.label}
           </label>
@@ -99,14 +133,26 @@ export function AddHotelManagerForm({ hotelId }: { hotelId: string }) {
   );
 }
 
-function PermissionToggle({ hotelId, manager, permKey, label }: { hotelId: string; manager: Manager; permKey: string; label: string }) {
-  const [, formAction] = useActionState(updateHotelManagerPermissions, null);
+function PermissionToggle({
+  kind,
+  propertyId,
+  manager,
+  permKey,
+  label,
+}: {
+  kind: ManagerKind;
+  propertyId: string;
+  manager: Manager;
+  permKey: string;
+  label: string;
+}) {
+  const [, formAction] = useActionState(KINDS[kind].update, null);
   const granted = manager.permissions.includes(permKey);
   const next = granted ? manager.permissions.filter((p) => p !== permKey) : [...manager.permissions, permKey];
 
   return (
     <form action={formAction}>
-      <input type="hidden" name="hotelId" value={hotelId} />
+      <input type="hidden" name={KINDS[kind].idField} value={propertyId} />
       <input type="hidden" name="managerId" value={manager.id} />
       {next.map((p) => (
         <input key={p} type="hidden" name="permissions" value={p} />
@@ -126,12 +172,12 @@ function PermissionToggle({ hotelId, manager, permKey, label }: { hotelId: strin
   );
 }
 
-function ResetPasswordControl({ hotelId, managerId }: { hotelId: string; managerId: string }) {
-  const [state, formAction] = useActionState(resetHotelManagerPassword, null);
+function ResetPasswordControl({ kind, propertyId, managerId }: { kind: ManagerKind; propertyId: string; managerId: string }) {
+  const [state, formAction] = useActionState(KINDS[kind].reset, null);
   return (
     <div className="space-y-2">
       <form action={formAction}>
-        <input type="hidden" name="hotelId" value={hotelId} />
+        <input type="hidden" name={KINDS[kind].idField} value={propertyId} />
         <input type="hidden" name="managerId" value={managerId} />
         <SubmitButton variant="outline" size="sm" pendingText="Resetting…" className="gap-1.5">
           <KeyRound className="size-3.5" /> Reset password
@@ -150,10 +196,11 @@ function ResetPasswordControl({ hotelId, managerId }: { hotelId: string; manager
  * manager's full control surface on screen at once regardless of how many
  * there were.
  */
-export function HotelManagerRow({ hotelId, manager }: { hotelId: string; manager: Manager }) {
+function ManagerRow({ kind, propertyId, manager }: { kind: ManagerKind; propertyId: string; manager: Manager }) {
+  const config = KINDS[kind];
   const [detailOpen, setDetailOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [state, formAction] = useActionState(removeHotelManager, null);
+  const [state, formAction] = useActionState(config.remove, null);
 
   const [lastState, setLastState] = useState(state);
   if (state !== lastState) {
@@ -195,12 +242,19 @@ export function HotelManagerRow({ hotelId, manager }: { hotelId: string; manager
             <div className="space-y-2">
               <Label>Permissions</Label>
               <div className="flex flex-wrap gap-2">
-                {MANAGER_PERMISSIONS.map((perm) => (
-                  <PermissionToggle key={perm.key} hotelId={hotelId} manager={manager} permKey={perm.key} label={perm.label} />
+                {config.permissions.map((perm) => (
+                  <PermissionToggle
+                    key={perm.key}
+                    kind={kind}
+                    propertyId={propertyId}
+                    manager={manager}
+                    permKey={perm.key}
+                    label={perm.label}
+                  />
                 ))}
               </div>
             </div>
-            <ResetPasswordControl hotelId={hotelId} managerId={manager.id} />
+            <ResetPasswordControl kind={kind} propertyId={propertyId} managerId={manager.id} />
           </div>
           <DialogFooter>
             <Button
@@ -217,7 +271,7 @@ export function HotelManagerRow({ hotelId, manager }: { hotelId: string; manager
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <form action={formAction}>
-            <input type="hidden" name="hotelId" value={hotelId} />
+            <input type="hidden" name={config.idField} value={propertyId} />
             <input type="hidden" name="managerId" value={manager.id} />
             <AlertDialogHeader>
               <AlertDialogTitle>Remove {manager.profile?.full_name ?? manager.profile?.email}?</AlertDialogTitle>
@@ -251,7 +305,7 @@ export function HotelManagerRow({ hotelId, manager }: { hotelId: string; manager
  * (manager-invite-actions.ts), which authorize the caller (admin or the
  * hotel's owning partner) at the RPC layer rather than here.
  */
-export function HotelManagersSection({ hotelId, managers }: { hotelId: string; managers: Manager[] }) {
+function ManagersSection({ kind, propertyId, managers }: { kind: ManagerKind; propertyId: string; managers: Manager[] }) {
   const [expanded, setExpanded] = useState(false);
   const [adding, setAdding] = useState(false);
   const hasManagers = managers.length > 0;
@@ -293,13 +347,21 @@ export function HotelManagersSection({ hotelId, managers }: { hotelId: string; m
         <ul className="divide-y divide-border">
           {managers.map((manager) => (
             <li key={manager.id} className="py-2.5 first:pt-0 last:pb-0">
-              <HotelManagerRow hotelId={hotelId} manager={manager} />
+              <ManagerRow kind={kind} propertyId={propertyId} manager={manager} />
             </li>
           ))}
         </ul>
       ) : null}
 
-      {adding ? <AddHotelManagerForm hotelId={hotelId} /> : null}
+      {adding ? <AddManagerForm kind={kind} propertyId={propertyId} /> : null}
     </div>
   );
+}
+
+export function HotelManagersSection({ hotelId, managers }: { hotelId: string; managers: Manager[] }) {
+  return <ManagersSection kind="hotel" propertyId={hotelId} managers={managers} />;
+}
+
+export function VenueManagersSection({ venueId, managers }: { venueId: string; managers: Manager[] }) {
+  return <ManagersSection kind="venue" propertyId={venueId} managers={managers} />;
 }

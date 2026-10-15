@@ -367,7 +367,9 @@ export default async function BookingDetailPage({
           <CardHeader className="pb-4">
             <CardTitle className="flex flex-wrap items-center gap-2 text-base">
               Event booking progress
-              {hallStatus === "pending" && awaitingPayment ? (
+              {hallStatus === "waitlisted" ? (
+                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Waitlisted</Badge>
+              ) : hallStatus === "pending" && awaitingPayment ? (
                 <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Requested</Badge>
               ) : null}
             </CardTitle>

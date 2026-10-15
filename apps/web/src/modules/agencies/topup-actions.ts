@@ -141,7 +141,7 @@ export async function startOnlineTopup(
       ? parsed.data.returnTo
       : null;
 
-  const method = getPaymentMethod(parsed.data.method);
+  const method = await getPaymentMethod(parsed.data.method);
   if (!method || method.provider === "manual" || method.provider === "wallet") {
     return { error: "That payment method is not available." };
   }
