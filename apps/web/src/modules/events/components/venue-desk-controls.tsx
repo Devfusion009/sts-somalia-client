@@ -1,108 +1,28 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
-import { Check, Ban } from "lucide-react";
+import { useActionState, useState } from "react";
+import { Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
 import {
   blockVenueDates,
   quoteHallBookingPrice,
   setHallBookingStatus,
 } from "@/modules/events/venue-manager-actions";
-import { DESK_STATUSES } from "@/modules/events/venue-desk-types";
-import { ConfirmButton, ConfirmDialog } from "@/components/ui/confirm-button";
+import { HallMoveActions } from "@/modules/events/components/hall-move-actions";
 
-/** Status select that submits on change; the allocator's refusal shows inline. */
-export function DeskStatusControl({ venueId, bookingId, status }: { venueId: string; bookingId: string; status: string }) {
-  const [state, formAction] = useActionState(setHallBookingStatus, null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [value, setValue] = useState(status);
-  const [asking, setAsking] = useState<string | null>(null);
-  const options: string[] = (DESK_STATUSES as readonly string[]).includes(status)
-    ? [...DESK_STATUSES]
-    : [status, ...DESK_STATUSES];
+type DeskBookingRef = { id: string; status: string; start_date: string; end_date: string; price: number | string };
 
-  function commit(next: string) {
-    setValue(next);
-    requestAnimationFrame(() => formRef.current?.requestSubmit());
-  }
-
-  return (
-    <form action={formAction} ref={formRef} className="space-y-1">
-      <input type="hidden" name="venueId" value={venueId} />
-      <input type="hidden" name="bookingId" value={bookingId} />
-      <input type="hidden" name="status" value={value} />
-      <Select
-        value={value}
-        onValueChange={(next) => {
-          if (!next || next === value) return;
-          if (next === "cancelled" || next === "no_show") setAsking(next);
-          else commit(next);
-        }}
-      >
-        <SelectTrigger size="sm" className="w-32 capitalize">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((opt) => (
-            <SelectItem key={opt} value={opt} className="capitalize" disabled={!(DESK_STATUSES as readonly string[]).includes(opt)}>
-              {opt.replace(/_/g, " ")}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {state?.error ? <p className="max-w-48 text-xs text-destructive">{state.error}</p> : null}
-      <ConfirmDialog
-        open={asking !== null}
-        onOpenChange={(open) => !open && setAsking(null)}
-        title={asking === "no_show" ? "Mark this booking as no-show?" : "Cancel this booking?"}
-        confirmLabel={asking === "no_show" ? "Mark no-show" : "Cancel booking"}
-        icon="ban"
-        onConfirm={() => {
-          if (asking) commit(asking);
-          setAsking(null);
-        }}
-      />
-    </form>
-  );
+/** The booking's allowed moves as buttons; the allocator's refusal shows as a toast. */
+export function DeskStatusControl({ venueId, booking, today }: { venueId: string; booking: DeskBookingRef; today: string }) {
+  return <HallMoveActions booking={booking} today={today} action={setHallBookingStatus} fields={{ venueId }} />;
 }
 
-/** One-click confirm / decline for a request card. */
-export function DeskDecision({ venueId, bookingId }: { venueId: string; bookingId: string }) {
-  const [state, formAction] = useActionState(setHallBookingStatus, null);
-  return (
-    <div className="space-y-1">
-      <div className="flex gap-1.5">
-        <form action={formAction}>
-          <input type="hidden" name="venueId" value={venueId} />
-          <input type="hidden" name="bookingId" value={bookingId} />
-          <input type="hidden" name="status" value="confirmed" />
-          <SubmitButton size="sm" className="gap-1" pendingText="Confirming…">
-            <Check className="size-3.5" /> Confirm
-          </SubmitButton>
-        </form>
-        <form action={formAction}>
-          <input type="hidden" name="venueId" value={venueId} />
-          <input type="hidden" name="bookingId" value={bookingId} />
-          <input type="hidden" name="status" value="cancelled" />
-          <ConfirmButton
-            title="Decline this booking request?"
-            confirmLabel="Decline"
-            icon="ban"
-            size="sm"
-            variant="outline"
-            className="gap-1 text-destructive hover:text-destructive"
-          >
-            <Ban className="size-3.5" /> Decline
-          </ConfirmButton>
-        </form>
-      </div>
-      {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
-    </div>
-  );
+/** Confirm / decline for a request card. */
+export function DeskDecision({ venueId, booking, today }: { venueId: string; booking: DeskBookingRef; today: string }) {
+  return <HallMoveActions booking={booking} today={today} action={setHallBookingStatus} fields={{ venueId }} />;
 }
 
 export function DeskPriceForm({

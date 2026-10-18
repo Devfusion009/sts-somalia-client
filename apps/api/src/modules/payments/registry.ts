@@ -12,12 +12,21 @@ export async function getAvailablePaymentMethods(opts?: {
   const payments = {
     stripe: !!gateways.stripe,
     razorpay: !!gateways.razorpay,
+    sifalo: !!gateways.sifalo,
     waafi: !!gateways.waafi,
     edahab: !!gateways.edahab,
     testMode: gateways.testMode,
   };
-  // One processor serves card payments; Stripe wins if both are connected.
-  const cardProvider: PaymentProvider | null = payments.stripe ? "stripe" : payments.razorpay ? "razorpay" : null;
+  // One processor serves card payments. A dedicated card gateway (Stripe,
+  // Razorpay) wins when connected; otherwise Sifalo Pay's hosted checkout
+  // takes cards, so a Somalia-based merchant needs no Stripe account.
+  const cardProvider: PaymentProvider | null = payments.stripe
+    ? "stripe"
+    : payments.razorpay
+      ? "razorpay"
+      : payments.sifalo
+        ? "sifalo"
+        : null;
   const methods: PaymentMethodDef[] = [];
 
   if (opts?.agencyWallet) {
@@ -26,6 +35,7 @@ export async function getAvailablePaymentMethods(opts?: {
       label: "Agency Balance",
       description: `Pay from your agency wallet — ${opts.agencyWallet.currency} ${opts.agencyWallet.available.toFixed(2)} available`,
       kind: "wallet",
+      group: "other",
       provider: "wallet",
       badges: ["B2B"],
       requiresPhone: false,
@@ -39,6 +49,7 @@ export async function getAvailablePaymentMethods(opts?: {
       label: "Credit / Debit Card",
       description: "Pay securely using your card",
       kind: "card",
+      group: "international",
       provider: cardProvider ?? "test",
       badges: ["VISA", "Mastercard"],
       requiresPhone: false,
@@ -51,27 +62,31 @@ export async function getAvailablePaymentMethods(opts?: {
     { id: "zaad", label: "ZAAD", description: "Telesom ZAAD mobile money", badges: ["ZAAD"] },
     { id: "sahal", label: "Sahal", description: "Golis Sahal mobile money", badges: ["SAHAL"] },
   ];
-  if (payments.waafi || payments.testMode) {
+  // Direct WaafiPay wins for EVC Plus / ZAAD / Sahal when connected; Sifalo covers them otherwise.
+  if (payments.waafi || payments.sifalo || payments.testMode) {
     for (const wallet of mobileWallets) {
       methods.push({
         ...wallet,
         kind: "mobile_money",
-        provider: payments.waafi ? "waafi" : "test",
-        requiresPhone: true,
-        simulated: !payments.waafi,
+        group: "local",
+        provider: payments.waafi ? "waafi" : payments.sifalo ? "sifalo" : "test",
+        // Sifalo's hosted page collects the wallet number itself.
+        requiresPhone: !!payments.waafi || (!payments.sifalo && payments.testMode),
+        simulated: !payments.waafi && !payments.sifalo,
       });
     }
   }
-  if (payments.edahab || payments.testMode) {
+  if (payments.edahab || payments.sifalo || payments.testMode) {
     methods.push({
       id: "edahab",
       label: "eDahab",
       description: "Dahabshiil eDahab mobile money",
       kind: "mobile_money",
-      provider: payments.edahab ? "edahab" : "test",
+      group: "local",
+      provider: payments.edahab ? "edahab" : payments.sifalo ? "sifalo" : "test",
       badges: ["eDahab"],
-      requiresPhone: true,
-      simulated: !payments.edahab,
+      requiresPhone: !!payments.edahab || (!payments.sifalo && payments.testMode),
+      simulated: !payments.edahab && !payments.sifalo,
     });
   }
 
@@ -81,6 +96,7 @@ export async function getAvailablePaymentMethods(opts?: {
       label: "Bank Transfer",
       description: "Pay via bank transfer and send us the receipt",
       kind: "bank",
+      group: "other",
       provider: "manual",
       badges: ["Bank"],
       requiresPhone: false,
@@ -91,6 +107,7 @@ export async function getAvailablePaymentMethods(opts?: {
       label: "Pay at Office",
       description: "Pay in cash at any STS office",
       kind: "cash",
+      group: "other",
       provider: "manual",
       badges: ["Cash"],
       requiresPhone: false,

@@ -180,52 +180,81 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
       <div className="hidden items-center gap-2 lg:flex">
         {profile ? (
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" className="h-11 gap-2 rounded-full pl-2 transition-[height] duration-300 ease-out group-data-[condensed]/header:h-9" />}>
-              <Avatar className="size-7">
-                <AvatarFallback className="text-xs">{initials(profile.full_name, profile.email)}</AvatarFallback>
-              </Avatar>
-              <span className="max-w-28 truncate">{profile.full_name || "My Account"}</span>
+            <DropdownMenuTrigger
+              render={
+                <button
+                  type="button"
+                  className="group/user flex h-11 items-center gap-2.5 rounded-full border border-border/70 bg-white/70 py-1 pr-3 pl-1 shadow-sm backdrop-blur transition-all duration-300 ease-out hover:border-primary/40 hover:bg-white hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none group-data-[condensed]/header:h-9"
+                />
+              }
+            >
+              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-teal-700 text-xs font-bold text-white ring-2 ring-white group-data-[condensed]/header:size-7">
+                {initials(profile.full_name, profile.email)}
+              </span>
+              <span className="max-w-28 truncate text-sm font-semibold">{profile.full_name || "My Account"}</span>
+              <ExpandMoreIcon sx={{ fontSize: 18 }} className="text-muted-foreground transition-transform duration-200 group-aria-expanded/user:rotate-180" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel className="truncate">{profile.email}</DropdownMenuLabel>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              {profile.role !== "agent" ? (
-                <DropdownMenuItem render={<Link href="/account" />}>
-                  <PersonIcon sx={{ fontSize: 18 }} /> My Account
-                </DropdownMenuItem>
-              ) : null}
-              {profile?.is_platform_admin ? (
-                <DropdownMenuItem render={<Link href={portalHref("admin")} />}>
-                  <DashboardIcon sx={{ fontSize: 18 }} /> Admin Console
-                </DropdownMenuItem>
-              ) : null}
-              {contexts.length > 0 ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel>Switch account</DropdownMenuLabel>
-                  </DropdownMenuGroup>
-                  {contexts.map((c) => (
-                    <DropdownMenuItem key={c.type} render={<Link href={c.href} />}>
-                      <DashboardIcon sx={{ fontSize: 18 }} />
-                      <span className="min-w-0 flex-1 truncate">
-                        {c.name} <span className="text-muted-foreground">· {c.label}</span>
-                      </span>
-                      {c.status && c.status !== "live" ? (
-                        <span className="shrink-0 text-xs text-muted-foreground capitalize">{c.status}</span>
-                      ) : null}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              ) : null}
-              <DropdownMenuSeparator />
-              <form action={signOutAction}>
-                <DropdownMenuItem variant="destructive" render={<button type="submit" className="w-full" />}>
-                  <LogoutIcon sx={{ fontSize: 18 }} /> Sign out
-                </DropdownMenuItem>
-              </form>
+            <DropdownMenuContent align="end" sideOffset={10} className="w-72 overflow-hidden rounded-2xl border border-border/60 p-0 shadow-2xl shadow-black/15 ring-0">
+              <div className="relative overflow-hidden bg-gradient-to-br from-[#06312f] via-[#0a4a45] to-primary px-4 pt-4 pb-4 text-white">
+                <div className="pointer-events-none absolute -top-10 -right-10 size-32 rounded-full bg-brand-accent/25 blur-2xl" aria-hidden />
+                <div className="relative flex items-center gap-3">
+                  <span className="grid size-12 shrink-0 place-items-center rounded-full bg-white/15 text-base font-bold ring-2 ring-white/40 backdrop-blur">
+                    {initials(profile.full_name, profile.email)}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-heading text-base leading-tight font-bold">{profile.full_name || "My Account"}</p>
+                    <p className="truncate text-xs text-white/75">{profile.email}</p>
+                  </div>
+                </div>
+                <span className="relative mt-3 inline-flex items-center rounded-full border border-white/25 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase">
+                  {profile.is_platform_admin ? "Administrator" : profile.role.replace(/_/g, " ")}
+                </span>
+              </div>
+
+              <div className="p-1.5">
+                {profile.role !== "agent" ? (
+                  <>
+                    <MenuLink href="/account" icon={<PersonIcon sx={{ fontSize: 18 }} />} label="My Account" />
+                    <MenuLink href="/account/bookings" icon={<FlightTakeoffIcon sx={{ fontSize: 18 }} />} label="My Bookings" />
+                    <MenuLink href="/account/visa" icon={<ArticleIcon sx={{ fontSize: 18 }} />} label="Visa Applications" />
+                  </>
+                ) : null}
+                {profile?.is_platform_admin ? (
+                  <MenuLink href={portalHref("admin")} icon={<DashboardIcon sx={{ fontSize: 18 }} />} label="Admin Console" />
+                ) : null}
+                {contexts.length > 0 ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel className="px-2.5 text-[11px] tracking-wider uppercase">Switch account</DropdownMenuLabel>
+                    </DropdownMenuGroup>
+                    {contexts.map((c) => (
+                      <DropdownMenuItem key={c.type} render={<Link href={c.href} />} className="gap-3 rounded-xl px-2.5 py-2">
+                        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-accent/10 text-brand-accent">
+                          <DashboardIcon sx={{ fontSize: 18 }} />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {c.name} <span className="text-muted-foreground">· {c.label}</span>
+                        </span>
+                        {c.status && c.status !== "live" ? (
+                          <span className="shrink-0 text-xs text-muted-foreground capitalize">{c.status}</span>
+                        ) : null}
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                ) : null}
+              </div>
+
+              <div className="border-t border-border/60 bg-muted/40 p-1.5">
+                <form action={signOutAction}>
+                  <DropdownMenuItem variant="destructive" render={<button type="submit" className="w-full" />} className="gap-3 rounded-xl px-2.5 py-2 font-semibold">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-destructive/10">
+                      <LogoutIcon sx={{ fontSize: 18 }} />
+                    </span>
+                    Sign out
+                  </DropdownMenuItem>
+                </form>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
@@ -483,5 +512,17 @@ export function HeaderSearch() {
         </motion.div>
       ) : null}
     </AnimatePresence>
+  );
+}
+
+function MenuLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+  return (
+    <DropdownMenuItem render={<Link href={href} />} className="group/item gap-3 rounded-xl px-2.5 py-2 font-medium">
+      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary transition-colors group-hover/item:bg-primary group-hover/item:text-white">
+        {icon}
+      </span>
+      <span className="flex-1">{label}</span>
+      <ArrowForwardIcon sx={{ fontSize: 16 }} className="text-muted-foreground opacity-0 transition-all group-hover/item:translate-x-0.5 group-hover/item:opacity-100" />
+    </DropdownMenuItem>
   );
 }

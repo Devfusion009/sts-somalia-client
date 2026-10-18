@@ -153,6 +153,40 @@ const SLIDES = [
   },
 ];
 
+/* Per-slide palette, parallel to SLIDES: scrim tint, price chip, CTA glow. */
+const THEMES = [
+  { // Gulf skyline — night blue, gold light
+    scrim: "from-[#050b1c]/85 via-[#0a1a38]/50 to-[#050b1c]/20",
+    chip: "border-sky-200/25 bg-[#0a1a38]/45 shadow-sky-950/40",
+    price: "text-amber-300",
+    cta: "shadow-[0_8px_28px_-6px_rgba(251,191,36,0.55)]",
+  },
+  { // Dunes — sand, copper
+    scrim: "from-[#2a1204]/85 via-[#3d1d08]/45 to-[#2a1204]/15",
+    chip: "border-amber-200/30 bg-[#3d1d08]/45 shadow-amber-950/40",
+    price: "text-amber-300",
+    cta: "shadow-[0_8px_28px_-6px_rgba(244,113,28,0.6)]",
+  },
+  { // Coast — deep teal water
+    scrim: "from-[#031c1d]/85 via-[#06312f]/45 to-[#031c1d]/15",
+    chip: "border-teal-200/30 bg-[#06312f]/45 shadow-teal-950/40",
+    price: "text-orange-300",
+    cta: "shadow-[0_8px_28px_-6px_rgba(45,212,191,0.45)]",
+  },
+  { // Istanbul — midnight indigo, bridge lights
+    scrim: "from-[#07061c]/88 via-[#14103a]/50 to-[#07061c]/20",
+    chip: "border-indigo-200/25 bg-[#14103a]/50 shadow-indigo-950/40",
+    price: "text-orange-300",
+    cta: "shadow-[0_8px_28px_-6px_rgba(129,140,248,0.5)]",
+  },
+  { // Nairobi — green dusk
+    scrim: "from-[#07170e]/85 via-[#0f2e1b]/45 to-[#07170e]/15",
+    chip: "border-emerald-200/25 bg-[#0f2e1b]/45 shadow-emerald-950/40",
+    price: "text-lime-300",
+    cta: "shadow-[0_8px_28px_-6px_rgba(74,222,128,0.45)]",
+  },
+] as const;
+
 const SLIDE_MS = 6500;
 
 export function HeroCarousel() {
@@ -229,7 +263,7 @@ export function HeroCarousel() {
             )}
 
             {/* Scrim — heavy on the left where the offer card sits */}
-            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/25" aria-hidden />
+            <div className={cn("absolute inset-0 bg-gradient-to-r", THEMES[i].scrim)} aria-hidden />
             <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/70 to-transparent" aria-hidden />
 
             <div className="relative z-10 mx-auto flex h-full max-w-7xl items-center justify-between gap-10 px-4 pt-14 pb-36 sm:px-6 lg:px-8 lg:pb-40">
@@ -252,17 +286,17 @@ export function HeroCarousel() {
                 <p className="mt-3 max-w-md text-lg leading-relaxed text-white/85">{s.subtitle}</p>
 
                 {/* Price banner */}
-                <div className="mt-6 inline-flex items-baseline gap-2 rounded-xl bg-white px-5 py-3 shadow-2xl">
-                  <span className="font-heading text-lg font-bold text-foreground">{s.priceLabel}</span>
-                  <span className="font-heading text-3xl font-extrabold text-brand-accent sm:text-4xl">{s.price}</span>
-                  <span className="text-sm font-medium text-muted-foreground">{s.priceSuffix}</span>
+                <div className={cn("mt-6 inline-flex items-baseline gap-2 rounded-2xl border px-5 py-3 shadow-xl backdrop-blur-md", THEMES[i].chip)}>
+                  <span className="font-heading text-lg font-semibold text-white/80">{s.priceLabel}</span>
+                  <span className={cn("font-heading text-3xl font-extrabold sm:text-4xl", THEMES[i].price)}>{s.price}</span>
+                  <span className="text-sm font-medium text-white/70">{s.priceSuffix}</span>
                 </div>
 
                 <div>
                   <Link
                     href={s.href}
                     tabIndex={i === index ? undefined : -1}
-                    className="mt-6 inline-flex h-12 items-center rounded-full bg-brand-accent px-8 font-heading text-base font-bold text-brand-accent-foreground shadow-lg transition-all duration-200 hover:bg-brand-accent/90 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/50 focus-visible:outline-none"
+                    className={cn("mt-6 inline-flex h-12 items-center rounded-full bg-brand-accent px-8 font-heading text-base font-bold text-brand-accent-foreground transition-all duration-200 hover:bg-brand-accent/90", THEMES[i].cta, "focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/50 focus-visible:outline-none")}
                   >
                     {s.cta}
                   </Link>

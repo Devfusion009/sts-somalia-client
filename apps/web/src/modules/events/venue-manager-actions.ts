@@ -13,7 +13,9 @@ import { uploadImages, removeImage, setCoverImage, type GalleryUploadState } fro
 import { TARGETS } from "@/modules/admin/gallery-targets";
 import { getMyManagedVenue, hasVenuePermission, type ManagedVenue } from "./venue-manager-queries";
 import type { VenueManagerPermission } from "./venue-manager-permissions";
-import { DESK_STATUSES, OFFLINE_PAYMENT_METHODS, type VenueBookingResult } from "./venue-desk-types";
+import { OFFLINE_PAYMENT_METHODS, type VenueBookingResult } from "./venue-desk-types";
+import { requireVenueAccess, revalidateVenueDesk } from "./venue-access";
+import { nextHallBookingMoves } from "./hall-transitions";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a valid date.");
 const clockTime = z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid time.");
@@ -31,11 +33,7 @@ async function requireVenuePermission(
 }
 
 function revalidateDesk(venueId: string) {
-  for (const path of ["", "/bookings", "/calendar"]) {
-    revalidatePath(`/manager/venues/${venueId}${path}`);
-  }
-  revalidatePath("/admin/events");
-  revalidatePath("/admin/queue");
+  revalidateVenueDesk(venueId);
 }
 
 function optionalText(formData: FormData, key: string) {
@@ -183,14 +181,16 @@ export async function checkVenueSlot(
 const statusSchema = z.object({
   venueId: z.string().uuid(),
   bookingId: z.string().uuid(),
-  status: z.enum(DESK_STATUSES),
+  status: z.enum(["confirmed", "cancelled", "completed", "no_show", "refunded"]),
 });
 
 /**
- * Confirm, decline, complete or mark no-show. Confirming a waitlisted
- * request re-runs the allocator and fails with its message when the slot is
- * still taken. Declining also closes the customer's unpaid order — paid
- * orders stay with the refund flow.
+ * Confirm, decline, complete or mark no-show — only the moves the booking's
+ * status and dates allow (nextHallBookingMoves, enforced again by
+ * hall_bookings_status_guard). Confirming a waitlisted request re-runs the
+ * allocator and fails with its message when the slot is still taken. The
+ * database closes an unpaid order on decline and opens the refund when a
+ * paid booking is cancelled.
  */
 export async function setHallBookingStatus(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = statusSchema.safeParse({
@@ -200,39 +200,37 @@ export async function setHallBookingStatus(_prev: ActionState, formData: FormDat
   });
   if (!parsed.success) return { error: "Invalid status." };
 
-  let gate: Awaited<ReturnType<typeof requireVenuePermission>>;
+  let access: Awaited<ReturnType<typeof requireVenueAccess>>;
   try {
-    gate = await requireVenuePermission(parsed.data.venueId, "bookings");
+    access = await requireVenueAccess(parsed.data.venueId, "bookings");
   } catch (e) {
     unstable_rethrow(e);
     return { error: (e as Error).message };
   }
-  if (!gate) return { error: "You don't have permission to manage bookings for this venue." };
+  if (!access) return { error: "You don't have permission to manage bookings for this venue." };
 
   const supabase = await createClient();
+  const { data: booking } = await supabase
+    .from("hall_bookings")
+    .select("id, status, start_date, end_date, price")
+    .eq("id", parsed.data.bookingId)
+    .eq("venue_id", parsed.data.venueId)
+    .maybeSingle();
+  if (!booking) return { error: "Booking not found." };
+  if (!nextHallBookingMoves(booking, todayIso(), access.isAdmin).includes(parsed.data.status)) {
+    return { error: `A ${booking.status.replace(/_/g, " ")} booking can't be changed to ${parsed.data.status.replace(/_/g, " ")}.` };
+  }
+  if (parsed.data.status === "confirmed" && Number(booking.price) <= 0) return { error: "Set the price before confirming." };
+
   const { data: updated, error } = await supabase
     .from("hall_bookings")
     .update({ status: parsed.data.status })
     .eq("id", parsed.data.bookingId)
-    .eq("venue_id", parsed.data.venueId)
+    .eq("status", booking.status)
     .select("id")
     .maybeSingle();
   if (error) return { error: error.message };
-  if (!updated) return { error: "Booking not found." };
-
-  if (parsed.data.status === "cancelled") {
-    // Managers can't write orders under RLS; the gate above already proved
-    // this booking is theirs to decline.
-    const admin = createAdminClient();
-    const { data: item } = await admin
-      .from("order_items")
-      .select("order:order_id (id, status)")
-      .eq("hall_booking_id", parsed.data.bookingId)
-      .maybeSingle();
-    if (item?.order && (item.order.status === "pending_payment" || item.order.status === "held")) {
-      await admin.from("orders").update({ status: "cancelled" }).eq("id", item.order.id);
-    }
-  }
+  if (!updated) return { error: "This booking was just changed. Refresh and try again." };
 
   revalidateDesk(parsed.data.venueId);
   return { error: null };
@@ -253,8 +251,9 @@ export async function quoteHallBookingPrice(_prev: ActionState, formData: FormDa
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const gate = await requireVenuePermission(parsed.data.venueId, "bookings");
-  if (!gate) return { error: "You don't have permission to manage bookings for this venue." };
+  if (!(await requireVenueAccess(parsed.data.venueId, "bookings"))) {
+    return { error: "You don't have permission to manage bookings for this venue." };
+  }
 
   const supabase = await createClient();
   const { data: updated, error } = await supabase
@@ -286,7 +285,7 @@ export async function markHallBookingPaid(formData: FormData): Promise<void> {
   const bookingId = z.string().uuid().safeParse(formData.get("bookingId"));
   const venueId = String(formData.get("venueId") ?? "");
   if (!bookingId.success) return;
-  if (!(await requireVenuePermission(venueId, "bookings"))) return;
+  if (!(await requireVenueAccess(venueId, "bookings"))) return;
 
   const supabase = await createClient();
   await supabase

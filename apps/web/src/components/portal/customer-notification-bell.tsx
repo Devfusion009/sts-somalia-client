@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { trpc } from "@/lib/trpc/react";
 import { cn } from "@/lib/utils";
+import { useBellAlert } from "@/components/portal/use-bell-alert";
 import { ACTIONABLE_TYPES } from "@/lib/notifications/actionable-types";
 
 type NotificationRow = {
@@ -22,7 +23,12 @@ type NotificationRow = {
 
 function targetHref(n: NotificationRow): string | null {
   if (ACTIONABLE_TYPES.has(n.type)) return "/account/become";
-  if (n.type === "booking_waitlisted" || n.type === "booking_confirmed" || n.type === "booking_declined") {
+  if (
+    n.type === "booking_waitlisted" ||
+    n.type === "booking_confirmed" ||
+    n.type === "booking_declined" ||
+    n.type.startsWith("booking_request_")
+  ) {
     const orderId = (n.data as { order_id?: string } | null)?.order_id;
     return orderId ? `/account/bookings/${orderId}` : "/account/bookings";
   }
@@ -65,6 +71,8 @@ export function CustomerNotificationBell({ notifications }: { notifications: Not
 
   const needsAction = notifications.some((n) => ACTIONABLE_TYPES.has(n.type));
 
+  const bellRef = useBellAlert(notifications.map((n) => n.id));
+
   return (
     <Popover>
       <PopoverTrigger
@@ -72,9 +80,10 @@ export function CustomerNotificationBell({ notifications }: { notifications: Not
           <Button
             variant="ghost"
             size="icon"
-            className={cn("relative", needsAction && "animate-alert-pulse rounded-full text-destructive")}
+            ref={bellRef}
+            className={cn("relative rounded-full", needsAction && "text-destructive")}
           >
-            <Bell className={cn("size-4", needsAction && "animate-bell-ring")} />
+            <Bell className="size-4" />
             {notifications.length > 0 ? (
               <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
                 {notifications.length > 9 ? "9+" : notifications.length}

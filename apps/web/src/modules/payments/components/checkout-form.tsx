@@ -17,10 +17,17 @@ export type CheckoutMethod = {
   label: string;
   description: string;
   kind: "card" | "mobile_money" | "wallet" | "bank" | "cash";
+  group: "local" | "international" | "other";
   badges: string[];
   requiresPhone: boolean;
   simulated: boolean;
 };
+
+const GROUPS = [
+  { id: "local", title: "Local payments" },
+  { id: "international", title: "International cards" },
+  { id: "other", title: "Other ways to pay" },
+] as const;
 
 const KIND_ICONS = {
   card: CreditCard,
@@ -150,8 +157,14 @@ export function CheckoutForm({
 
       <div>
         <h2 className="font-heading text-base font-semibold">Select Payment Method</h2>
-        <div className="mt-3 space-y-2.5" role="radiogroup" aria-label="Payment method">
-          {methods.map((method) => {
+        <div className="mt-3 space-y-5" role="radiogroup" aria-label="Payment method">
+          {GROUPS.map((group) => {
+            const groupMethods = methods.filter((m) => m.group === group.id);
+            if (groupMethods.length === 0) return null;
+            return (
+              <div key={group.id} className="space-y-2.5">
+                <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{group.title}</h3>
+                {groupMethods.map((method) => {
             const Icon = KIND_ICONS[method.kind];
             const active = method.id === selectedId;
             return (
@@ -202,6 +215,9 @@ export function CheckoutForm({
                   ))}
                 </span>
               </button>
+            );
+          })}
+              </div>
             );
           })}
         </div>

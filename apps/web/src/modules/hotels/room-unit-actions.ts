@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getMyHotelScope } from "@/modules/hotels/partner-queries";
+import { blockConflict } from "@/modules/hotels/block-guard";
 import type { ActionState } from "@/lib/auth/actions";
 
 /**
@@ -89,23 +90,100 @@ const statusSchema = z.object({
   reason: z.string().trim().max(300).optional(),
 });
 
-export async function setRoomUnitStatus(formData: FormData): Promise<void> {
+function todayPlus(days: number) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+export async function setRoomUnitStatus(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = statusSchema.safeParse({
     unitId: formData.get("unitId"),
     status: formData.get("status"),
     reason: formData.get("reason")?.toString().trim() || undefined,
   });
-  if (!parsed.success) return;
+  if (!parsed.success) return { error: "Choose a status." };
 
   await requireUser();
   const supabase = await createClient();
-  await supabase
+  const { data: unit } = await supabase
+    .from("hotel_room_units")
+    .select("id, hotel_id, room_type_id, status")
+    .eq("id", parsed.data.unitId)
+    .maybeSingle();
+  if (!unit) return { error: "Room not found." };
+
+  if (unit.status === "active" && parsed.data.status !== "active") {
+    const conflict = await blockConflict(supabase, unit.hotel_id, unit.room_type_id, todayPlus(0), todayPlus(120));
+    if (conflict) return { error: conflict };
+  }
+
+  const { error } = await supabase
     .from("hotel_room_units")
     .update({
       status: parsed.data.status,
       out_of_order_reason: parsed.data.status === "out_of_order" ? (parsed.data.reason ?? null) : null,
     })
     .eq("id", parsed.data.unitId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/manager/[hotelId]/rooms/[roomId]", "page");
+  revalidatePath("/partner/hotels/[id]/rooms/[roomId]", "page");
+  return { error: null };
+}
+
+const blockSchema = z
+  .object({
+    unitId: z.string().uuid(),
+    dateStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a start date."),
+    dateEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the date the room returns."),
+    reason: z.string().trim().max(300).optional(),
+  })
+  .refine((d) => d.dateEnd > d.dateStart, { message: "The room must return after the start date.", path: ["dateEnd"] });
+
+/** Takes one room out of sale from dateStart until dateEnd (the night it is back; not blocked). */
+export async function addRoomBlock(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = blockSchema.safeParse({
+    unitId: formData.get("unitId"),
+    dateStart: formData.get("dateStart"),
+    dateEnd: formData.get("dateEnd"),
+    reason: formData.get("reason")?.toString().trim() || undefined,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const profile = await requireUser();
+  const supabase = await createClient();
+  const { data: unit } = await supabase
+    .from("hotel_room_units")
+    .select("id, hotel_id, room_type_id")
+    .eq("id", parsed.data.unitId)
+    .maybeSingle();
+  if (!unit) return { error: "Room not found." };
+
+  const conflict = await blockConflict(supabase, unit.hotel_id, unit.room_type_id, parsed.data.dateStart, parsed.data.dateEnd);
+  if (conflict) return { error: conflict };
+
+  const { error } = await supabase.from("hotel_room_disable_dates").insert({
+    room_unit_id: unit.id,
+    date_start: parsed.data.dateStart,
+    date_end: parsed.data.dateEnd,
+    reason: parsed.data.reason ?? null,
+    created_by: profile.id,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath("/manager/[hotelId]/rooms/[roomId]", "page");
+  revalidatePath("/partner/hotels/[id]/rooms/[roomId]", "page");
+  return { error: null };
+}
+
+export async function deleteRoomBlock(formData: FormData): Promise<void> {
+  const blockId = z.string().uuid().safeParse(formData.get("blockId"));
+  if (!blockId.success) return;
+
+  await requireUser();
+  const supabase = await createClient();
+  await supabase.from("hotel_room_disable_dates").delete().eq("id", blockId.data);
 
   revalidatePath("/manager/[hotelId]/rooms/[roomId]", "page");
   revalidatePath("/partner/hotels/[id]/rooms/[roomId]", "page");

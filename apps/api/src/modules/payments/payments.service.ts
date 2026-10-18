@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { RlsSupabaseService } from "../../infra/supabase/rls-supabase.service";
 import { AdminSupabaseService } from "../../infra/supabase/admin-supabase.service";
 import { OrdersService } from "../orders/orders.service";
+import { SifaloService, type SifaloSettlement } from "./sifalo.service";
 import { getPaymentMethod } from "./registry";
 import { initiateWithProvider } from "./providers";
 import type { InitiationResult, InitiatePaymentInput, RecordPaymentInput } from "@sts/shared-types";
@@ -22,7 +23,8 @@ export class PaymentsService {
   constructor(
     private readonly rls: RlsSupabaseService,
     private readonly admin: AdminSupabaseService,
-    private readonly orders: OrdersService
+    private readonly orders: OrdersService,
+    private readonly sifalo: SifaloService
   ) {}
 
   /** Sum of this order's already-succeeded payments — the source of truth for balance due. */
@@ -192,6 +194,16 @@ export class PaymentsService {
   }
 
   /** Customer abandons a pending manual payment to pick another method. */
+  /**
+   * The customer's browser returns from Sifalo's hosted checkout with a sid.
+   * RLS proves the payment is theirs; SifaloService re-verifies with Sifalo.
+   */
+  async confirmSifaloReturn(paymentId: string, sid: string): Promise<{ status: SifaloSettlement; orderId: string | null }> {
+    const { data: payment } = await this.rls.get().from("payments").select("id, order_id").eq("id", paymentId).maybeSingle();
+    if (!payment) return { status: "ignored", orderId: null };
+    return { status: await this.sifalo.settle(payment.id, sid), orderId: payment.order_id };
+  }
+
   async cancelPendingPayment(paymentId: string) {
     const supabase = this.rls.get();
     // Visibility through RLS proves the caller may act on this payment.

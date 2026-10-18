@@ -8,6 +8,7 @@ import { GalleryManager } from "@/components/admin/gallery-manager";
 import { PropertyReviews } from "@/components/admin/property-reviews";
 import { uploadVenueImages, removeVenueImage, setVenueCoverImage } from "@/modules/admin/property-gallery-actions";
 import { VenueForm } from "../venue-form";
+import { VenueTabs } from "./venue-tabs";
 import { getVenueManagers } from "@/modules/events/venue-manager-queries";
 import { VenueManagersSection } from "@/modules/hotels/components/manager-form";
 
@@ -30,6 +31,8 @@ export default async function AdminVenueDetailPage({ params }: { params: Promise
         </div>
         <VenueForm venue={venue} />
       </div>
+
+      <VenueTabs id={venue.id} active="overview" />
 
       <Card>
         <CardContent>

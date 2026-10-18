@@ -4,12 +4,14 @@ import { AccountPaymentsService } from "./account.service";
 import { CheckoutService } from "./checkout.service";
 import { StripeWebhookController } from "./stripe-webhook.controller";
 import { RazorpayWebhookController } from "./razorpay-webhook.controller";
+import { SifaloWebhookController } from "./sifalo-webhook.controller";
+import { SifaloService } from "./sifalo.service";
 import { OrdersModule } from "../orders/orders.module";
 
 @Module({
   imports: [OrdersModule],
-  controllers: [StripeWebhookController, RazorpayWebhookController],
-  providers: [PaymentsService, AccountPaymentsService, CheckoutService],
+  controllers: [StripeWebhookController, RazorpayWebhookController, SifaloWebhookController],
+  providers: [PaymentsService, AccountPaymentsService, CheckoutService, SifaloService],
   exports: [PaymentsService, AccountPaymentsService, CheckoutService],
 })
 export class PaymentsModule {}

@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getStayPrices } from "@/modules/hotels/rates";
+import { blockConflict } from "@/modules/hotels/block-guard";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
+import { requireHotelPermission, revalidateHotelDesk } from "@/modules/hotels/hotel-access";
 
 export type FrontDeskActionState = { error: string | null } | null;
 
@@ -71,28 +74,8 @@ export async function createFrontDeskBooking(
     .maybeSingle();
   if (roomError || !roomType) return { error: "Room type not found." };
 
-  const nights = Math.max(
-    1,
-    Math.round((new Date(`${checkOut}T00:00:00Z`).getTime() - new Date(`${checkIn}T00:00:00Z`).getTime()) / 86_400_000)
-  );
-
-  const { data: inventoryRows } = await supabase
-    .from("hotel_room_inventory")
-    .select("date, price_override")
-    .eq("room_id", roomType.id)
-    .gte("date", checkIn)
-    .lt("date", checkOut);
-  const overrideByDate = new Map(
-    (inventoryRows ?? []).filter((r) => r.price_override !== null).map((r) => [r.date, Number(r.price_override)])
-  );
-
-  let totalPrice = 0;
-  const cursor = new Date(`${checkIn}T00:00:00Z`);
-  for (let i = 0; i < nights; i++) {
-    const iso = cursor.toISOString().slice(0, 10);
-    totalPrice += (overrideByDate.get(iso) ?? Number(roomType.base_price)) * numRooms;
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
+  const prices = await getStayPrices(supabase, [roomType], checkIn, checkOut);
+  const totalPrice = (prices.get(roomType.id)?.total ?? 0) * numRooms;
 
   const { error: insertError } = await supabase.from("hotel_bookings").insert({
     hotel_id: hotelId,
@@ -121,12 +104,10 @@ export async function createFrontDeskBooking(
 }
 
 async function requireBookingAccess(bookingId: string) {
-  const profile = await requireUser();
   const supabase = await createClient();
   const { data: booking } = await supabase.from("hotel_bookings").select("id, hotel_id").eq("id", bookingId).maybeSingle();
   if (!booking) throw new Error("Booking not found.");
-  const managed = await getMyManagedHotel(profile.id, booking.hotel_id);
-  if (!managed || !hasPermission(managed, "bookings")) throw new Error("Not permitted.");
+  if (!(await requireHotelPermission(booking.hotel_id, "bookings"))) throw new Error("Not permitted.");
   return { supabase, hotelId: booking.hotel_id };
 }
 
@@ -136,8 +117,16 @@ export async function checkInBooking(formData: FormData): Promise<void> {
   if (!bookingId.success) return;
   try {
     const { supabase, hotelId } = await requireBookingAccess(bookingId.data);
-    await supabase.from("hotel_bookings").update({ checked_in_at: new Date().toISOString() }).eq("id", bookingId.data);
+    // Only a confirmed stay whose arrival date has come; never twice.
+    await supabase
+      .from("hotel_bookings")
+      .update({ checked_in_at: new Date().toISOString() })
+      .eq("id", bookingId.data)
+      .eq("status", "confirmed")
+      .lte("check_in", new Date().toISOString().slice(0, 10))
+      .is("checked_in_at", null);
     revalidatePath(`/manager/${hotelId}/front-desk`);
+    revalidateHotelDesk(hotelId);
   } catch {
     // Best-effort: a permission or lookup failure here just leaves the
     // booking unchanged — no partial state to unwind.
@@ -149,8 +138,14 @@ export async function checkOutBooking(formData: FormData): Promise<void> {
   if (!bookingId.success) return;
   try {
     const { supabase, hotelId } = await requireBookingAccess(bookingId.data);
-    await supabase.from("hotel_bookings").update({ checked_out_at: new Date().toISOString() }).eq("id", bookingId.data);
+    await supabase
+      .from("hotel_bookings")
+      .update({ checked_out_at: new Date().toISOString() })
+      .eq("id", bookingId.data)
+      .not("checked_in_at", "is", null)
+      .is("checked_out_at", null);
     revalidatePath(`/manager/${hotelId}/front-desk`);
+    revalidateHotelDesk(hotelId);
   } catch {
     // See checkInBooking.
   }
@@ -192,6 +187,7 @@ export async function assignRoomUnit(_prev: FrontDeskActionState, formData: Form
     });
     if (error) return { error: error.message };
     revalidatePath(`/manager/${hotelId}/front-desk`);
+    revalidateHotelDesk(hotelId);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not assign room." };
   }
@@ -296,7 +292,7 @@ const disableRoomSchema = z
     dateEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick an end date."),
     reason: z.string().trim().max(300).optional(),
   })
-  .refine((d) => d.dateEnd >= d.dateStart, { message: "End date must be on or after the start date.", path: ["dateEnd"] });
+  .refine((d) => d.dateEnd > d.dateStart, { message: "The room must return after the start date.", path: ["dateEnd"] });
 
 /** Disable Room — a date-ranged block on one physical room (hotel_room_disable_dates), not a standing toggle. */
 export async function disableRoomUnit(_prev: FrontDeskActionState, formData: FormData): Promise<FrontDeskActionState> {
@@ -314,6 +310,16 @@ export async function disableRoomUnit(_prev: FrontDeskActionState, formData: For
   if (!managed || !hasPermission(managed, "rooms")) return { error: "You don't have permission to manage rooms for this hotel." };
 
   const supabase = await createClient();
+  const { data: unit } = await supabase
+    .from("hotel_room_units")
+    .select("room_type_id")
+    .eq("id", parsed.data.roomUnitId)
+    .eq("hotel_id", parsed.data.hotelId)
+    .maybeSingle();
+  if (!unit) return { error: "Room not found." };
+  const conflict = await blockConflict(supabase, parsed.data.hotelId, unit.room_type_id, parsed.data.dateStart, parsed.data.dateEnd);
+  if (conflict) return { error: conflict };
+
   const { error } = await supabase.from("hotel_room_disable_dates").insert({
     room_unit_id: parsed.data.roomUnitId,
     date_start: parsed.data.dateStart,

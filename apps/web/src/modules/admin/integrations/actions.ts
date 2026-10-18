@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { encryptCredentials, decryptCredentials } from "@/lib/integrations-crypto";
 import { EXCLUSIVE_PROVIDER_GROUPS, getProvider } from "@/lib/provider-catalog";
-import { testRazorpayConnection, testStripeConnection } from "@/lib/provider-runtime/payments-test";
+import { testRazorpayConnection, testSifaloConnection, testStripeConnection } from "@/lib/provider-runtime/payments-test";
 import { testDuffelConnection } from "@/lib/provider-runtime/duffel";
 import { testHotelbedsConnection } from "@/lib/provider-runtime/hotelbeds";
 import { testZylalabsVisaConnection } from "@/lib/provider-runtime/visa-check";
@@ -179,6 +179,7 @@ const TEST_FN: Record<
 > = {
   stripe: (creds) => testStripeConnection(creds.secret_key),
   razorpay: (creds) => testRazorpayConnection(creds.key_id, creds.key_secret),
+  sifalo: (creds) => testSifaloConnection(creds.api_user, creds.api_key),
   waafi: async () => ({ ok: true, message: "Credentials saved. WaafiPay has no read-only check." }),
   edahab: async () => ({ ok: true, message: "Credentials saved. eDahab has no read-only check." }),
   duffel: (creds) => testDuffelConnection(creds.api_key),

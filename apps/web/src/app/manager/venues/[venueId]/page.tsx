@@ -245,7 +245,7 @@ export default async function VenueManagerDashboard({ params }: { params: Promis
                       {b.status === "waitlisted" ? (
                         <Badge className={cn("border-transparent", HALL_STATUS_BADGE.waitlisted)}>Waitlisted</Badge>
                       ) : null}
-                      {canBook ? <DeskDecision venueId={venueId} bookingId={b.id} /> : null}
+                      {canBook ? <DeskDecision venueId={venueId} booking={b} today={today} /> : null}
                     </li>
                   ))}
                 </ul>

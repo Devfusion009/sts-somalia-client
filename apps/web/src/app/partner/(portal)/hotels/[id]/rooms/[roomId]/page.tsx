@@ -7,6 +7,7 @@ import {
   getMyHotelScope,
   getRoomForInventory,
   getRoomUnits,
+  getRoomBlocks,
   getRoomBookings,
   getHotelForEdit,
 } from "@/modules/hotels/partner-queries";
@@ -31,13 +32,14 @@ export default async function RoomInventoryPage({
   const room = await getRoomForInventory(roomId, id, scope.hotelIds);
   if (!room) notFound();
 
-  const [hotel, availability, roomUnits, bookings] = await Promise.all([
+  const [hotel, availability, roomUnits, roomBlocks, bookings] = await Promise.all([
     getHotelForEdit(id, scope.hotelIds),
     // No roomId filter: one call returns every room type's nights, so the
     // offline-booking form's room-type picker can show live availability
     // for whichever type is selected, not just this page's own room.
     getHotelAvailability(id, { days: 60 }),
     getRoomUnits(room.id, id, scope.hotelIds),
+    getRoomBlocks(room.id, id, scope.hotelIds),
     getRoomBookings(room.id, id, scope.hotelIds),
   ]);
   const nights = availability.find((a) => a.roomId === room.id)?.nights ?? [];
@@ -129,7 +131,7 @@ export default async function RoomInventoryPage({
           <CardTitle className="text-base">Rooms</CardTitle>
         </CardHeader>
         <CardContent>
-          <RoomUnitsManager hotelId={id} roomTypeId={room.id} units={roomUnits} canEdit />
+          <RoomUnitsManager hotelId={id} roomTypeId={room.id} units={roomUnits} blocks={roomBlocks} canEdit />
         </CardContent>
       </Card>
     </div>

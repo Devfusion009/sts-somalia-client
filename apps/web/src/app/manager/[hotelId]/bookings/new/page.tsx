@@ -6,7 +6,7 @@ import { quoteStay } from "@/modules/hotels/reservation-actions";
 import { BackLink } from "@/components/back-link";
 import { NewBookingForm } from "@/modules/hotels/components/new-booking-form";
 
-export const metadata = { title: "Record offline booking" };
+export const metadata = { title: "Book now" };
 
 function nextDay(iso: string) {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -37,7 +37,7 @@ export default async function NewOfflineBookingPage({
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-center gap-3">
         <BackLink href={`/manager/${hotelId}/bookings`} label="Bookings" />
-        <h1 className="font-heading text-2xl font-semibold">Record offline booking</h1>
+        <h1 className="font-heading text-2xl font-semibold">Book now</h1>
       </div>
       <NewBookingForm hotelId={hotelId} today={today} initialQuote={initial.quote} preferredRoomId={room} />
     </div>

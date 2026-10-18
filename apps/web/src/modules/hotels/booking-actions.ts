@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getStayPrices } from "@/modules/hotels/rates";
 import { requireUser } from "@/lib/auth/session";
 import {
   assertAgencyCanBookProduct,
@@ -25,7 +26,7 @@ function nightsBetween(checkIn: string, checkOut: string) {
 
 /**
  * What one room costs for the whole stay: each night's per-date rate when the
- * hotel set one, else the base rate. The booking, the review page and the
+ * hotel set one, else a matching rate rule, else the base rate. The booking, the review page and the
  * order all price from this, so the figure shown is the figure charged.
  */
 async function stayPricePerRoom(
@@ -34,22 +35,8 @@ async function stayPricePerRoom(
   checkIn: string,
   checkOut: string,
 ) {
-  const { data } = await supabase
-    .from("hotel_room_inventory")
-    .select("date, price_override")
-    .eq("room_id", room.id)
-    .gte("date", checkIn)
-    .lt("date", checkOut);
-  const overrides = new Map(
-    (data ?? []).filter((r) => r.price_override !== null).map((r) => [r.date, Number(r.price_override)]),
-  );
-  let total = 0;
-  const cursor = new Date(`${checkIn}T00:00:00Z`);
-  for (let i = 0; i < nightsBetween(checkIn, checkOut); i++) {
-    total += overrides.get(cursor.toISOString().slice(0, 10)) ?? room.base_price;
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return total;
+  const prices = await getStayPrices(supabase, [room], checkIn, checkOut);
+  return prices.get(room.id)?.total ?? room.base_price * nightsBetween(checkIn, checkOut);
 }
 
 export type ActionState = {

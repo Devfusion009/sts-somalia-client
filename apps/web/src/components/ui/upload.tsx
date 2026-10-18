@@ -247,7 +247,7 @@ export function FileField({
     const added = incoming.map((file) => {
       const preview = file.type.startsWith("image/") && file.type !== "image/heic" ? URL.createObjectURL(file) : null;
       if (preview) previews.current.add(preview);
-      return { key: crypto.randomUUID(), file, preview };
+      return { key: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`, file, preview };
     });
     sync(multiple ? [...picked, ...added] : added);
     if (autoSubmit) requestAnimationFrame(() => inputRef.current?.form?.requestSubmit());

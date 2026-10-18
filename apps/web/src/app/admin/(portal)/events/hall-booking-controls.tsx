@@ -1,79 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { updateHallBookingStatus, updateHallBookingPrice } from "@/modules/admin/actions";
-import type { Database } from "@/lib/types/database.types";
-import { ConfirmButton } from "@/components/ui/confirm-button";
-
-type BookingStatus = Database["public"]["Enums"]["booking_status"];
-
-const DESTRUCTIVE: BookingStatus[] = ["cancelled", "refunded", "no_show", "failed"];
-
-const STATUSES: BookingStatus[] = [
-  "pending",
-  "waitlisted",
-  "confirmed",
-  "completed",
-  "cancelled",
-  "refunded",
-  "no_show",
-];
-
-export function HallBookingStatusSelect({
-  bookingId,
-  status,
-}: {
-  bookingId: string;
-  status: BookingStatus;
-}) {
-  const [state, formAction] = useActionState(updateHallBookingStatus, null);
-  const [value, setValue] = useState<BookingStatus>(status);
-
-  return (
-    <form action={formAction} className="flex items-center justify-end gap-1.5">
-      <input type="hidden" name="bookingId" value={bookingId} />
-      <input type="hidden" name="status" value={value} />
-      <Select value={value} onValueChange={(v) => setValue(v as BookingStatus)}>
-        <SelectTrigger size="sm" className="w-[130px] capitalize">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {STATUSES.map((s) => (
-            <SelectItem key={s} value={s} className="capitalize">
-              {s.replace("_", " ")}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {DESTRUCTIVE.includes(value) ? (
-        <ConfirmButton
-          title={`Change status to ${value.replace(/_/g, " ")}?`}
-          confirmLabel="Save"
-          icon="ban"
-          size="sm"
-          variant="outline"
-          disabled={value === status}
-        >
-          Save
-        </ConfirmButton>
-      ) : (
-        <Button size="sm" variant="outline" type="submit" disabled={value === status}>
-          Save
-        </Button>
-      )}
-      {state?.error ? <span className="text-xs text-destructive">{state.error}</span> : null}
-    </form>
-  );
-}
+import { updateHallBookingPrice } from "@/modules/admin/actions";
 
 export function HallBookingPriceForm({
   bookingId,

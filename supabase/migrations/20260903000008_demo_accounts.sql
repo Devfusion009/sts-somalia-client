@@ -73,6 +73,8 @@ begin
   insert into public.agency_members (agency_id, profile_id, role_in_agency, status)
   values (v_agency_id, v_agent_id, 'owner', 'active');
 
-  insert into public.hotel_managers (hotel_id, profile_id, status)
-  values (v_hotel_id, v_manager_id, 'active');
+  if exists (select 1 from public.hotels where id = v_hotel_id) then
+    insert into public.hotel_managers (hotel_id, profile_id, status)
+    values (v_hotel_id, v_manager_id, 'active');
+  end if;
 end $$;

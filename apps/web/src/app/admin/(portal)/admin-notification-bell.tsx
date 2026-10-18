@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { trpc } from "@/lib/trpc/react";
 import { cn } from "@/lib/utils";
+import { useBellAlert } from "@/components/portal/use-bell-alert";
 
 type NotificationRow = {
   id: string;
@@ -56,11 +57,10 @@ const POLL_MS = 30_000;
  *
  * Two alert behaviors layered on the plain bell:
  *
- * - While any unread `new_order` alert exists, the bell rings and a red
- *   pulse radiates from it (emergency-light styling, CSS-only keyframes in
- *   globals.css that prefers-reduced-motion turns off). New orders are the
- *   one notification an admin must act on promptly — the manual-booking
- *   queue is a promise to the customer that someone is watching.
+ * - When a notification arrives, the bell rings with a red pulse and a
+ *   chime plays (useBellAlert), then it stays still. While an unread
+ *   `new_order` exists the bell stays red: the manual-booking queue is a
+ *   promise to the customer that someone is watching.
  * - Light polling: router.refresh() every 30s while the tab is visible.
  *   Notifications are still server-fetched in the layout (no client data
  *   path, no Realtime — neither exists in this codebase); refresh() just
@@ -108,6 +108,8 @@ export function AdminNotificationBell({ notifications }: { notifications: Notifi
 
   const orderAlert = notifications.some((n) => n.type === "new_order");
 
+  const bellRef = useBellAlert(notifications.map((n) => n.id));
+
   return (
     <Popover>
       <PopoverTrigger
@@ -115,9 +117,10 @@ export function AdminNotificationBell({ notifications }: { notifications: Notifi
           <Button
             variant="ghost"
             size="icon"
-            className={cn("relative", orderAlert && "animate-alert-pulse rounded-full text-destructive")}
+            ref={bellRef}
+            className={cn("relative rounded-full", orderAlert && "text-destructive")}
           >
-            <Bell className={cn("size-4", orderAlert && "animate-bell-ring")} />
+            <Bell className="size-4" />
             {notifications.length > 0 ? (
               <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
                 {notifications.length > 9 ? "9+" : notifications.length}

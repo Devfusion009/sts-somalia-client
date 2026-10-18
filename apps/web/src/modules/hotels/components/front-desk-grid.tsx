@@ -2,7 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Plus, Search, Users, DollarSign, Lock, LogIn, LogOut, Pencil, ArrowLeftRight, Ban, X } from "lucide-react";
+import { BedDouble, Plus, Search, Users, DollarSign, Lock, LogIn, LogOut, Pencil, ArrowLeftRight, Ban, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -308,19 +308,19 @@ export function FrontDeskGrid({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-card p-2 ring-1 ring-foreground/10">
         <div className="relative min-w-56 flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Booking ID, reference, guest name or email…"
-            className="h-8 pl-8 text-sm"
+            className="h-9 rounded-full border-transparent bg-secondary/60 pl-9 text-sm focus-visible:bg-card"
           />
         </div>
 
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="h-8" />}>
+          <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="h-9 rounded-full px-4" />}>
             Room type{roomTypeFilter.size > 0 ? ` (${roomTypeFilter.size})` : ""}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
@@ -344,7 +344,7 @@ export function FrontDeskGrid({
         </DropdownMenu>
 
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="h-8" />}>
+          <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="h-9 rounded-full px-4" />}>
             Status{statusFilter.size > 0 ? ` (${statusFilter.size})` : ""}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
@@ -383,7 +383,7 @@ export function FrontDeskGrid({
         {canEdit ? (
           <div className="ml-auto flex items-center gap-2">
             {reschedulePending ? <span className="text-xs text-muted-foreground">Moving…</span> : null}
-            <Button size="sm" className="gap-1.5" onClick={() => setAddBooking({ open: true, prefill: null })}>
+            <Button size="sm" className="h-9 gap-1.5 rounded-full px-4 shadow-sm" onClick={() => setAddBooking({ open: true, prefill: null })}>
               <Plus className="size-4" /> Add Booking
             </Button>
           </div>
@@ -396,19 +396,32 @@ export function FrontDeskGrid({
         </Alert>
       ) : null}
 
-      <div className="overflow-x-auto rounded-xl border border-border">
+      <div className="overflow-x-auto rounded-2xl bg-card ring-1 ring-foreground/10">
         <table ref={tableRef} className="w-full border-collapse text-xs">
           <thead>
             <tr>
-              <th ref={firstColRef} className="sticky left-0 z-10 min-w-28 border-b border-border bg-card px-3 py-2 text-left font-semibold">
-                Room Num
+              <th ref={firstColRef} className="sticky left-0 z-10 min-w-32 border-b border-border bg-card px-4 py-3 text-left text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                Room
               </th>
-              {dateList.map((date) => (
-                <th key={date} className="min-w-28 border-b border-l border-border bg-card px-2 py-2 text-center font-semibold">
-                  <div>{format(new Date(`${date}T00:00:00Z`), "EEE")}</div>
-                  <div className="text-muted-foreground">{format(new Date(`${date}T00:00:00Z`), "dd MMM")}</div>
-                </th>
-              ))}
+              {dateList.map((date) => {
+                const d = new Date(`${date}T00:00:00Z`);
+                const today = date === new Date().toISOString().slice(0, 10);
+                const weekend = [0, 5, 6].includes(d.getUTCDay());
+                return (
+                  <th
+                    key={date}
+                    className={cn(
+                      "min-w-28 border-b border-l border-border px-2 py-2.5 text-center",
+                      today ? "bg-primary/10" : weekend ? "bg-secondary/50" : "bg-card"
+                    )}
+                  >
+                    <div className={cn("text-[11px] font-semibold tracking-wider uppercase", today ? "text-primary" : "text-muted-foreground")}>
+                      {format(d, "EEE")}
+                    </div>
+                    <div className={cn("font-heading text-sm font-bold tabular-nums", today && "text-primary")}>{format(d, "d MMM")}</div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -428,8 +441,9 @@ export function FrontDeskGrid({
             ))}
             {visibleRoomTypes.every((rt) => rt.units.length === 0) ? (
               <tr>
-                <td colSpan={dateList.length + 1} className="px-3 py-8 text-center text-muted-foreground">
-                  No rooms added yet — add rooms under each room type first.
+                <td colSpan={dateList.length + 1} className="px-3 py-14 text-center text-muted-foreground">
+                  <BedDouble className="mx-auto mb-2 size-6 opacity-50" />
+                  <span className="text-sm font-medium">No rooms added</span>
                 </td>
               </tr>
             ) : null}
@@ -602,21 +616,31 @@ function RoomTypeSection({
   return (
     <>
       <tr className="bg-secondary/40">
-        <th className="sticky left-0 z-10 bg-secondary/60 px-3 py-1.5 text-left font-semibold">{roomType.name}</th>
-        {roomType.dates.map((d) => (
-          <td key={d.date} className="border-l border-border bg-secondary/40 px-2 py-1.5 text-center">
-            <span className="rounded bg-secondary px-1.5 py-0.5 font-semibold">
-              {d.available}/{d.total}
-            </span>
-            <div className="mt-0.5 text-muted-foreground">{roomType.currency} {d.price.toFixed(0)}</div>
-          </td>
-        ))}
+        <th className="sticky left-0 z-10 border-t border-border bg-secondary px-4 py-2.5 text-left text-sm font-semibold">{roomType.name}</th>
+        {roomType.dates.map((d) => {
+          const sold = d.total > 0 ? Math.min(1, Math.max(0, (d.total - d.available) / d.total)) : 0;
+          const bar = d.available === 0 ? "bg-destructive" : sold >= 0.75 ? "bg-brand-gold" : "bg-primary";
+          return (
+            <td key={d.date} className="border-t border-l border-border bg-secondary/40 px-3 py-2 text-center">
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="font-heading text-sm font-bold tabular-nums">{d.available}</span>
+                <span className="text-muted-foreground tabular-nums">/ {d.total}</span>
+              </div>
+              <div className="mx-auto mt-1 h-1 w-full max-w-16 overflow-hidden rounded-full bg-foreground/10">
+                <div className={cn("h-full rounded-full", bar)} style={{ width: `${sold * 100}%` }} />
+              </div>
+              <div className="mt-1 text-[11px] text-muted-foreground tabular-nums">
+                {roomType.currency} {d.price.toFixed(0)}
+              </div>
+            </td>
+          );
+        })}
       </tr>
       {visibleUnits.map((unit) => {
         const cells = buildRowCells(dateList, bars[unit.id] ?? [], disabledByUnit.get(unit.id) ?? []);
         return (
           <tr key={unit.id}>
-            <td className="sticky left-0 z-10 flex items-center justify-between gap-1 border-t border-border bg-card px-3 py-1.5 font-medium">
+            <td className="sticky left-0 z-10 flex items-center justify-between gap-1 border-t border-border bg-card px-4 py-2 font-medium">
               <span>
                 {unit.roomNumber}
                 {unit.floor ? <span className="text-muted-foreground"> · F{unit.floor}</span> : null}
@@ -824,7 +848,7 @@ function DisableRoomButton({ hotelId, roomUnitId, roomNumber }: { hotelId: strin
               <Input id="dateStart" name="dateStart" type="date" min={today} required />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="dateEnd">To</Label>
+              <Label htmlFor="dateEnd">Back on</Label>
               <Input id="dateEnd" name="dateEnd" type="date" min={today} required />
             </div>
           </div>

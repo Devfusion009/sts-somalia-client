@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { nextHallBookingMoves } from "@/modules/events/hall-transitions";
+import { todayIso } from "@/modules/hotels/availability";
 import { requireUser } from "@/lib/auth/session";
 import { getMyVenuePartnerId } from "./venue-partner-queries";
 
@@ -129,12 +131,24 @@ export async function updateVenueBookingStatus(_prev: ActionState, formData: For
   }
 
   const supabase = await createClient();
+  const { data: booking } = await supabase
+    .from("hall_bookings")
+    .select("id, status, start_date, end_date, price")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (!booking) return { error: "Booking not found." };
+  if (!(nextHallBookingMoves(booking, todayIso()) as string[]).includes(status)) {
+    return { error: `A ${booking.status.replace(/_/g, " ")} booking can't be changed to ${status.replace(/_/g, " ")}.` };
+  }
+  if (status === "confirmed" && Number(booking.price) <= 0) return { error: "Set the price before confirming." };
+
   // RLS restricts the update to bookings on this partner's own venues; the
   // explicit venue check just turns a silent no-op into a real error.
   const { data: updated, error } = await supabase
     .from("hall_bookings")
     .update({ status: status as (typeof bookingStatuses)[number] })
     .eq("id", bookingId)
+    .eq("status", booking.status)
     .select("id")
     .maybeSingle();
   if (error) return { error: error.message };

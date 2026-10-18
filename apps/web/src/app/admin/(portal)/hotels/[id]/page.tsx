@@ -24,6 +24,7 @@ import { updateHotelBookingStatus } from "@/modules/admin/actions";
 import { pipelineStatus, PIPELINE_STATUS_STYLES } from "@/modules/bookings/pipeline-status";
 import { cn } from "@/lib/utils";
 import { HotelLogo } from "@/modules/hotels/components/hotel-logo";
+import { HotelTabs } from "./hotel-tabs";
 
 export const metadata: Metadata = { title: "Manage Hotel" };
 
@@ -124,6 +125,8 @@ export default async function AdminHotelDetailPage({
           <Stat label="Managers" value={managers.length} />
           <Stat label="Photos" value={images.length} />
         </dl>
+
+        <HotelTabs id={id} active="overview" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -301,7 +304,9 @@ export default async function AdminHotelDetailPage({
                   return (
                     <TableRow key={booking.id}>
                       <TableCell>
-                        <p className="font-medium">{booking.customer?.full_name ?? booking.customer?.email ?? "—"}</p>
+                        <Link href={`/admin/hotels/${id}/bookings/${booking.id}`} className="font-medium hover:text-primary hover:underline">
+                          {booking.customer?.full_name ?? booking.customer?.email ?? "—"}
+                        </Link>
                       </TableCell>
                       <TableCell>{booking.room?.name ?? "—"}</TableCell>
                       <TableCell className="text-sm">

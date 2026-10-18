@@ -20,8 +20,14 @@ export async function createApp(): Promise<NestExpressApplication> {
   // request.rawBody is undefined in the webhook controller.
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
+  // WEB_ORIGIN is a comma-separated list: the public site plus every portal
+  // origin (admin., agent., manager., ...) that calls tRPC from the browser.
+  const origins = (process.env.WEB_ORIGIN ?? "http://localhost:3000")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: process.env.WEB_ORIGIN ?? "http://localhost:3000",
+    origin: origins.length === 1 ? origins[0] : origins,
     credentials: false, // auth travels as a bearer header, never a cookie, across this boundary
   });
 

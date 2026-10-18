@@ -113,6 +113,35 @@ export async function getRoomUnits(
   return data ?? [];
 }
 
+export type RoomBlock = {
+  id: string;
+  roomUnitId: string;
+  dateStart: string;
+  dateEnd: string;
+  reason: string | null;
+};
+
+/** Upcoming and current date blocks on the rooms of one room type. */
+export async function getRoomBlocks(roomTypeId: string, hotelId: string, hotelIds: string[]): Promise<RoomBlock[]> {
+  if (!hotelIds.includes(hotelId)) return [];
+  const supabase = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await supabase
+    .from("hotel_room_disable_dates")
+    .select("id, room_unit_id, date_start, date_end, reason, unit:hotel_room_units!inner(room_type_id, hotel_id)")
+    .eq("unit.room_type_id", roomTypeId)
+    .eq("unit.hotel_id", hotelId)
+    .gt("date_end", today)
+    .order("date_start");
+  return (data ?? []).map((b) => ({
+    id: b.id,
+    roomUnitId: b.room_unit_id,
+    dateStart: b.date_start,
+    dateEnd: b.date_end,
+    reason: b.reason,
+  }));
+}
+
 /**
  * Every live (not cancelled/failed/refunded) booking against one room type,
  * newest stay first — what actually occupies its nights, online or offline,
@@ -239,7 +268,7 @@ export async function getPartnerBookings(hotelIds: string[]) {
   const { data } = await supabase
     .from("hotel_bookings")
     .select(
-      "id, hotel_id, check_in, check_out, num_rooms, num_adults, num_children, status, channel, source, payment_method, paid_at, total_price, currency, created_at, guest_details, hotels(name), hotel_rooms(name)",
+      "id, hotel_id, check_in, check_out, checked_in_at, num_rooms, num_adults, num_children, status, channel, source, payment_method, paid_at, total_price, currency, created_at, guest_details, hotels(name), hotel_rooms(name)",
     )
     .in("hotel_id", hotelIds)
     .order("created_at", { ascending: false });

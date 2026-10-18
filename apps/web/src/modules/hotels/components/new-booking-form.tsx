@@ -318,10 +318,10 @@ export function NewBookingForm({
 
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={startOver}>
-              Record another booking
+              New booking
             </Button>
-            <Button variant="outline" render={<Link href={`/manager/${hotelId}/bookings`} />}>
-              View bookings
+            <Button variant="outline" render={<Link href={`/manager/${hotelId}/bookings/${confirmation.bookingId}`} />}>
+              View booking
             </Button>
           </div>
         </CardContent>

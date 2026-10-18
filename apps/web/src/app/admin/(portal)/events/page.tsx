@@ -17,7 +17,10 @@ import { getVenuesAdmin, getVenueCitiesAdmin, getHallBookingsAdmin } from "@/mod
 import { venueImageUrls } from "@/modules/events/images";
 import { VenueFilters } from "./venue-filters";
 import { VenueForm } from "./venue-form";
-import { HallBookingStatusSelect, HallBookingPriceForm } from "./hall-booking-controls";
+import { HallBookingPriceForm } from "./hall-booking-controls";
+import { HallMoveActions } from "@/modules/events/components/hall-move-actions";
+import { updateHallBookingStatus } from "@/modules/admin/actions";
+import { todayIso } from "@/modules/hotels/availability";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Events & Halls" };
@@ -261,7 +264,7 @@ export default async function AdminEventsPage({
                         >
                           {booking.status.replace("_", " ")}
                         </Badge>
-                        <HallBookingStatusSelect bookingId={booking.id} status={booking.status} />
+                        <HallMoveActions booking={booking} today={todayIso()} isAdmin action={updateHallBookingStatus} />
                       </div>
                     </TableCell>
                   </TableRow>
