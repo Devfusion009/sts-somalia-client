@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedVenue, getPendingHallBookingCount } from "@/modules/events/venue-manager-queries";
+import { getOpenVenueRequestCount } from "@/modules/events/venue-refund-queries";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 
@@ -23,8 +24,9 @@ export default async function ManagerVenueLayout({
   const managed = await getMyManagedVenue(profile.id, venueId);
   if (!managed) notFound();
 
-  const [pending, contexts] = await Promise.all([
+  const [pending, openRequests, contexts] = await Promise.all([
     getPendingHallBookingCount(venueId),
+    getOpenVenueRequestCount(venueId),
     getMyPartnerContexts(profile.id, profile.full_name),
   ]);
 
@@ -37,6 +39,9 @@ export default async function ManagerVenueLayout({
         { href: base, label: "Dashboard", icon: "overview" },
         { href: `${base}/bookings`, label: "Bookings", icon: "bookings", badge: pending || undefined },
         { href: `${base}/calendar`, label: "Calendar", icon: "calendar" },
+        ...(can("bookings")
+          ? [{ href: `${base}/refunds`, label: "Refunds", icon: "refund" as const, badge: openRequests || undefined }]
+          : []),
         ...(can("photos") ? [{ href: `${base}/photos`, label: "Photos", icon: "photos" as const }] : []),
         ...(can("profile") ? [{ href: `${base}/profile`, label: "Venue Profile", icon: "events" as const }] : []),
         { href: `${base}/reviews`, label: "Reviews", icon: "reviews" },

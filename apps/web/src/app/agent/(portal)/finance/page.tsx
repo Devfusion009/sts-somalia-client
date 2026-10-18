@@ -40,7 +40,7 @@ export default async function AgentFinancePage() {
   const [wallet, earnings, payouts, requests, topups] = await Promise.all([
     getAgencyWallet(membership.agency.id),
     getAgencyEarningsSummary(membership.agency.id),
-    getAgencyCommissionPayouts(membership.agency.id),
+    getAgencyCommissionPayouts(membership.agency.id, 1),
     getAgencyPayoutRequests(membership.agency.id),
     getAgencyTopupRequests(membership.agency.id),
   ]);

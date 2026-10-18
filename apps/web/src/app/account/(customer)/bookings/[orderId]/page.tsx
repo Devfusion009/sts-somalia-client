@@ -10,7 +10,6 @@ import {
   FileText,
   Landmark,
   Plane,
-  ReceiptText,
   Send,
   Ticket,
   Users,
@@ -30,6 +29,8 @@ import {
   StatusBadge,
   formatMoney,
 } from "@/modules/bookings/components/booking-shared";
+import { getRefundQuote } from "@/modules/hotels/refund-queries";
+import { getHallRefundQuote } from "@/modules/events/hall-detail-queries";
 import { CancelOrderButton } from "@/modules/orders/components/cancel-order-button";
 import { Button } from "@/components/ui/button";
 import { BackLink } from "@/components/back-link";
@@ -132,6 +133,19 @@ export default async function BookingDetailPage({
     .select("invoice_number, status")
     .eq("order_id", orderId)
     .maybeSingle();
+
+  const { data: quoteItem } = await supabase
+    .from("order_items")
+    .select("hotel_booking_id, hall_booking_id")
+    .eq("order_id", orderId)
+    .or("hotel_booking_id.not.is.null,hall_booking_id.not.is.null")
+    .limit(1)
+    .maybeSingle();
+  const refundQuote = quoteItem?.hotel_booking_id
+    ? await getRefundQuote(quoteItem.hotel_booking_id)
+    : quoteItem?.hall_booking_id
+      ? await getHallRefundQuote(quoteItem.hall_booking_id)
+      : null;
 
   const isPaid = ["paid", "processing", "completed"].includes(order.status);
   const isCancellableDirectly = order.status === "held" || order.status === "pending_payment";
@@ -282,15 +296,15 @@ export default async function BookingDetailPage({
             variant="outline"
             size="sm"
             className="gap-1.5"
-            disabled={!invoice}
+            disabled={order.status === "cancelled"}
             render={
-              invoice ? (
+              order.status !== "cancelled" ? (
                 <a href={`/api/invoices/${orderId}`} target="_blank" rel="noopener noreferrer" />
               ) : undefined
             }
           >
-            <ReceiptText className="size-3.5" /> Invoice
-            {invoice ? ` ${invoice.invoice_number}` : ""}
+            <Download className="size-3.5" />
+            {invoice ? `Invoice ${invoice.invoice_number}` : "Proforma invoice"}
           </Button>
         </CardContent>
       </Card>
@@ -611,6 +625,14 @@ export default async function BookingDetailPage({
             </Alert>
           ) : (
             <div className="space-y-3">
+              {refundQuote && refundQuote.refundAmount !== null && refundQuote.paidAmount > 0 ? (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Refund if cancelled today </span>
+                  <span className="font-medium">
+                    {formatMoney(refundQuote.refundAmount, refundQuote.currency)} ({refundQuote.deductionPercent}% deducted)
+                  </span>
+                </p>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <BookingRequestDialog
                   orderId={orderId}

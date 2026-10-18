@@ -14,11 +14,22 @@ export type StripeGateway = { secretKey: string; webhookSecret: string | null };
 export type RazorpayGateway = { keyId: string; keySecret: string; webhookSecret: string | null };
 export type WaafiGateway = { merchantUid: string; apiUserId: string; apiKey: string; apiUrl: string };
 export type EdahabGateway = { apiKey: string; agentCode: string; apiUrl: string };
+/** Sifalo Pay: Somali mobile money (EVC Plus, ZAAD, Sahal, eDahab, Premier Wallet) and Visa/Mastercard behind one hosted checkout. */
+export type SifaloGateway = {
+  apiUser: string;
+  apiKey: string;
+  gatewayUrl: string;
+  checkoutUrl: string;
+  verifyUrl: string;
+  /** Public HTTPS base of this API, used for the payment webhook. Null in local dev, where Sifalo cannot reach us. */
+  webhookBaseUrl: string | null;
+};
 export type BankTransferDetails = { bankName: string; accountName: string; accountNumber: string };
 
 export type PaymentGateways = {
   stripe: StripeGateway | null;
   razorpay: RazorpayGateway | null;
+  sifalo: SifaloGateway | null;
   waafi: WaafiGateway | null;
   edahab: EdahabGateway | null;
   testMode: boolean;
@@ -78,6 +89,7 @@ export async function getPaymentGateways(): Promise<PaymentGateways> {
   const stripeDb = db.stripe;
   const stripeSecret = stripeDb?.secret_key ?? env.STRIPE_SECRET_KEY;
   const razorDb = db.razorpay;
+  const sifaloDb = db.sifalo;
   const waafiDb = db.waafi;
   const edahabDb = db.edahab;
   const waafi = {
@@ -93,6 +105,11 @@ export async function getPaymentGateways(): Promise<PaymentGateways> {
   // An admin switching card payments to Razorpay overrides a leftover env Stripe key.
   const stripeOverridden = !!razorDb && !stripeDb;
 
+  const sifaloUser = sifaloDb?.api_user ?? env.SIFALO_API_USER;
+  const sifaloKey = sifaloDb?.api_key ?? env.SIFALO_API_KEY;
+  const sifaloGatewayUrl = (env.SIFALO_GATEWAY_URL ?? "https://api.sifalopay.com/gateway/").replace(/\/?$/, "/");
+  const apiPublicUrl = env.API_PUBLIC_URL ?? env.NEXT_PUBLIC_API_URL ?? null;
+
   const explicitTestMode = env.PAYMENTS_TEST_MODE;
   return {
     stripe:
@@ -102,6 +119,17 @@ export async function getPaymentGateways(): Promise<PaymentGateways> {
     razorpay:
       razorDb?.key_id && razorDb?.key_secret
         ? { keyId: razorDb.key_id, keySecret: razorDb.key_secret, webhookSecret: razorDb.webhook_secret ?? null }
+        : null,
+    sifalo:
+      sifaloUser && sifaloKey
+        ? {
+            apiUser: sifaloUser,
+            apiKey: sifaloKey,
+            gatewayUrl: sifaloGatewayUrl,
+            checkoutUrl: env.SIFALO_CHECKOUT_URL ?? "https://pay.sifalo.com/checkout/",
+            verifyUrl: `${sifaloGatewayUrl}verify.php`,
+            webhookBaseUrl: apiPublicUrl && apiPublicUrl.startsWith("https://") ? apiPublicUrl.replace(/\/$/, "") : null,
+          }
         : null,
     waafi:
       waafi.merchantUid && waafi.apiUserId && waafi.apiKey

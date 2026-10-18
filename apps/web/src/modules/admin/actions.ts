@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { phoneSchema } from "@/modules/partner-applications/schemas";
 import { applyHotelBookingMove } from "@/modules/hotels/booking-status";
+import { todayIso } from "@/modules/hotels/availability";
 import { createClient } from "@/lib/supabase/server";
+import { nextHallBookingMoves } from "@/modules/events/hall-transitions";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
 import type { Database } from "@/lib/types/database.types";
@@ -696,11 +698,25 @@ export async function updateHallBookingStatus(
   }
 
   const supabase = await createClient();
+  const { data: booking } = await supabase
+    .from("hall_bookings")
+    .select("id, venue_id, status, start_date, end_date, price")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (!booking) return { error: "Booking not found." };
+  if (!(nextHallBookingMoves(booking, todayIso(), true) as string[]).includes(status)) {
+    return { error: `A ${booking.status.replace(/_/g, " ")} booking can't be changed to ${status.replace(/_/g, " ")}.` };
+  }
+  if (status === "confirmed" && Number(booking.price) <= 0) return { error: "Set the price before confirming." };
+
   const { error } = await supabase
     .from("hall_bookings")
     .update({ status: status as (typeof hallBookingStatuses)[number] })
-    .eq("id", bookingId);
+    .eq("id", bookingId)
+    .eq("status", booking.status);
   if (error) return { error: error.message };
+  revalidatePath(`/admin/events/${booking.venue_id}`, "layout");
+  revalidatePath(`/manager/venues/${booking.venue_id}`, "layout");
   if (status === "cancelled") await cancelUnpaidOrderForBooking(supabase, "hall_booking_id", bookingId);
   revalidatePath("/admin/events");
   revalidatePath("/admin/queue");
@@ -732,7 +748,8 @@ export async function updateHotelBookingStatus(
   if (result.error) return result;
   revalidatePath("/admin/queue");
   revalidatePath("/admin/orders");
-  revalidatePath("/admin/hotels");
+  revalidatePath("/admin/hotels", "layout");
+  revalidatePath("/manager", "layout");
   return { error: null };
 }
 

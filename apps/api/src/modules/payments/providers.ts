@@ -4,6 +4,7 @@ import {
   type EdahabGateway,
   type PaymentGateways,
   type RazorpayGateway,
+  type SifaloGateway,
   type StripeGateway,
   type WaafiGateway,
 } from "../../infra/payment-config";
@@ -35,6 +36,8 @@ export async function initiateWithProvider(input: InitiationInput): Promise<Init
       return gateways.stripe ? initiateStripe(input, gateways.stripe, gateways.siteUrl) : missing;
     case "razorpay":
       return gateways.razorpay ? initiateRazorpay(input, gateways.razorpay, gateways.siteUrl) : missing;
+    case "sifalo":
+      return gateways.sifalo ? initiateSifalo(input, gateways.sifalo, gateways.siteUrl) : missing;
     case "waafi":
       return gateways.waafi ? initiateWaafi(input, gateways.waafi) : missing;
     case "edahab":
@@ -184,4 +187,39 @@ async function initiateEdahab(input: InitiationInput, gateway: EdahabGateway): P
     };
   }
   return { type: "error", message: payload.StatusDescription ?? "Could not create the eDahab invoice." };
+}
+
+/**
+ * Sifalo Pay hosted checkout: the server obtains a one-time key and token,
+ * the customer pays on Sifalo's page (wallet or card), and settlement happens
+ * only after the payment is re-verified against Sifalo — see SifaloService.
+ * The payment id rides on return_url / webhook_url as order_id.
+ */
+async function initiateSifalo(input: InitiationInput, gateway: SifaloGateway, siteUrl: string): Promise<InitiationResult> {
+  const returnUrl = `${siteUrl}/checkout/${input.orderId}/success?order_id=${input.paymentId}`;
+  const res = await fetch(gateway.gatewayUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${gateway.apiUser}:${gateway.apiKey}`).toString("base64")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount: input.amount.toFixed(2),
+      currency: input.currency,
+      gateway: "checkout",
+      return_url: returnUrl,
+      ...(gateway.webhookBaseUrl
+        ? { webhook_url: `${gateway.webhookBaseUrl}/payments/sifalo/webhook` }
+        : {}),
+    }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  const session = (await res.json().catch(() => ({}))) as { key?: string; token?: string; response?: string };
+  if (!session.key || !session.token) {
+    return { type: "error", message: "Could not start the payment. Try again or choose another method." };
+  }
+  const url = new URL(gateway.checkoutUrl);
+  url.searchParams.set("key", session.key);
+  url.searchParams.set("token", session.token);
+  return { type: "redirect", url: url.toString() };
 }

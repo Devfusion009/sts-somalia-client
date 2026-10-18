@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { BadgeDollarSign, Banknote, CalendarClock, Download, FileText, TrendingUp } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
@@ -6,6 +7,7 @@ import {
   getMyAgency,
   getAgencyCommissionEntries,
   getAgencyCommissionPayouts,
+  getAgencyCommissionReport,
   getAgencyEarningsSummary,
   type AgencyCommissionEntry,
 } from "@/modules/agencies/queries";
@@ -21,6 +23,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { ADMIN_PAGE_SIZE, parsePage } from "@/lib/pagination";
+import { Pager } from "@/components/dashboard/pager";
 import { ReportFilters } from "./report-filters";
 import type { Database } from "@/lib/types/database.types";
 
@@ -54,58 +58,50 @@ function money(amount: number) {
   return `USD ${amount.toFixed(2)}`;
 }
 
-function monthKey(iso: string) {
-  return iso.slice(0, 7); // YYYY-MM
-}
-
 export default async function AgentReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; type?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; type?: string; page?: string }>;
 }) {
-  const { from, to, type } = await searchParams;
+  const { from, to, type, page: pageParam } = await searchParams;
   const itemType =
     type && type in VERTICAL_LABELS ? (type as OrderItemType) : undefined;
   const profile = await requireUser();
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
 
-  const [entries, payouts, summary] = await Promise.all([
-    getAgencyCommissionEntries(membership.agency.id, { from, to, itemType }),
+  const page = parsePage(pageParam);
+  const filters = { from, to, itemType };
+  const [{ rows: entries, total: entryTotal }, report, payouts, summary] = await Promise.all([
+    getAgencyCommissionEntries(membership.agency.id, filters, page),
+    getAgencyCommissionReport(membership.agency.id, filters),
     getAgencyCommissionPayouts(membership.agency.id),
     getAgencyEarningsSummary(membership.agency.id),
   ]);
-  const earning = entries.filter((e) => e.status !== "reversed");
-
-  const totalEarned = earning.reduce((sum, e) => sum + Number(e.amount), 0);
-  const thisMonth = monthKey(new Date().toISOString());
-  const earnedThisMonth = earning
-    .filter((e) => monthKey(e.created_at) === thisMonth)
-    .reduce((sum, e) => sum + Number(e.amount), 0);
-
-  const byMonth = new Map<string, { bookings: number; commission: number; markup: number; total: number }>();
-  for (const entry of earning) {
-    const key = monthKey(entry.created_at);
-    const row = byMonth.get(key) ?? { bookings: 0, commission: 0, markup: 0, total: 0 };
-    row.bookings += 1;
-    row.commission += Number(entry.commission_amount);
-    row.markup += Number(entry.markup_amount);
-    row.total += Number(entry.amount);
-    byMonth.set(key, row);
-  }
-  const months = [...byMonth.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  const hrefFor = (target: number) => {
+    const params = new URLSearchParams({
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+      ...(type ? { type } : {}),
+      ...(target > 1 ? { page: String(target) } : {}),
+    });
+    const qs = params.toString();
+    return qs ? `/agent/reports?${qs}` : "/agent/reports";
+  };
+  if (page > 1 && entries.length === 0) redirect(hrefFor(1));
+  const months = report.months;
 
   const stats = [
     {
       label: "Total Earned",
-      value: money(totalEarned),
-      sub: `${earning.length} settled bookings`,
+      value: money(report.earnedTotal),
+      sub: `${report.earnedCount} settled bookings`,
       icon: BadgeDollarSign,
       tint: "bg-primary/10 text-primary",
     },
     {
       label: "Earned This Month",
-      value: money(earnedThisMonth),
+      value: money(report.earnedThisMonth),
       sub: format(new Date(), "MMMM yyyy"),
       icon: TrendingUp,
       tint: "bg-chart-3/10 text-chart-3",
@@ -197,10 +193,10 @@ export default async function AgentReportsPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {months.map(([key, row]) => (
-                    <TableRow key={key}>
+                  {months.map((row) => (
+                    <TableRow key={row.month}>
                       <TableCell className="font-medium">
-                        {format(new Date(`${key}-01`), "MMM yyyy")}
+                        {format(new Date(`${row.month}-01`), "MMM yyyy")}
                       </TableCell>
                       <TableCell className="text-right">{row.bookings}</TableCell>
                       <TableCell className="text-right font-semibold">
@@ -220,7 +216,7 @@ export default async function AgentReportsPage({
           </CardHeader>
           {entries.length === 0 ? (
             <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              Earnings appear here automatically when an agency booking is paid.
+              No commission entries yet.
             </CardContent>
           ) : (
             <div className="overflow-x-auto">
@@ -272,6 +268,11 @@ export default async function AgentReportsPage({
               </Table>
             </div>
           )}
+          {entryTotal > ADMIN_PAGE_SIZE ? (
+            <div className="border-t border-border px-4 py-3">
+              <Pager page={page} total={entryTotal} hrefFor={hrefFor} />
+            </div>
+          ) : null}
         </Card>
       </div>
 

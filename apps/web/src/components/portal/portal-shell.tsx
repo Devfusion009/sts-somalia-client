@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
-  LogOut,
   ExternalLink,
   LayoutDashboard,
   User,
@@ -64,12 +63,10 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { signOutAction } from "@/lib/auth/actions";
+import { PortalAccountMenu } from "@/components/portal/portal-account-menu";
 import { AdminAccountMenu, type AdminMenuInfo } from "@/components/portal/admin-account-menu";
-import { rootOrigin, stripPortalPrefix, portalHref } from "@/lib/subdomain";
+import { rootOrigin, stripPortalPrefix } from "@/lib/subdomain";
 import { cn } from "@/lib/utils";
 import type { PartnerContext } from "@/modules/identity/queries";
 
@@ -115,6 +112,14 @@ export const PORTAL_ICONS = {
   reviews: Star,
   "new-booking": CirclePlus,
 } satisfies Record<string, LucideIcon>;
+
+const SUPPORT_EMAIL = "info@scoutsts.com";
+
+const MANAGER_TIPS = [
+  { label: "Front Desk: new booking", keys: "Drag empty cells" },
+  { label: "Front Desk: move a booking", keys: "Drag the bar" },
+  { label: "Front Desk: open details", keys: "Click the bar" },
+];
 
 export type PortalIconName = keyof typeof PORTAL_ICONS;
 export type PortalNavItem = { href: string; label: string; icon: PortalIconName; badge?: number };
@@ -274,6 +279,7 @@ export function PortalShell({
   headerExtra,
   accountCode,
   adminMenu,
+  menuInfo,
   children,
 }: {
   portalName: string;
@@ -296,6 +302,8 @@ export function PortalShell({
   headerExtra?: React.ReactNode;
   /** Admin console only: replaces the account switcher with the operator's own account menu. */
   adminMenu?: AdminMenuInfo;
+  /** Help-dialog context for the non-admin portals: workspace name, deployed commit, support address override. */
+  menuInfo?: { workspace?: string | null; buildSha?: string | null; supportEmail?: string };
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -416,51 +424,31 @@ export function PortalShell({
                   {accountTriggerContent}
                 </AdminAccountMenu>
               ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger render={accountTrigger}>{accountTriggerContent}</DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" side="top" className="w-64">
-                    <DropdownMenuGroup>
-                      <DropdownMenuLabel>Switch account</DropdownMenuLabel>
-                    </DropdownMenuGroup>
-                    {/* A hotel manager has no B2C account behind it — see the
-                        rejection in signInAction. An agent's role fully
-                        replaces "customer" on approval — see account/layout.tsx
-                        — so /account is a dead end for them too, unlike every
-                        other partner portal (hotel partner, affiliate, venue
-                        keep their dual Personal/partner access). */}
-                    {accent !== "manager" && accent !== "agent" ? (
-                      <DropdownMenuItem render={<Link href={rootOrigin() ? `${rootOrigin()}/account` : "/account"} />}>
-                        <User /> Personal Account
-                      </DropdownMenuItem>
-                    ) : null}
-                    {isPlatformAdmin ? (
-                      <DropdownMenuItem render={<Link href={portalHref("admin")} />}>
-                        <ShieldCheck /> Admin Console
-                      </DropdownMenuItem>
-                    ) : null}
-                    {contexts.map((c) => (
-                      <DropdownMenuItem key={c.type} render={<Link href={c.href} />}>
-                        <LayoutDashboard />
-                        <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                          <span className="truncate">
-                            {c.name} <span className="text-muted-foreground">· {c.label}</span>
-                          </span>
-                          {c.status && c.status !== "live" ? (
-                            <Badge variant="outline" className="shrink-0 text-[10px] capitalize">
-                              {c.status}
-                            </Badge>
-                          ) : null}
-                        </span>
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuSeparator />
-                    <form action={signOutAction}>
-                      <DropdownMenuItem variant="destructive" render={<button type="submit" className="w-full" />}>
-                        <LogOut /> Sign out
-                      </DropdownMenuItem>
-                    </form>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <PortalAccountMenu
+                  trigger={accountTrigger}
+                  name={profileName}
+                  email={profileEmail}
+                  roleLabel={roleLabel}
+                  accountCode={accountCode}
+                  contexts={contexts}
+                  isPlatformAdmin={isPlatformAdmin}
+                  // A hotel manager has no B2C account behind it — see the
+                  // rejection in signInAction. An agent's role fully replaces
+                  // "customer" on approval — see account/layout.tsx — so
+                  // /account is a dead end for them too, unlike every other
+                  // partner portal (hotel partner, affiliate, venue keep their
+                  // dual Personal/partner access).
+                  showPersonalAccount={accent !== "manager" && accent !== "agent"}
+                  info={{
+                    supportEmail: menuInfo?.supportEmail ?? SUPPORT_EMAIL,
+                    buildSha: menuInfo?.buildSha ?? null,
+                    workspace: menuInfo?.workspace ?? null,
+                    securityHref: accent === "agent" ? "/agent/security" : accent === "customer" ? "/account/security" : null,
+                    tips: accent === "manager" ? MANAGER_TIPS : [],
+                  }}
+                >
+                  {accountTriggerContent}
+                </PortalAccountMenu>
               )}
             </SidebarMenuItem>
           </SidebarMenu>

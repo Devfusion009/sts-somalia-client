@@ -28,6 +28,11 @@ const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const CONCURRENCY = 3;
 const EASE = [0.22, 1, 0.36, 1] as const;
 
+// crypto.randomUUID exists only in secure contexts; the portals are served
+// over plain http on the *.test hosts in development.
+const newKey = () =>
+  typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 type UploadResult = ActionState & { upload?: { path: string; signedUrl: string } };
 
 /**
@@ -450,7 +455,7 @@ export function GalleryManager({
       // Nothing in flight: this drop starts a new batch, so its speed/ETA clock restarts.
       if (active.current === 0 && queue.current.length === 0) setClock(null);
       const added: UploadItem[] = list.map((file) => {
-        const key = crypto.randomUUID();
+        const key = newKey();
         const isVideo = file.type.startsWith("video/");
         const preview = !isVideo && accepted.includes(file.type) ? URL.createObjectURL(file) : null;
         if (preview) previews.current.add(preview);

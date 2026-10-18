@@ -19,18 +19,23 @@ export type HotelBookingStatus =
 
 export type HotelBookingMove = "confirmed" | "completed" | "no_show" | "cancelled";
 
-/** Moves available now. Completing or no-showing a stay needs the stay to have begun. */
+/**
+ * Moves available now. A guest who has checked in can only have the stay
+ * completed; before check-in, no-show needs the arrival date to have come.
+ */
 export function nextHotelBookingMoves(
   status: string,
   checkIn: string,
-  today: string
+  today: string,
+  checkedIn = false
 ): HotelBookingMove[] {
   switch (status) {
     case "pending":
     case "waitlisted":
       return ["confirmed", "cancelled"];
     case "confirmed":
-      return checkIn <= today ? ["completed", "no_show", "cancelled"] : ["cancelled"];
+      if (checkedIn) return ["completed"];
+      return checkIn <= today ? ["no_show", "cancelled"] : ["cancelled"];
     default:
       return [];
   }

@@ -84,11 +84,29 @@ export function bucketKey(date: Date, granularity: BucketGranularity): string {
     return date.toISOString().slice(0, 13); // YYYY-MM-DDTHH
   }
   if (granularity === "week") {
+    // UTC like the hour/day keys: a local-time weekday under a UTC date key
+    // made week buckets shift with the server's time zone.
     const weekStart = new Date(date);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
     return weekStart.toISOString().slice(0, 10);
   }
   return date.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+/**
+ * Bucket for an hourly UTC key ('YYYY-MM-DDTHH') returned by the database's
+ * *_activity aggregates — the bucket bucketKey() gives the start of that hour.
+ */
+export function hourlyBucketKey(hourKey: string, granularity: BucketGranularity): string {
+  return bucketKey(new Date(`${hourKey}:00:00Z`), granularity);
+}
+
+/**
+ * Whole-unit rounding for a sum of 2-decimal money values added up as floats:
+ * 5944.50 can arrive as 5944.4999…, so it is settled to cents first.
+ */
+export function roundMoney(amount: number): number {
+  return Math.round(Number(amount.toFixed(2)));
 }
 
 export function bucketLabel(key: string, granularity: BucketGranularity): string {

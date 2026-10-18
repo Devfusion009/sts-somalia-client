@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Sparkline } from "./sparkline";
+import { Sparkline } from "./lazy-charts";
 
 /**
  * Stat card: label with a small muted icon, value, optional period-over-period

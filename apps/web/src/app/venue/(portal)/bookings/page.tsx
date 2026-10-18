@@ -5,6 +5,7 @@ import { getMyVenuePartnerId, getVenueBookings } from "@/modules/events/venue-pa
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { VenueBookingStatusControl } from "./venue-booking-status";
+import { todayIso } from "@/modules/hotels/availability";
 
 export const metadata = { title: "Booking Requests" };
 
@@ -54,7 +55,7 @@ export default async function VenueBookingsPage() {
             <p className="font-heading text-lg font-semibold">
               {b.currency} {Number(b.price).toFixed(2)}
             </p>
-            <VenueBookingStatusControl bookingId={b.id} status={b.status} />
+            <VenueBookingStatusControl booking={b} today={todayIso()} />
           </div>
         </CardContent>
       </Card>

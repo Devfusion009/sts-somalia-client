@@ -17,12 +17,12 @@ export async function applyHotelBookingMove(
   const supabase = await createClient();
   const { data: booking } = await supabase
     .from("hotel_bookings")
-    .select("id, status, check_in, total_price")
+    .select("id, status, check_in, checked_in_at, total_price")
     .eq("id", bookingId)
     .maybeSingle();
   if (!booking) return { error: "Booking not found." };
 
-  if (!nextHotelBookingMoves(booking.status, booking.check_in, todayIso()).includes(next)) {
+  if (!nextHotelBookingMoves(booking.status, booking.check_in, todayIso(), booking.checked_in_at !== null).includes(next)) {
     return { error: `A ${booking.status.replace(/_/g, " ")} booking can't be changed to ${next.replace(/_/g, " ")}.` };
   }
   if (next === "confirmed" && Number(booking.total_price) <= 0) {

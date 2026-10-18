@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { trpc } from "@/lib/trpc/react";
 import { cn } from "@/lib/utils";
+import { useBellAlert } from "@/components/portal/use-bell-alert";
 import { ACTIONABLE_TYPES } from "@/lib/notifications/actionable-types";
 
 type NotificationRow = {
@@ -87,6 +88,8 @@ export function AgentNotificationBell({ notifications }: { notifications: Notifi
   const lowBalanceAlert = notifications.some((n) => n.type === "low_balance");
   const actionAlert = lowBalanceAlert || notifications.some((n) => ACTIONABLE_TYPES.has(n.type));
 
+  const bellRef = useBellAlert(notifications.map((n) => n.id));
+
   return (
     <Popover>
       <PopoverTrigger
@@ -94,9 +97,10 @@ export function AgentNotificationBell({ notifications }: { notifications: Notifi
           <Button
             variant="ghost"
             size="icon"
-            className={cn("relative", actionAlert && "animate-alert-pulse rounded-full text-destructive")}
+            ref={bellRef}
+            className={cn("relative rounded-full", actionAlert && "text-destructive")}
           >
-            <Bell className={cn("size-4", actionAlert && "animate-bell-ring")} />
+            <Bell className="size-4" />
             {notifications.length > 0 ? (
               <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
                 {notifications.length > 9 ? "9+" : notifications.length}

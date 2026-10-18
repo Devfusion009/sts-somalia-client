@@ -91,11 +91,12 @@ export default async function CheckoutPage({
   const pendingPayment = order.payments.find((p) => p.status === "requires_action");
   const availableMethods = await trpc.payments.methods.query({ agencyWallet });
   const methods: CheckoutMethod[] = availableMethods.map(
-    ({ id, label, description, kind, badges, requiresPhone, simulated }) => ({
+    ({ id, label, description, kind, group, badges, requiresPhone, simulated }) => ({
       id,
       label,
       description,
       kind,
+      group,
       badges,
       requiresPhone,
       simulated,

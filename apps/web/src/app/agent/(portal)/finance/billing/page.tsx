@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { BadgeMinus, BadgePlus, Download, FileClock, FileText } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import { getMyAgency, getAgencyInvoices, getAgencyWalletNotes, getAgencyWallet } from "@/modules/agencies/queries";
+import { getMyAgency, getAgencyInvoices, getAgencyWalletNotes, getAgencyStatement } from "@/modules/agencies/queries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { parsePage } from "@/lib/pagination";
+import { Pager } from "@/components/dashboard/pager";
 import { WalletNotesTable } from "./wallet-notes-table";
 
 export const metadata: Metadata = { title: "Billing" };
@@ -42,22 +45,36 @@ function money(amount: number) {
   return `USD ${amount.toFixed(2)}`;
 }
 
-export default async function AgentBillingPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function AgentBillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; page?: string }>;
+}) {
   const profile = await requireUser();
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
 
-  const { tab: tabParam } = await searchParams;
+  const { tab: tabParam, page: pageParam } = await searchParams;
   const tab: TabKey = TABS.some((t) => t.key === tabParam) ? (tabParam as TabKey) : "invoices";
   const agencyId = membership.agency.id;
 
-  const [invoices, notes, wallet] = await Promise.all([
-    tab === "invoices" ? getAgencyInvoices(agencyId) : Promise.resolve([]),
+  const page = parsePage(pageParam);
+
+  const empty = { rows: [], total: 0 };
+  const [invoicePage, notePage, statementPage] = await Promise.all([
+    tab === "invoices" ? getAgencyInvoices(agencyId, page) : Promise.resolve(empty),
     tab === "credit-notes" || tab === "debit-notes"
-      ? getAgencyWalletNotes(agencyId, tab === "credit-notes" ? "credit_note" : "debit_note")
-      : Promise.resolve([]),
-    tab === "statement" ? getAgencyWallet(agencyId) : Promise.resolve(null),
+      ? getAgencyWalletNotes(agencyId, tab === "credit-notes" ? "credit_note" : "debit_note", page)
+      : Promise.resolve(empty),
+    tab === "statement" ? getAgencyStatement(agencyId, page) : Promise.resolve(empty),
   ]);
+  const invoices = invoicePage.rows;
+  const notes = notePage.rows;
+  const transactions = statementPage.rows;
+  const total = invoicePage.total + notePage.total + statementPage.total;
+  const hrefFor = (target: number) =>
+    `/agent/finance/billing?tab=${tab}${target > 1 ? `&page=${target}` : ""}`;
+  if (page > 1 && invoices.length + notes.length + transactions.length === 0) redirect(hrefFor(1));
 
   return (
     <div className="space-y-6">
@@ -154,9 +171,9 @@ export default async function AgentBillingPage({ searchParams }: { searchParams:
         <WalletNotesTable notes={notes} emptyIcon={BadgeMinus} emptyTitle="No debit notes yet" />
       ) : null}
 
-      {tab === "statement" && wallet ? (
+      {tab === "statement" ? (
         <Card className="overflow-hidden py-0">
-          {wallet.transactions.length === 0 ? (
+          {transactions.length === 0 ? (
             <CardContent className="flex flex-col items-center gap-2 py-14 text-center">
               <FileClock className="size-8 text-muted-foreground" />
               <p className="font-medium">No activity yet</p>
@@ -175,7 +192,7 @@ export default async function AgentBillingPage({ searchParams }: { searchParams:
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {wallet.transactions.map((tx) => (
+                  {transactions.map((tx) => (
                     <TableRow key={tx.id}>
                       <TableCell className="text-sm text-muted-foreground">
                         {format(new Date(tx.created_at), "d MMM yyyy, HH:mm")}
@@ -206,6 +223,8 @@ export default async function AgentBillingPage({ searchParams }: { searchParams:
           )}
         </Card>
       ) : null}
+
+      <Pager page={page} total={total} hrefFor={hrefFor} />
     </div>
   );
 }

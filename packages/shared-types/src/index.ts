@@ -797,13 +797,15 @@ export const paymentMethodIdValues = [
 ] as const;
 export type PaymentMethodId = (typeof paymentMethodIdValues)[number];
 
-export type PaymentProvider = "stripe" | "razorpay" | "waafi" | "edahab" | "wallet" | "manual" | "test";
+export type PaymentProvider = "stripe" | "razorpay" | "sifalo" | "waafi" | "edahab" | "wallet" | "manual" | "test";
 
 export type PaymentMethodDef = {
   id: PaymentMethodId;
   label: string;
   description: string;
   kind: "card" | "mobile_money" | "wallet" | "bank" | "cash";
+  /** Checkout section: Somali mobile money, international cards, or settled outside the gateways. */
+  group: "local" | "international" | "other";
   provider: PaymentProvider;
   badges: string[];
   requiresPhone: boolean;

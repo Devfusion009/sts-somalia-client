@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { hotelGuestNames } from "@/modules/orders/format";
 import { getHotelAvailability } from "@/modules/hotels/availability";
+import { getStayPrices } from "@/modules/hotels/rates";
 
 export type FrontDeskStatus =
   | "reserved"
@@ -188,8 +189,16 @@ export async function getFrontDeskBoard(hotelId: string, startDate: string, days
 
   const infoByRoomType = new Map((roomTypeInfo ?? []).map((r) => [r.id, r]));
 
+  const stayPrices = await getStayPrices(
+    supabase,
+    (roomTypeInfo ?? []).map((r) => ({ id: r.id, base_price: r.base_price })),
+    startDate,
+    endDateExclusive
+  );
+
   const roomTypes: FrontDeskRoomType[] = roomTypeAvailability.map((rt) => {
     const info = infoByRoomType.get(rt.roomId);
+    const rateByNight = new Map((stayPrices.get(rt.roomId)?.nights ?? []).map((n) => [n.night, n.rate]));
     return {
       id: rt.roomId,
       name: rt.roomName,
@@ -204,7 +213,7 @@ export async function getFrontDeskBoard(hotelId: string, startDate: string, days
         date: n.night,
         total: n.capacity ?? 0,
         available: n.available ?? 0,
-        price: n.priceOverride ?? Number(info?.base_price ?? 0),
+        price: rateByNight.get(n.night) ?? n.priceOverride ?? Number(info?.base_price ?? 0),
       })),
     };
   });

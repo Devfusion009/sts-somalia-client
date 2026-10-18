@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, getMyManagedHotels, getPendingBookingCount } from "@/modules/hotels/manager-queries";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
+import { getOpenRequestCount } from "@/modules/hotels/refund-queries";
 import { hotelLogoUrl } from "@/modules/hotels/images";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 
@@ -28,8 +29,9 @@ export default async function ManagerHotelLayout({
   const managed = await getMyManagedHotel(profile.id, hotelId);
   if (!managed) notFound();
 
-  const [pendingBookings, allManaged, contexts] = await Promise.all([
+  const [pendingBookings, openRequests, allManaged, contexts] = await Promise.all([
     getPendingBookingCount(hotelId),
+    getOpenRequestCount(hotelId),
     getMyManagedHotels(profile.id),
     getMyPartnerContexts(profile.id, profile.full_name),
   ]);
@@ -39,13 +41,22 @@ export default async function ManagerHotelLayout({
     label: managed.hotel.name,
     items: [
       { href: base, label: "Dashboard", icon: "overview" },
+      ...(managed.permissions.includes("bookings")
+        ? [{ href: `${base}/bookings/new`, label: "Book Now", icon: "new-booking" as const }]
+        : []),
       { href: `${base}/bookings`, label: "Bookings", icon: "bookings", badge: pendingBookings || undefined },
       ...(managed.permissions.includes("bookings")
-        ? [{ href: `${base}/front-desk`, label: "Front Desk", icon: "calendar" as const }]
+        ? [
+            { href: `${base}/front-desk`, label: "Front Desk", icon: "calendar" as const },
+            { href: `${base}/refunds`, label: "Refunds", icon: "refund" as const, badge: openRequests || undefined },
+            { href: `${base}/guests`, label: "Guests", icon: "team" as const },
+            { href: `${base}/reports`, label: "Reports", icon: "earnings" as const },
+          ]
         : []),
       ...(managed.permissions.includes("rooms") || managed.permissions.includes("availability")
         ? [{ href: `${base}/rooms`, label: "Rooms & Availability", icon: "rooms" as const }]
         : []),
+      ...(managed.permissions.includes("rooms") ? [{ href: `${base}/rates`, label: "Rates", icon: "tiers" as const }] : []),
       ...(managed.permissions.includes("photos") ? [{ href: `${base}/photos`, label: "Photos & Media", icon: "photos" as const }] : []),
       ...(managed.permissions.includes("profile") ? [{ href: `${base}/profile`, label: "Hotel Profile", icon: "hotels" as const }] : []),
       { href: `${base}/reviews`, label: "Reviews", icon: "reviews" },
@@ -74,6 +85,7 @@ export default async function ManagerHotelLayout({
       accent="manager"
       brandLogoUrl={hotelLogoUrl(managed.hotel.logo_path)}
       brandName={managed.hotel.name}
+      menuInfo={{ workspace: managed.hotel.name, buildSha: process.env.VERCEL_GIT_COMMIT_SHA ?? null }}
     >
       {children}
     </PortalShell>

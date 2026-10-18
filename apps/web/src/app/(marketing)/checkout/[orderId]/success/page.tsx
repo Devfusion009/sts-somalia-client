@@ -21,13 +21,22 @@ function money(amount: number | string, currency: string) {
 
 export default async function CheckoutSuccessPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orderId: string }>;
+  searchParams: Promise<{ order_id?: string; sid?: string }>;
 }) {
   const { orderId } = await params;
+  const { order_id: returnedPaymentId, sid } = await searchParams;
   await requireUser();
 
   const trpc = await getServerTrpc();
+  // Back from Sifalo Pay's hosted checkout: confirm the payment with Sifalo
+  // before reading the order, so the page reflects the settled state even if
+  // the webhook has not arrived yet.
+  if (returnedPaymentId && sid) {
+    await trpc.payments.confirmSifalo.mutate({ paymentId: returnedPaymentId, sid }).catch(() => null);
+  }
   let order: CheckoutOrderRow | null;
   try {
     // Cast, not inferred — see the comment on the same call in

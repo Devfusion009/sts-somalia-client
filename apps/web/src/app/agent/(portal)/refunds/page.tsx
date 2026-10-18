@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { RotateCcw } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
@@ -7,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { parsePage } from "@/lib/pagination";
+import { Pager } from "@/components/dashboard/pager";
 import { RequestRefundForm } from "./request-refund-form";
 
 export const metadata: Metadata = { title: "Refunds" };
@@ -17,17 +20,20 @@ const STATUS_STYLES: Record<string, string> = {
   rejected: "bg-destructive/10 text-destructive",
 };
 
-export default async function AgentRefundsPage() {
+export default async function AgentRefundsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const profile = await requireUser();
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
 
   const canRequest = ["owner", "admin", "booking_staff"].includes(membership.roleInAgency);
 
-  const [requests, refundableOrders] = await Promise.all([
-    getAgencyRefundRequests(membership.agency.id),
+  const page = parsePage((await searchParams).page);
+  const [{ rows: requests, total }, refundableOrders] = await Promise.all([
+    getAgencyRefundRequests(membership.agency.id, page),
     canRequest ? getAgencyRefundableOrders(membership.agency.id) : Promise.resolve([]),
   ]);
+  const hrefFor = (target: number) => (target > 1 ? `/agent/refunds?page=${target}` : "/agent/refunds");
+  if (page > 1 && requests.length === 0) redirect(hrefFor(1));
 
   return (
     <div className="space-y-6">
@@ -43,11 +49,6 @@ export default async function AgentRefundsPage() {
           <CardContent className="flex flex-col items-center gap-2 py-14 text-center">
             <RotateCcw className="size-8 text-muted-foreground" />
             <p className="font-medium">No refund requests yet</p>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              {canRequest
-                ? "Requesting a refund notifies STS admins for review — approved requests credit your wallet directly."
-                : "Only the owner, an admin, or booking staff can request a refund."}
-            </p>
           </CardContent>
         ) : (
           <div className="overflow-x-auto">
@@ -88,6 +89,8 @@ export default async function AgentRefundsPage() {
           </div>
         )}
       </Card>
+
+      <Pager page={page} total={total} hrefFor={hrefFor} />
     </div>
   );
 }

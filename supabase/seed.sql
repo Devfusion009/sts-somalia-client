@@ -121,12 +121,12 @@ hotel as (
   from partner
   returning id
 )
-insert into public.hotel_rooms (hotel_id, name, description, max_occupancy, base_price, currency, status)
-select id, 'Deluxe Double Room', 'Double room with sea view, air conditioning, and workspace.', 2, 120.00, 'USD', 'published'::public.listing_status from hotel
+insert into public.hotel_rooms (hotel_id, name, description, max_occupancy, base_price, currency, status, total_units)
+select id, 'Deluxe Double Room', 'Double room with sea view, air conditioning, and workspace.', 2, 120.00, 'USD', 'published'::public.listing_status, 5 from hotel
 union all
-select id, 'Executive Suite', 'Suite with separate living area and panoramic ocean views.', 3, 220.00, 'USD', 'published'::public.listing_status from hotel
+select id, 'Executive Suite', 'Suite with separate living area and panoramic ocean views.', 3, 220.00, 'USD', 'published'::public.listing_status, 5 from hotel
 union all
-select id, 'Standard Twin Room', 'Comfortable twin room ideal for colleagues or friends.', 2, 95.00, 'USD', 'published'::public.listing_status from hotel;
+select id, 'Standard Twin Room', 'Comfortable twin room ideal for colleagues or friends.', 2, 95.00, 'USD', 'published'::public.listing_status, 5 from hotel;
 
 with partner2 as (
   insert into public.hotel_partners (name, contact_email, status)
@@ -146,10 +146,10 @@ hotel2 as (
   from partner2
   returning id
 )
-insert into public.hotel_rooms (hotel_id, name, description, max_occupancy, base_price, currency, status)
-select id, 'Classic Queen Room', 'Queen bed, breakfast included.', 2, 75.00, 'USD', 'published'::public.listing_status from hotel2
+insert into public.hotel_rooms (hotel_id, name, description, max_occupancy, base_price, currency, status, total_units)
+select id, 'Classic Queen Room', 'Queen bed, breakfast included.', 2, 75.00, 'USD', 'published'::public.listing_status, 5 from hotel2
 union all
-select id, 'Family Quadruple Room', 'Two double beds, city views — great for families.', 4, 130.00, 'USD', 'published'::public.listing_status from hotel2;
+select id, 'Family Quadruple Room', 'Two double beds, city views — great for families.', 4, 130.00, 'USD', 'published'::public.listing_status, 5 from hotel2;
 
 
 -- ----------------------------------------------------------------------------
@@ -175,9 +175,9 @@ with h as (
          'published'::public.listing_status
   returning id
 )
-insert into public.hotel_rooms (hotel_id, name, description, max_occupancy, base_price, currency, status)
-select id, 'Garden Villa', 'Standalone villa opening onto the palm garden.', 3, 130.00, 'USD', 'published'::public.listing_status from h union all
-select id, 'Pearl Sea Suite', 'Top-floor suite with a private plunge pool facing the sea.', 2, 295.00, 'USD', 'published'::public.listing_status from h;
+insert into public.hotel_rooms (hotel_id, name, description, max_occupancy, base_price, currency, status, total_units)
+select id, 'Garden Villa', 'Standalone villa opening onto the palm garden.', 3, 130.00, 'USD', 'published'::public.listing_status, 5 from h union all
+select id, 'Pearl Sea Suite', 'Top-floor suite with a private plunge pool facing the sea.', 2, 295.00, 'USD', 'published'::public.listing_status, 5 from h;
 
 with h as (
   insert into public.hotels (id, partner_id, name, slug, description, star_rating, city, country_code,
@@ -193,9 +193,9 @@ with h as (
          'published'::public.listing_status
   returning id
 )
-insert into public.hotel_rooms (hotel_id, name, description, max_occupancy, base_price, currency, status)
-select id, 'Highland Suite', 'One-bedroom suite with kitchenette and sitting room.', 3, 95.00, 'USD', 'published'::public.listing_status from h union all
-select id, 'Family Suite', 'Two bedrooms sharing a lounge — sleeps five.', 5, 160.00, 'USD', 'published'::public.listing_status from h;
+insert into public.hotel_rooms (hotel_id, name, description, max_occupancy, base_price, currency, status, total_units)
+select id, 'Highland Suite', 'One-bedroom suite with kitchenette and sitting room.', 3, 95.00, 'USD', 'published'::public.listing_status, 5 from h union all
+select id, 'Family Suite', 'Two bedrooms sharing a lounge — sleeps five.', 5, 160.00, 'USD', 'published'::public.listing_status, 5 from h;
 
 with h as (
   insert into public.hotels (id, partner_id, name, slug, description, star_rating, city, country_code,
@@ -211,9 +211,9 @@ with h as (
          'published'::public.listing_status
   returning id
 )
-insert into public.hotel_rooms (hotel_id, name, description, max_occupancy, base_price, currency, status)
-select id, 'Ocean Deluxe Room', 'Balcony facing the Indian Ocean, king bed, rain shower.', 2, 145.00, 'USD', 'published'::public.listing_status from h union all
-select id, 'Beachfront Suite', 'Separate living room and a wraparound terrace above the pool deck.', 4, 265.00, 'USD', 'published'::public.listing_status from h;
+insert into public.hotel_rooms (hotel_id, name, description, max_occupancy, base_price, currency, status, total_units)
+select id, 'Ocean Deluxe Room', 'Balcony facing the Indian Ocean, king bed, rain shower.', 2, 145.00, 'USD', 'published'::public.listing_status, 5 from h union all
+select id, 'Beachfront Suite', 'Separate living room and a wraparound terrace above the pool deck.', 4, 265.00, 'USD', 'published'::public.listing_status, 5 from h;
 
 with h as (
   insert into public.hotels (id, partner_id, name, slug, description, star_rating, city, country_code,
@@ -229,9 +229,9 @@ with h as (
          'published'::public.listing_status
   returning id
 )
-insert into public.hotel_rooms (hotel_id, name, description, max_occupancy, base_price, currency, status)
-select id, 'Executive King', 'High-floor room with desk, lounge access and skyline views.', 2, 120.00, 'USD', 'published'::public.listing_status from h union all
-select id, 'Diplomatic Suite', 'Corner suite with a private meeting table for six.', 3, 240.00, 'USD', 'published'::public.listing_status from h;
+insert into public.hotel_rooms (hotel_id, name, description, max_occupancy, base_price, currency, status, total_units)
+select id, 'Executive King', 'High-floor room with desk, lounge access and skyline views.', 2, 120.00, 'USD', 'published'::public.listing_status, 5 from h union all
+select id, 'Diplomatic Suite', 'Corner suite with a private meeting table for six.', 3, 240.00, 'USD', 'published'::public.listing_status, 5 from h;
 
 -- ----------------------------------------------------------------------------
 -- Umrah packages

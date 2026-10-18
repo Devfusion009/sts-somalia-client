@@ -27,12 +27,14 @@ export function BookingMoveActions({
   status,
   checkIn,
   today,
+  checkedIn = false,
   action,
 }: {
   bookingId: string;
   status: string;
   checkIn: string;
   today: string;
+  checkedIn?: boolean;
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
 }) {
   // Toast from the call itself: the row can re-render without these buttons
@@ -43,7 +45,7 @@ export function BookingMoveActions({
     else toast.success(MOVE_MESSAGES[String(formData.get("status"))] ?? "Saved.", { position: "top-center" });
     return result;
   }, null);
-  const moves = nextHotelBookingMoves(status, checkIn, today);
+  const moves = nextHotelBookingMoves(status, checkIn, today, checkedIn);
 
   if (moves.length === 0) return null;
 

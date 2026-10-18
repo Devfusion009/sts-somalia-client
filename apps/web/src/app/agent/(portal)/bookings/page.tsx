@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import {
   ArrowRight,
@@ -26,6 +27,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { parsePage } from "@/lib/pagination";
+import { Pager } from "@/components/dashboard/pager";
 import { CancelOrderButton } from "@/modules/orders/components/cancel-order-button";
 
 const TYPE_ICON = {
@@ -58,19 +61,28 @@ const FILTERS = [
 export default async function AgentBookingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string }>;
+  searchParams: Promise<{ type?: string; page?: string }>;
 }) {
-  const { type } = await searchParams;
+  const { type, page: pageParam } = await searchParams;
   const profile = await requireUser();
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
 
-  const orders = await getAgencyOrders(membership.agency.id);
-  const activeFilter = FILTERS.some((f) => f.key === type) ? (type as string) : "all";
-  const filtered =
-    activeFilter === "all"
-      ? orders
-      : orders.filter((o) => o.order_items.some((i) => i.item_type === activeFilter));
+  const activeFilter = FILTERS.find((f) => f.key === type)?.key ?? "all";
+  const page = parsePage(pageParam);
+  const { orders: filtered, total } = await getAgencyOrders(membership.agency.id, {
+    page,
+    type: activeFilter === "all" ? undefined : activeFilter,
+  });
+  const hrefFor = (target: number) => {
+    const params = new URLSearchParams();
+    if (activeFilter !== "all") params.set("type", activeFilter);
+    if (target > 1) params.set("page", String(target));
+    const qs = params.toString();
+    return qs ? `/agent/bookings?${qs}` : "/agent/bookings";
+  };
+  // A page past the end (stale link, filter just changed) comes back empty.
+  if (page > 1 && filtered.length === 0) redirect(hrefFor(1));
 
   return (
     <div className="space-y-6">
@@ -263,6 +275,8 @@ export default async function AgentBookingsPage({
           </div>
         </Card>
       )}
+
+      <Pager page={page} total={total} hrefFor={hrefFor} />
     </div>
   );
 }

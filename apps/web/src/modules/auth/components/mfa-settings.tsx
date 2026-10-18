@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, ShieldPlus, AlertCircle, Trash2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +11,16 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 
 type EnrolledFactor = { id: string; friendly_name: string | null };
+
+/**
+ * The browser Supabase MFA API, imported on first use. The admin layout
+ * renders this component on its enrollment screen, so a static import put
+ * supabase-js (~64 KB gzipped) on every admin page.
+ */
+async function mfaApi() {
+  const { createClient } = await import("@/lib/supabase/client");
+  return createClient().auth.mfa;
+}
 
 type EnrollState = {
   factorId: string;
@@ -29,7 +38,6 @@ type EnrollState = {
  */
 export function MfaSettings({ factors }: { factors: EnrolledFactor[] }) {
   const router = useRouter();
-  const supabase = createClient();
   const [pending, startTransition] = useTransition();
   const [enrolling, setEnrolling] = useState<EnrollState>(null);
   const [code, setCode] = useState("");
@@ -40,7 +48,8 @@ export function MfaSettings({ factors }: { factors: EnrolledFactor[] }) {
   function beginEnroll() {
     setError(null);
     startTransition(async () => {
-      const { data, error: enrollError } = await supabase.auth.mfa.enroll({
+      const mfa = await mfaApi();
+      const { data, error: enrollError } = await mfa.enroll({
         factorType: "totp",
         friendlyName: "Authenticator App",
       });
@@ -56,20 +65,21 @@ export function MfaSettings({ factors }: { factors: EnrolledFactor[] }) {
     if (!enrolling) return;
     setError(null);
     startTransition(async () => {
-      const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
+      const mfa = await mfaApi();
+      const { data: challenge, error: challengeError } = await mfa.challenge({
         factorId: enrolling.factorId,
       });
       if (challengeError || !challenge) {
-        setError(challengeError?.message ?? "Could not verify — try again.");
+        setError(challengeError?.message ?? "Verification failed.");
         return;
       }
-      const { error: verifyError } = await supabase.auth.mfa.verify({
+      const { error: verifyError } = await mfa.verify({
         factorId: enrolling.factorId,
         challengeId: challenge.id,
         code,
       });
       if (verifyError) {
-        setError("That code didn't match — check the time on your device and try again.");
+        setError("Incorrect code.");
         return;
       }
       setEnrolling(null);
@@ -81,7 +91,8 @@ export function MfaSettings({ factors }: { factors: EnrolledFactor[] }) {
   function removeFactor(factorId: string) {
     setError(null);
     startTransition(async () => {
-      const { error: unenrollError } = await supabase.auth.mfa.unenroll({ factorId });
+      const mfa = await mfaApi();
+      const { error: unenrollError } = await mfa.unenroll({ factorId });
       if (unenrollError) {
         setError(unenrollError.message);
         return;
@@ -107,10 +118,6 @@ export function MfaSettings({ factors }: { factors: EnrolledFactor[] }) {
 
         {enrolling ? (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Scan this with Google Authenticator, Authy, or any TOTP app, then enter the 6-digit
-              code it shows.
-            </p>
             <div className="flex justify-center rounded-lg border border-border bg-white p-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -152,10 +159,6 @@ export function MfaSettings({ factors }: { factors: EnrolledFactor[] }) {
           </div>
         ) : hasFactor ? (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              An authenticator app is protecting this account — you&apos;ll be asked for a code
-              each time you sign in.
-            </p>
             {factors.map((f) => (
               <div key={f.id} className="flex items-center justify-between rounded-lg border border-border p-3">
                 <span className="text-sm font-medium">{f.friendly_name ?? "Authenticator App"}</span>
@@ -175,10 +178,6 @@ export function MfaSettings({ factors }: { factors: EnrolledFactor[] }) {
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Add an authenticator app for an extra layer of security beyond your password —
-              recommended for agency and admin accounts.
-            </p>
             <Button onClick={beginEnroll} disabled={pending} className="gap-1.5">
               <ShieldPlus className="size-4" /> Add authenticator app
             </Button>

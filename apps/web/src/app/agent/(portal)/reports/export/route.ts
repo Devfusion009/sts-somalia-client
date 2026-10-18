@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/session";
-import { getMyAgency, getAgencyCommissionEntries } from "@/modules/agencies/queries";
+import { getMyAgency, getAgencyCommissionLedger } from "@/modules/agencies/queries";
 import { toCsv } from "@/lib/csv";
 
 export async function GET() {
@@ -9,7 +9,7 @@ export async function GET() {
     return new Response("No active agency membership.", { status: 403 });
   }
 
-  const entries = await getAgencyCommissionEntries(membership.agency.id);
+  const entries = await getAgencyCommissionLedger(membership.agency.id);
 
   const csv = toCsv(
     entries.map((e) => ({

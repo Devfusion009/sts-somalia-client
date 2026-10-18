@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { Search } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
@@ -15,6 +16,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SelectCustomerButton } from "@/modules/agencies/components/select-customer-button";
+import { Pager } from "@/components/dashboard/pager";
+import { parsePage } from "@/lib/pagination";
 import { AddCustomerForm } from "./add-customer-form";
 
 function money(amount: number, currency: string) {
@@ -24,15 +27,26 @@ function money(amount: number, currency: string) {
 export default async function AgentCustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }) {
   const profile = await requireUser();
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
 
-  const { q } = await searchParams;
-  const customers = await getAgencyCustomersWithStats(membership.agency.id, q);
-  const registeredCount = customers.filter((c) => c.profile_id).length;
+  const { q, page: pageParam } = await searchParams;
+  const page = parsePage(pageParam);
+  const { customers, total, registered: registeredCount } = await getAgencyCustomersWithStats(
+    membership.agency.id,
+    { search: q, page }
+  );
+  const hrefFor = (target: number) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (target > 1) params.set("page", String(target));
+    const qs = params.toString();
+    return qs ? `/agent/customers?${qs}` : "/agent/customers";
+  };
+  if (page > 1 && customers.length === 0) redirect(hrefFor(1));
 
   return (
     <div className="space-y-6">
@@ -52,9 +66,9 @@ export default async function AgentCustomersPage({
             className="pl-9"
           />
         </form>
-        {customers.length > 0 ? (
+        {total > 0 ? (
           <p className="text-sm text-muted-foreground">
-            {customers.length} customer{customers.length === 1 ? "" : "s"} · {registeredCount} with
+            {total} customer{total === 1 ? "" : "s"} · {registeredCount} with
             an STS account
           </p>
         ) : null}
@@ -130,6 +144,8 @@ export default async function AgentCustomersPage({
           </div>
         </Card>
       )}
+
+      <Pager page={page} total={total} hrefFor={hrefFor} />
     </div>
   );
 }

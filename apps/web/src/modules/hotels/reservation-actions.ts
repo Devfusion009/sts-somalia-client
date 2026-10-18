@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth/session";
-import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
+import { getStayPrices } from "@/modules/hotels/rates";
+import { requireHotelPermission, revalidateHotelDesk } from "@/modules/hotels/hotel-access";
 import { todayIso } from "@/modules/hotels/availability";
 import {
   OFFLINE_PAYMENT_METHODS,
@@ -23,10 +23,8 @@ function nightsBetween(checkIn: string, checkOut: string) {
 }
 
 async function requireBookingManager(hotelId: string) {
-  const profile = await requireUser();
-  const managed = await getMyManagedHotel(profile.id, hotelId);
-  if (!managed || !hasPermission(managed, "bookings")) return null;
-  return profile;
+  const access = await requireHotelPermission(hotelId, "bookings");
+  return access ? { id: access.profileId } : null;
 }
 
 /**
@@ -49,6 +47,8 @@ async function buildQuote(hotelId: string, checkIn: string, checkOut: string): P
     supabase.rpc("hotel_availability", { p_hotel_id: hotelId, p_from: checkIn, p_days: nights }),
   ]);
 
+  const stayPrices = await getStayPrices(supabase, rooms ?? [], checkIn, checkOut);
+
   return {
     checkIn,
     checkOut,
@@ -57,17 +57,14 @@ async function buildQuote(hotelId: string, checkIn: string, checkOut: string): P
       const base = Number(room.base_price);
       const roomNights = (nightRows ?? []).filter((n) => n.room_id === room.id);
       const tracked = roomNights.filter((n) => n.capacity !== null && n.available !== null);
-      const stayPrice = roomNights.reduce(
-        (sum, n) => sum + (n.price_override === null ? base : Number(n.price_override)),
-        0
-      );
+      const stayPrice = stayPrices.get(room.id)?.total ?? base * nights;
       return {
         id: room.id,
         name: room.name,
         currency: room.currency,
         maxOccupancy: room.max_occupancy,
         nightlyRate: base,
-        stayPricePerRoom: roomNights.length === nights ? stayPrice : base * nights,
+        stayPricePerRoom: stayPrice,
         available: tracked.length > 0 ? Math.min(...tracked.map((n) => n.available as number)) : null,
       };
     }),
@@ -227,5 +224,5 @@ export async function markBookingPaid(formData: FormData): Promise<void> {
     .eq("source", "offline")
     .is("paid_at", null);
 
-  revalidatePath(`/manager/${hotelId.data}/bookings`);
+  revalidateHotelDesk(hotelId.data);
 }

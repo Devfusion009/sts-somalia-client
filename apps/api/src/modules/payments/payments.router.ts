@@ -29,6 +29,13 @@ export const paymentsRouter = router({
     return svc.initiatePayment(ctx.user!.id, input);
   }),
 
+  confirmSifalo: protectedProcedure
+    .input(z.object({ paymentId: z.string().uuid(), sid: z.string().min(1).max(200) }))
+    .mutation(async ({ ctx, input }) => {
+      const svc = await ctx.resolve(PaymentsService);
+      return svc.confirmSifaloReturn(input.paymentId, input.sid);
+    }),
+
   cancelPending: protectedProcedure.input(cancelPendingPaymentSchema).mutation(async ({ ctx, input }) => {
     const svc = await ctx.resolve(PaymentsService);
     return svc.cancelPendingPayment(input.paymentId);

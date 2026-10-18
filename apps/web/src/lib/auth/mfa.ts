@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -16,13 +17,13 @@ import { createClient } from "@/lib/supabase/server";
  * requireMfaSatisfied() closes.
  */
 
-/** True if the signed-in user must complete a pending MFA challenge before proceeding. */
-export async function mfaChallengePending(): Promise<boolean> {
+/** True if the signed-in user must complete a pending MFA challenge before proceeding. Memoized per request. */
+export const mfaChallengePending = cache(async (): Promise<boolean> => {
   const supabase = await createClient();
   const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (!data) return false;
   return data.currentLevel === "aal1" && data.nextLevel === "aal2";
-}
+});
 
 /**
  * True if the signed-in user has at least one verified factor. Read from the

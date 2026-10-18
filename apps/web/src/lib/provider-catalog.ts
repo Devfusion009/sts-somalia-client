@@ -60,6 +60,20 @@ export const PROVIDER_CATALOG: ProviderDefinition[] = [
     ],
   },
   {
+    key: "sifalo",
+    category: "payments",
+    group: "Mobile money and cards",
+    name: "Sifalo Pay",
+    description: "EVC Plus, ZAAD, Sahal, eDahab, Premier Wallet, Visa and Mastercard through one hosted checkout.",
+    selfServe: true,
+    docsUrl: "https://developer.sifalopay.com",
+    signupUrl: "https://pay.sifalo.com",
+    credentialFields: [
+      { key: "api_user", label: "API user" },
+      { key: "api_key", label: "API key" },
+    ],
+  },
+  {
     key: "waafi",
     category: "payments",
     group: "Mobile money",

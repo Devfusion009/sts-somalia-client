@@ -1,5 +1,5 @@
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
-import { format } from "date-fns";
+import { differenceInCalendarDays, format } from "date-fns";
 import { describeOrderItem, hotelGuestNames } from "@/modules/orders/format";
 import type { CheckoutOrderRow } from "api/dist/modules/payments/checkout.service";
 import { pdfText } from "@/lib/pdf-text";
@@ -10,7 +10,8 @@ const MUTED = "#6b7280";
 const BORDER = "#e5e7eb";
 
 const styles = StyleSheet.create({
-  page: { padding: 40, fontSize: 10, color: "#1f2937", fontFamily: "Helvetica" },
+  accentBar: { position: "absolute", top: 0, left: 0, right: 0, height: 8, backgroundColor: PRIMARY },
+  page: { padding: 40, paddingTop: 48, fontSize: 10, color: "#1f2937", fontFamily: "Helvetica" },
   headerRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 24 },
   brand: { fontSize: 20, fontWeight: 700, color: PRIMARY },
   // Width chosen so the mark sits level with the INVOICE title opposite it.
@@ -30,6 +31,8 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     backgroundColor: PRIMARY,
   },
+  pendingBadge: { backgroundColor: "#d97706" },
+  dueBlock: { marginTop: 24, padding: 12, backgroundColor: "#fffbeb", borderRadius: 4, borderLeft: "3px solid #d97706" },
   partiesRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 20 },
   partyBlock: { width: "48%" },
   partyLabel: { fontSize: 8, color: MUTED, textTransform: "uppercase", marginBottom: 4 },
@@ -89,12 +92,15 @@ export function InvoiceDocument({
   issuedAt,
   customer,
   agencyName,
+  proforma = false,
 }: {
   order: CheckoutOrderRow;
   invoiceNumber: string;
   issuedAt: string;
-  customer: { full_name: string | null; email: string | null };
+  customer: { full_name: string | null; email: string | null; phone?: string | null };
   agencyName: string | null;
+  /** Unpaid order: titled and labelled as a proforma, with the amount due. */
+  proforma?: boolean;
 }) {
   const succeededPayment = order.payments.find((p) => p.status === "succeeded");
   const logo = stsLogo();
@@ -103,6 +109,7 @@ export function InvoiceDocument({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        <View style={styles.accentBar} fixed />
         <View style={styles.headerRow}>
           <View>
             {/* Falls back to the wordmark if the asset can't be read, so a
@@ -119,11 +126,15 @@ export function InvoiceDocument({
             <Text style={styles.brandSub}>+252 611 444 420 · info@scoutsts.com</Text>
           </View>
           <View>
-            <Text style={styles.docTitle}>INVOICE</Text>
+            <Text style={styles.docTitle}>{proforma ? "PROFORMA INVOICE" : "INVOICE"}</Text>
             <Text style={styles.docMeta}>{invoiceNumber}</Text>
             <Text style={styles.docMeta}>Issued {format(new Date(issuedAt), "d MMM yyyy")}</Text>
             <Text style={styles.docMeta}>Order {order.order_number}</Text>
-            {isSettled ? <Text style={styles.statusBadge}>Paid</Text> : null}
+            {isSettled ? (
+              <Text style={styles.statusBadge}>Paid</Text>
+            ) : proforma ? (
+              <Text style={[styles.statusBadge, styles.pendingBadge]}>Payment pending</Text>
+            ) : null}
           </View>
         </View>
 
@@ -132,6 +143,7 @@ export function InvoiceDocument({
             <Text style={styles.partyLabel}>Billed to</Text>
             <Text style={styles.partyName}>{customer.full_name ?? "Customer"}</Text>
             {customer.email ? <Text style={styles.partyLine}>{customer.email}</Text> : null}
+            {customer.phone ? <Text style={styles.partyLine}>{customer.phone}</Text> : null}
             {agencyName ? <Text style={styles.partyLine}>Booked via {agencyName}</Text> : null}
           </View>
           {succeededPayment ? (
@@ -162,6 +174,15 @@ export function InvoiceDocument({
                 <View style={styles.colItem}>
                   <Text style={styles.itemTitle}>{pdfText(info.title)}</Text>
                   {info.subtitle ? <Text style={styles.itemSubtitle}>{pdfText(info.subtitle)}</Text> : null}
+                  {item.item_type === "hotel" && item.hotel_booking ? (
+                    <Text style={styles.itemSubtitle}>
+                      {differenceInCalendarDays(
+                        new Date(item.hotel_booking.check_out),
+                        new Date(item.hotel_booking.check_in)
+                      )}{" "}
+                      night(s)
+                    </Text>
+                  ) : null}
                   {guestNames.length > 0 ? (
                     <Text style={styles.itemSubtitle}>Guests: {guestNames.join(", ")}</Text>
                   ) : null}
@@ -198,6 +219,15 @@ export function InvoiceDocument({
           </View>
         </View>
 
+        {proforma && !isSettled ? (
+          <View style={styles.dueBlock}>
+            <Text style={styles.paymentLabel}>Amount due</Text>
+            <Text style={[styles.paymentText, { fontWeight: 700 }]}>{money(order.total, order.currency)}</Text>
+            <Text style={[styles.paymentText, { marginTop: 4 }]}>
+              Quote ref {order.order_number}. A tax invoice is issued once payment is received.
+            </Text>
+          </View>
+        ) : (
         <View style={styles.paymentBlock}>
           <Text style={styles.paymentLabel}>Booking status</Text>
           <Text style={styles.paymentText}>
@@ -206,10 +236,11 @@ export function InvoiceDocument({
               : `Order status: ${order.status.replace(/_/g, " ")}.`}
           </Text>
         </View>
+        )}
 
         <View style={styles.footer} fixed>
           <Text style={styles.footerText}>
-            STS Somalia — this invoice also serves as your booking voucher. Questions? WhatsApp us
+            {proforma ? "STS Somalia — proforma invoice, not a receipt." : "STS Somalia — this invoice also serves as your booking voucher."} Questions? WhatsApp us
             at +252 611 444 420 with your order number {order.order_number}.
           </Text>
         </View>

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans, JetBrains_Mono, Tajawal, Amiri, ADLaM_Display } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
-import { MuiProvider } from "@/components/mui-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { TrpcProvider } from "@/lib/trpc/provider";
@@ -128,12 +127,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <MuiProvider>
-            <TrpcProvider>
-              <TooltipProvider>{children}</TooltipProvider>
-              <Toaster />
-            </TrpcProvider>
-          </MuiProvider>
+          <TrpcProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+            <Toaster />
+          </TrpcProvider>
         </ThemeProvider>
       </body>
     </html>
