@@ -22,7 +22,7 @@ import {
   getAgencyRecentActivity,
 } from "@/modules/agencies/queries";
 import { resolveDateRange, percentChange, bucketLabel } from "@/lib/date-range";
-import { SalesTimelineChart } from "@/modules/agencies/components/sales-timeline-chart";
+import { SalesTimelineChart } from "@/components/dashboard/lazy-charts";
 import { LowBalanceBanner } from "@/modules/notifications/components/low-balance-banner";
 import { BroadcastBanner } from "@/modules/notifications/components/broadcast-banner";
 import { AgencySupportCard } from "@/modules/agencies/components/agency-support-card";

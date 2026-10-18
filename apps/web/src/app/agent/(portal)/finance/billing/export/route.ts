@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/session";
-import { getMyAgency, getAgencyWallet } from "@/modules/agencies/queries";
+import { getMyAgency, getAgencyWalletLedger } from "@/modules/agencies/queries";
 import { toCsv } from "@/lib/csv";
 
 export async function GET() {
@@ -9,10 +9,10 @@ export async function GET() {
     return new Response("No active agency membership.", { status: 403 });
   }
 
-  const wallet = await getAgencyWallet(membership.agency.id);
+  const ledger = await getAgencyWalletLedger(membership.agency.id);
 
   const csv = toCsv(
-    wallet.transactions.map((tx) => ({
+    ledger.map((tx) => ({
       date: new Date(tx.created_at).toISOString().slice(0, 10),
       type: tx.type,
       document_number: tx.document_number ?? "",

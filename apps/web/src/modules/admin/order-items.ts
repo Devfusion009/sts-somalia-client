@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import type { AdminOrder, OrderIndexRow } from "./queries";
+import type { AdminOrder } from "./queries";
 
 /**
  * Turns one order line into something an operator can act on: what was bought,
@@ -140,33 +140,6 @@ export function travelLength(from: string | null, to: string | null): string | n
 export function orderTravelStart(order: AdminOrder): string | null {
   const dates = order.order_items
     .map((i) => describeOrderItem(i).from)
-    .filter((d): d is string => Boolean(d))
-    .sort();
-  return dates[0] ?? null;
-}
-
-/**
- * Earliest travel date of an order from the slim index rows — the same dates
- * describeOrderItem reads (`from`), without loading the rest of each booking.
- */
-export function indexTravelStart(order: OrderIndexRow): string | null {
-  const dates = order.order_items
-    .map((item) => {
-      switch (item.item_type) {
-        case "hotel":
-          return item.hotel_booking?.check_in ?? null;
-        case "flight":
-          return item.flight_booking?.depart_at ?? null;
-        case "umrah":
-          return item.umrah_booking?.departure?.departure_date ?? null;
-        case "hall":
-          return item.hall_booking?.start_date ?? null;
-        case "visa":
-          return visaDates(item.visa_application?.travel_details).from;
-        default:
-          return null;
-      }
-    })
     .filter((d): d is string => Boolean(d))
     .sort();
   return dates[0] ?? null;

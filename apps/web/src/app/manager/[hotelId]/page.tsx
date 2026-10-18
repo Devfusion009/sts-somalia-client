@@ -21,9 +21,10 @@ import {
   getWeekForecast,
 } from "@/modules/hotels/partner-queries";
 import { todayIso } from "@/modules/hotels/availability";
+import { getTodayCounts } from "@/modules/hotels/booking-detail-queries";
 import { hotelGuestNames } from "@/modules/orders/format";
 import { FrontDeskList } from "@/modules/hotels/components/front-desk-list";
-import { OccupancyDonut } from "@/modules/hotels/components/occupancy-donut";
+import { OccupancyDonut } from "@/components/dashboard/lazy-charts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -142,11 +143,12 @@ export default async function ManagerDashboardPage({
   const prevWeek = format(addDays(weekStartDate, -7), "yyyy-MM-dd");
   const nextWeek = format(addDays(weekStartDate, 7), "yyyy-MM-dd");
 
-  const [frontDesk, stats, recent, forecast] = await Promise.all([
+  const [frontDesk, stats, recent, forecast, today] = await Promise.all([
     getHotelFrontDesk(hotelId, [hotelId]),
     getPartnerStats([hotelId]),
     getRecentPartnerBookings([hotelId]),
     getWeekForecast(hotelId, weekStart),
+    getTodayCounts(hotelId, todayIso()),
   ]);
 
   const canEditBookings = hasPermission(managed, "bookings");
@@ -186,7 +188,7 @@ export default async function ManagerDashboardPage({
             <CalendarPlus className="size-5" />
           </span>
           <span className="min-w-0 flex-1 text-sm font-bold">
-            Record offline booking
+            Book now
           </span>
           <ArrowRight className="size-4.5 shrink-0" />
         </Link>
@@ -198,6 +200,10 @@ export default async function ManagerDashboardPage({
           { label: "Arriving today", value: frontDesk.arrivingToday.length },
           { label: "Departing today", value: frontDesk.departingToday.length },
           { label: "Pending bookings", value: stats.pendingCount },
+          { label: "New today", value: today.newToday },
+          { label: "Checked out today", value: today.checkedOutToday },
+          { label: "Cancelled today", value: today.cancelledToday },
+          { label: "No-shows today", value: today.noShowToday },
         ].map((stat) => (
           <div key={stat.label} className="bg-secondary/40 px-4 py-3">
             <dt className="text-xs text-muted-foreground">{stat.label}</dt>

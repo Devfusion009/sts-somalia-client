@@ -48,12 +48,14 @@ import {
   getStatCardTrends,
 } from "@/modules/admin/queries";
 import { VISA_STAGE_LABELS, type VisaStage } from "@/modules/visa/workflow";
-import { RevenueTrendChart } from "@/modules/admin/components/revenue-trend-chart";
-import { BookingsByTypeChart } from "@/modules/admin/components/bookings-by-type-chart";
-import { UsersByRoleChart } from "@/modules/admin/components/users-by-role-chart";
-import { UserGrowthChart } from "@/modules/admin/components/user-growth-chart";
-import { B2BvsB2CChart } from "@/modules/admin/components/b2b-b2c-chart";
-import { Sparkline } from "@/components/dashboard/sparkline";
+import {
+  RevenueTrendChart,
+  BookingsByTypeChart,
+  UsersByRoleChart,
+  UserGrowthChart,
+  B2BvsB2CChart,
+  Sparkline,
+} from "@/components/dashboard/lazy-charts";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { resolveDateRange, percentChange } from "@/lib/date-range";
 import { PanelPairSkeleton, PanelSkeleton, StatRowSkeleton } from "@/components/dashboard/skeletons";

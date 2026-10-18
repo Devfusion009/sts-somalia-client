@@ -6,6 +6,7 @@ import {
   getAgencyForAdmin,
   getAgencyWallet,
   getAgencyCommissionEntries,
+  getAgencyPendingCommissionEntries,
   getAgencyCommissionPayouts,
   getAgencyMarkups,
   getAgencyMarkupRequests,
@@ -24,7 +25,7 @@ import { MarkupChange, ScopeBadge } from "@/modules/agencies/components/markup-c
 import { agencyLogoUrl } from "@/modules/agencies/logo";
 import { resolveDateRange, bucketLabel } from "@/lib/date-range";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
-import { SalesTimelineChart } from "@/modules/agencies/components/sales-timeline-chart";
+import { SalesTimelineChart } from "@/components/dashboard/lazy-charts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -36,6 +37,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { ADMIN_PAGE_SIZE, parsePage } from "@/lib/pagination";
+import { Pager } from "@/components/dashboard/pager";
 import {
   CommissionRateForm,
   CreditLimitForm,
@@ -62,19 +65,22 @@ export default async function AdminAgencyDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ range?: string; from?: string; to?: string; entries?: string }>;
 }) {
   await requirePlatformAdmin();
   const { id } = await params;
-  const range = resolveDateRange(await searchParams);
+  const sp = await searchParams;
+  const range = resolveDateRange(sp);
+  const entriesPage = parsePage(sp.entries);
 
   const agency = await getAgencyForAdmin(id);
   if (!agency) notFound();
 
-  const [wallet, commissionEntries, payouts, markups, markupRequests, tiers, metrics, customers, earnings, payoutRequests, topupRequests] =
+  const [wallet, { rows: commissionEntries, total: commissionEntryTotal }, pending, payouts, markups, markupRequests, tiers, metrics, customers, earnings, payoutRequests, topupRequests] =
     await Promise.all([
       getAgencyWallet(agency.id),
-      getAgencyCommissionEntries(agency.id),
+      getAgencyCommissionEntries(agency.id, undefined, entriesPage),
+      getAgencyPendingCommissionEntries(agency.id),
       getAgencyCommissionPayouts(agency.id),
       getAgencyMarkups(agency.id),
       getAgencyMarkupRequests(agency.id),
@@ -85,17 +91,21 @@ export default async function AdminAgencyDetailPage({
       getAgencyPayoutRequests(agency.id),
       getAgencyTopupRequests(agency.id),
     ]);
-  const supabaseForProofs = await createClient();
+  // One signing request for every proof instead of one round trip per request.
   const proofUrls = new Map<string, string>();
-  for (const request of topupRequests) {
-    if (!request.proof_path) continue;
-    const { data } = await supabaseForProofs.storage.from("payment-proofs").createSignedUrl(request.proof_path, 3600);
-    if (data?.signedUrl) proofUrls.set(request.id, data.signedUrl);
+  const withProof = topupRequests.filter((r) => r.proof_path);
+  if (withProof.length > 0) {
+    const supabaseForProofs = await createClient();
+    const { data: signed } = await supabaseForProofs.storage
+      .from("payment-proofs")
+      .createSignedUrls(withProof.map((r) => r.proof_path as string), 3600);
+    withProof.forEach((request, i) => {
+      const url = signed?.[i]?.signedUrl;
+      if (url) proofUrls.set(request.id, url);
+    });
   }
 
-  const pendingEntries = commissionEntries
-    .filter((e) => e.status === "pending")
-    .map((e) => ({
+  const pendingEntries = pending.rows.map((e) => ({
       id: e.id,
       amount: Number(e.amount),
       orderNumber: e.order?.order_number ?? null,
@@ -106,10 +116,17 @@ export default async function AdminAgencyDetailPage({
   const currentMarkupByScope = new Map(markups.map((rule) => [rule.item_type ?? "all", rule]));
   const logoUrl = agencyLogoUrl(agency.logo_path);
 
-  const totalEarned = commissionEntries
-    .filter((e) => e.status !== "reversed")
-    .reduce((sum, e) => sum + Number(e.amount), 0);
-
+  const totalEarned = earnings.totalEarned;
+  const entriesHref = (target: number) => {
+    const params = new URLSearchParams();
+    for (const key of ["range", "from", "to"] as const) {
+      const value = sp[key];
+      if (value) params.set(key, value);
+    }
+    if (target > 1) params.set("entries", String(target));
+    const qs = params.toString();
+    return qs ? `/admin/agencies/${agency.id}?${qs}` : `/admin/agencies/${agency.id}`;
+  };
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -695,6 +712,11 @@ export default async function AdminAgencyDetailPage({
             </Table>
           </div>
         )}
+        {commissionEntryTotal > ADMIN_PAGE_SIZE ? (
+          <div className="border-t border-border px-4 py-3">
+            <Pager page={entriesPage} total={commissionEntryTotal} hrefFor={entriesHref} />
+          </div>
+        ) : null}
       </Card>
 
       <Card className="overflow-hidden py-0">

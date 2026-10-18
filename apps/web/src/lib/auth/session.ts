@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { rootOrigin, portalLoginHref, type PortalSubdomain } from "@/lib/subdomain";
 import { createClient } from "@/lib/supabase/server";
@@ -8,8 +9,12 @@ import type { Database } from "@/lib/types/database.types";
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type AppRole = Database["public"]["Enums"]["app_role"];
 
-/** Current signed-in user's profile, or null if not signed in. */
-export async function getCurrentProfile(): Promise<Profile | null> {
+/**
+ * Current signed-in user's profile, or null if not signed in. Memoized per
+ * request with React cache(): a portal layout, its page and the header all
+ * ask, and each ask was a fresh auth-server round trip plus a profile read.
+ */
+export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
 
   // The profile read does not depend on the token check, so the two overlap
@@ -25,7 +30,7 @@ export async function getCurrentProfile(): Promise<Profile | null> {
   ]);
   if (!user || user.id !== claimedId) return null;
   return profile;
-}
+});
 
 /** `sub` of the access token in the session cookie, unverified — only ever used to start a read early. */
 async function sessionUserId(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string | null> {

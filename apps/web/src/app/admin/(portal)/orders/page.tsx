@@ -20,10 +20,10 @@ import { StatTile } from "@/components/dashboard/stat-tile";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getOrderIndex, getOrdersByIds } from "@/modules/admin/queries";
-import { describeOrderItem, travelWindow, travelLength, orderTravelStart, indexTravelStart } from "@/modules/admin/order-items";
+import { getOrderQueue, getOrdersByIds } from "@/modules/admin/queries";
+import { describeOrderItem, travelWindow, travelLength, orderTravelStart } from "@/modules/admin/order-items";
 import { Pager } from "@/components/dashboard/pager";
-import { ADMIN_PAGE_SIZE, parsePage } from "@/lib/pagination";
+import { parsePage } from "@/lib/pagination";
 import { OrderStatusSelect } from "./order-status-select";
 import { RecordPaymentDialog } from "./record-payment-dialog";
 import { ConfirmPaymentButton } from "./confirm-payment-button";
@@ -82,33 +82,11 @@ export default async function AdminOrdersPage({
   const filter = FILTERS.find((f) => f.key === filterParam)?.key ?? "all";
   const page = parsePage(pageParam);
 
-  // Filters, chip counts and the stat tiles come from the slim index; only the
-  // page of orders actually shown loads its full booking and payment detail.
-  const index = await getOrderIndex();
-
+  // Filters, chip counts and the stat tiles are aggregated in the database;
+  // only the page of orders actually shown loads its full booking and payment detail.
   const today = new Date().setHours(0, 0, 0, 0);
-  const needsAction = (o: (typeof index)[number]) => o.payments.some((p) => p.status === "requires_action");
-  const departsWithin30Days = (o: (typeof index)[number]) => {
-    const start = indexTravelStart(o);
-    if (!start) return false;
-    const days = (new Date(start).setHours(0, 0, 0, 0) - today) / 86_400_000;
-    return days >= 0 && days <= 30;
-  };
-
-  const matching = index.filter((o) => {
-    if (filter === "all") return true;
-    if (filter === "action") return needsAction(o);
-    if (filter === "upcoming") return departsWithin30Days(o) && o.status !== "cancelled";
-    return o.status === filter;
-  });
-
-  const settled = index.filter((o) => ["paid", "processing", "completed"].includes(o.status));
-  const revenue = settled.reduce((sum, o) => sum + Number(o.total), 0);
-  const actionCount = index.filter(needsAction).length;
-  const soonCount = index.filter((o) => departsWithin30Days(o) && o.status !== "cancelled").length;
-
-  const pageIds = matching.slice((page - 1) * ADMIN_PAGE_SIZE, page * ADMIN_PAGE_SIZE).map((o) => o.id);
-  const visible = await getOrdersByIds(pageIds);
+  const queue = await getOrderQueue(filter, page, format(today, "yyyy-MM-dd"));
+  const visible = await getOrdersByIds(queue.ids);
 
   return (
     <div className="space-y-6">
@@ -117,25 +95,25 @@ export default async function AdminOrdersPage({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile icon={Receipt} label="Orders" value={String(index.length)} />
+        <StatTile icon={Receipt} label="Orders" value={String(queue.total)} />
         <StatTile
           icon={Wallet}
           label="Settled revenue"
-          value={`USD ${revenue.toFixed(0)}`}
-          hint={`${settled.length} paid`}
+          value={`USD ${queue.settledRevenue.toFixed(0)}`}
+          hint={`${queue.settledCount} paid`}
         />
         <StatTile
           icon={BadgeCheck}
           label="Awaiting confirmation"
-          value={String(actionCount)}
+          value={String(queue.action)}
           hint="bank transfer / cash"
-          tone={actionCount > 0 ? "warn" : undefined}
+          tone={queue.action > 0 ? "warn" : undefined}
         />
         <StatTile
           icon={CalendarRange}
           label="Travelling within 30 days"
-          value={String(soonCount)}
-          tone={soonCount > 0 ? "accent" : undefined}
+          value={String(queue.upcoming)}
+          tone={queue.upcoming > 0 ? "accent" : undefined}
         />
       </div>
 
@@ -144,12 +122,12 @@ export default async function AdminOrdersPage({
           const active = f.key === filter;
           const count =
             f.key === "all"
-              ? index.length
+              ? queue.total
               : f.key === "action"
-                ? actionCount
+                ? queue.action
                 : f.key === "upcoming"
-                  ? soonCount
-                  : index.filter((o) => o.status === f.key).length;
+                  ? queue.upcoming
+                  : (queue.byStatus[f.key] ?? 0);
           return (
             <Link
               key={f.key}
@@ -179,7 +157,7 @@ export default async function AdminOrdersPage({
       {visible.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
-            <p className="text-sm font-medium">{index.length === 0 ? "No orders yet." : "No orders match this filter."}</p>
+            <p className="text-sm font-medium">{queue.total === 0 ? "No orders yet." : "No orders match this filter."}</p>
           </CardContent>
         </Card>
       ) : (
@@ -419,7 +397,7 @@ export default async function AdminOrdersPage({
         </div>
       )}
 
-      <Pager page={page} total={matching.length} hrefFor={(n) => `/orders?filter=${filter}&page=${n}`} />
+      <Pager page={page} total={queue.matching} hrefFor={(n) => `/orders?filter=${filter}&page=${n}`} />
     </div>
   );
 }

@@ -7,6 +7,8 @@ import { getBookingCustomers } from "@/modules/agencies/booking-context";
 import { NewBookingCustomerDialog } from "@/modules/agencies/components/new-booking-customer-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Pager } from "@/components/dashboard/pager";
+import { parsePage } from "@/lib/pagination";
 import { CustomerPickerTable } from "./customer-picker-table";
 
 const SERVICES = [
@@ -25,9 +27,9 @@ const SERVICES = [
 export default async function BookingDeskPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, page: pageParam } = await searchParams;
   const profile = await requireUser();
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
@@ -59,11 +61,20 @@ export default async function BookingDeskPage({
     );
   }
 
-  const customers = await getAgencyCustomersWithStats(membership.agency.id, q);
+  const page = parsePage(pageParam);
   // Without a search, the counter almost always wants someone seen recently.
-  const ordered = q
-    ? customers
-    : [...customers].sort((a, b) => (b.lastBookingAt ?? "").localeCompare(a.lastBookingAt ?? ""));
+  const { customers: ordered, total } = await getAgencyCustomersWithStats(membership.agency.id, {
+    search: q,
+    page,
+    sort: q ? "name" : "recent",
+  });
+  const hrefFor = (target: number) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (target > 1) params.set("page", String(target));
+    const qs = params.toString();
+    return qs ? `/agent/book?${qs}` : "/agent/book";
+  };
 
   return (
     <div className="space-y-4">
@@ -102,6 +113,8 @@ export default async function BookingDeskPage({
           }))}
         />
       )}
+
+      <Pager page={page} total={total} hrefFor={hrefFor} />
     </div>
   );
 }

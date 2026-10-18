@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { getSocialLinks } from "@/lib/site-settings";
+import { MuiProvider } from "@/components/mui-provider";
 import { SocialLinksForm } from "./social-links-form";
 
 export const metadata: Metadata = { title: "Site settings" };
@@ -14,7 +15,9 @@ export default async function AdminSiteSettingsPage() {
       <h1 className="font-heading text-2xl font-semibold">Site settings</h1>
       <section className="space-y-3">
         <h2 className="font-heading text-base font-semibold">Social links</h2>
-        <SocialLinksForm links={links} />
+        <MuiProvider>
+          <SocialLinksForm links={links} />
+        </MuiProvider>
       </section>
     </div>
   );

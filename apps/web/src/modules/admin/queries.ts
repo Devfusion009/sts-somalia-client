@@ -1,42 +1,46 @@
 import "server-only";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { bucketKey, bucketLabel, enumerateBuckets } from "@/lib/date-range";
-import { pageRange, searchTerm } from "@/lib/pagination";
+import { bucketLabel, enumerateBuckets, hourlyBucketKey, roundMoney } from "@/lib/date-range";
+import { ADMIN_PAGE_SIZE, pageRange, searchTerm } from "@/lib/pagination";
 import type { Database } from "@/lib/types/database.types";
 
+/**
+ * Headline totals. Users, the role split, order count and revenue are
+ * aggregated by admin_dashboard_totals() in the database — summing row lists
+ * here stopped counting at PostgREST's 1000-row cap.
+ */
 export async function getDashboardStats() {
   const supabase = await createClient();
 
   const [
-    { data: profiles },
-    { count: totalOrders },
-    { data: paidOrders },
+    { data: totals },
     { count: pendingAgency },
     { count: pendingPartner },
     { count: pendingAffiliate },
     { count: pendingVenue },
   ] = await Promise.all([
-    supabase.from("profiles").select("role"),
-    supabase.from("orders").select("*", { count: "exact", head: true }),
-    supabase.from("orders").select("total").in("status", ["paid", "completed"]),
+    supabase.rpc("admin_dashboard_totals"),
     supabase.from("agency_applications").select("*", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("hotel_partner_applications").select("*", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("affiliate_applications").select("*", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("venue_partner_applications").select("*", { count: "exact", head: true }).eq("status", "pending"),
   ]);
 
+  const raw = (totals ?? {}) as {
+    usersByRole?: Record<string, number | string>;
+    totalUsers?: number | string;
+    totalOrders?: number | string;
+    revenue?: number | string;
+  };
   const usersByRole: Record<string, number> = {};
-  for (const p of profiles ?? []) {
-    usersByRole[p.role] = (usersByRole[p.role] ?? 0) + 1;
-  }
-
-  const revenue = (paidOrders ?? []).reduce((sum, o) => sum + Number(o.total), 0);
+  for (const [role, n] of Object.entries(raw.usersByRole ?? {})) usersByRole[role] = Number(n);
 
   return {
     usersByRole,
-    totalUsers: profiles?.length ?? 0,
-    totalOrders: totalOrders ?? 0,
-    revenue,
+    totalUsers: Number(raw.totalUsers ?? 0),
+    totalOrders: Number(raw.totalOrders ?? 0),
+    revenue: Number(raw.revenue ?? 0),
     pendingApplications: (pendingAgency ?? 0) + (pendingPartner ?? 0) + (pendingAffiliate ?? 0) + (pendingVenue ?? 0),
     pendingAgency: pendingAgency ?? 0,
     pendingPartner: pendingPartner ?? 0,
@@ -257,6 +261,48 @@ export async function getAdminProfiles() {
   return data ?? [];
 }
 
+export type OrderQueueFilter = "all" | "action" | "upcoming" | Database["public"]["Enums"]["order_status"];
+
+export type OrderQueue = {
+  total: number;
+  action: number;
+  upcoming: number;
+  byStatus: Record<string, number>;
+  settledCount: number;
+  settledRevenue: number;
+  matching: number;
+  ids: string[];
+};
+
+/**
+ * Filter chip counts, stat tiles and the ids of one page of the Orders queue,
+ * from admin_order_queue(). `today` is the local calendar date the "travelling
+ * within 30 days" window starts from.
+ */
+export async function getOrderQueue(filter: OrderQueueFilter, page: number, today: string): Promise<OrderQueue> {
+  const supabase = await createClient();
+  const { from } = pageRange(page);
+  const { data } = await supabase.rpc("admin_order_queue", {
+    p_filter: filter,
+    p_today: today,
+    p_offset: from,
+    p_limit: ADMIN_PAGE_SIZE,
+  });
+  const raw = (data ?? {}) as Partial<Record<keyof OrderQueue, unknown>>;
+  const byStatus: Record<string, number> = {};
+  for (const [status, n] of Object.entries((raw.byStatus ?? {}) as Record<string, number | string>)) byStatus[status] = Number(n);
+  return {
+    total: Number(raw.total ?? 0),
+    action: Number(raw.action ?? 0),
+    upcoming: Number(raw.upcoming ?? 0),
+    byStatus,
+    settledCount: Number(raw.settledCount ?? 0),
+    settledRevenue: Number(raw.settledRevenue ?? 0),
+    matching: Number(raw.matching ?? 0),
+    ids: (raw.ids ?? []) as string[],
+  };
+}
+
 /**
  * Every order, with what was actually booked and when the customer travels.
  *
@@ -270,26 +316,6 @@ export async function getAdminProfiles() {
  * One unbroken literal: supabase-js parses this string statically to type the
  * embeds, and a concatenated one collapses to GenericStringError.
  */
-/**
- * The slim version of every recent order — just what the filter chips, the
- * counts and the stat tiles are computed from (status, total, whether a
- * payment awaits a human, and the dates travel starts). The page filters this,
- * then loads the full cards for only the 25 it will show.
- */
-export async function getOrderIndex() {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("orders")
-    .select(
-      "id, status, total, created_at, payments(status), order_items(item_type, hotel_booking:hotel_booking_id(check_in), flight_booking:flight_booking_id(depart_at), visa_application:visa_application_id(travel_details), umrah_booking:umrah_booking_id(departure:departure_id(departure_date)), hall_booking:hall_booking_id(start_date))"
-    )
-    .order("created_at", { ascending: false })
-    .limit(1000);
-  return data ?? [];
-}
-
-export type OrderIndexRow = Awaited<ReturnType<typeof getOrderIndex>>[number];
-
 export async function getOrdersByIds(ids: string[]) {
   if (ids.length === 0) return [];
   const supabase = await createClient();
@@ -386,69 +412,12 @@ export async function getActiveAgenciesForPicker() {
   return data ?? [];
 }
 
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-export async function getRevenueTrend(months = 6) {
-  const supabase = await createClient();
-
-  const cutoff = new Date();
-  cutoff.setDate(1);
-  cutoff.setMonth(cutoff.getMonth() - (months - 1));
-  cutoff.setHours(0, 0, 0, 0);
-
-  const { data } = await supabase
-    .from("orders")
-    .select("total, status, created_at")
-    .in("status", ["paid", "processing", "completed"])
-    .gte("created_at", cutoff.toISOString());
-
-  const buckets = new Map<string, { revenue: number; orders: number }>();
-  for (let i = 0; i < months; i++) {
-    const d = new Date(cutoff);
-    d.setMonth(d.getMonth() + i);
-    buckets.set(`${d.getFullYear()}-${d.getMonth()}`, { revenue: 0, orders: 0 });
-  }
-
-  for (const order of data ?? []) {
-    const d = new Date(order.created_at);
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    const bucket = buckets.get(key);
-    if (!bucket) continue;
-    bucket.revenue += Number(order.total);
-    bucket.orders += 1;
-  }
-
-  return Array.from(buckets.entries()).map(([key, value]) => {
-    const [, month] = key.split("-").map(Number);
-    return { month: MONTH_LABELS[month], revenue: Math.round(value.revenue), orders: value.orders };
-  });
-}
-
 const BOOKING_TYPE_LABELS: Record<string, string> = {
   hotel: "Hotels",
   flight: "Flights",
   visa: "Visa",
   umrah: "Umrah",
 };
-
-export async function getBookingsByType() {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("order_items")
-    .select("item_type, orders!inner(status)")
-    .in("orders.status", ["paid", "processing", "completed"]);
-
-  const counts: Record<string, number> = { hotel: 0, flight: 0, visa: 0, umrah: 0 };
-  for (const item of data ?? []) {
-    counts[item.item_type] = (counts[item.item_type] ?? 0) + 1;
-  }
-
-  return Object.entries(counts).map(([type, count]) => ({
-    type,
-    label: BOOKING_TYPE_LABELS[type] ?? type,
-    count,
-  }));
-}
 
 export async function getRecentOrdersWithItems(limit = 6) {
   const supabase = await createClient();
@@ -463,26 +432,17 @@ export async function getRecentOrdersWithItems(limit = 6) {
   return data ?? [];
 }
 
+/** All-time top hotels by confirmed+completed booking revenue (admin_top_hotels). */
 export async function getTopHotels(limit = 5) {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("hotel_bookings")
-    .select("hotel_id, total_price, status, hotels(name, city)")
-    .in("status", ["confirmed", "completed"]);
-
-  const byHotel = new Map<string, { name: string; city: string; bookings: number; revenue: number }>();
-  for (const booking of data ?? []) {
-    const hotel = booking.hotels as unknown as { name: string; city: string } | null;
-    if (!hotel) continue;
-    const existing = byHotel.get(booking.hotel_id) ?? { name: hotel.name, city: hotel.city, bookings: 0, revenue: 0 };
-    existing.bookings += 1;
-    existing.revenue += Number(booking.total_price);
-    byHotel.set(booking.hotel_id, existing);
-  }
-
-  return Array.from(byHotel.values())
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, limit);
+  const { data } = await supabase.rpc("admin_top_hotels", { p_limit: limit });
+  const rows = (data ?? []) as { name: string; city: string; bookings: number | string; revenue: number | string }[];
+  return rows.map((row) => ({
+    name: row.name,
+    city: row.city,
+    bookings: Number(row.bookings),
+    revenue: Number(row.revenue),
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -549,10 +509,10 @@ export async function getVisaOrderAdmin(applicationId: string) {
 
 export async function getVisaStatsAdmin() {
   const supabase = await createClient();
-  const { data } = await supabase.from("visa_applications").select("status").neq("status", "draft");
+  const { data } = await supabase.rpc("admin_visa_status_counts");
   const byStatus: Record<string, number> = {};
-  for (const row of data ?? []) byStatus[row.status] = (byStatus[row.status] ?? 0) + 1;
-  return { total: data?.length ?? 0, byStatus };
+  for (const [status, n] of Object.entries((data ?? {}) as Record<string, number | string>)) byStatus[status] = Number(n);
+  return { total: Object.values(byStatus).reduce((sum, n) => sum + n, 0), byStatus };
 }
 
 // ---------------------------------------------------------------------------
@@ -777,36 +737,54 @@ export async function getAuditLog(opts?: { entityType?: string; actorId?: string
 export type AuditLogEntry = Awaited<ReturnType<typeof getAuditLog>>[number];
 
 /** Distinct entity types currently present, for the filter dropdown. */
+/** Every entity type in the audit log, for its filter (audit_log_entity_types reads the index, not the rows). */
 export async function getAuditLogEntityTypes() {
   const supabase = await createClient();
-  const { data } = await supabase.from("audit_logs").select("entity_type").limit(2000);
-  return Array.from(new Set((data ?? []).map((r) => r.entity_type))).sort();
+  const { data } = await supabase.rpc("audit_log_entity_types");
+  return (data ?? []).map((r) => r.entity_type);
 }
+
+/** [orders, paid+completed count, paid+completed revenue, settled count, settled revenue, B2B count, B2B revenue] per hour. */
+type OrderActivityHour = [number, number, number, number, number, number, number];
+
+/**
+ * Hourly order aggregates for a range (admin_order_activity). Memoized per
+ * request: the stat cards, revenue chart and B2B split all read one range.
+ */
+const getOrderActivity = cache(async (fromIso: string, toIso: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("admin_order_activity", { p_from: fromIso, p_to: toIso });
+  const hours = (data ?? {}) as Record<string, (number | string)[]>;
+  return Object.entries(hours).map(([hour, values]) => [hour, values.map(Number) as OrderActivityHour] as const);
+});
+
+const getSignupActivity = cache(async (fromIso: string, toIso: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("admin_signup_activity", { p_from: fromIso, p_to: toIso });
+  const raw = (data ?? {}) as { baseline?: number | string; buckets?: Record<string, number | string> };
+  return {
+    baseline: Number(raw.baseline ?? 0),
+    hours: Object.entries(raw.buckets ?? {}).map(([hour, n]) => [hour, Number(n)] as const),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Date-range-aware dashboard additions (user growth, B2B/B2C split, agent
-// leaderboard, stat-card comparisons, ranged revenue/bookings). Kept as new
-// functions rather than changing the signatures of the existing
-// getRevenueTrend/getBookingsByType above, so nothing already calling those
-// with no arguments is affected.
+// leaderboard, stat-card comparisons, ranged revenue/bookings), aggregated by
+// the admin_* functions in 20261018000002_dashboard_aggregates.sql.
 // ---------------------------------------------------------------------------
 
 /** Cumulative registered users over the range, bucketed by the caller's chosen granularity. */
 export async function getUserGrowth(from: Date, to: Date, granularity: "hour" | "day" | "week") {
-  const supabase = await createClient();
-
-  const [{ count: baseline }, { data: inRange }] = await Promise.all([
-    supabase.from("profiles").select("*", { count: "exact", head: true }).lt("created_at", from.toISOString()),
-    supabase.from("profiles").select("created_at").gte("created_at", from.toISOString()).lte("created_at", to.toISOString()),
-  ]);
+  const { baseline, hours } = await getSignupActivity(from.toISOString(), to.toISOString());
 
   const perBucket = new Map<string, number>();
-  for (const row of inRange ?? []) {
-    const key = bucketKey(new Date(row.created_at), granularity);
-    perBucket.set(key, (perBucket.get(key) ?? 0) + 1);
+  for (const [hour, n] of hours) {
+    const key = hourlyBucketKey(hour, granularity);
+    perBucket.set(key, (perBucket.get(key) ?? 0) + n);
   }
 
-  let running = baseline ?? 0;
+  let running = baseline;
   return enumerateBuckets(from, to, granularity).map((key) => {
     running += perBucket.get(key) ?? 0;
     return { bucket: key, label: bucketLabel(key, granularity), total: running };
@@ -815,80 +793,52 @@ export async function getUserGrowth(from: Date, to: Date, granularity: "hour" | 
 
 /** B2B (agency_id set) vs B2C order volume/revenue within the range, paid+completed only. */
 export async function getB2BvsB2C(from: Date, to: Date) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("orders")
-    .select("agency_id, total, status, created_at")
-    .in("status", ["paid", "completed"])
-    .gte("created_at", from.toISOString())
-    .lte("created_at", to.toISOString());
-
+  const hours = await getOrderActivity(from.toISOString(), to.toISOString());
   const result = {
     b2b: { orders: 0, revenue: 0 },
     b2c: { orders: 0, revenue: 0 },
   };
-  for (const order of data ?? []) {
-    const bucket = order.agency_id ? result.b2b : result.b2c;
-    bucket.orders += 1;
-    bucket.revenue += Number(order.total);
+  for (const [, [, paidOrders, paidRevenue, , , b2bOrders, b2bRevenue]] of hours) {
+    result.b2b.orders += b2bOrders;
+    result.b2b.revenue += b2bRevenue;
+    result.b2c.orders += paidOrders - b2bOrders;
+    result.b2c.revenue += paidRevenue - b2bRevenue;
   }
   return [
-    { channel: "B2B", label: "Agencies", orders: result.b2b.orders, revenue: Math.round(result.b2b.revenue) },
-    { channel: "B2C", label: "Direct customers", orders: result.b2c.orders, revenue: Math.round(result.b2c.revenue) },
+    { channel: "B2B", label: "Agencies", orders: result.b2b.orders, revenue: roundMoney(result.b2b.revenue) },
+    { channel: "B2C", label: "Direct customers", orders: result.b2c.orders, revenue: roundMoney(result.b2c.revenue) },
   ];
 }
 
 /** Top agencies by revenue within the range, paid+completed only. */
 export async function getAgentLeaderboard(from: Date, to: Date, limit = 10) {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("orders")
-    .select("agency_id, total, status, created_at, agencies(name)")
-    .in("status", ["paid", "completed"])
-    .not("agency_id", "is", null)
-    .gte("created_at", from.toISOString())
-    .lte("created_at", to.toISOString());
-
-  const byAgency = new Map<string, { name: string; orders: number; revenue: number }>();
-  for (const order of data ?? []) {
-    if (!order.agency_id) continue;
-    const agency = order.agencies as unknown as { name: string } | null;
-    const existing = byAgency.get(order.agency_id) ?? { name: agency?.name ?? "—", orders: 0, revenue: 0 };
-    existing.orders += 1;
-    existing.revenue += Number(order.total);
-    byAgency.set(order.agency_id, existing);
-  }
-
-  return Array.from(byAgency.values())
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, limit)
-    .map((row) => ({ ...row, revenue: Math.round(row.revenue) }));
+  const { data } = await supabase.rpc("admin_agent_leaderboard", {
+    p_from: from.toISOString(),
+    p_to: to.toISOString(),
+    p_limit: limit,
+  });
+  const rows = (data ?? []) as { name: string; orders: number | string; revenue: number | string }[];
+  return rows.map((row) => ({ name: row.name, orders: Number(row.orders), revenue: Math.round(Number(row.revenue)) }));
 }
 
 /** Revenue trend bucketed for an arbitrary date range (not just trailing months) — feeds the date-range-aware dashboard. */
 export async function getRevenueTrendRanged(from: Date, to: Date, granularity: "hour" | "day" | "week") {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("orders")
-    .select("total, status, created_at")
-    .in("status", ["paid", "processing", "completed"])
-    .gte("created_at", from.toISOString())
-    .lte("created_at", to.toISOString());
+  const hours = await getOrderActivity(from.toISOString(), to.toISOString());
 
   const buckets = new Map<string, { revenue: number; orders: number }>();
   for (const key of enumerateBuckets(from, to, granularity)) buckets.set(key, { revenue: 0, orders: 0 });
 
-  for (const order of data ?? []) {
-    const key = bucketKey(new Date(order.created_at), granularity);
-    const bucket = buckets.get(key);
+  for (const [hour, [, , , settledOrders, settledRevenue]] of hours) {
+    const bucket = buckets.get(hourlyBucketKey(hour, granularity));
     if (!bucket) continue;
-    bucket.revenue += Number(order.total);
-    bucket.orders += 1;
+    bucket.revenue += settledRevenue;
+    bucket.orders += settledOrders;
   }
 
   return Array.from(buckets.entries()).map(([key, value]) => ({
     month: bucketLabel(key, granularity),
-    revenue: Math.round(value.revenue),
+    revenue: roundMoney(value.revenue),
     orders: value.orders,
   }));
 }
@@ -896,17 +846,13 @@ export async function getRevenueTrendRanged(from: Date, to: Date, granularity: "
 /** Bookings-by-type for an arbitrary date range. */
 export async function getBookingsByTypeRanged(from: Date, to: Date) {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("order_items")
-    .select("item_type, created_at, orders!inner(status, created_at)")
-    .in("orders.status", ["paid", "processing", "completed"])
-    .gte("orders.created_at", from.toISOString())
-    .lte("orders.created_at", to.toISOString());
+  const { data } = await supabase.rpc("admin_bookings_by_type", {
+    p_from: from.toISOString(),
+    p_to: to.toISOString(),
+  });
 
   const counts: Record<string, number> = { hotel: 0, flight: 0, visa: 0, umrah: 0, hall: 0 };
-  for (const item of data ?? []) {
-    counts[item.item_type] = (counts[item.item_type] ?? 0) + 1;
-  }
+  for (const [type, n] of Object.entries((data ?? {}) as Record<string, number | string>)) counts[type] = Number(n);
 
   return Object.entries(counts).map(([type, count]) => ({
     type,
@@ -925,27 +871,16 @@ export async function getStatCardTrends(
 ) {
   const supabase = await createClient();
 
-  const [current, previous] = await Promise.all([
-    Promise.all([
-      supabase.from("profiles").select("created_at").gte("created_at", from.toISOString()).lte("created_at", to.toISOString()),
-      supabase.from("orders").select("created_at").gte("created_at", from.toISOString()).lte("created_at", to.toISOString()),
-      supabase.from("orders").select("total, created_at").in("status", ["paid", "completed"]).gte("created_at", from.toISOString()).lte("created_at", to.toISOString()),
-      supabase
-        .from("agency_applications")
-        .select("created_at", { count: "exact" })
-        .eq("status", "pending")
-        .gte("created_at", from.toISOString())
-        .lte("created_at", to.toISOString()),
-    ]),
-    Promise.all([
-      supabase.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", previousFrom.toISOString()).lte("created_at", previousTo.toISOString()),
-      supabase.from("orders").select("*", { count: "exact", head: true }).gte("created_at", previousFrom.toISOString()).lte("created_at", previousTo.toISOString()),
-      supabase.from("orders").select("total").in("status", ["paid", "completed"]).gte("created_at", previousFrom.toISOString()).lte("created_at", previousTo.toISOString()),
-    ]),
+  const [signups, orders, previousOrders, { count: previousUsers }] = await Promise.all([
+    getSignupActivity(from.toISOString(), to.toISOString()),
+    getOrderActivity(from.toISOString(), to.toISOString()),
+    getOrderActivity(previousFrom.toISOString(), previousTo.toISOString()),
+    supabase
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", previousFrom.toISOString())
+      .lte("created_at", previousTo.toISOString()),
   ]);
-
-  const [newUsers, newOrders, paidOrders] = current;
-  const [prevUsersRes, prevOrdersRes, prevPaidOrders] = previous;
 
   const buckets = enumerateBuckets(from, to, granularity);
   const usersSeries = new Array(buckets.length).fill(0);
@@ -953,24 +888,31 @@ export async function getStatCardTrends(
   const revenueSeries = new Array(buckets.length).fill(0);
   const bucketIndex = new Map(buckets.map((b, i) => [b, i]));
 
-  for (const row of newUsers.data ?? []) {
-    const idx = bucketIndex.get(bucketKey(new Date(row.created_at), granularity));
-    if (idx !== undefined) usersSeries[idx] += 1;
+  let usersCurrent = 0;
+  for (const [hour, n] of signups.hours) {
+    usersCurrent += n;
+    const idx = bucketIndex.get(hourlyBucketKey(hour, granularity));
+    if (idx !== undefined) usersSeries[idx] += n;
   }
-  for (const row of newOrders.data ?? []) {
-    const idx = bucketIndex.get(bucketKey(new Date(row.created_at), granularity));
-    if (idx !== undefined) ordersSeries[idx] += 1;
-  }
-  for (const row of paidOrders.data ?? []) {
-    const idx = bucketIndex.get(bucketKey(new Date(row.created_at), granularity));
-    if (idx !== undefined) revenueSeries[idx] += Number(row.total);
+  let ordersCurrent = 0;
+  for (const [hour, [count, , paidRevenue]] of orders) {
+    ordersCurrent += count;
+    const idx = bucketIndex.get(hourlyBucketKey(hour, granularity));
+    if (idx === undefined) continue;
+    ordersSeries[idx] += count;
+    revenueSeries[idx] += paidRevenue;
   }
 
-  const prevRevenue = (prevPaidOrders.data ?? []).reduce((sum, o) => sum + Number(o.total), 0);
+  let ordersPrevious = 0;
+  let revenuePrevious = 0;
+  for (const [, [count, , paidRevenue]] of previousOrders) {
+    ordersPrevious += count;
+    revenuePrevious += paidRevenue;
+  }
 
   return {
-    users: { current: newUsers.data?.length ?? 0, previous: prevUsersRes.count ?? 0, series: usersSeries },
-    orders: { current: newOrders.data?.length ?? 0, previous: prevOrdersRes.count ?? 0, series: ordersSeries },
-    revenue: { current: Math.round(revenueSeries.reduce((a, b) => a + b, 0)), previous: Math.round(prevRevenue), series: revenueSeries },
+    users: { current: usersCurrent, previous: previousUsers ?? 0, series: usersSeries },
+    orders: { current: ordersCurrent, previous: ordersPrevious, series: ordersSeries },
+    revenue: { current: roundMoney(revenueSeries.reduce((a, b) => a + b, 0)), previous: roundMoney(revenuePrevious), series: revenueSeries },
   };
 }

@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/session";
-import { getMyAgency, getAgencyCommissionEntries } from "@/modules/agencies/queries";
+import { getMyAgency, getAgencyCommissionLedger } from "@/modules/agencies/queries";
 import { renderCommissionStatementPdf } from "@/modules/agencies/pdf/render";
 import type { Database } from "@/lib/types/database.types";
 
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   const to = searchParams.get("to") ?? undefined;
   const itemType = parseItemType(searchParams.get("type"));
 
-  const entries = await getAgencyCommissionEntries(membership.agency.id, { from, to, itemType });
+  const entries = await getAgencyCommissionLedger(membership.agency.id, { from, to, itemType });
   const periodLabel =
     from || to ? `${from ?? "start"} — ${to ?? "now"}` : "All time";
 

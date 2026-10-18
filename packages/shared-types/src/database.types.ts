@@ -1432,6 +1432,8 @@ export type Database = {
           approved_amount: number | null
           created_at: string
           currency: string
+          hall_booking_id: string | null
+          hotel_booking_id: string | null
           id: string
           kind: Database["public"]["Enums"]["booking_request_kind"]
           order_id: string
@@ -1448,6 +1450,8 @@ export type Database = {
           approved_amount?: number | null
           created_at?: string
           currency?: string
+          hall_booking_id?: string | null
+          hotel_booking_id?: string | null
           id?: string
           kind: Database["public"]["Enums"]["booking_request_kind"]
           order_id: string
@@ -1464,6 +1468,8 @@ export type Database = {
           approved_amount?: number | null
           created_at?: string
           currency?: string
+          hall_booking_id?: string | null
+          hotel_booking_id?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["booking_request_kind"]
           order_id?: string
@@ -1477,6 +1483,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "booking_requests_hall_booking_id_fkey"
+            columns: ["hall_booking_id"]
+            isOneToOne: false
+            referencedRelation: "hall_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_requests_hotel_booking_id_fkey"
+            columns: ["hotel_booking_id"]
+            isOneToOne: false
+            referencedRelation: "hotel_bookings"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "booking_requests_order_id_fkey"
             columns: ["order_id"]
@@ -1911,6 +1931,54 @@ export type Database = {
         }
         Relationships: []
       }
+      hall_booking_events: {
+        Row: {
+          actor_id: string | null
+          booking_id: string
+          created_at: string
+          from_value: string | null
+          id: string
+          kind: string
+          to_value: string | null
+          venue_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          booking_id: string
+          created_at?: string
+          from_value?: string | null
+          id?: string
+          kind: string
+          to_value?: string | null
+          venue_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          booking_id?: string
+          created_at?: string
+          from_value?: string | null
+          id?: string
+          kind?: string
+          to_value?: string | null
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hall_booking_events_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "hall_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hall_booking_events_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "event_venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hall_bookings: {
         Row: {
           admin_notes: string | null
@@ -2081,6 +2149,61 @@ export type Database = {
           },
           {
             foreignKeyName: "hotel_amenities_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hotel_booking_events: {
+        Row: {
+          actor_id: string | null
+          booking_id: string
+          created_at: string
+          from_value: string | null
+          hotel_id: string
+          id: string
+          kind: string
+          to_value: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          booking_id: string
+          created_at?: string
+          from_value?: string | null
+          hotel_id: string
+          id?: string
+          kind: string
+          to_value?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          booking_id?: string
+          created_at?: string
+          from_value?: string | null
+          hotel_id?: string
+          id?: string
+          kind?: string
+          to_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_booking_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_booking_events_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "hotel_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_booking_events_hotel_id_fkey"
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
@@ -2669,6 +2792,102 @@ export type Database = {
             columns: ["room_type_id"]
             isOneToOne: false
             referencedRelation: "hotel_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hotel_rate_rules: {
+        Row: {
+          adjustment: string
+          created_at: string
+          created_by: string | null
+          date_end: string
+          date_start: string
+          hotel_id: string
+          id: string
+          name: string
+          room_id: string | null
+          value: number
+          weekdays: number[] | null
+        }
+        Insert: {
+          adjustment: string
+          created_at?: string
+          created_by?: string | null
+          date_end: string
+          date_start: string
+          hotel_id: string
+          id?: string
+          name: string
+          room_id?: string | null
+          value: number
+          weekdays?: number[] | null
+        }
+        Update: {
+          adjustment?: string
+          created_at?: string
+          created_by?: string | null
+          date_end?: string
+          date_start?: string
+          hotel_id?: string
+          id?: string
+          name?: string
+          room_id?: string | null
+          value?: number
+          weekdays?: number[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_rate_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_rate_rules_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_rate_rules_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "hotel_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hotel_refund_rules: {
+        Row: {
+          created_at: string
+          days_before: number
+          deduction_percent: number
+          hotel_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          days_before: number
+          deduction_percent: number
+          hotel_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          days_before?: number
+          deduction_percent?: number
+          hotel_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_refund_rules_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
         ]
@@ -4691,6 +4910,38 @@ export type Database = {
           },
         ]
       }
+      venue_refund_rules: {
+        Row: {
+          created_at: string
+          days_before: number
+          deduction_percent: number
+          id: string
+          venue_id: string
+        }
+        Insert: {
+          created_at?: string
+          days_before: number
+          deduction_percent: number
+          id?: string
+          venue_id: string
+        }
+        Update: {
+          created_at?: string
+          days_before?: number
+          deduction_percent?: number
+          id?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_refund_rules_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "event_venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venue_managers: {
         Row: {
           created_at: string
@@ -6563,13 +6814,67 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_agent_leaderboard: {
+        Args: { p_from: string; p_limit: number; p_to: string }
+        Returns: Json
+      }
+      admin_bookings_by_type: {
+        Args: { p_from: string; p_to: string }
+        Returns: Json
+      }
+      admin_dashboard_totals: { Args: Record<PropertyKey, never>; Returns: Json }
       admin_nav_counts: { Args: Record<PropertyKey, never>; Returns: Json }
+      admin_order_activity: {
+        Args: { p_from: string; p_to: string }
+        Returns: Json
+      }
+      admin_order_queue: {
+        Args: {
+          p_filter: string
+          p_limit: number
+          p_offset: number
+          p_today: string
+        }
+        Returns: Json
+      }
       admin_payout_queue_totals: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      admin_signup_activity: {
+        Args: { p_from: string; p_to: string }
+        Returns: Json
+      }
+      admin_top_hotels: { Args: { p_limit: number }; Returns: Json }
+      admin_visa_status_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      agency_commission_report: {
+        Args: {
+          p_agency_id: string
+          p_from?: string
+          p_item_type?: string
+          p_to?: string
+        }
+        Returns: Json
+      }
+      agency_customer_page: {
+        Args: {
+          p_agency_id: string
+          p_limit: number
+          p_offset: number
+          p_search: string
+          p_sort: string
+        }
+        Returns: Json
+      }
       agency_earnings_summary: {
         Args: { target_agency_id: string }
+        Returns: Json
+      }
+      agency_period_activity: {
+        Args: { p_agency_id: string; p_from: string; p_to: string }
         Returns: Json
       }
       applicant_can_edit: {
@@ -6639,6 +6944,12 @@ export type Database = {
       assign_hotel_booking_room_unit: {
         Args: { p_booking_id: string; p_room_unit_id: string }
         Returns: undefined
+      }
+      audit_log_entity_types: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          entity_type: string
+        }[]
       }
       can_access_order: { Args: { target_order_id: string }; Returns: boolean }
       can_manage_hotel_managers: {
@@ -6767,6 +7078,115 @@ export type Database = {
       has_role: {
         Args: { check_role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
+      }
+      complete_booking_request: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
+      hall_refund_quote: {
+        Args: { p_as_of?: string; p_booking_id: string }
+        Returns: {
+          currency: string
+          days_before: number
+          deduction_percent: number
+          paid_amount: number
+          refund_amount: number
+        }[]
+      }
+      hotel_guest_directory: {
+        Args: { p_hotel_id: string }
+        Returns: {
+          booking_ids: string[]
+          cancelled: number
+          channel: string
+          currency: string
+          email: string
+          first_stay: string
+          full_name: string
+          guest_key: string
+          last_stay: string
+          next_arrival: string
+          no_shows: number
+          phone: string
+          room_nights: number
+          stays: number
+          total_spent: number
+        }[]
+      }
+      hotel_nightly_rates: {
+        Args: { p_from: string; p_room_ids: string[]; p_to: string }
+        Returns: {
+          night: string
+          rate: number
+          room_id: string
+          rule_name: string
+          source: string
+        }[]
+      }
+      hotel_refund_quote: {
+        Args: { p_as_of?: string; p_booking_id: string }
+        Returns: {
+          currency: string
+          days_before: number
+          deduction_percent: number
+          paid_amount: number
+          refund_amount: number
+        }[]
+      }
+      my_affiliate_ids: { Args: Record<PropertyKey, never>; Returns: string[] }
+      my_agency_admin_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      my_agency_booker_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      my_agency_ids: { Args: Record<PropertyKey, never>; Returns: string[] }
+      my_hotel_partner_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      my_hotel_partner_owner_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      my_managed_hotel_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      my_managed_hotel_ids_with: { Args: { perm: string }; Returns: string[] }
+      my_managed_venue_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      my_managed_venue_ids_with: { Args: { perm: string }; Returns: string[] }
+      my_teammate_ids: { Args: Record<PropertyKey, never>; Returns: string[] }
+      my_venue_partner_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      my_venue_partner_owner_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      resolve_hall_booking_request: {
+        Args: {
+          p_amount?: number
+          p_decision: string
+          p_note?: string
+          p_request_id: string
+        }
+        Returns: undefined
+      }
+      resolve_hotel_booking_request: {
+        Args: {
+          p_amount?: number
+          p_decision: string
+          p_note?: string
+          p_request_id: string
+        }
+        Returns: undefined
       }
       hotel_availability: {
         Args: {
