@@ -5,6 +5,8 @@ import { format } from "date-fns";
 import {
   ArrowRight,
   Check,
+  BedDouble,
+  CalendarDays,
   CreditCard,
   Download,
   FileText,
@@ -41,6 +43,12 @@ import { Separator } from "@/components/ui/separator";
 import { FlightDetails, hasFlightDetails } from "@/app/(marketing)/umrah/[slug]/flight-details";
 import { umrahTimeline, UMRAH_STAGE_LABEL, UMRAH_DOC_TYPE_LABEL, formatFileSize } from "@/modules/umrah/timeline";
 import type { BookingType } from "@/modules/bookings/types";
+import { getBookingTravel } from "@/modules/umrah/itinerary-queries";
+import { HotelStayList, ItineraryList, contactLine } from "@/modules/umrah/components/travel-details";
+import { PilgrimEditor } from "@/modules/umrah/components/pilgrim-editor";
+import { PilgrimDocuments } from "@/modules/umrah/components/pilgrim-documents";
+import { umrahVoucherAvailable } from "@/modules/umrah/voucher-gate";
+import type { PilgrimReadiness } from "@/modules/umrah/readiness";
 
 export const metadata: Metadata = { title: "Booking Details" };
 
@@ -153,10 +161,9 @@ export default async function BookingDetailPage({
   // confirm the booking and its final price — at which point the customer
   // pays from this page.
   const awaitingPayment = order.status === "pending_payment";
-  const voucherAvailable = isPaid;
-
   const umrahItem = order.order_items.find((i) => i.item_type === "umrah");
   const umrahBooking = umrahItem?.umrah_booking ?? null;
+  const voucherAvailable = umrahVoucherAvailable(order.status, umrahBooking?.fulfillment_stage);
   // The booking's own status now comes back on the checkout query, and for a
   // private trip it is the ONLY accurate source: that booking sits at
   // 'pending' until staff confirm availability, which is exactly the state
@@ -177,11 +184,13 @@ export default async function BookingDetailPage({
     ? umrahTimeline(umrahBooking?.fulfillment_stage, umrahBookingStatus)
     : null;
 
-  const [umrahPilgrims, umrahHistory, umrahDocumentRows] = umrahBooking
+  const [umrahPilgrims, umrahHistory, umrahDocumentRows, umrahReadinessRows, umrahTravel] = umrahBooking
     ? await Promise.all([
         supabase
           .from("umrah_pilgrims")
-          .select("id, full_name, gender, passport_number")
+          .select(
+            "id, full_name, gender, date_of_birth, nationality, passport_number, passport_expiry, passport_issue_country, mahram_name, mahram_relation, phone"
+          )
           .eq("booking_id", umrahBooking.id)
           .order("full_name")
           .then(({ data }) => data ?? []),
@@ -193,12 +202,24 @@ export default async function BookingDetailPage({
           .then(({ data }) => data ?? []),
         supabase
           .from("umrah_booking_documents")
-          .select("id, pilgrim_id, doc_type, title, storage_path, file_name, file_size, created_at")
+          .select("id, pilgrim_id, doc_type, title, storage_path, file_name, file_size, created_at, source, review_status, review_note")
           .eq("booking_id", umrahBooking.id)
           .order("created_at", { ascending: false })
           .then(({ data }) => data ?? []),
+        supabase
+          .rpc("umrah_pilgrim_readiness", { p_booking_id: umrahBooking.id })
+          .then(({ data }) => data ?? []),
+        getBookingTravel(supabase, umrahBooking.id),
       ])
-    : [[], [], []];
+    : [[], [], [], [], null];
+  const umrahReadiness: Record<string, PilgrimReadiness> = Object.fromEntries(
+    umrahReadinessRows.map((r) => [r.pilgrim_id, { missing: r.missing, warnings: r.warnings }])
+  );
+  // Pilgrim details and hand-in documents stay editable until visas are filed.
+  const umrahOpenForChanges =
+    !!umrahBooking &&
+    ["pending", "confirmed"].includes(umrahBooking.status ?? "") &&
+    ["booked", "confirmed"].includes(umrahBooking.fulfillment_stage ?? "");
 
   // Private bucket: links are signed per render and expire after an hour.
   const signedUrls = new Map<string, string>();
@@ -214,7 +235,13 @@ export default async function BookingDetailPage({
     }
   }
   const pilgrimNames = new Map(umrahPilgrims.map((pilgrim) => [pilgrim.id, pilgrim.full_name]));
-  const umrahDocuments = umrahDocumentRows.filter((doc) => signedUrls.has(doc.storage_path));
+  const umrahDocuments = umrahDocumentRows.filter(
+    (doc) => doc.source !== "customer" && signedUrls.has(doc.storage_path)
+  );
+  const umrahHandedIn = umrahDocumentRows
+    .filter((doc) => doc.source === "customer")
+    .map((doc) => ({ ...doc, url: signedUrls.get(doc.storage_path) ?? null }));
+  const umrahContact = contactLine(umrahTravel?.contact ?? null);
   const umrahDeparture = umrahBooking?.departure ?? null;
 
   const openRequests = requests.filter((r) => r.status === "requested" || r.status === "in_review");
@@ -292,6 +319,21 @@ export default async function BookingDetailPage({
           >
             <Download className="size-3.5" /> Travel voucher
           </Button>
+          {umrahBooking ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={!voucherAvailable}
+              render={
+                voucherAvailable ? (
+                  <a href={`/api/umrah-itinerary/${orderId}`} target="_blank" rel="noopener noreferrer" />
+                ) : undefined
+              }
+            >
+              <Download className="size-3.5" /> Itinerary
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             size="sm"
@@ -455,6 +497,39 @@ export default async function BookingDetailPage({
         </Card>
       ) : null}
 
+      {umrahTravel?.itinerary ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CalendarDays className="size-4 text-muted-foreground" /> Day by day
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="border-t border-border">
+              <ItineraryList itinerary={umrahTravel.itinerary} />
+            </div>
+            {umrahContact ? (
+              <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">{umrahContact}</p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {umrahTravel && umrahTravel.hotels.length > 0 ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <BedDouble className="size-4 text-muted-foreground" /> Hotels
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="border-t border-border">
+              <HotelStayList hotels={umrahTravel.hotels} />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {umrahPilgrims.length > 0 ? (
         <Card>
           <CardHeader className="pb-3">
@@ -463,19 +538,27 @@ export default async function BookingDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ul className="divide-y divide-border border-t border-border">
-              {umrahPilgrims.map((pilgrim) => (
-                <li key={pilgrim.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                  <span className="min-w-0 flex-1 text-sm font-medium">{pilgrim.full_name}</span>
-                  <span className="text-xs capitalize text-muted-foreground">{pilgrim.gender}</span>
-                  {pilgrim.passport_number ? (
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {pilgrim.passport_number}
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+            <div className="border-t border-border">
+              <PilgrimEditor pilgrims={umrahPilgrims} readiness={umrahReadiness} editable={umrahOpenForChanges} />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {umrahBooking && umrahPilgrims.length > 0 && (umrahOpenForChanges || umrahHandedIn.length > 0) ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileText className="size-4 text-muted-foreground" /> Passports and photos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PilgrimDocuments
+              bookingId={umrahBooking.id}
+              pilgrims={umrahPilgrims.map((p) => ({ id: p.id, full_name: p.full_name }))}
+              documents={umrahHandedIn}
+              canUpload={umrahOpenForChanges}
+            />
           </CardContent>
         </Card>
       ) : null}

@@ -117,12 +117,27 @@ const TYPE_LABEL: Record<string, string> = {
   hall: "Event hall",
 };
 
+type VoucherHotel = { city: string; name: string; checkIn: string | null; checkOut: string | null };
+
+const CITY: Record<string, string> = { makkah: "Makkah", madinah: "Madinah", other: "" };
+
+function hotelLine(hotel: VoucherHotel) {
+  const dates =
+    hotel.checkIn && hotel.checkOut
+      ? `${format(new Date(`${hotel.checkIn}T00:00:00`), "d MMM yyyy")} – ${format(new Date(`${hotel.checkOut}T00:00:00`), "d MMM yyyy")}`
+      : null;
+  return [hotel.name, CITY[hotel.city] ?? hotel.city, dates].filter(Boolean).join(" · ");
+}
+
 export function VoucherDocument({
   order,
   customer,
+  umrahHotels = [],
 }: {
   order: CheckoutOrderRow;
   customer: { full_name: string | null; email: string | null };
+  /** Hotels with check-in/out dates for the order's Umrah booking. */
+  umrahHotels?: VoucherHotel[];
 }) {
   const logo = stsLogo();
   const issuedAt = new Date().toISOString();
@@ -239,6 +254,15 @@ export function VoucherDocument({
                 <View style={styles.itemDetail}>
                   <Text style={styles.detailLabel}>Return flight</Text>
                   <Text>{pdfText(inbound)}</Text>
+                </View>
+              ) : null}
+
+              {umrah && umrahHotels.length > 0 ? (
+                <View style={styles.itemDetail}>
+                  <Text style={styles.detailLabel}>Hotels</Text>
+                  {umrahHotels.map((hotel) => (
+                    <Text key={`${hotel.city}-${hotel.name}`}>{pdfText(hotelLine(hotel))}</Text>
+                  ))}
                 </View>
               ) : null}
 

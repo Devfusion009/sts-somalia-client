@@ -91,13 +91,18 @@ export async function getAllPackages(): Promise<PackageCardData[]> {
 
 export async function getPackageBySlug(slug: string) {
   const supabase = await createClient();
+  // Lazy backstop for the unpaid-seat sweep: release this package's stale
+  // unpaid bookings before its seat counts are read.
+  const { data: pkgId } = await supabase.from("umrah_packages").select("id").eq("slug", slug).maybeSingle();
+  if (pkgId) await supabase.rpc("release_stale_umrah_seats", { p_package_id: pkgId.id });
+
   const { data } = await supabase
     .from("umrah_packages")
     .select(
       `id, slug, name, description, tagline, tier, is_featured, origin_iata, destination_iata,
        duration_days, includes, images, base_price, original_price, currency, status,
        meal_plan, meals_note, contact_person_name, contact_person_phone, contact_person_email, contact_whatsapp,
-       umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, offline_seats, price_override,
+       umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, offline_seats, price_override, sales_close_days, status,
          outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at,
          return_airline, return_flight_number, return_departs_at, return_arrives_at, baggage_note),
        umrah_package_hotels(id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order),
@@ -109,4 +114,24 @@ export async function getPackageBySlug(slug: string) {
     .maybeSingle();
 
   return data;
+}
+
+/**
+ * Departures still on sale, soonest first: open, and departing after the
+ * departure's own sales cutoff (departure_date - sales_close_days > today).
+ * create_umrah_group_booking applies the same rule on the server.
+ */
+export function bookableDepartures<
+  T extends { departure_date: string; sales_close_days?: number | null; status?: string | null },
+>(departures: T[]): T[] {
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return departures
+    .filter((d) => (d.status ?? "open") === "open")
+    .filter((d) => {
+      const [y, m, day] = d.departure_date.split("-").map(Number);
+      const close = new Date(Date.UTC(y, m - 1, day - (d.sales_close_days ?? 0))).toISOString().slice(0, 10);
+      return close > today;
+    })
+    .sort((a, b) => a.departure_date.localeCompare(b.departure_date));
 }

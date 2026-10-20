@@ -221,6 +221,9 @@ const detailsSchema = z.object({
   contactPersonPhone: optionalText(40),
   contactPersonEmail: z.union([z.string().trim().email("Enter a valid contact email."), z.literal("")]).optional(),
   contactWhatsapp: optionalText(40),
+  depositPercent: z.union([z.literal(""), z.coerce.number().min(0, "Deposit must be 0 to 100%.").max(100, "Deposit must be 0 to 100%.")]),
+  balanceDueDays: z.coerce.number().int().min(0, "Balance due must be 0 to 180 days.").max(180, "Balance due must be 0 to 180 days."),
+  fullPaymentBeforeDocuments: z.boolean(),
 });
 
 export async function updateUmrahPackageDetails(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -239,6 +242,9 @@ export async function updateUmrahPackageDetails(_prev: ActionState, formData: Fo
     contactPersonPhone: formData.get("contactPersonPhone") || undefined,
     contactPersonEmail: formData.get("contactPersonEmail") ?? "",
     contactWhatsapp: formData.get("contactWhatsapp") || undefined,
+    depositPercent: String(formData.get("depositPercent") ?? "").trim(),
+    balanceDueDays: formData.get("balanceDueDays") || 30,
+    fullPaymentBeforeDocuments: formData.get("fullPaymentBeforeDocuments") === "on",
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const d = parsed.data;
@@ -259,6 +265,9 @@ export async function updateUmrahPackageDetails(_prev: ActionState, formData: Fo
       contact_person_phone: d.contactPersonPhone || null,
       contact_person_email: d.contactPersonEmail || null,
       contact_whatsapp: d.contactWhatsapp || null,
+      deposit_percent: d.depositPercent === "" ? null : d.depositPercent,
+      balance_due_days: d.balanceDueDays,
+      full_payment_before_documents: d.fullPaymentBeforeDocuments,
     })
     .eq("id", d.packageId);
   if (error) return { error: error.message };

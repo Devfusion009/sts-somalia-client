@@ -13,6 +13,8 @@ import {
 } from "@/modules/orders/helpers";
 import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
 import { REQUEST_NOT_EDITABLE_ERROR } from "@/modules/umrah/custom-errors";
+import { getUmrahOperations } from "@/modules/umrah/settings";
+import { addDays } from "@/modules/umrah/itinerary";
 import { UMRAH_CATEGORIES, type UmrahService } from "@/modules/umrah/services";
 import {
   isRoomSharing,
@@ -161,6 +163,8 @@ export async function saveUmrahTripBasics(
   if (data.nights_makkah + data.nights_madinah === 0) {
     return { error: "Add at least one night in Makkah or Madinah.", values: formValues(formData) };
   }
+  const leadError = await departureLeadError(data.departure_date);
+  if (leadError) return { error: leadError, values: formValues(formData) };
 
   // Every traveller's name is captured here, next to the count that sets
   // it, rather than only three steps later at the pilgrim-details screen —
@@ -419,6 +423,8 @@ export async function submitUmrahCustomRequest(
   if (!request) return { error: REQUEST_NOT_EDITABLE_ERROR };
 
   if (!request.departure_date) return { error: "Go back to step 1 and choose a departure date." };
+  const leadError = await departureLeadError(request.departure_date);
+  if (leadError) return { error: `${leadError} Go back to step 1 to change it.` };
 
   const { data: lineRows } = await supabase
     .from("umrah_custom_request_services")
@@ -460,6 +466,9 @@ export async function submitUmrahCustomRequest(
     .select("id")
     .single();
 
+  // One live booking per request (unique index): a double-submitted step 4
+  // stops here instead of creating a second booking.
+  if (bookingError?.code === "23505") return { error: "This trip was already submitted." };
   if (bookingError || !booking) {
     return { error: bookingError?.message ?? "Could not create the booking." };
   }
@@ -477,7 +486,10 @@ export async function submitUmrahCustomRequest(
       mahram_relation: p.mahram_relation ?? null,
     }))
   );
-  if (pilgrimsError) return { error: pilgrimsError.message };
+  if (pilgrimsError) {
+    await supabase.from("umrah_bookings").delete().eq("id", booking.id);
+    return { error: pilgrimsError.message };
+  }
 
   let order;
   try {
@@ -492,6 +504,7 @@ export async function submitUmrahCustomRequest(
       umrahBookingId: booking.id,
     });
   } catch (err) {
+    await supabase.from("umrah_bookings").delete().eq("id", booking.id);
     return { error: err instanceof Error ? err.message : "Could not create the order." };
   }
 
@@ -508,6 +521,20 @@ export async function submitUmrahCustomRequest(
 // ---------------------------------------------------------------------------
 // Shared
 // ---------------------------------------------------------------------------
+
+/** A private trip must leave after today plus the configured lead time. */
+async function departureLeadError(departureDate: string): Promise<string | null> {
+  const { privateLeadDays } = await getUmrahOperations();
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const earliest = addDays(today, Math.max(privateLeadDays, 0) + 1);
+  if (departureDate < earliest) {
+    return privateLeadDays > 0
+      ? `Choose a departure at least ${privateLeadDays + 1} days from today.`
+      : "Choose a departure date after today.";
+  }
+  return null;
+}
 
 type Client = Awaited<ReturnType<typeof createClient>>;
 

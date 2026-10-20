@@ -44,6 +44,10 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
   const itinerary = [...(pkg.umrah_itinerary_days ?? [])].sort((a, b) => a.day_number - b.day_number);
   const pricing = [...(pkg.umrah_package_pricing ?? [])].sort((a, b) => a.sharing - b.sharing);
   const linkedAgencyIds = (pkg.umrah_package_agencies ?? []).map((a) => a.agency_id);
+  const hasRateCard = pricing.length > 0;
+  const knownAirlines = [
+    ...new Set(departures.flatMap((d) => [d.outbound_airline, d.return_airline]).filter((a): a is string => !!a)),
+  ].sort();
 
   return (
     <div className="space-y-6">
@@ -101,6 +105,9 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
             contactPersonPhone={pkg.contact_person_phone}
             contactPersonEmail={pkg.contact_person_email}
             contactWhatsapp={pkg.contact_whatsapp}
+            depositPercent={pkg.deposit_percent === null ? null : Number(pkg.deposit_percent)}
+            balanceDueDays={pkg.balance_due_days}
+            fullPaymentBeforeDocuments={pkg.full_payment_before_documents}
           />
         </CardContent>
       </Card>
@@ -147,7 +154,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
         <CardHeader>
           <CardTitle className="text-base">Departures</CardTitle>
           <CardAction>
-            <DepartureDialog packageId={pkg.id} currency={pkg.currency} />
+            <DepartureDialog packageId={pkg.id} currency={pkg.currency} hasRateCard={hasRateCard} airlines={knownAirlines} />
           </CardAction>
         </CardHeader>
         <Table>
@@ -158,7 +165,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
               <TableHead>Seats</TableHead>
               <TableHead>Seats left</TableHead>
               <TableHead>Flights</TableHead>
-              <TableHead>Price override</TableHead>
+              <TableHead>{hasRateCard ? "Sales close" : "Price override"}</TableHead>
               <TableHead className="text-right" />
             </TableRow>
           </TableHeader>
@@ -188,11 +195,26 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
                     </TableCell>
                     <TableCell>{flights.length ? flights.join(" · ") : "—"}</TableCell>
                     <TableCell>
-                      {d.price_override !== null ? formatMoney(Number(d.price_override), pkg.currency) : "—"}
+                      {hasRateCard
+                        ? d.sales_close_days > 0
+                          ? `${d.sales_close_days} days before`
+                          : "On the day"
+                        : d.price_override !== null
+                          ? formatMoney(Number(d.price_override), pkg.currency)
+                          : "—"}
+                      {d.status !== "open" ? (
+                        <Badge className="ml-2 border-transparent bg-muted capitalize text-muted-foreground">{d.status}</Badge>
+                      ) : null}
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1.5">
-                        <DepartureDialog packageId={pkg.id} currency={pkg.currency} departure={d} />
+                        <DepartureDialog
+                          packageId={pkg.id}
+                          currency={pkg.currency}
+                          departure={d}
+                          hasRateCard={hasRateCard}
+                          airlines={knownAirlines}
+                        />
                         {d.booked_seats === 0 ? (
                           <DeleteDepartureButton departureId={d.id} label={formatDay(d.departure_date)} />
                         ) : null}

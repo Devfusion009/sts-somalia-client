@@ -41,7 +41,7 @@ export class PaymentsService {
 
     const { data: order } = await supabase
       .from("orders")
-      .select("id, order_number, status, total, currency, agency_id")
+      .select("id, order_number, status, total, currency, agency_id, min_first_payment")
       .eq("id", input.orderId)
       .maybeSingle();
 
@@ -59,10 +59,15 @@ export class PaymentsService {
     if (amount > remaining + 0.01) {
       return { error: `That's more than the remaining balance of ${order.currency} ${remaining.toFixed(2)}.` };
     }
-    const minFirstPayment = Math.round(Number(order.total) * MIN_DEPOSIT_FRACTION * 100) / 100;
+    // An Umrah package may set its own deposit share (orders.min_first_payment,
+    // computed in SQL); everything else uses the platform-wide fraction.
+    const minFirstPayment =
+      order.min_first_payment != null
+        ? Number(order.min_first_payment)
+        : Math.round(Number(order.total) * MIN_DEPOSIT_FRACTION * 100) / 100;
     if (paidTotal === 0 && amount < minFirstPayment - 0.01) {
       return {
-        error: `The first payment must be at least ${order.currency} ${minFirstPayment.toFixed(2)} (${MIN_DEPOSIT_FRACTION * 100}% deposit).`,
+        error: `The first payment must be at least ${order.currency} ${minFirstPayment.toFixed(2)}.`,
       };
     }
 

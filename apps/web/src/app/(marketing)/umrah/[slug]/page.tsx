@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { MediaPlaceholder } from "@/components/media-placeholder";
-import { getPackageBySlug } from "@/modules/umrah/queries";
+import { bookableDepartures, getPackageBySlug } from "@/modules/umrah/queries";
 import { packageTier, discountPercent } from "@/modules/umrah/components/package-card";
 import { umrahImageUrls, MEAL_PLAN_LABELS, sharingLabel } from "@/modules/umrah/images";
 import { INCLUDE_DETAILS } from "@/modules/umrah/includes";
@@ -45,10 +45,7 @@ export default async function UmrahPackagePage({
   const pkg = await getPackageBySlug(slug);
   if (!pkg) notFound();
 
-  const today = new Date(new Date().toDateString());
-  const upcomingDepartures = (pkg.umrah_package_departures ?? [])
-    .filter((d) => new Date(d.departure_date) >= today)
-    .sort((a, b) => a.departure_date.localeCompare(b.departure_date));
+  const upcomingDepartures = bookableDepartures(pkg.umrah_package_departures ?? []);
 
   const includes: string[] = Array.isArray(pkg.includes) ? (pkg.includes as string[]) : [];
   const tier = packageTier(pkg);

@@ -5,7 +5,13 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getUmrahBookingsAdmin } from "@/modules/umrah/fulfillment-admin-queries";
+import {
+  getUmrahBookingsAdmin,
+  getUmrahFilterOptions,
+  type UmrahPaymentFilter,
+} from "@/modules/umrah/fulfillment-admin-queries";
+import { Pager } from "@/components/dashboard/pager";
+import { parsePage } from "@/lib/pagination";
 import { formatMoney } from "@/modules/umrah/pricing";
 import { cn } from "@/lib/utils";
 import {
@@ -19,14 +25,43 @@ import { StageBadge, formatDay } from "./shared";
 
 export const metadata: Metadata = { title: "Umrah Bookings" };
 
+const PAYMENT_FILTERS: { value: UmrahPaymentFilter; label: string }[] = [
+  { value: "unpaid", label: "Awaiting payment" },
+  { value: "partial", label: "Partially paid" },
+  { value: "paid", label: "Paid" },
+  { value: "closed", label: "Cancelled or refunded" },
+];
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const selectClass =
+  "border-input h-8 rounded-md border bg-transparent px-2.5 text-xs shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+
 export default async function AdminUmrahBookingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ stage?: string }>;
+  searchParams: Promise<{ stage?: string; departure?: string; package?: string; payment?: string; page?: string }>;
 }) {
-  const { stage: rawStage } = await searchParams;
-  const stage = isUmrahStage(rawStage) ? rawStage : undefined;
-  const bookings = await getUmrahBookingsAdmin(stage);
+  const params = await searchParams;
+  const stage = isUmrahStage(params.stage) ? params.stage : undefined;
+  const departureId = params.departure && UUID.test(params.departure) ? params.departure : undefined;
+  const packageId = params.package && UUID.test(params.package) ? params.package : undefined;
+  const payment = PAYMENT_FILTERS.some((f) => f.value === params.payment)
+    ? (params.payment as UmrahPaymentFilter)
+    : undefined;
+  const page = parsePage(params.page);
+  const [{ bookings, total }, options] = await Promise.all([
+    getUmrahBookingsAdmin({ stage, departureId, packageId, payment, page }),
+    getUmrahFilterOptions(),
+  ]);
+
+  const hrefWith = (next: Record<string, string | undefined>) => {
+    const merged = { stage, departure: departureId, package: packageId, payment, ...next };
+    const qs = new URLSearchParams(
+      Object.entries(merged).filter((e): e is [string, string] => typeof e[1] === "string" && e[1] !== "")
+    ).toString();
+    return `/admin/umrah/bookings${qs ? `?${qs}` : ""}`;
+  };
 
   const chip = (active: boolean) =>
     cn(
@@ -39,15 +74,46 @@ export default async function AdminUmrahBookingsPage({
       <h1 className="font-heading text-2xl font-semibold">Umrah Bookings</h1>
 
       <div className="flex flex-wrap gap-2">
-        <Link href="/admin/umrah/bookings" className={chip(!stage)}>
+        <Link href={hrefWith({ stage: undefined })} className={chip(!stage)}>
           All
         </Link>
         {UMRAH_STAGES.map((s) => (
-          <Link key={s} href={`/admin/umrah/bookings?stage=${s}`} className={chip(stage === s)}>
+          <Link key={s} href={hrefWith({ stage: s })} className={chip(stage === s)}>
             {UMRAH_STAGE_LABELS[s]}
           </Link>
         ))}
       </div>
+
+      <form method="get" action="/admin/umrah/bookings" className="flex flex-wrap items-center gap-2">
+        {stage ? <input type="hidden" name="stage" value={stage} /> : null}
+        <select name="package" defaultValue={packageId ?? ""} className={selectClass} aria-label="Package">
+          <option value="">All packages</option>
+          {options.packages.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <select name="departure" defaultValue={departureId ?? ""} className={selectClass} aria-label="Departure">
+          <option value="">All departures</option>
+          {options.departures.map((d) => (
+            <option key={d.id} value={d.id}>
+              {formatDay(d.departure_date)} · {d.package?.name ?? "Umrah"}
+            </option>
+          ))}
+        </select>
+        <select name="payment" defaultValue={payment ?? ""} className={selectClass} aria-label="Payment">
+          <option value="">Any payment</option>
+          {PAYMENT_FILTERS.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+        <Button type="submit" size="sm" variant="outline" className="h-8">
+          Filter
+        </Button>
+      </form>
 
       <Card className="overflow-hidden py-0">
         <Table>
@@ -68,7 +134,7 @@ export default async function AdminUmrahBookingsPage({
             {bookings.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
-                  {stage ? `No bookings at "${UMRAH_STAGE_LABELS[stage]}".` : "No Umrah bookings yet."}
+                  No matching bookings.
                 </TableCell>
               </TableRow>
             ) : (
@@ -92,8 +158,10 @@ export default async function AdminUmrahBookingsPage({
                     </TableCell>
                     <TableCell>{formatDay(departureDate)}</TableCell>
                     <TableCell>
-                      <p className="font-medium">{b.customer?.full_name ?? "—"}</p>
-                      {b.customer?.email ? <p className="text-xs text-muted-foreground">{b.customer.email}</p> : null}
+                      <p className="font-medium">{b.guest?.full_name ?? b.customer?.full_name ?? "—"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {b.guest ? `Booked by ${b.agency?.name ?? b.customer?.full_name ?? "agent"}` : (b.customer?.email ?? "")}
+                      </p>
                     </TableCell>
                     <TableCell>{b.num_pilgrims}</TableCell>
                     <TableCell className="tabular-nums">{formatMoney(b.total_price, b.currency)}</TableCell>
@@ -136,6 +204,7 @@ export default async function AdminUmrahBookingsPage({
           </TableBody>
         </Table>
       </Card>
+      <Pager page={page} total={total} hrefFor={(n) => `${hrefWith({})}${hrefWith({}).includes("?") ? "&" : "?"}page=${n}`} />
     </div>
   );
 }

@@ -11,7 +11,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -22,29 +21,23 @@ type Kind = "cancellation" | "refund" | "modification";
 
 const COPY: Record<
   Kind,
-  { trigger: string; title: string; description: string; placeholder: string; showAmount: boolean }
+  { trigger: string; title: string; placeholder: string; showAmount: boolean }
 > = {
   cancellation: {
     trigger: "Request cancellation",
     title: "Request a cancellation",
-    description:
-      "We'll check the supplier's cancellation rules for this booking and come back to you with what it costs before anything is cancelled.",
     placeholder: "Tell us which part of the booking you need to cancel, and why.",
     showAmount: false,
   },
   refund: {
     trigger: "Request refund",
     title: "Request a refund",
-    description:
-      "Tell us what you're claiming for. Refunds are assessed against the fare rules that applied when you booked, and we'll confirm the amount before processing.",
     placeholder: "Explain what you'd like refunded and why.",
     showAmount: true,
   },
   modification: {
     trigger: "Request a change",
     title: "Request a change",
-    description:
-      "Date changes, name corrections, extra rooms — describe what you need and we'll quote any supplier fee before making the change.",
     placeholder: "Describe the change you need — new dates, corrected spelling, extra travellers.",
     showAmount: false,
   },
@@ -117,7 +110,6 @@ export function BookingRequestDialog({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{copy.title}</DialogTitle>
-            <DialogDescription>{copy.description}</DialogDescription>
           </DialogHeader>
 
           <form action={handleSubmit} className="space-y-4">
