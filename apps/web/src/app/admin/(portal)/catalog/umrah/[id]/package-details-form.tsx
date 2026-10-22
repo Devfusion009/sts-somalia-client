@@ -65,6 +65,9 @@ export function PackageDetailsForm({
   contactPersonPhone,
   contactPersonEmail,
   contactWhatsapp,
+  depositPercent,
+  balanceDueDays,
+  fullPaymentBeforeDocuments,
 }: {
   packageId: string;
   tagline: string | null;
@@ -81,6 +84,9 @@ export function PackageDetailsForm({
   contactPersonPhone: string | null;
   contactPersonEmail: string | null;
   contactWhatsapp: string | null;
+  depositPercent: number | null;
+  balanceDueDays: number;
+  fullPaymentBeforeDocuments: boolean;
 }) {
   const [state, formAction] = useActionState(updateUmrahPackageDetails, null);
 
@@ -122,7 +128,6 @@ export function PackageDetailsForm({
               </option>
             ))}
           </select>
-          <p className="text-xs text-muted-foreground">Shown as a badge on the card.</p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="originIata">From (airport)</Label>
@@ -190,9 +195,6 @@ export function PackageDetailsForm({
 
       <div className="space-y-3 rounded-lg border border-border p-4">
         <p className="text-sm font-medium">Responsible person</p>
-        <p className="-mt-2 text-xs text-muted-foreground">
-          Shown on the public package page so pilgrims and agents know exactly who to call.
-        </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="contactPersonName">Name</Label>
@@ -227,6 +229,46 @@ export function PackageDetailsForm({
             />
           </div>
         </div>
+      </div>
+
+      <div className="space-y-3 rounded-lg border border-border p-4">
+        <p className="text-sm font-medium">Payment terms</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="depositPercent">Deposit (%)</Label>
+            <Input
+              id="depositPercent"
+              name="depositPercent"
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              placeholder="50"
+              defaultValue={depositPercent ?? ""}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="balanceDueDays">Balance due (days before departure)</Label>
+            <Input
+              id="balanceDueDays"
+              name="balanceDueDays"
+              type="number"
+              min={0}
+              max={180}
+              defaultValue={balanceDueDays}
+              required
+            />
+          </div>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="fullPaymentBeforeDocuments"
+            defaultChecked={fullPaymentBeforeDocuments}
+            className="size-4"
+          />
+          Full payment before e-tickets and hotel vouchers
+        </label>
       </div>
 
       <SubmitButton pendingText="Saving…">Save details</SubmitButton>

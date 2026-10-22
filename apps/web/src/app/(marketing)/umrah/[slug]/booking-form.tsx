@@ -320,9 +320,23 @@ export function BookingForm({
             {selectedRate ? ` · ${sharingLabel(selectedRate.sharing)}` : ""}
           </p>
         </div>
-        <SubmitButton size="lg" disabled={!selectedId || needsSharing} pendingText="Creating booking…" className="gap-2">
-          Continue to Payment <ArrowRight className="size-4" />
-        </SubmitButton>
+        <div className="flex flex-wrap items-center gap-2">
+          {bookedForSlot ? (
+            <SubmitButton
+              name="intent"
+              value="hold"
+              size="lg"
+              variant="outline"
+              disabled={!selectedId || needsSharing}
+              pendingText="Holding…"
+            >
+              Hold 24h
+            </SubmitButton>
+          ) : null}
+          <SubmitButton size="lg" disabled={!selectedId || needsSharing} pendingText="Creating booking…" className="gap-2">
+            Continue to Payment <ArrowRight className="size-4" />
+          </SubmitButton>
+        </div>
       </div>
     </form>
   );

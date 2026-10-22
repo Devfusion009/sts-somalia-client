@@ -61,3 +61,34 @@ export async function saveBankTransfer(_prev: ActionState, formData: FormData): 
   revalidatePath("/admin/integrations");
   return { error: null };
 }
+
+const umrahOperationsSchema = z.object({
+  unpaidHoldHours: z.coerce.number().int().min(0, "Seat hold must be 0 to 720 hours.").max(720, "Seat hold must be 0 to 720 hours."),
+  privateDepositPercent: z.coerce.number().min(0, "Deposit must be 0 to 100%.").max(100, "Deposit must be 0 to 100%."),
+  privateBalanceDueDays: z.coerce.number().int().min(0, "Balance due must be 0 to 180 days.").max(180, "Balance due must be 0 to 180 days."),
+  privateLeadDays: z.coerce.number().int().min(0, "Lead time must be 0 to 120 days.").max(120, "Lead time must be 0 to 120 days."),
+  privateFullPaymentBeforeDocuments: z.boolean(),
+  visaRequiresPassport: z.boolean(),
+  requiredDocuments: z.array(z.enum(["passport_copy", "photo", "vaccination", "national_id"])),
+});
+
+/** umrah_operations: read by SQL through umrah_setting() and by modules/umrah/settings.ts. */
+export async function saveUmrahOperations(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requirePlatformAdmin();
+  const parsed = umrahOperationsSchema.safeParse({
+    unpaidHoldHours: formData.get("unpaidHoldHours"),
+    privateDepositPercent: formData.get("privateDepositPercent"),
+    privateBalanceDueDays: formData.get("privateBalanceDueDays"),
+    privateLeadDays: formData.get("privateLeadDays"),
+    privateFullPaymentBeforeDocuments: formData.get("privateFullPaymentBeforeDocuments") === "on",
+    visaRequiresPassport: formData.get("visaRequiresPassport") === "on",
+    requiredDocuments: formData.getAll("requiredDocuments").map(String),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const error = await saveSetting("umrah_operations", parsed.data);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/site-settings");
+  return { error: null };
+}

@@ -5,7 +5,6 @@ import { BackLink } from "@/components/back-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getUmrahBookingAdmin } from "@/modules/umrah/fulfillment-admin-queries";
 import { formatMoney } from "@/modules/umrah/pricing";
 import {
@@ -16,7 +15,21 @@ import {
   type UmrahDocType,
 } from "../stages";
 import { StageBadge, formatDay, formatFileSize, formatFlightTime } from "../shared";
-import { DeleteDocumentButton, DocumentUploadForm, StageForm } from "./fulfillment-forms";
+import {
+  CancelBookingButton,
+  DeleteDocumentButton,
+  DeleteSegmentButton,
+  DocumentUploadForm,
+  ReviewDocumentButtons,
+  SegmentDialog,
+  StageForm,
+} from "./fulfillment-forms";
+import { RecordPaymentDialog } from "../../../orders/record-payment-dialog";
+import { PilgrimEditor } from "@/modules/umrah/components/pilgrim-editor";
+import { HotelStayList, ItineraryList, contactLine } from "@/modules/umrah/components/travel-details";
+import { CITY_LABEL } from "@/modules/umrah/itinerary";
+import { HAND_IN_LABEL, REVIEW_STATUS_LABEL, type HandInType } from "@/modules/umrah/readiness";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Umrah Booking" };
 
@@ -70,7 +83,11 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
 
   const isGroup = booking.booking_kind === "group";
   const title = isGroup ? (booking.package?.name ?? "Group Umrah") : (booking.custom_request?.reference ?? "Private Umrah");
-  const reference = booking.order?.order_number ?? null;
+  const order = booking.order;
+  const reference = order?.order_number ?? null;
+  const travel = booking.travel;
+  const itinerary = travel?.itinerary ?? null;
+  const contact = contactLine(travel?.contact ?? null);
   const currentIndex = UMRAH_STAGES.indexOf(booking.fulfillment_stage);
   const nextStages = UMRAH_STAGES.slice(currentIndex + 1);
   const closed = ["cancelled", "refunded", "failed"].includes(booking.status);
@@ -120,7 +137,11 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
               </>
             ) : null}
             <Divider />
-            <span>{booking.customer?.full_name ?? booking.customer?.email ?? "Customer"}</span>
+            <span>
+              {booking.order?.guest
+                ? `${booking.order.guest.full_name} · booked by ${booking.booker?.full_name ?? booking.customer?.full_name ?? "agent"}`
+                : (booking.customer?.full_name ?? booking.customer?.email ?? "Customer")}
+            </span>
             {booking.customer?.email && booking.customer.full_name ? (
               <>
                 <Divider />
@@ -142,15 +163,20 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
           </p>
         </div>
 
-        <dl className="flex flex-wrap gap-x-8 gap-y-2 rounded-lg bg-secondary/40 px-4 py-3 text-sm">
-          <Stat label="Pilgrims" value={booking.num_pilgrims} />
-          <Stat label="Total" value={formatMoney(booking.total_price, booking.currency)} />
-          <Stat
-            label="Payment"
-            value={booking.order ? (ORDER_STATUS_LABELS[booking.order.status] ?? booking.order.status) : "No order"}
-          />
-          {booking.room_sharing ? <Stat label="Room sharing" value={`${booking.room_sharing} per room`} /> : null}
-        </dl>
+        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-secondary/40 px-4 py-3">
+          <dl className="flex flex-1 flex-wrap gap-x-8 gap-y-2 text-sm">
+            <Stat label="Pilgrims" value={booking.num_pilgrims} />
+            <Stat label="Total" value={formatMoney(order?.total ?? booking.total_price, booking.currency)} />
+            {order ? <Stat label="Paid" value={formatMoney(order.paid, order.currency)} /> : null}
+            {order && order.balance > 0 ? <Stat label="Balance" value={formatMoney(order.balance, order.currency)} /> : null}
+            {order?.balance_due_at && order.balance > 0 ? <Stat label="Due by" value={formatDay(order.balance_due_at)} /> : null}
+            <Stat label="Payment" value={order ? (ORDER_STATUS_LABELS[order.status] ?? order.status) : "No order"} />
+            {booking.room_sharing ? <Stat label="Room sharing" value={`${booking.room_sharing} per room`} /> : null}
+          </dl>
+          {order && order.balance > 0 && ["pending_payment", "held", "partially_paid"].includes(order.status) ? (
+            <RecordPaymentDialog orderId={order.id} remaining={order.balance} currency={order.currency} />
+          ) : null}
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -158,7 +184,12 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-heading text-base font-semibold">Stage</h2>
-              <StageBadge stage={booking.fulfillment_stage} />
+              <div className="flex items-center gap-2">
+                <StageBadge stage={booking.fulfillment_stage} />
+                {!closed && booking.status !== "completed" && booking.fulfillment_stage !== "completed" ? (
+                  <CancelBookingButton bookingId={booking.id} paid={order?.paid ?? 0} currency={booking.currency} />
+                ) : null}
+              </div>
             </div>
             {nextStages.length > 0 && !closed ? (
               <StageForm bookingId={booking.id} nextStages={nextStages} />
@@ -228,46 +259,150 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
       ) : null}
 
       <section className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-heading text-base font-semibold">Travel details</h2>
+          <SegmentDialog bookingId={booking.id} />
+        </div>
+        {travel && travel.segments.length > 0 ? (
+          <Card className="overflow-hidden py-0">
+            <ul className="divide-y divide-border">
+              {travel.segments.map((segment) => (
+                <li key={segment.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <Badge variant="secondary" className="capitalize">
+                    {segment.kind}
+                  </Badge>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{segment.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {[
+                        segment.provider,
+                        segment.reference,
+                        segment.city ? (CITY_LABEL[segment.city] ?? segment.city) : null,
+                        segment.starts_at ? formatFlightTime(segment.starts_at) : null,
+                        segment.ends_at ? `to ${formatFlightTime(segment.ends_at)}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                  <SegmentDialog bookingId={booking.id} segment={segment} />
+                  <DeleteSegmentButton segmentId={segment.id} title={segment.title} />
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="space-y-3">
+          <h2 className="font-heading text-base font-semibold">{isGroup ? "Hotels" : "Services"}</h2>
+          <Card className="overflow-hidden py-0">
+            {isGroup ? (
+              travel && travel.hotels.length > 0 ? (
+                <HotelStayList hotels={travel.hotels} />
+              ) : (
+                <p className="px-5 py-6 text-sm text-muted-foreground">No hotels on this package.</p>
+              )
+            ) : booking.serviceLines.length > 0 ? (
+              <ul className="divide-y divide-border">
+                {booking.serviceLines.map((line) => (
+                  <li key={line.id} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
+                    <span className="min-w-0">
+                      <span className="font-medium">{line.name}</span>
+                      <span className="text-muted-foreground"> · {line.quantity} × {formatMoney(Number(line.unit_price), booking.currency)}</span>
+                    </span>
+                    <span className="tabular-nums">{formatMoney(Number(line.line_total), booking.currency)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-5 py-6 text-sm text-muted-foreground">No services.</p>
+            )}
+          </Card>
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-heading text-base font-semibold">Day by day</h2>
+            {itinerary?.warnings.includes("nights_mismatch") ? (
+              <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Hotel nights do not match the dates</Badge>
+            ) : null}
+            {itinerary?.warnings.includes("days_mismatch") ? (
+              <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Day plan does not match the duration</Badge>
+            ) : null}
+          </div>
+          <Card className="overflow-hidden py-0">
+            {itinerary ? (
+              <ItineraryList itinerary={itinerary} />
+            ) : (
+              <p className="px-5 py-6 text-sm text-muted-foreground">No departure date.</p>
+            )}
+            {contact ? <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">{contact}</p> : null}
+          </Card>
+        </section>
+      </div>
+
+      <section className="space-y-3">
         <h2 className="font-heading text-base font-semibold">Pilgrims</h2>
         <Card className="overflow-hidden py-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Gender</TableHead>
-                <TableHead>Date of birth</TableHead>
-                <TableHead>Nationality</TableHead>
-                <TableHead>Passport</TableHead>
-                <TableHead>Passport expiry</TableHead>
-                <TableHead>Mahram</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {booking.pilgrims.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                    No pilgrim details yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                booking.pilgrims.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.full_name}</TableCell>
-                    <TableCell className="capitalize">{p.gender}</TableCell>
-                    <TableCell>{formatDay(p.date_of_birth)}</TableCell>
-                    <TableCell>{p.nationality ?? "—"}</TableCell>
-                    <TableCell className="font-mono text-xs">{p.passport_number ?? "—"}</TableCell>
-                    <TableCell>{formatDay(p.passport_expiry)}</TableCell>
-                    <TableCell>
-                      {p.mahram_name ? `${p.mahram_name}${p.mahram_relation ? ` (${p.mahram_relation})` : ""}` : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+          {booking.pilgrims.length === 0 ? (
+            <p className="px-5 py-10 text-center text-sm text-muted-foreground">No pilgrim details yet.</p>
+          ) : (
+            <PilgrimEditor pilgrims={booking.pilgrims} readiness={booking.readiness} editable variant="table" />
+          )}
         </Card>
       </section>
+
+      {booking.handedIn.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="font-heading text-base font-semibold">Passports and photos</h2>
+          <Card className="overflow-hidden py-0">
+            <ul className="divide-y divide-border">
+              {booking.handedIn.map((doc) => (
+                <li key={doc.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {HAND_IN_LABEL[doc.doc_type as HandInType] ?? doc.doc_type}
+                      {doc.pilgrim_id ? ` · ${pilgrimName.get(doc.pilgrim_id) ?? "Pilgrim"}` : ""}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {[doc.file_size ? formatFileSize(doc.file_size) : null, new Date(doc.created_at).toLocaleDateString(), doc.review_note]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                  <Badge
+                    className={cn(
+                      "border-transparent",
+                      doc.review_status === "accepted"
+                        ? "bg-primary/10 text-primary"
+                        : doc.review_status === "rejected"
+                          ? "bg-destructive/10 text-destructive"
+                          : "bg-brand-gold/15 text-brand-gold"
+                    )}
+                  >
+                    {REVIEW_STATUS_LABEL[doc.review_status] ?? doc.review_status}
+                  </Badge>
+                  {doc.url ? (
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="size-8"
+                      aria-label={`Download ${doc.title}`}
+                      nativeButton={false}
+                      render={<a href={doc.url} target="_blank" rel="noopener noreferrer" />}
+                    >
+                      <Download className="size-3.5" />
+                    </Button>
+                  ) : null}
+                  {doc.review_status === "pending" ? <ReviewDocumentButtons documentId={doc.id} /> : null}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="font-heading text-base font-semibold">Documents</h2>

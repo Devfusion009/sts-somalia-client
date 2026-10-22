@@ -32,7 +32,9 @@ function targetHref(n: NotificationRow): string | null {
     const orderId = (n.data as { order_id?: string } | null)?.order_id;
     return orderId ? `/account/bookings/${orderId}` : "/account/bookings";
   }
-  if (n.type === "umrah_stage_changed") {
+  // Every umrah_* notification (stage, cancellation, quote, documents,
+  // reminders, travel changes) carries the order it belongs to.
+  if (n.type.startsWith("umrah_")) {
     const orderId = (n.data as { orderId?: string } | null)?.orderId;
     return orderId ? `/account/bookings/${orderId}` : "/account/bookings";
   }

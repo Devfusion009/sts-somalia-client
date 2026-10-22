@@ -32,7 +32,9 @@ function targetHref(n: NotificationRow): string | null {
   // The agent portal has no per-application visa view yet (that arrives with
   // the desk in M7), so this lands on the filtered agency bookings list.
   if (n.type === "visa_status_changed") return "/agent/bookings?type=visa";
-  if (n.type === "umrah_stage_changed") {
+  // Every umrah_* notification (stage, cancellation, quote, documents,
+  // reminders, travel changes) carries the order it belongs to.
+  if (n.type.startsWith("umrah_")) {
     const data = n.data as { orderId?: string } | null;
     return data?.orderId ? `/agent/bookings/${data.orderId}` : "/agent/bookings?type=umrah";
   }

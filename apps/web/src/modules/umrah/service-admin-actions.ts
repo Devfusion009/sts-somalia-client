@@ -5,6 +5,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
+import { repriceQuotedOrder } from "@/modules/orders/helpers";
+import { notifyUmrahBooking } from "@/modules/umrah/notify";
 
 function revalidateCatalog() {
   revalidatePath("/admin/catalog/umrah/services");
@@ -165,40 +167,41 @@ export async function deleteUmrahService(formData: FormData): Promise<void> {
 
 /**
  * Quote/adjust a private Umrah request's price before the customer pays —
- * the same job updateHotelBookingPrice does for manual hotel requests, and it
- * keeps the unpaid order in step with the booking so what is charged is
- * exactly what was confirmed here.
+ * the same job updateHotelBookingPrice does for manual hotel requests. The
+ * order is re-priced through repriceQuotedOrder so an agency booking keeps
+ * its margin on top of the new net price.
  */
 export async function updateUmrahRequestPrice(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
   await requirePlatformAdmin();
-  const bookingId = String(formData.get("bookingId"));
-  const price = Number(formData.get("price"));
-  if (!Number.isFinite(price) || price < 0) return { error: "Enter a valid price." };
+  const bookingId = z.string().uuid().safeParse(formData.get("bookingId"));
+  if (!bookingId.success) return { error: "Invalid booking." };
+  const price = z.coerce.number().positive().safeParse(formData.get("price"));
+  if (!price.success) return { error: "Enter a price greater than zero." };
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("umrah_bookings")
-    .update({ total_price: price })
-    .eq("id", bookingId);
-  if (error) return { error: error.message };
-
   const { data: item } = await supabase
     .from("order_items")
-    .select("id, order:order_id (id, status)")
-    .eq("umrah_booking_id", bookingId)
+    .select("id, order:order_id (id, status, agency_id)")
+    .eq("umrah_booking_id", bookingId.data)
     .maybeSingle();
-
-  if (item?.order && item.order.status === "pending_payment") {
-    await supabase
-      .from("order_items")
-      .update({ unit_price: price, total_price: price })
-      .eq("id", item.id);
-    await supabase.from("orders").update({ subtotal: price, total: price }).eq("id", item.order.id);
+  if (item?.order && item.order.status !== "pending_payment") {
+    return { error: "This order already has a payment." };
   }
 
+  const { error } = await supabase
+    .from("umrah_bookings")
+    .update({ total_price: price.data })
+    .eq("id", bookingId.data);
+  if (error) return { error: error.message };
+
+  if (item?.order) {
+    await repriceQuotedOrder(supabase, item.order, item.id, "umrah", price.data);
+  }
+
+  void notifyUmrahBooking(bookingId.data, "request_quoted");
   revalidatePath("/admin/umrah/requests");
   revalidatePath("/admin/queue");
   revalidatePath("/admin/orders");
@@ -206,10 +209,10 @@ export async function updateUmrahRequestPrice(
 }
 
 /**
- * Confirm or decline a private Umrah request. Declining also cancels the
- * order while it is still unpaid — a paid order is deliberately left alone,
- * because the refund flow owns it (the same rule the hotel/hall decline
- * actions follow).
+ * Confirm or decline a private Umrah request. Declining goes through
+ * decline_umrah_private_request, which cancels the order while it is still
+ * unpaid (a paid order is left to the refund flow, as hotel/hall declines
+ * are) and notifies the customer.
  */
 export async function updateUmrahBookingStatus(
   _prev: ActionState,
@@ -219,6 +222,7 @@ export async function updateUmrahBookingStatus(
   const bookingId = String(formData.get("bookingId"));
   const status = String(formData.get("status"));
   if (!["confirmed", "cancelled"].includes(status)) return { error: "Unknown status." };
+  const note = String(formData.get("note") ?? "").trim().slice(0, 500);
 
   const supabase = await createClient();
   // Confirming goes through the stage machine so it writes the timeline and
@@ -229,20 +233,13 @@ export async function updateUmrahBookingStatus(
           p_booking_id: bookingId,
           p_stage: "confirmed",
         })
-      : await supabase.from("umrah_bookings").update({ status: "cancelled" }).eq("id", bookingId);
+      : await supabase.rpc("decline_umrah_private_request", {
+          p_booking_id: bookingId,
+          p_note: note || undefined,
+        });
   if (error) return { error: error.message };
 
-  if (status === "cancelled") {
-    const { data: item } = await supabase
-      .from("order_items")
-      .select("order:order_id (id, status)")
-      .eq("umrah_booking_id", bookingId)
-      .maybeSingle();
-    if (item?.order && ["pending_payment", "held"].includes(item.order.status)) {
-      await supabase.from("orders").update({ status: "cancelled" }).eq("id", item.order.id);
-    }
-  }
-
+  void notifyUmrahBooking(bookingId, status === "confirmed" ? "stage_changed" : "request_declined", note || undefined);
   revalidatePath("/admin/umrah/requests");
   revalidatePath("/admin/queue");
   return { error: null };

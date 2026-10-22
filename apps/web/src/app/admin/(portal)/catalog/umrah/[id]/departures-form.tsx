@@ -28,6 +28,8 @@ export type DepartureRow = {
   booked_seats: number;
   offline_seats: number;
   price_override: number | string | null;
+  sales_close_days: number;
+  status: string;
   outbound_airline: string | null;
   outbound_flight_number: string | null;
   outbound_departs_at: string | null;
@@ -59,7 +61,17 @@ function useCloseAndRefresh(state: ActionState, close: () => void) {
   }, [state, router]);
 }
 
-function FlightFields({ prefix, label, departure }: { prefix: "outbound" | "return"; label: string; departure?: DepartureRow }) {
+function FlightFields({
+  prefix,
+  label,
+  departure,
+  airlinesListId,
+}: {
+  prefix: "outbound" | "return";
+  label: string;
+  departure?: DepartureRow;
+  airlinesListId: string;
+}) {
   return (
     <fieldset className="space-y-3">
       <legend className="mb-1 text-sm font-semibold">{label}</legend>
@@ -70,6 +82,7 @@ function FlightFields({ prefix, label, departure }: { prefix: "outbound" | "retu
             id={`${prefix}Airline`}
             name={`${prefix}Airline`}
             maxLength={80}
+            list={airlinesListId}
             defaultValue={departure?.[`${prefix}_airline`] ?? ""}
           />
         </div>
@@ -109,11 +122,18 @@ export function DepartureDialog({
   packageId,
   currency,
   departure,
+  hasRateCard,
+  airlines,
 }: {
   packageId: string;
   currency: string;
   departure?: DepartureRow;
+  /** Rate-card packages are priced by room sharing; a per-departure override would be ignored. */
+  hasRateCard: boolean;
+  /** Carriers already used on this package, offered as suggestions. */
+  airlines: string[];
 }) {
+  const airlinesListId = `airlines-${departure?.id ?? "new"}`;
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(departure ? updateUmrahDeparture : createUmrahDeparture, null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -184,22 +204,57 @@ export function DepartureDialog({
                 required
               />
             </div>
+            {hasRateCard ? null : (
+              <div className="space-y-1.5">
+                <Label htmlFor="priceOverride">Price override ({currency})</Label>
+                <Input
+                  id="priceOverride"
+                  name="priceOverride"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="Package price"
+                  defaultValue={departure?.price_override ?? ""}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="priceOverride">Price override ({currency})</Label>
+              <Label htmlFor="salesCloseDays">Sales close (days before departure)</Label>
               <Input
-                id="priceOverride"
-                name="priceOverride"
+                id="salesCloseDays"
+                name="salesCloseDays"
                 type="number"
                 min={0}
-                step="0.01"
-                placeholder="Package price"
-                defaultValue={departure?.price_override ?? ""}
+                max={120}
+                placeholder="0"
+                defaultValue={departure?.sales_close_days ?? 0}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="departureStatus">Sales</Label>
+              <select
+                id="departureStatus"
+                name="status"
+                defaultValue={departure?.status === "closed" ? "closed" : "open"}
+                disabled={departure?.status === "cancelled"}
+                className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+              </select>
             </div>
           </div>
 
-          <FlightFields prefix="outbound" label="Outbound flight" departure={departure} />
-          <FlightFields prefix="return" label="Return flight" departure={departure} />
+          <datalist id={airlinesListId}>
+            {airlines.map((a) => (
+              <option key={a} value={a} />
+            ))}
+          </datalist>
+          <FlightFields prefix="outbound" label="Outbound flight" departure={departure} airlinesListId={airlinesListId} />
+          <FlightFields prefix="return" label="Return flight" departure={departure} airlinesListId={airlinesListId} />
 
           <div className="space-y-1.5">
             <Label htmlFor="baggageNote">Baggage</Label>

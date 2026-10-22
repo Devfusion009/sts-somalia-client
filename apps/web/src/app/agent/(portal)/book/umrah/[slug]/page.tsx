@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { getBookingCustomers } from "@/modules/agencies/booking-context";
 import { createBatchBooking } from "@/modules/agencies/batch-booking-actions";
-import { getPackageBySlug } from "@/modules/umrah/queries";
+import { bookableDepartures, getPackageBySlug } from "@/modules/umrah/queries";
 import { BookingForm } from "@/app/(marketing)/umrah/[slug]/booking-form";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -28,10 +28,7 @@ export default async function AgentUmrahBookingPage({
   const pkg = await getPackageBySlug(slug);
   if (!pkg) notFound();
 
-  const today = new Date(new Date().toDateString());
-  const upcomingDepartures = (pkg.umrah_package_departures ?? [])
-    .filter((departure) => new Date(departure.departure_date) >= today)
-    .sort((a, b) => a.departure_date.localeCompare(b.departure_date));
+  const upcomingDepartures = bookableDepartures(pkg.umrah_package_departures ?? []);
 
   return (
     <div className="space-y-4">

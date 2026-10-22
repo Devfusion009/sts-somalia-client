@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { CancelOrderButton } from "@/modules/orders/components/cancel-order-button";
 import { ConvertHoldButton } from "@/modules/orders/components/convert-hold-button";
+import { umrahSeatHoldEnd } from "@/modules/umrah/settings";
 
 export const metadata: Metadata = { title: "Checkout" };
 
@@ -55,7 +56,18 @@ export default async function CheckoutPage({
     .reduce((sum, p) => sum + Number(p.amount), 0);
   const remaining = Number(order.total) - paidTotal;
   const isFirstPayment = paidTotal === 0;
-  const minDeposit = Math.round(Number(order.total) * MIN_DEPOSIT_FRACTION * 100) / 100;
+  // Umrah packages may set their own deposit share; everything else is the platform-wide 50%.
+  const minDeposit =
+    order.min_first_payment != null
+      ? Number(order.min_first_payment)
+      : Math.round(Number(order.total) * MIN_DEPOSIT_FRACTION * 100) / 100;
+  const umrahItem = order.order_items.find((item) => item.item_type === "umrah");
+  const umrahGroupUnpaid =
+    order.status === "pending_payment" &&
+    paidTotal === 0 &&
+    umrahItem?.umrah_booking?.booking_kind === "group" &&
+    umrahItem.umrah_booking.status === "pending";
+  const umrahSeatsHeldUntil = umrahGroupUnpaid ? await umrahSeatHoldEnd(order.created_at) : null;
 
   const isHeld = order.status === "held";
   const holdExpired = isHeld && order.hold_expires_at != null && new Date(order.hold_expires_at) < new Date();
@@ -169,6 +181,14 @@ export default async function CheckoutPage({
                   </div>
                 </>
               ) : null}
+              {order.balance_due_at && umrahItem ? (
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Balance due by</span>
+                  <span>
+                    {new Date(`${order.balance_due_at}T00:00:00`).toLocaleDateString(undefined, { dateStyle: "medium" })}
+                  </span>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -230,6 +250,17 @@ export default async function CheckoutPage({
             </Card>
           ) : (
             <div className="space-y-3">
+              {umrahSeatsHeldUntil ? (
+                <Card className="border-brand-gold/50 bg-brand-gold/5">
+                  <CardHeader className="flex-row items-center gap-2 space-y-0">
+                    <CalendarClock className="size-4 text-brand-gold" />
+                    <CardTitle className="text-base">
+                      Seats held until{" "}
+                      {umrahSeatsHeldUntil.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                    </CardTitle>
+                  </CardHeader>
+                </Card>
+              ) : null}
               <CheckoutForm
                 orderId={order.id}
                 methods={methods}
@@ -271,7 +302,9 @@ export default async function CheckoutPage({
                 <span>{paidTotal > 0 ? "Balance due" : "Total Fee"}</span>
                 <span className="text-primary">{money(remaining, order.currency)}</span>
               </div>
-              <p className="pt-1 text-xs text-muted-foreground">All fees are non-refundable.</p>
+              {umrahItem ? null : (
+                <p className="pt-1 text-xs text-muted-foreground">All fees are non-refundable.</p>
+              )}
             </CardContent>
           </Card>
 

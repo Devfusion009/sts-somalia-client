@@ -390,7 +390,7 @@ export async function getUmrahPackageById(id: string) {
     .from("umrah_packages")
     .select(
       `*,
-       umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, offline_seats, price_override, outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at, return_airline, return_flight_number, return_departs_at, return_arrives_at, baggage_note),
+       umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, offline_seats, price_override, sales_close_days, status, outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at, return_airline, return_flight_number, return_departs_at, return_arrives_at, baggage_note),
        umrah_package_hotels(id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order),
        umrah_itinerary_days(id, day_number, title, description),
        umrah_package_pricing(id, sharing, price),

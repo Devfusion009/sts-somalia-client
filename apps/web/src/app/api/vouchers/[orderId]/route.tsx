@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getServerTrpc } from "@/lib/trpc/server";
 import type { CheckoutOrderRow } from "api/dist/modules/payments/checkout.service";
 import { VoucherDocument } from "@/modules/bookings/pdf/VoucherDocument";
+import { getBookingTravel } from "@/modules/umrah/itinerary-queries";
+import { umrahVoucherAvailable } from "@/modules/umrah/voucher-gate";
 
 /**
  * Renders the travel voucher for an order on demand.
@@ -39,17 +41,19 @@ export async function GET(
     return NextResponse.json({ error: "Booking not found." }, { status: 404 });
   }
 
-  // Vouchers are for bookings that actually exist as commitments. Handing one
-  // out for an unpaid order would let a customer present a document for
-  // something the supplier has never confirmed.
-  if (order.status === "pending_payment" || order.status === "cancelled") {
+  // Vouchers are for bookings that actually exist as commitments: fully paid,
+  // and for Umrah, flights and hotels confirmed. The same rule enables the
+  // download buttons on the account and agent booking pages.
+  const umrahBooking = order.order_items.find((item) => item.item_type === "umrah")?.umrah_booking ?? null;
+  if (!umrahVoucherAvailable(order.status, umrahBooking ? umrahBooking.fulfillment_stage : undefined)) {
     return NextResponse.json(
-      { error: "A voucher is available once this booking is confirmed." },
+      { error: "A voucher is available once this booking is paid and travel is confirmed." },
       { status: 409 }
     );
   }
 
   const supabase = await createClient();
+  const umrahTravel = umrahBooking ? await getBookingTravel(supabase, umrahBooking.id) : null;
   const { data: customer } = await supabase
     .from("profiles")
     .select("full_name, email")
@@ -60,6 +64,7 @@ export async function GET(
     <VoucherDocument
       order={order}
       customer={{ full_name: customer?.full_name ?? null, email: customer?.email ?? null }}
+      umrahHotels={umrahTravel?.hotels ?? []}
     />
   );
 

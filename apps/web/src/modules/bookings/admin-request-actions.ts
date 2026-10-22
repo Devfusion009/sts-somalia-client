@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
+import { notifyUmrahBooking } from "@/modules/umrah/notify";
 
 export type AdminRequestState = { error: string | null } | null;
 
@@ -17,8 +18,9 @@ const schema = z.object({
 /**
  * Admin's side of a customer request. Hotel requests go through the same SQL
  * resolver the hotel uses, so approving one still cancels the stay and
- * notifies the guest. Other requests (flight, visa, Umrah) are updated
- * directly. "Completed" means the refund has been paid out: the payment is
+ * notifies the guest; Umrah requests go through resolve_umrah_booking_request,
+ * which cancels the booking on an approved cancellation. Other requests
+ * (flight, visa) are updated directly. "Completed" means the refund has been paid out: the payment is
  * marked refunded and a fully refunded order becomes 'refunded'.
  */
 export async function decideCustomerRequest(_prev: AdminRequestState, formData: FormData): Promise<AdminRequestState> {
@@ -36,7 +38,7 @@ export async function decideCustomerRequest(_prev: AdminRequestState, formData: 
   const supabase = await createClient();
   const { data: request } = await supabase
     .from("booking_requests")
-    .select("id, status, hotel_booking_id, hall_booking_id")
+    .select("id, status, kind, hotel_booking_id, hall_booking_id, umrah_booking_id")
     .eq("id", requestId)
     .maybeSingle();
   if (!request) return { error: "Request not found." };
@@ -52,6 +54,19 @@ export async function decideCustomerRequest(_prev: AdminRequestState, formData: 
       p_note: note,
     });
     if (error) return { error: error.message };
+  } else if (request.umrah_booking_id) {
+    // Approving an Umrah cancellation ends the booking, releases its seats
+    // and closes the stage track in the same transaction.
+    const { error } = await supabase.rpc("resolve_umrah_booking_request", {
+      p_request_id: requestId,
+      p_decision: decision,
+      p_amount: decision === "approved" ? amount : undefined,
+      p_note: note,
+    });
+    if (error) return { error: error.message };
+    if (decision === "approved" && request.kind === "cancellation") {
+      void notifyUmrahBooking(request.umrah_booking_id, "booking_cancelled", note);
+    }
   } else {
     if (request.status !== "requested" && request.status !== "in_review") {
       return { error: "This request is already closed." };

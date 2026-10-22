@@ -74,76 +74,22 @@ export async function createUmrahBooking(_prevState: ActionState, formData: Form
 
   const supabase = await createClient();
 
-  const { data: departure, error: departureError } = await supabase
-    .from("umrah_package_departures")
-    .select("id, package_id, total_seats, booked_seats, offline_seats, price_override, umrah_packages(base_price, currency, status)")
-    .eq("id", departure_id)
-    .maybeSingle();
-
-  if (departureError || !departure || departure.umrah_packages?.status !== "published") {
-    return { error: "That departure could not be found." };
-  }
-
-  const seatsLeft = departure.total_seats - departure.booked_seats - departure.offline_seats;
-  if (num_pilgrims > seatsLeft) {
-    return { error: `Only ${seatsLeft} seat(s) left on this departure.` };
-  }
-
-  // Priced server-side only. A package with a room-sharing rate card charges
-  // the rate for the chosen sharing; without one, the departure's override or
-  // the package base price applies.
-  const { data: rateCard, error: rateCardError } = await supabase
-    .from("umrah_package_pricing")
-    .select("sharing, price")
-    .eq("package_id", departure.package_id);
-  if (rateCardError) return { error: "Could not load package pricing." };
-
-  let unitPrice: number;
-  let roomSharing: number | null = null;
-  if (rateCard && rateCard.length > 0) {
-    const rate = rateCard.find((r) => r.sharing === room_sharing);
-    if (!rate) return { error: "Select a room sharing option." };
-    unitPrice = Number(rate.price);
-    roomSharing = rate.sharing;
-  } else {
-    unitPrice = Number(departure.price_override ?? departure.umrah_packages.base_price);
-  }
-  const totalPrice = unitPrice * num_pilgrims;
-  const currency = departure.umrah_packages.currency;
   const agencyId = await getActiveAgencyId(supabase, profile.id);
   const access = await assertAgencyCanBookProduct(supabase, agencyId, "umrah");
   if (!access.ok) return { error: access.message };
   const agencyCustomerId = await resolveBookedForCustomer(supabase, agencyId, formData);
+  // Agents may reserve without paying; the hold expires like any other.
+  const hold = Boolean(agencyId) && formData.get("intent") === "hold";
 
-  const { data: booking, error: bookingError } = await supabase
-    .from("umrah_bookings")
-    .insert({
-      package_id: departure.package_id,
-      departure_id: departure.id,
-      customer_id: profile.id,
-      booked_by: profile.id,
-      agency_id: agencyId,
-      num_pilgrims,
-      total_price: totalPrice,
-      currency,
-      room_sharing: roomSharing,
-      special_requests: special_requests ?? null,
-    })
-    .select()
-    .single();
-
-  // The seat check above is advisory; the insert trigger re-checks under a row
-  // lock on the departure, so a race for the last seats surfaces here.
-  if (bookingError?.message?.includes("not enough seats left on this departure")) {
-    return { error: "Not enough seats left on this departure." };
-  }
-  if (bookingError || !booking) {
-    return { error: bookingError?.message ?? "Could not create the booking." };
-  }
-
-  const { error: pilgrimsError } = await supabase.from("umrah_pilgrims").insert(
-    pilgrims.map((pilgrim) => ({
-      booking_id: booking.id,
+  // Booking and pilgrims are written in one transaction, priced in SQL from
+  // the rate card / departure / package, and refused once sales close. The
+  // insert trigger re-checks seats under a row lock on the departure.
+  const { data: bookingId, error: bookingError } = await supabase.rpc("create_umrah_group_booking", {
+    p_departure_id: departure_id,
+    p_num_pilgrims: num_pilgrims,
+    p_room_sharing: room_sharing ?? 0,
+    p_special_requests: special_requests ?? "",
+    p_pilgrims: pilgrims.map((pilgrim) => ({
       full_name: pilgrim.full_name,
       gender: pilgrim.gender,
       date_of_birth: pilgrim.date_of_birth ?? null,
@@ -152,12 +98,19 @@ export async function createUmrahBooking(_prevState: ActionState, formData: Form
       passport_expiry: pilgrim.passport_expiry ?? null,
       mahram_name: pilgrim.mahram_name ?? null,
       mahram_relation: pilgrim.mahram_relation ?? null,
-    }))
-  );
-
-  if (pilgrimsError) {
-    return { error: pilgrimsError.message };
+    })),
+    p_agency_id: agencyId ?? undefined,
+  });
+  if (bookingError || !bookingId) {
+    return { error: groupBookingErrorMessage(bookingError?.message) };
   }
+
+  const { data: booking } = await supabase
+    .from("umrah_bookings")
+    .select("id, total_price, currency")
+    .eq("id", bookingId)
+    .single();
+  if (!booking) return { error: "Could not create the booking." };
 
   let order;
   try {
@@ -166,12 +119,15 @@ export async function createUmrahBooking(_prevState: ActionState, formData: Form
       bookedBy: profile.id,
       agencyId,
       agencyCustomerId,
-      currency,
+      currency: booking.currency,
       itemType: "umrah",
-      price: totalPrice,
+      price: Number(booking.total_price),
       umrahBookingId: booking.id,
+      hold,
     });
   } catch (err) {
+    // Undo the booking so its seats are not held by a booking with no order.
+    await supabase.from("umrah_bookings").delete().eq("id", booking.id);
     return { error: err instanceof Error ? err.message : "Could not create the order." };
   }
 
@@ -180,4 +136,16 @@ export async function createUmrahBooking(_prevState: ActionState, formData: Form
   }
 
   redirect(`/checkout/${order.id}`);
+}
+
+/** Maps create_umrah_group_booking's raise messages to one plain line. */
+function groupBookingErrorMessage(message: string | undefined) {
+  if (!message) return "Could not create the booking.";
+  if (message.includes("not enough seats left")) return "Not enough seats left on this departure.";
+  if (message.includes("bookings for this departure are closed")) return "Bookings for this departure are closed.";
+  if (message.includes("select a room sharing option")) return "Select a room sharing option.";
+  if (message.includes("departure not found")) return "That departure could not be found.";
+  if (message.includes("full name")) return "Enter each pilgrim's full name.";
+  if (message.includes("do not match")) return "Add details for every pilgrim.";
+  return "Could not create the booking.";
 }

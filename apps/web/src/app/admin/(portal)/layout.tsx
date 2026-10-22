@@ -53,6 +53,7 @@ const NAV_GROUPS: PortalNavGroup[] = [
       { href: "/admin/orders", label: "Orders & Payments", icon: "orders" },
       { href: "/admin/umrah/requests", label: "Private Umrah", icon: "bookings" },
       { href: "/admin/umrah/bookings", label: "Umrah Bookings", icon: "bookings" },
+      { href: "/admin/umrah/departures", label: "Umrah Departures", icon: "calendar" },
     ],
   },
   {

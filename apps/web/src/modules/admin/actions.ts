@@ -12,6 +12,7 @@ import { requirePlatformAdmin } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
 import type { Database } from "@/lib/types/database.types";
 import { UMRAH_INCLUDE_KEYS } from "@/modules/umrah/includes";
+import { notifyUmrahBooking } from "@/modules/umrah/notify";
 import { rememberRoomType } from "@/modules/hotels/room-types";
 import { uploadImages } from "@/modules/admin/property-gallery-actions";
 import { TARGETS } from "@/modules/admin/gallery-targets";
@@ -414,6 +415,8 @@ const departureSchema = z.object({
   returnDepartsAt: optionalFlightTime,
   returnArrivesAt: optionalFlightTime,
   baggageNote: optionalText(200),
+  salesCloseDays: z.coerce.number().int().min(0, "Sales close must be 0 to 120 days.").max(120, "Sales close must be 0 to 120 days."),
+  status: z.union([z.enum(["open", "closed"]), z.literal("")]),
 });
 
 type ParsedDeparture =
@@ -438,6 +441,8 @@ function parseDeparture(formData: FormData): ParsedDeparture {
     returnDepartsAt: text("returnDepartsAt"),
     returnArrivesAt: text("returnArrivesAt"),
     baggageNote: text("baggageNote"),
+    salesCloseDays: text("salesCloseDays") || "0",
+    status: text("status"),
   });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const d = parsed.data;
@@ -467,9 +472,42 @@ function parseDeparture(formData: FormData): ParsedDeparture {
         return_departs_at: d.returnDepartsAt,
         return_arrives_at: d.returnArrivesAt,
       baggage_note: d.baggageNote,
+      sales_close_days: d.salesCloseDays,
+      // A cancelled departure posts no status (the field is disabled) and stays cancelled.
+      ...(d.status ? { status: d.status } : {}),
     },
   };
 }
+
+/**
+ * A package with a room-sharing rate card is charged from the rate card, so a
+ * departure price override would be shown in admin but never charged.
+ */
+async function rateCardOverrideError(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  packageId: string,
+  priceOverride: number | null | undefined
+) {
+  if (priceOverride === null || priceOverride === undefined) return null;
+  const { count } = await supabase
+    .from("umrah_package_pricing")
+    .select("id", { count: "exact", head: true })
+    .eq("package_id", packageId);
+  return count && count > 0 ? "This package is priced by room sharing." : null;
+}
+
+const FLIGHT_FIELDS = [
+  "departure_date",
+  "return_date",
+  "outbound_airline",
+  "outbound_flight_number",
+  "outbound_departs_at",
+  "outbound_arrives_at",
+  "return_airline",
+  "return_flight_number",
+  "return_departs_at",
+  "return_arrives_at",
+] as const;
 
 function departureErrorMessage(error: { message: string; code?: string }) {
   if (error.message.includes("seats_within_total")) return "Seats sold exceed total seats.";
@@ -489,6 +527,8 @@ export async function createUmrahDeparture(_prev: ActionState, formData: FormDat
   if (!parsed.ok) return { error: parsed.error };
 
   const supabase = await createClient();
+  const overrideError = await rateCardOverrideError(supabase, parsed.packageId, parsed.row.price_override);
+  if (overrideError) return { error: overrideError };
   const { error } = await supabase
     .from("umrah_package_departures")
     .insert({ package_id: parsed.packageId, ...parsed.row });
@@ -505,6 +545,19 @@ export async function updateUmrahDeparture(_prev: ActionState, formData: FormDat
   if (!parsed.ok) return { error: parsed.error };
 
   const supabase = await createClient();
+  const { data: before } = await supabase
+    .from("umrah_package_departures")
+    .select(
+      "price_override, departure_date, return_date, outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at, return_airline, return_flight_number, return_departs_at, return_arrives_at"
+    )
+    .eq("id", departureId.data)
+    .maybeSingle();
+  // Clearing or keeping an existing override is allowed; setting a new one on
+  // a rate-card package is not.
+  if (parsed.row.price_override !== before?.price_override) {
+    const overrideError = await rateCardOverrideError(supabase, parsed.packageId, parsed.row.price_override);
+    if (overrideError) return { error: overrideError };
+  }
   const { data, error } = await supabase
     .from("umrah_package_departures")
     .update(parsed.row)
@@ -513,6 +566,28 @@ export async function updateUmrahDeparture(_prev: ActionState, formData: FormDat
     .select("id");
   if (error) return { error: departureErrorMessage(error) };
   if (!data?.length) return { error: "Departure not found." };
+
+  // In-app alerts come from the umrah_departures_notify_change trigger; this
+  // adds email / WhatsApp for every live booking on the departure.
+  const changed =
+    before &&
+    FLIGHT_FIELDS.some((field) => {
+      const next = (parsed.row as Record<string, unknown>)[field] ?? null;
+      const prev = (before as Record<string, unknown>)[field] ?? null;
+      return field.endsWith("_at") && next && prev
+        ? new Date(String(next)).getTime() !== new Date(String(prev)).getTime()
+        : next !== prev;
+    });
+  if (changed) {
+    const { data: live } = await supabase
+      .from("umrah_bookings")
+      .select("id")
+      .eq("departure_id", departureId.data)
+      .in("status", ["pending", "confirmed"])
+      .limit(1000);
+    for (const booking of live ?? []) void notifyUmrahBooking(booking.id, "flight_changed");
+  }
+
   revalidateUmrahPackage(parsed.packageId);
   return { error: null };
 }
