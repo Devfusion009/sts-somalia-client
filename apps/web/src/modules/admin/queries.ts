@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getServerTrpc } from "@/lib/trpc/server";
-import type { UmrahPackageAdmin } from "api/dist/modules/umrah/services/package-admin.service";
+import type { UmrahPackageAdmin, UmrahPackageAdminListItem } from "api/dist/modules/umrah/services/package-admin.service";
 import { bucketLabel, enumerateBuckets, hourlyBucketKey, roundMoney } from "@/lib/date-range";
 import { ADMIN_PAGE_SIZE, pageRange, searchTerm } from "@/lib/pagination";
 import type { Database } from "@/lib/types/database.types";
@@ -376,9 +376,11 @@ export async function getVisaNationalityRulesAdmin(visaTypeId: string) {
   return data ?? [];
 }
 
-export async function getUmrahPackagesAdmin() {
+export async function getUmrahPackagesAdmin(): Promise<UmrahPackageAdminListItem[]> {
   const trpc = await getServerTrpc();
-  return trpc.umrah.admin.packages.list.query();
+  // Same TS2589 as getUmrahPackageById below.
+  const query = trpc.umrah.admin.packages.list.query as unknown as () => Promise<UmrahPackageAdminListItem[]>;
+  return query();
 }
 
 /** Full package config for the admin detail page; null when it doesn't exist. */
