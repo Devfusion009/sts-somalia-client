@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Check, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SecureDataNote } from "./visa-shared";
 
 export const WIZARD_STEPS = [
   { step: 1, label: "Applicant type" },
@@ -94,7 +93,6 @@ export function WizardStepper({
           })}
         </ol>
       </div>
-      <SecureDataNote />
     </aside>
   );
 }

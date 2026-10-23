@@ -127,7 +127,9 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
     num_adults: numAdults,
     num_children: numChildren,
     special_requests: specialRequests || null,
-    guest_details: guestDetails,
+    // No names typed: the booker is the lead guest, so every console shows a
+    // name instead of "Guest" (front desk, bookings list, booking detail).
+    guest_details: guestDetails.length > 0 || !profile.full_name ? guestDetails : [{ full_name: profile.full_name }],
     total_price: totalPrice,
     currency: room.currency,
   };
@@ -203,6 +205,13 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
   redirect(`/checkout/${order.id}`);
 }
 
+export type StayQuote = {
+  unitsLeft: number | null;
+  pricePerRoom: number;
+  /** One room's rate for each night of the stay, so the guest sees how the total is built. */
+  nights: Array<{ night: string; rate: number }>;
+};
+
 /**
  * Rooms left and the per-room price for a stay, for the booking form to
  * refresh as the dates change. unitsLeft is null when the hotel hasn't set a
@@ -212,7 +221,7 @@ export async function getStayQuote(
   roomId: string,
   checkIn: string,
   checkOut: string,
-): Promise<{ unitsLeft: number | null; pricePerRoom: number } | null> {
+): Promise<StayQuote | null> {
   const ids = z.string().uuid().safeParse(roomId);
   const dates = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
   if (!ids.success || !dates.safeParse(checkIn).success || !dates.safeParse(checkOut).success || checkOut <= checkIn) {
@@ -227,8 +236,10 @@ export async function getStayQuote(
   ]);
   if (!room) return null;
   const row = left?.[0];
+  const price = (await getStayPrices(supabase, [room], checkIn, checkOut)).get(room.id);
   return {
     unitsLeft: row ? Math.max(0, row.units_left) : null,
-    pricePerRoom: await stayPricePerRoom(supabase, room, checkIn, checkOut),
+    pricePerRoom: price?.total ?? room.base_price * nightsBetween(checkIn, checkOut),
+    nights: price?.nights.map((n) => ({ night: n.night, rate: n.rate })) ?? [],
   };
 }

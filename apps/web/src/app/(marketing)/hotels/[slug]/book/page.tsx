@@ -8,7 +8,7 @@ import { hotelImageUrls, amenityLabel } from "@/modules/hotels/images";
 import { MediaPlaceholder } from "@/components/media-placeholder";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { AgencyBookingSlot } from "@/modules/agencies/components/agency-booking-slot";
+import { AgencyBookingSlot, viewerAgencyId } from "@/modules/agencies/components/agency-booking-slot";
 import { BookingReviewForm } from "./booking-review-form";
 
 export const metadata: Metadata = { title: "Review your booking" };
@@ -21,7 +21,7 @@ export default async function HotelBookingReviewPage({
   searchParams: Promise<{ roomId?: string; checkIn?: string; checkOut?: string; guests?: string; rooms?: string }>;
 }) {
   const [{ slug }, { roomId, checkIn, checkOut, guests, rooms }] = await Promise.all([params, searchParams]);
-  const hotel = await getHotelBySlug(slug);
+  const [hotel, viewerAgency] = await Promise.all([getHotelBySlug(slug), viewerAgencyId()]);
   if (!hotel) notFound();
 
   const room = hotel.hotel_rooms.find((r) => r.id === roomId && r.status === "published");
@@ -138,9 +138,10 @@ export default async function HotelBookingReviewPage({
           defaults={{ checkIn, checkOut, guests, numRooms: rooms }}
           hotelSummary={hotelSummary}
           roomSummary={roomSummary}
-          bookedForSlot={<AgencyBookingSlot />}
+          bookedForSlot={viewerAgency ? <AgencyBookingSlot /> : null}
           initialUnitsLeft={stayQuote?.unitsLeft ?? null}
           initialPricePerRoom={stayQuote?.pricePerRoom ?? null}
+          initialNightly={stayQuote?.nights ?? []}
         />
       </div>
     </div>

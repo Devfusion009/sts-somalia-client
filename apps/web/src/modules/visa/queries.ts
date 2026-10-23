@@ -49,7 +49,7 @@ export async function getResolvedVisaPricing(visaTypeId: string, nationalityCode
 /** The signed-in user's applications (any status), newest first. */
 export async function getMyVisaApplications() {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("visa_applications")
     .select(
       `*,
@@ -62,6 +62,8 @@ export async function getMyVisaApplications() {
        order_items (order:order_id (id, status, total, currency))`
     )
     .order("created_at", { ascending: false });
+  // A failed read must not render as "No visa applications yet".
+  if (error) throw error;
   return data ?? [];
 }
 

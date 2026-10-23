@@ -80,7 +80,10 @@ export class FlightsService {
       origin_iata: input.origin,
       destination_iata: input.destination,
       depart_at: new Date(`${input.departDate}T09:00:00Z`).toISOString(),
-      return_at: input.returnDate ? new Date(`${input.returnDate}T09:00:00Z`).toISOString() : null,
+      return_at:
+        input.tripType === "round_trip" && input.returnDate
+          ? new Date(`${input.returnDate}T09:00:00Z`).toISOString()
+          : null,
       cabin_class: input.cabinClass,
       status: "pending",
       total_price: 0,
@@ -93,7 +96,11 @@ export class FlightsService {
       },
     });
 
-    if (error) return { error: error.message };
+    if (error) {
+      // Raw Postgres text ("violates foreign key constraint ...") must never reach a traveller.
+      console.error(`[flights] quote request insert failed: ${error.code} ${error.message}`);
+      return { error: "Could not send the quote request. Try again or call +252 611 444 420." };
+    }
     return { error: null };
   }
 }

@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -76,9 +75,6 @@ export function VenuePartnerForm({ venue }: { venue?: EditableVenue }) {
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{venue ? "Edit venue" : "Add venue"}</DialogTitle>
-          <DialogDescription>
-            Submitted venues are reviewed by STS staff before appearing on the public Events &amp; Halls pages.
-          </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
           {venue ? <input type="hidden" name="venueId" value={venue.id} /> : null}

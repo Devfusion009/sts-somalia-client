@@ -26,7 +26,7 @@ export async function saveVenueRefundRule(_prev: VenueRefundState, formData: For
   const { error } = await supabase
     .from("venue_refund_rules")
     .upsert({ venue_id: venueId, days_before: daysBefore, deduction_percent: deductionPercent }, { onConflict: "venue_id,days_before" });
-  if (error) return { error: error.message };
+  if (error) return { error: "The rule could not be saved." };
   revalidateVenueDesk(venueId);
   return { error: null };
 }

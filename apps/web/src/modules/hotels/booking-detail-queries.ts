@@ -36,6 +36,8 @@ export type BookingDetail = {
   numAdults: number;
   numChildren: number;
   guests: Array<{ fullName: string; phone: string | null }>;
+  customerId: string | null;
+  customerName: string | null;
   customerEmail: string | null;
   specialRequests: string | null;
   totalPrice: number;
@@ -90,7 +92,8 @@ export async function getBookingDetail(hotelId: string, bookingId: string): Prom
        checked_in_at, checked_out_at,
        hotel:hotels(name),
        room:hotel_rooms(id, name),
-       customer:profiles!hotel_bookings_customer_id_fkey(email),
+       customer_id,
+       customer:profiles!hotel_bookings_customer_id_fkey(full_name, email),
        order_items(order:orders(status, order_number, payments(method_label, status))),
        hotel_booking_room_units(locked, unit:hotel_room_units(id, room_number, floor))`
     )
@@ -136,6 +139,8 @@ export async function getBookingDetail(hotelId: string, bookingId: string): Prom
     numAdults: booking.num_adults,
     numChildren: booking.num_children,
     guests: readGuests(booking.guest_details),
+    customerId: booking.customer_id,
+    customerName: booking.customer?.full_name ?? null,
     customerEmail: booking.customer?.email ?? null,
     specialRequests: booking.special_requests,
     totalPrice: Number(booking.total_price),

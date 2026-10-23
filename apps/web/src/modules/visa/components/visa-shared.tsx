@@ -19,7 +19,8 @@ export function processingText(visa: Pick<VisaTypeRow, "processing_days_min" | "
 }
 
 export function fmtMoney(amount: number | string, currency: string) {
-  return `${currency} ${Number(amount).toFixed(0)}`;
+  const value = Number(amount);
+  return `${currency} ${Number.isInteger(value) ? value : value.toFixed(2)}`;
 }
 
 const STATUS_BADGE_STYLES: Record<string, string> = {
@@ -145,28 +146,6 @@ export function VisaTypeBanner({
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-export function SecureDataNote() {
-  return (
-    <div className="rounded-xl border border-primary/20 bg-secondary/60 p-4">
-      <p className="flex items-center gap-2 text-sm font-semibold text-primary">
-        <svg viewBox="0 0 24 24" fill="none" className="size-4" aria-hidden>
-          <path
-            d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinejoin="round"
-          />
-          <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
-        Your data is secure and encrypted
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        We use 256-bit SSL encryption to protect your information.
-      </p>
     </div>
   );
 }

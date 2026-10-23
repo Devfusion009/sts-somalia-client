@@ -43,7 +43,6 @@ import { Separator } from "@/components/ui/separator";
 import { FlightDetails, hasFlightDetails } from "@/app/(marketing)/umrah/[slug]/flight-details";
 import { umrahTimeline, UMRAH_STAGE_LABEL, UMRAH_DOC_TYPE_LABEL, formatFileSize } from "@/modules/umrah/timeline";
 import type { BookingType } from "@/modules/bookings/types";
-import { getBookingTravel } from "@/modules/umrah/itinerary-queries";
 import { HotelStayList, ItineraryList, contactLine } from "@/modules/umrah/components/travel-details";
 import { PilgrimEditor } from "@/modules/umrah/components/pilgrim-editor";
 import { PilgrimDocuments } from "@/modules/umrah/components/pilgrim-documents";
@@ -161,6 +160,10 @@ export default async function BookingDetailPage({
   // confirm the booking and its final price — at which point the customer
   // pays from this page.
   const awaitingPayment = order.status === "pending_payment";
+  const paidSoFar = order.payments
+    .filter((p) => p.status === "succeeded")
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+  const balanceDue = order.status === "partially_paid" ? Number(order.total) - paidSoFar : 0;
   const umrahItem = order.order_items.find((i) => i.item_type === "umrah");
   const umrahBooking = umrahItem?.umrah_booking ?? null;
   const voucherAvailable = umrahVoucherAvailable(order.status, umrahBooking?.fulfillment_stage);
@@ -184,56 +187,22 @@ export default async function BookingDetailPage({
     ? umrahTimeline(umrahBooking?.fulfillment_stage, umrahBookingStatus)
     : null;
 
-  const [umrahPilgrims, umrahHistory, umrahDocumentRows, umrahReadinessRows, umrahTravel] = umrahBooking
-    ? await Promise.all([
-        supabase
-          .from("umrah_pilgrims")
-          .select(
-            "id, full_name, gender, date_of_birth, nationality, passport_number, passport_expiry, passport_issue_country, mahram_name, mahram_relation, phone"
-          )
-          .eq("booking_id", umrahBooking.id)
-          .order("full_name")
-          .then(({ data }) => data ?? []),
-        supabase
-          .from("umrah_booking_stage_history")
-          .select("id, stage, note, created_at")
-          .eq("booking_id", umrahBooking.id)
-          .order("created_at", { ascending: false })
-          .then(({ data }) => data ?? []),
-        supabase
-          .from("umrah_booking_documents")
-          .select("id, pilgrim_id, doc_type, title, storage_path, file_name, file_size, created_at, source, review_status, review_note")
-          .eq("booking_id", umrahBooking.id)
-          .order("created_at", { ascending: false })
-          .then(({ data }) => data ?? []),
-        supabase
-          .rpc("umrah_pilgrim_readiness", { p_booking_id: umrahBooking.id })
-          .then(({ data }) => data ?? []),
-        getBookingTravel(supabase, umrahBooking.id),
-      ])
-    : [[], [], [], [], null];
-  const umrahReadiness: Record<string, PilgrimReadiness> = Object.fromEntries(
-    umrahReadinessRows.map((r) => [r.pilgrim_id, { missing: r.missing, warnings: r.warnings }])
-  );
+  // Pilgrims, history, documents (signed links), readiness and travel — one API read under the caller's access.
+  const umrahFile = umrahBooking ? await (await getServerTrpc()).umrah.bookingFile.query({ bookingId: umrahBooking.id }) : null;
+  const umrahPilgrims = umrahFile?.pilgrims ?? [];
+  const umrahHistory = umrahFile?.history ?? [];
+  const umrahDocumentRows = umrahFile?.documents ?? [];
+  const umrahTravel = umrahFile?.travel ?? null;
+  const umrahReadiness: Record<string, PilgrimReadiness> = umrahFile?.readiness ?? {};
   // Pilgrim details and hand-in documents stay editable until visas are filed.
   const umrahOpenForChanges =
     !!umrahBooking &&
     ["pending", "confirmed"].includes(umrahBooking.status ?? "") &&
     ["booked", "confirmed"].includes(umrahBooking.fulfillment_stage ?? "");
 
-  // Private bucket: links are signed per render and expire after an hour.
-  const signedUrls = new Map<string, string>();
-  if (umrahDocumentRows.length > 0) {
-    const { data: signed } = await supabase.storage
-      .from("umrah-documents")
-      .createSignedUrls(
-        umrahDocumentRows.map((doc) => doc.storage_path),
-        60 * 60
-      );
-    for (const entry of signed ?? []) {
-      if (entry.path && entry.signedUrl) signedUrls.set(entry.path, entry.signedUrl);
-    }
-  }
+  const signedUrls = new Map<string, string>(
+    umrahDocumentRows.filter((doc) => doc.url).map((doc) => [doc.storage_path, doc.url as string])
+  );
   const pilgrimNames = new Map(umrahPilgrims.map((pilgrim) => [pilgrim.id, pilgrim.full_name]));
   const umrahDocuments = umrahDocumentRows.filter(
     (doc) => doc.source !== "customer" && signedUrls.has(doc.storage_path)
@@ -646,7 +615,7 @@ export default async function BookingDetailPage({
               {order.payments.map((payment) => (
                 <li key={payment.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium capitalize">{payment.provider}</p>
+                    <p className="text-sm font-medium capitalize">{payment.method_label ?? payment.provider}</p>
                     <p className="text-xs text-muted-foreground">
                       {format(new Date(payment.created_at), "d MMM yyyy, HH:mm")}
                     </p>
@@ -658,6 +627,17 @@ export default async function BookingDetailPage({
                 </li>
               ))}
             </ul>
+            {balanceDue > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Balance due</p>
+                  <p className="font-heading text-lg font-bold">{formatMoney(balanceDue, order.currency)}</p>
+                </div>
+                <Button className="gap-1.5" render={<Link href={`/checkout/${orderId}`} />}>
+                  <CreditCard className="size-4" /> Pay balance
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

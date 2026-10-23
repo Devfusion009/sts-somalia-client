@@ -9,8 +9,17 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { RoomNight } from "@/modules/hotels/availability";
+import type { NightlyRate } from "@/modules/hotels/rates";
 
-export function RoomNightsTable({ nights, currency }: { nights: RoomNight[]; currency: string }) {
+export function RoomNightsTable({
+  nights,
+  currency,
+  rates = {},
+}: {
+  nights: RoomNight[];
+  currency: string;
+  rates?: Record<string, NightlyRate>;
+}) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const minNight = nights[0]?.night;
@@ -103,8 +112,8 @@ export function RoomNightsTable({ nights, currency }: { nights: RoomNight[]; cur
                     </span>
                   )}
                 </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {n.priceOverride !== null ? `${currency} ${n.priceOverride.toFixed(0)}` : "base"}
+                <TableCell className="text-right tabular-nums">
+                  <RateCell rate={rates[n.night]} override={n.priceOverride} currency={currency} />
                 </TableCell>
               </TableRow>
             );
@@ -112,5 +121,25 @@ export function RoomNightsTable({ nights, currency }: { nights: RoomNight[]; cur
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+function money(amount: number) {
+  const cents = Math.round(amount * 100) / 100;
+  return Number.isInteger(cents) ? cents.toFixed(0) : cents.toFixed(2);
+}
+
+/** The selling rate for the night, tagged with where it comes from when it isn't the base rate. */
+function RateCell({ rate, override, currency }: { rate?: NightlyRate; override: number | null; currency: string }) {
+  const amount = rate?.rate ?? override;
+  if (amount === undefined || amount === null) return <span className="text-muted-foreground">Base</span>;
+  const tag = rate ? (rate.source === "override" ? "Override" : rate.source === "rule" ? rate.ruleName : null) : "Override";
+  return (
+    <span className="inline-flex items-baseline gap-2">
+      {tag ? <span className="text-xs text-muted-foreground">{tag}</span> : null}
+      <span className={cn(rate?.source === "base" ? "text-muted-foreground" : "font-semibold text-foreground")}>
+        {currency} {money(amount)}
+      </span>
+    </span>
   );
 }

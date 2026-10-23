@@ -144,6 +144,7 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
                   id="hotel-country"
                   name="countryCode"
                   maxLength={2}
+                  className="uppercase"
                   defaultValue={hotel?.country_code ?? "SO"}
                   required
                 />
@@ -182,12 +183,24 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
             </div>
             <AmenitiesField initial={amenitiesList(hotel?.amenities)} />
             <div className="space-y-2">
-              <Label htmlFor="hotel-policies">Policies (cancellation, house rules, ...)</Label>
-              <Textarea id="hotel-policies" name="policies" rows={3} defaultValue={hotel?.policies ?? ""} />
+              <Label htmlFor="hotel-policies">Policies</Label>
+              <Textarea
+                id="hotel-policies"
+                name="policies"
+                rows={3}
+                placeholder="Cancellation, house rules"
+                defaultValue={hotel?.policies ?? ""}
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="hotel-links">Links (one per line: Label | URL)</Label>
-              <Textarea id="hotel-links" name="links" rows={3} defaultValue={linksList(hotel?.property_links)} />
+              <Label htmlFor="hotel-links">Links</Label>
+              <Textarea
+                id="hotel-links"
+                name="links"
+                rows={3}
+                placeholder="Website | https://example.com"
+                defaultValue={linksList(hotel?.property_links)}
+              />
             </div>
             <div className="space-y-2">
               <Label>Owner</Label>

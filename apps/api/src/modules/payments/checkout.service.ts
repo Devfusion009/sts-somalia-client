@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RlsSupabaseService } from "../../infra/supabase/rls-supabase.service";
 import type { Database } from "@sts/shared-types";
-import { countryName } from "@sts/shared-types";
+import { countryName, eventTypeLabel } from "@sts/shared-types";
 import { format } from "date-fns";
 
 type Tables = Database["public"]["Tables"];
@@ -38,7 +38,9 @@ export type CheckoutOrderRow = Tables["orders"]["Row"] & {
           })
         | null;
       hall_booking:
-        | (Tables["hall_bookings"]["Row"] & { venue: Pick<Tables["event_venues"]["Row"], "name"> })
+        | (Tables["hall_bookings"]["Row"] & {
+            venue: Pick<Tables["event_venues"]["Row"], "name" | "price_unit" | "base_price">;
+          })
         | null;
     }
   >;
@@ -81,7 +83,7 @@ export class CheckoutService {
                return_airline, return_flight_number, return_departs_at, return_arrives_at, baggage_note
              )
            ),
-           hall_booking:hall_booking_id (id, status, start_date, end_date, event_type, venue:venue_id (name))
+           hall_booking:hall_booking_id (id, status, start_date, end_date, start_time, event_type, venue:venue_id (name, price_unit, base_price))
          ),
          payments (*)`
       )
@@ -151,7 +153,7 @@ export function describeOrderItem(item: CheckoutOrderItem): { title: string; sub
         : "";
       return {
         title: booking?.venue?.name ?? "Hall booking",
-        subtitle: booking ? `${booking.event_type} · ${range}` : "",
+        subtitle: booking ? `${eventTypeLabel(booking.event_type)} · ${range}` : "",
         href: "/account/bookings",
       };
     }

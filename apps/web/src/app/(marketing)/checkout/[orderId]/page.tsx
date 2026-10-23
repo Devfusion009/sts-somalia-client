@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { CancelOrderButton } from "@/modules/orders/components/cancel-order-button";
 import { ConvertHoldButton } from "@/modules/orders/components/convert-hold-button";
 import { umrahSeatHoldEnd } from "@/modules/umrah/settings";
+import { hallAwaitingQuote } from "@sts/shared-types";
 
 export const metadata: Metadata = { title: "Checkout" };
 
@@ -69,6 +70,7 @@ export default async function CheckoutPage({
     umrahItem.umrah_booking.status === "pending";
   const umrahSeatsHeldUntil = umrahGroupUnpaid ? await umrahSeatHoldEnd(order.created_at) : null;
 
+  const awaitingQuote = order.order_items.some((item) => item.hall_booking && hallAwaitingQuote(item.hall_booking));
   const isHeld = order.status === "held";
   const holdExpired = isHeld && order.hold_expires_at != null && new Date(order.hold_expires_at) < new Date();
 
@@ -246,6 +248,16 @@ export default async function CheckoutPage({
                   update in your account automatically.
                 </p>
                 <CancelPendingPaymentButton paymentId={pendingPayment.id} />
+              </CardContent>
+            </Card>
+          ) : awaitingQuote ? (
+            <Card className="border-brand-gold/50 bg-brand-gold/5">
+              <CardHeader className="flex-row items-center gap-2 space-y-0">
+                <Hourglass className="size-4 text-brand-gold" />
+                <CardTitle className="text-base">Awaiting the venue&apos;s price</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CancelOrderButton orderId={order.id} redirectTo="/account/bookings" />
               </CardContent>
             </Card>
           ) : (

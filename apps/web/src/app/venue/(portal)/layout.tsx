@@ -43,10 +43,7 @@ export default async function VenuePartnerLayout({ children }: { children: React
       <div className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
         <Card>
           <CardContent className="space-y-3 p-6 text-center">
-            <p className="font-medium">No active venue partner membership found</p>
-            <p className="text-sm text-muted-foreground">
-              You don&apos;t currently have an active venue partner membership on this account.
-            </p>
+            <p className="font-medium">No active venue partner membership</p>
             <Button render={<Link href="/account/become?program=venue" />}>Apply to list your venue</Button>
           </CardContent>
         </Card>

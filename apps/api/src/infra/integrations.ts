@@ -1,3 +1,4 @@
+import { env } from "../config/env";
 /**
  * Direct port of apps/web's lib/integrations.ts — env-driven capability
  * registry. Ported additively (apps/web's original stays, still used by
@@ -10,26 +11,26 @@
 const bool = (v: string | undefined) => v === "true" || v === "1";
 
 export function getIntegrations() {
-  const stripe = !!process.env.STRIPE_SECRET_KEY;
+  const stripe = !!env().STRIPE_SECRET_KEY;
   const waafi = !!(
-    process.env.WAAFI_MERCHANT_UID &&
-    process.env.WAAFI_API_USER_ID &&
-    process.env.WAAFI_API_KEY
+    env().WAAFI_MERCHANT_UID &&
+    env().WAAFI_API_USER_ID &&
+    env().WAAFI_API_KEY
   );
-  const edahab = !!(process.env.EDAHAB_API_KEY && process.env.EDAHAB_AGENT_CODE);
+  const edahab = !!(env().EDAHAB_API_KEY && env().EDAHAB_AGENT_CODE);
 
-  const explicitTestMode = process.env.PAYMENTS_TEST_MODE;
-  const testMode = explicitTestMode !== undefined ? bool(explicitTestMode) : process.env.NODE_ENV !== "production";
+  const explicitTestMode = env().PAYMENTS_TEST_MODE;
+  const testMode = explicitTestMode !== undefined ? bool(explicitTestMode) : env().NODE_ENV !== "production";
 
   return {
     payments: { stripe, waafi, edahab, testMode },
-    email: { resend: !!process.env.RESEND_API_KEY },
-    whatsappApi: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM),
-    siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+    email: { resend: !!env().RESEND_API_KEY },
+    whatsappApi: !!(env().TWILIO_ACCOUNT_SID && env().TWILIO_AUTH_TOKEN && env().TWILIO_WHATSAPP_FROM),
+    siteUrl: env().NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
     bankTransfer: {
-      bankName: process.env.BANK_TRANSFER_BANK_NAME ?? "Premier Bank",
-      accountName: process.env.BANK_TRANSFER_ACCOUNT_NAME ?? "Scout Travel Solution LTD",
-      accountNumber: process.env.BANK_TRANSFER_ACCOUNT_NUMBER ?? "020160002200",
+      bankName: env().BANK_TRANSFER_BANK_NAME ?? "Premier Bank",
+      accountName: env().BANK_TRANSFER_ACCOUNT_NAME ?? "Scout Travel Solution LTD",
+      accountNumber: env().BANK_TRANSFER_ACCOUNT_NUMBER ?? "020160002200",
     },
   };
 }

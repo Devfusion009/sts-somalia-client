@@ -4,6 +4,8 @@ import { AlertCircle, Pencil } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { getHotelRoomAdmin } from "@/modules/admin/queries";
 import { getHotelAvailability } from "@/modules/hotels/availability";
+import { getNightRates } from "@/modules/hotels/rates";
+import { createClient } from "@/lib/supabase/server";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,7 @@ export default async function AdminRoomInventoryPage({
 
   const [availability] = await getHotelAvailability(id, { roomId, days: 60 });
   const nights = availability?.nights ?? [];
+  const rates = await getNightRates(await createClient(), room, nights.map((n) => n.night));
   const images = Array.isArray(room.images) ? room.images.filter((p): p is string => typeof p === "string") : [];
 
   return (
@@ -57,7 +60,7 @@ export default async function AdminRoomInventoryPage({
           <CardTitle className="text-base">Next 60 nights</CardTitle>
         </CardHeader>
         <div className="overflow-x-auto">
-          <RoomNightsTable nights={nights} currency={room.currency} />
+          <RoomNightsTable nights={nights} currency={room.currency} rates={rates} />
         </div>
       </Card>
 

@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { eventTypeLabel } from "@sts/shared-types";
 import { countryName } from "@/lib/countries";
 import { sharingLabel } from "@/modules/umrah/images";
 import type { Database } from "@/lib/types/database.types";
@@ -133,7 +134,7 @@ export function describeOrderItem(item: DescribableOrderItem): {
         : "";
       return {
         title: booking?.venue?.name ?? "Hall booking",
-        subtitle: booking ? `${booking.event_type} · ${range}` : "",
+        subtitle: booking ? `${eventTypeLabel(booking.event_type)} · ${range}` : "",
         href: "/account/bookings",
       };
     }

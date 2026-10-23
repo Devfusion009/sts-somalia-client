@@ -12,6 +12,8 @@ import {
   getHotelForEdit,
 } from "@/modules/hotels/partner-queries";
 import { getHotelAvailability } from "@/modules/hotels/availability";
+import { getNightRates } from "@/modules/hotels/rates";
+import { createClient } from "@/lib/supabase/server";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +45,7 @@ export default async function RoomInventoryPage({
     getRoomBookings(room.id, id, scope.hotelIds),
   ]);
   const nights = availability.find((a) => a.roomId === room.id)?.nights ?? [];
+  const rates = await getNightRates(await createClient(), room, nights.map((n) => n.night));
   const availabilityByRoom = Object.fromEntries(availability.map((a) => [a.roomId, a.nights]));
   // Always include the room this page is on, even if it isn't published — an
   // unpublished type can't drop out of the picker while you're actively
@@ -103,7 +106,7 @@ export default async function RoomInventoryPage({
           <CardTitle className="text-base">Next 60 nights</CardTitle>
         </CardHeader>
         <div className="overflow-x-auto">
-          <RoomNightsTable nights={nights} currency={room.currency} />
+          <RoomNightsTable nights={nights} currency={room.currency} rates={rates} />
         </div>
       </Card>
 

@@ -46,9 +46,10 @@ function stayState(b: BookingDetail, today: string) {
   return today >= b.checkIn ? "Due in" : "Upcoming";
 }
 
-function actorLabel(event: BookingEvent, viewerId: string) {
+function actorLabel(event: BookingEvent, viewerId: string, customerId: string | null) {
   if (!event.actorId) return "System";
-  return event.actorId === viewerId ? "You" : "Staff";
+  if (event.actorId === viewerId) return "You";
+  return event.actorId === customerId ? "Guest" : "Staff";
 }
 
 function providerLabel(provider: string) {
@@ -111,7 +112,7 @@ export async function BookingDetailView({
   const today = todayIso();
   const state = stayState(booking, today);
   const live = booking.status === "pending" || booking.status === "confirmed";
-  const leadGuest = booking.guests[0]?.fullName ?? "Guest";
+  const leadGuest = booking.guests[0]?.fullName ?? booking.customerName ?? booking.customerEmail ?? "Guest";
   const paymentLabel = booking.paymentMethod ? PAYMENT_METHOD_LABEL[booking.paymentMethod as OfflinePaymentMethod] : null;
   const isOffline = booking.source === "offline";
   const channelLabel = booking.channel === "b2b" ? "Agency" : isOffline ? "Offline" : "Online";
@@ -329,7 +330,7 @@ export async function BookingDetailView({
                     <CircleDot className="absolute -left-[1.6rem] top-0.5 size-3.5 bg-card text-primary" />
                     <p className="text-sm font-medium">{eventTitle(event)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {format(new Date(event.createdAt), "d MMM, HH:mm")} · {actorLabel(event, access.profileId)}
+                      {format(new Date(event.createdAt), "d MMM, HH:mm")} · {actorLabel(event, access.profileId, booking.customerId)}
                     </p>
                   </li>
                 ))}

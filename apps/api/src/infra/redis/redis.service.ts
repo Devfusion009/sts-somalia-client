@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import Redis from "ioredis";
+import { env } from "../../config/env";
 
 /**
  * Direct port of apps/web's lib/redis.ts, as a Nest singleton provider —
@@ -14,10 +15,11 @@ export class RedisService implements OnModuleDestroy {
   private initialized = false;
 
   private getClient(): Redis | null {
-    if (!process.env.REDIS_URL) return null;
+    const url = env().REDIS_URL;
+    if (!url) return null;
     if (!this.initialized) {
       this.initialized = true;
-      this.client = new Redis(process.env.REDIS_URL, {
+      this.client = new Redis(url, {
         maxRetriesPerRequest: 1,
         lazyConnect: true,
       });

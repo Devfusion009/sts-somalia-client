@@ -220,6 +220,8 @@ export function FlightSearchForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [adults, setAdults] = useState(defaults.adults ?? "1");
+  const [departDate, setDepartDate] = useState(defaults.departDate ?? "");
+  const today = new Date().toISOString().slice(0, 10);
   const [cabin, setCabin] = useState(defaults.cabin ?? "economy");
   const roundTrip = tripType === "round_trip";
   const cabinLabel = CABINS.find((c) => c.value === cabin)?.label ?? "Economy";
@@ -310,7 +312,9 @@ export function FlightSearchForm({
               type="date"
               autoComplete="off"
               required
+              min={today}
               defaultValue={defaults.departDate}
+              onChange={(e) => setDepartDate(e.target.value)}
               className={RESET_INPUT}
             />
           </div>
@@ -328,6 +332,7 @@ export function FlightSearchForm({
               type="date"
               autoComplete="off"
               disabled={!roundTrip}
+              min={departDate || today}
               defaultValue={defaults.returnDate}
               className={RESET_INPUT}
             />

@@ -19,6 +19,17 @@ export type ApplicantType = (typeof APPLICANT_TYPES)[number];
  */
 export { RELATIONSHIPS };
 
+/** Today as YYYY-MM-DD (UTC) — date inputs submit this format, so plain string order is date order. */
+export function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+const isoDate = (message: string) => z.string({ error: message }).regex(/^\d{4}-\d{2}-\d{2}$/, message);
+const pastDate = (message: string) =>
+  isoDate(message).refine((d) => d < todayIso(), "Date of birth must be in the past.");
+const unexpiredDate = (message: string) =>
+  isoDate(message).refine((d) => d > todayIso(), "This passport has expired.");
+
 /**
  * Only what the passport, the consulate contact chain, and payment actually
  * need. Anything a specific destination additionally requires goes through
@@ -27,34 +38,37 @@ export { RELATIONSHIPS };
  */
 export const personalInfoSchema = z.object({
   fullName: z.string().min(2, "Enter the full name as shown in the passport."),
-  dateOfBirth: z.string().min(1, "Enter the date of birth."),
+  dateOfBirth: pastDate("Enter the date of birth."),
   gender: z.enum(["male", "female"], { error: "Select a gender." }),
   nationality: z.string().length(2, "Select a nationality."),
   passportNumber: z.string().min(3, "Enter the passport number."),
-  passportExpiry: z.string().min(1, "Enter the passport expiry date."),
+  passportExpiry: unexpiredDate("Enter the passport expiry date."),
   email: z.string().email("Enter a valid email address."),
   mobile: z.string().min(7, "Enter a valid mobile number."),
 });
 export type PersonalInfo = z.infer<typeof personalInfoSchema>;
 
 export const travelInfoSchema = z.object({
-  arrivalDate: z.string().min(1, "Enter the arrival date."),
-  departureDate: z.string().min(1, "Enter the departure date."),
+  arrivalDate: isoDate("Enter the arrival date.").refine((d) => d >= todayIso(), "Arrival date can't be in the past."),
+  departureDate: isoDate("Enter the departure date."),
   purposeOfVisit: z.enum(
     ["tourism", "business", "family_visit", "medical", "transit", "umrah", "other"],
     { error: "Select the purpose of visit." }
   ),
   addressAtDestination: z.string().min(3, "Enter a hotel name or contact address."),
+}).refine((t) => t.departureDate >= t.arrivalDate, {
+  message: "Departure must be on or after arrival.",
+  path: ["departureDate"],
 });
 export type TravelInfo = z.infer<typeof travelInfoSchema>;
 
 export const memberSchema = z.object({
   fullName: z.string().min(2, "Enter the member's full name."),
   relationship: z.enum(RELATIONSHIPS, { error: "Select a relationship." }),
-  dateOfBirth: z.string().min(1, "Enter the date of birth."),
+  dateOfBirth: pastDate("Enter the date of birth."),
   nationality: z.string().length(2, "Select a nationality."),
   passportNumber: z.string().min(3, "Enter the passport number."),
-  passportExpiry: z.string().optional(),
+  passportExpiry: unexpiredDate("Enter a valid passport expiry date.").optional(),
 });
 export type MemberInput = z.infer<typeof memberSchema>;
 

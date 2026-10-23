@@ -9,10 +9,9 @@ import type { ActionState } from "@/lib/auth/actions";
  * Submits the SAME sign-in action the real form on this page would use,
  * with a hidden, pre-filled demo email/password — a real
  * signInWithPassword() call triggered by a click instead of typing, not a
- * parallel auth path. This is the ONLY way in on a hosted, demo-enabled
- * page — the page itself decides whether to render the real credential
- * form or this button (DEMO_LOGIN_ENABLED, checked server-side), never
- * both at once.
+ * parallel auth path. Rendered under the real credential form when
+ * DEMO_LOGIN_ENABLED is set (checked server-side): replacing the form locked
+ * every real admin, agent, manager and customer out of the hosted site.
  */
 export function DemoLoginButton({
   action,

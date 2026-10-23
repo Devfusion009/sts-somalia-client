@@ -44,7 +44,7 @@ export function InventoryRangeForm({ hotelId, roomId, currency }: { hotelId: str
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="totalUnits">
-            Rooms available per night <span className="text-destructive">*</span>
+            Rooms to sell
           </Label>
           <Input
             id="totalUnits"
@@ -52,19 +52,18 @@ export function InventoryRangeForm({ hotelId, roomId, currency }: { hotelId: str
             type="number"
             min={0}
             max={1000}
-            placeholder="0 blocks the dates"
-            required
+            placeholder="Unchanged"
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="priceOverride">Nightly price override ({currency}, optional)</Label>
+          <Label htmlFor="priceOverride">Price per night ({currency})</Label>
           <Input
             id="priceOverride"
             name="priceOverride"
             type="number"
-            min={0}
+            min={0.01}
             step="0.01"
-            placeholder="Base price"
+            placeholder="Unchanged"
           />
         </div>
       </div>

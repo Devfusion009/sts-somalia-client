@@ -86,3 +86,20 @@ export async function getStayPrices(
   }
   return result;
 }
+
+/**
+ * The rate each listed night actually sells at for one room, keyed by night —
+ * for inventory tables, so staff see the price a guest is charged (rule and
+ * override included), not just whether an override exists.
+ */
+export async function getNightRates(
+  supabase: SupabaseClient<Database>,
+  room: { id: string; base_price: number | string },
+  nights: string[]
+): Promise<Record<string, NightlyRate>> {
+  if (nights.length === 0) return {};
+  const last = new Date(`${nights[nights.length - 1]}T00:00:00Z`);
+  last.setUTCDate(last.getUTCDate() + 1);
+  const prices = await getStayPrices(supabase, [room], nights[0], last.toISOString().slice(0, 10));
+  return Object.fromEntries((prices.get(room.id)?.nights ?? []).map((n) => [n.night, n]));
+}

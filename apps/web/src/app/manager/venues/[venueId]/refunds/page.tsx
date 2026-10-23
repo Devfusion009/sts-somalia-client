@@ -8,5 +8,10 @@ export default async function VenueRefundsPage({ params }: { params: Promise<{ v
   const { venueId } = await params;
   const access = await getVenueAccess(venueId);
   if (!access || !access.can("bookings")) notFound();
-  return <VenueRefundsView venueId={venueId} base={`/manager/venues/${venueId}`} access={access} />;
+  return (
+    <div className="mx-auto max-w-6xl space-y-6">
+      <h1 className="font-heading text-2xl font-semibold">Refunds</h1>
+      <VenueRefundsView venueId={venueId} base={`/manager/venues/${venueId}`} access={access} />
+    </div>
+  );
 }

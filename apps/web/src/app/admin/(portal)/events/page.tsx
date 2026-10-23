@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,13 +13,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { MapPin, Users, ImageOff, Settings2 } from "lucide-react";
-import { getVenuesAdmin, getVenueCitiesAdmin, getHallBookingsAdmin } from "@/modules/admin/queries";
+import { getVenuesAdmin, getVenueCitiesAdmin, getUpcomingHallBookingsAdmin } from "@/modules/admin/queries";
 import { venueImageUrls } from "@/modules/events/images";
+import { venueMoney } from "@/modules/events/components/amenities";
 import { VenueFilters } from "./venue-filters";
 import { VenueForm } from "./venue-form";
-import { HallBookingPriceForm } from "./hall-booking-controls";
-import { HallMoveActions } from "@/modules/events/components/hall-move-actions";
-import { updateHallBookingStatus } from "@/modules/admin/actions";
+import { HallStatusBadge } from "@/modules/events/components/hall-badges";
+import { shortTime } from "@/modules/events/venue-desk-types";
+import { eventTypeLabel } from "@sts/shared-types";
 import { todayIso } from "@/modules/hotels/availability";
 import { cn } from "@/lib/utils";
 
@@ -32,25 +33,17 @@ const VENUE_STATUS_STYLES: Record<string, string> = {
   suspended: "bg-destructive/10 text-destructive",
 };
 
-const BOOKING_STATUS_STYLES: Record<string, string> = {
-  pending: "bg-brand-gold/15 text-brand-gold",
-  confirmed: "bg-primary/10 text-primary",
-  completed: "bg-chart-3/10 text-chart-3",
-  cancelled: "bg-destructive/10 text-destructive",
-};
-
 export default async function AdminEventsPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string; status?: string; city?: string }>;
 }) {
   const sp = await searchParams;
-  const [venues, { cities, total, published }, bookings] = await Promise.all([
+  const [venues, { cities, total, published }, { bookings, awaiting }] = await Promise.all([
     getVenuesAdmin(sp),
     getVenueCitiesAdmin(),
-    getHallBookingsAdmin(),
+    getUpcomingHallBookingsAdmin(todayIso()),
   ]);
-  const awaiting = bookings.filter((b) => b.status === "pending").length;
   const filtered = Boolean(sp.q || sp.status || sp.city);
 
   return (
@@ -154,14 +147,14 @@ export default async function AdminEventsPage({
                         {Number(venue.base_price) > 0 ? (
                           <>
                             <span className="font-semibold">
-                              {venue.currency} {Number(venue.base_price).toFixed(0)}
+                              {venueMoney(venue.currency, venue.base_price)}
                             </span>{" "}
                             <span className="text-xs text-muted-foreground">
                               {venue.price_unit.replace("per_", "/ ")}
                             </span>
                           </>
                         ) : (
-                          <span className="text-muted-foreground">Not set</span>
+                          <span className="text-muted-foreground">On request</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -202,70 +195,55 @@ export default async function AdminEventsPage({
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-heading text-lg font-semibold">Hall bookings</h2>
+        <h2 className="font-heading text-lg font-semibold">Upcoming events</h2>
         <Card className="overflow-hidden py-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Reference</TableHead>
-                <TableHead>Venue</TableHead>
-                <TableHead>Customer</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead>Event</TableHead>
-                <TableHead>Guests</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead className="text-right">Status</TableHead>
+                <TableHead>Venue</TableHead>
+                <TableHead>Client</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {bookings.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                    No hall bookings yet.
+                  <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                    No upcoming events.
                   </TableCell>
                 </TableRow>
               ) : (
                 bookings.map((booking) => (
-                  <TableRow key={booking.id}>
-                    <TableCell className="font-mono text-xs">{booking.booking_ref}</TableCell>
-                    <TableCell>
-                      <p className="font-medium">{booking.venue?.name ?? "—"}</p>
-                      <p className="text-xs text-muted-foreground">{booking.venue?.city}</p>
-                    </TableCell>
-                    <TableCell>
-                      <p>{booking.customer?.full_name ?? "—"}</p>
-                      <p className="text-xs text-muted-foreground">{booking.customer?.email}</p>
-                    </TableCell>
-                    <TableCell>
-                      <p className="capitalize">{booking.event_type.replace("_", " ")}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(booking.start_date), "dd MMM yyyy")}
-                        {booking.end_date !== booking.start_date
-                          ? ` – ${format(new Date(booking.end_date), "dd MMM yyyy")}`
-                          : ""}
-                        {booking.start_time ? ` · ${booking.start_time.slice(0, 5)}` : ""}
-                        {booking.end_time ? `–${booking.end_time.slice(0, 5)}` : ""}
+                  <TableRow key={booking.id} className="relative">
+                    <TableCell className="whitespace-nowrap">
+                      <Link
+                        href={`/admin/events/${booking.venue_id}/bookings/${booking.id}`}
+                        className="font-medium after:absolute after:inset-0 hover:text-primary"
+                      >
+                        {format(parseISO(booking.start_date), "EEE d MMM yyyy")}
+                      </Link>
+                      <p className="text-xs text-muted-foreground tabular-nums">
+                        {booking.end_date !== booking.start_date ? `to ${format(parseISO(booking.end_date), "d MMM")} · ` : ""}
+                        {shortTime(booking.start_time)
+                          ? `${shortTime(booking.start_time)}${booking.end_time ? `–${shortTime(booking.end_time)}` : ""}`
+                          : "All day"}
                       </p>
                     </TableCell>
-                    <TableCell>{booking.expected_guests ?? "—"}</TableCell>
                     <TableCell>
-                      <HallBookingPriceForm
-                        bookingId={booking.id}
-                        price={Number(booking.price)}
-                        currency={booking.currency}
-                      />
+                      <p className="font-medium">{booking.event_name || eventTypeLabel(booking.event_type)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {booking.expected_guests ?? "—"} guests · <span className="font-mono">{booking.booking_ref}</span>
+                      </p>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col items-end gap-1.5">
-                        <Badge
-                          className={cn(
-                            "border-transparent capitalize",
-                            BOOKING_STATUS_STYLES[booking.status] ?? "bg-muted text-muted-foreground"
-                          )}
-                        >
-                          {booking.status.replace("_", " ")}
-                        </Badge>
-                        <HallMoveActions booking={booking} today={todayIso()} isAdmin action={updateHallBookingStatus} />
-                      </div>
+                      <p>{booking.venue?.name ?? "—"}</p>
+                      <p className="text-xs text-muted-foreground">{booking.venue?.city}</p>
+                    </TableCell>
+                    <TableCell>{booking.agency?.name ?? booking.contact_name ?? "Client"}</TableCell>
+                    <TableCell>
+                      <HallStatusBadge status={booking.status} />
                     </TableCell>
                   </TableRow>
                 ))

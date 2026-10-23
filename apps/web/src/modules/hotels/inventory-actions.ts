@@ -2,6 +2,7 @@
 
 import { unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { inventoryRows, parseInventoryDetail } from "@/modules/hotels/inventory-rows";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
@@ -89,15 +90,7 @@ export async function setRoomInventory(
     });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const detail = z
-    .object({
-      totalUnits: z.coerce.number().int().min(0, "Units can't be negative.").max(1000),
-      priceOverride: z.coerce.number().min(0).optional(),
-    })
-    .safeParse({
-      totalUnits: formData.get("totalUnits"),
-      priceOverride: formData.get("priceOverride") || undefined,
-    });
+  const detail = parseInventoryDetail(formData);
   if (!detail.success) return { error: detail.error.issues[0].message };
 
   const dates = datesInRange(parsed.data.startDate, parsed.data.endDate);
@@ -107,15 +100,9 @@ export async function setRoomInventory(
   const room = await getOwnedRoom(supabase, parsed.data.roomId, parsed.data.hotelId, scope.hotelIds);
   if (!room) return { error: "Room not found." };
 
-  const { error } = await supabase.from("hotel_room_inventory").upsert(
-    dates.map((date) => ({
-      room_id: room.id,
-      date,
-      total_units: detail.data.totalUnits,
-      price_override: detail.data.priceOverride ?? null,
-    })),
-    { onConflict: "room_id,date" }
-  );
+  const built = await inventoryRows(supabase, room.id, dates, detail.data);
+  if ("error" in built) return { error: built.error };
+  const { error } = await supabase.from("hotel_room_inventory").upsert(built.rows, { onConflict: "room_id,date" });
   if (error) return { error: error.message };
 
   revalidatePath(`/partner/hotels/${parsed.data.hotelId}/rooms/${room.id}`);

@@ -60,7 +60,7 @@ export default async function PrivateUmrahPage({
   // Only a signed-in visitor can have a draft at all (starting one requires
   // an account), so this is skipped entirely for a signed-out visitor rather
   // than costing them a query that can never return anything.
-  const draft = profile ? await getMyDraftUmrahRequest(profile.id) : null;
+  const draft = profile ? await getMyDraftUmrahRequest() : null;
 
   const cheapestByCategory = new Map<string, { price: number; currency: string; unit: string }>();
   for (const service of services) {

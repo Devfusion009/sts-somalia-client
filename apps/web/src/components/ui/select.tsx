@@ -6,7 +6,40 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
-const Select = SelectPrimitive.Root
+/**
+ * Without an `items` map, Base UI's <Select.Value> renders the raw value
+ * ("none", "instant", "percent") instead of the option's label until the
+ * popup has mounted. Derive the map from the <SelectItem> children so every
+ * select shows its label; an explicit `items` prop still wins.
+ */
+function collectItemLabels(node: React.ReactNode, out: Record<string, React.ReactNode>) {
+  React.Children.forEach(node, (child) => {
+    if (!React.isValidElement<{ value?: unknown; children?: React.ReactNode }>(child)) return
+    if (child.type === SelectItem && child.props.value !== undefined && child.props.value !== null) {
+      out[String(child.props.value)] = child.props.children
+    } else if (child.props.children) {
+      collectItemLabels(child.props.children, out)
+    }
+  })
+}
+
+function Select<Value, Multiple extends boolean | undefined = false>({
+  items,
+  children,
+  ...props
+}: SelectPrimitive.Root.Props<Value, Multiple>) {
+  const derived = React.useMemo(() => {
+    if (items) return items
+    const out: Record<string, React.ReactNode> = {}
+    collectItemLabels(children, out)
+    return Object.keys(out).length > 0 ? out : undefined
+  }, [items, children])
+  return (
+    <SelectPrimitive.Root items={derived} {...props}>
+      {children}
+    </SelectPrimitive.Root>
+  )
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (

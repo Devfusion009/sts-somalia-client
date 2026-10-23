@@ -608,10 +608,10 @@ export type FlightOffersFilter = z.infer<typeof flightOffersFilterSchema>;
 
 export const requestFlightQuoteSchema = z
   .object({
-    origin: z.string().length(3, "Select a departure airport."),
-    destination: z.string().length(3, "Select a destination airport."),
-    departDate: z.string().min(1, "Choose a departure date."),
-    returnDate: z.string().optional(),
+    origin: z.string().regex(/^[A-Z]{3}$/, "Select a departure airport."),
+    destination: z.string().regex(/^[A-Z]{3}$/, "Select a destination airport."),
+    departDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a departure date."),
+    returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     tripType: z.enum(["one_way", "round_trip"]),
     cabinClass: z.enum(["economy", "premium_economy", "business", "first"]),
     adults: z.coerce.number().int().min(1, "At least one passenger.").max(9, "Maximum 9 passengers."),
@@ -630,152 +630,21 @@ export const requestFlightQuoteSchema = z
   .refine((d) => d.tripType !== "round_trip" || !!d.returnDate, {
     message: "Choose a return date for a round trip.",
     path: ["returnDate"],
+  })
+  // Dates are YYYY-MM-DD, so string order is date order. "Today" is UTC's,
+  // which is never later than the traveller's local date in East Africa.
+  .refine((d) => d.departDate >= new Date().toISOString().slice(0, 10), {
+    message: "Departure date can't be in the past.",
+    path: ["departDate"],
+  })
+  .refine((d) => !d.returnDate || d.returnDate >= d.departDate, {
+    message: "Return date must be on or after the departure date.",
+    path: ["returnDate"],
   });
 export type RequestFlightQuoteInput = z.infer<typeof requestFlightQuoteSchema>;
 
-/**
- * events — phase 4c. Direct port of modules/events/{actions,queries,
- * venue-partner-actions,venue-partner-queries}.ts.
- */
-
-export const venueFiltersSchema = z.object({ city: z.string().optional(), eventType: z.string().optional() });
-export type VenueFilters = z.infer<typeof venueFiltersSchema>;
-
-export const venueOccupiedRangesSchema = z.object({
-  venueId: z.string().uuid(),
-  from: z.string(),
-  to: z.string(),
-});
-export type VenueOccupiedRangesInput = z.infer<typeof venueOccupiedRangesSchema>;
-
-export const createHallBookingSchema = z.object({
-  venueId: z.string().uuid(),
-  eventType: z.string().min(2, "Select the type of event."),
-  eventName: z.string().max(200).optional(),
-  startDate: z.string().min(1, "Choose a start date."),
-  endDate: z.string().min(1, "Choose an end date."),
-  startTime: z.string().optional(),
-  endTime: z.string().optional(),
-  expectedGuests: z.coerce.number().int().min(1, "Enter the expected number of guests."),
-  setupRequirements: z.string().max(2000).optional(),
-  agencyCustomerId: z.string().optional(),
-  newCustomerName: z.string().optional(),
-  newCustomerPhone: z.string().optional(),
-});
-export type CreateHallBookingInput = z.infer<typeof createHallBookingSchema>;
-
-export const venuePriceUnitValues = ["per_event", "per_day", "per_hour", "per_person"] as const;
-
-export type HallPriceUnit = (typeof venuePriceUnitValues)[number];
-
-export type HallPriceInput = {
-  basePrice: number;
-  priceUnit: string;
-  expectedGuests: number;
-  startDate: string;
-  endDate: string;
-  startTime?: string | null;
-  endTime?: string | null;
-};
-
-export type HallPriceBreakdown = {
-  /** Units charged for: guests, days, hours, or 1 for a flat event fee. */
-  quantity: number;
-  /** Singular noun for the multiplied unit — "guest", "day", "hour", or null for a flat fee. */
-  unitNoun: "guest" | "day" | "hour" | null;
-  unitPrice: number;
-  total: number;
-  /** Venue publishes no price; the events team quotes it manually. */
-  onRequest: boolean;
-  /** per_hour with no times entered — quantity can't be known, so total is not yet final. */
-  needsTimes: boolean;
-};
-
-/** Inclusive day count: same start and end date is one day, not zero. */
-function hallDayCount(startDate: string, endDate: string): number {
-  const start = Date.parse(`${startDate}T00:00:00Z`);
-  const end = Date.parse(`${endDate}T00:00:00Z`);
-  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return 1;
-  return Math.floor((end - start) / 86_400_000) + 1;
-}
-
-/** Hours between two "HH:MM" times, rounded up; an end at or before the start is treated as overnight. */
-function hallHoursPerDay(startTime?: string | null, endTime?: string | null): number | null {
-  if (!startTime || !endTime) return null;
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  if ([sh, sm, eh, em].some((n) => !Number.isFinite(n))) return null;
-  const minutes = eh * 60 + em - (sh * 60 + sm);
-  const spanned = minutes > 0 ? minutes : minutes + 24 * 60;
-  return Math.max(1, Math.ceil(spanned / 60));
-}
-
-/**
- * The one place a hall's price is calculated. Both the customer-facing
- * estimate and the row written to hall_bookings call this, so what a
- * customer is quoted and what they are charged cannot drift apart — before
- * this existed, apps/api multiplied per_person by headcount but billed
- * per_day and per_hour venues a single unit regardless of how many days or
- * hours were booked.
- */
-export function computeHallPrice(input: HallPriceInput): HallPriceBreakdown {
-  const unitPrice = Number(input.basePrice) || 0;
-  const flat: HallPriceBreakdown = {
-    quantity: 1,
-    unitNoun: null,
-    unitPrice,
-    total: unitPrice,
-    onRequest: unitPrice <= 0,
-    needsTimes: false,
-  };
-  if (unitPrice <= 0) return flat;
-
-  switch (input.priceUnit) {
-    case "per_person": {
-      const quantity = Math.max(1, Math.floor(input.expectedGuests) || 1);
-      return { ...flat, quantity, unitNoun: "guest", total: unitPrice * quantity, onRequest: false };
-    }
-    case "per_day": {
-      const quantity = hallDayCount(input.startDate, input.endDate);
-      return { ...flat, quantity, unitNoun: "day", total: unitPrice * quantity, onRequest: false };
-    }
-    case "per_hour": {
-      const hours = hallHoursPerDay(input.startTime, input.endTime);
-      if (hours === null) return { ...flat, unitNoun: "hour", needsTimes: true, onRequest: false };
-      const quantity = hours * hallDayCount(input.startDate, input.endDate);
-      return { ...flat, quantity, unitNoun: "hour", total: unitPrice * quantity, onRequest: false };
-    }
-    default:
-      return { ...flat, onRequest: false };
-  }
-}
-
-export const venueUpsertSchema = z.object({
-  name: z.string().min(2, "Enter the venue name."),
-  city: z.string().min(1, "Enter the city."),
-  tagline: z.string().optional(),
-  description: z.string().optional(),
-  address: z.string().optional(),
-  capacitySeated: z.coerce.number().int().min(1).optional().or(z.literal("").transform(() => undefined)),
-  capacityStanding: z.coerce.number().int().min(1).optional().or(z.literal("").transform(() => undefined)),
-  sizeSqm: z.coerce.number().min(1).optional().or(z.literal("").transform(() => undefined)),
-  eventTypes: z.string().optional(),
-  basePrice: z.coerce.number().min(0),
-  currency: z.string().min(3).max(3).default("USD"),
-  priceUnit: z.enum(venuePriceUnitValues),
-  status: z.enum(["draft", "pending_review"]),
-});
-export type VenueUpsertInput = z.infer<typeof venueUpsertSchema>;
-
-export const updateMyVenueSchema = venueUpsertSchema.extend({ venueId: z.string().uuid() });
-export type UpdateMyVenueInput = z.infer<typeof updateMyVenueSchema>;
-
-export const venueBookingStatusValues = ["pending", "confirmed", "cancelled", "completed", "no_show"] as const;
-export const updateVenueBookingStatusSchema = z.object({
-  bookingId: z.string().uuid(),
-  status: z.enum(venueBookingStatusValues),
-});
-export type UpdateVenueBookingStatusInput = z.infer<typeof updateVenueBookingStatusSchema>;
+export * from "./events";
+export * from "./umrah";
 
 /**
  * payments — phase 4c. Direct port of modules/payments/{registry,providers,

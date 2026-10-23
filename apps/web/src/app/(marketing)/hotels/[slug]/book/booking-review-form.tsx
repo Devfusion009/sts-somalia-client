@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
-import { createHotelBooking, getStayQuote } from "@/modules/hotels/booking-actions";
+import { createHotelBooking, getStayQuote, type StayQuote } from "@/modules/hotels/booking-actions";
 import { cn } from "@/lib/utils";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -36,6 +36,25 @@ const REQUEST_OPTIONS = [
   "Breakfast included",
 ];
 
+/** Longer stays show the average instead of a line per night. */
+const MAX_NIGHT_LINES = 14;
+
+/** "2026-10-30" → "Fri 30 Oct", read as a calendar date (no timezone shift). */
+function nightLabel(iso: string) {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+/** Whole amounts without decimals, fractional ones to the cent — never round a charged figure away. */
+function formatMoney(amount: number) {
+  const cents = Math.round(amount * 100) / 100;
+  return Number.isInteger(cents) ? cents.toFixed(0) : cents.toFixed(2);
+}
+
 function nightsBetween(checkIn: string, checkOut: string) {
   if (!checkIn || !checkOut) return 0;
   const diff = new Date(checkOut).getTime() - new Date(checkIn).getTime();
@@ -52,6 +71,7 @@ export function BookingReviewForm({
   bookedForSlot,
   initialUnitsLeft,
   initialPricePerRoom,
+  initialNightly = [],
 }: {
   hotelId: string;
   room: {
@@ -66,6 +86,7 @@ export function BookingReviewForm({
   initialUnitsLeft: number | null;
   /** One room's price for the dates the page opened with, per-date rates included. */
   initialPricePerRoom: number | null;
+  initialNightly?: StayQuote["nights"];
   /** 'manual': submit a request STS confirms by hand — no payment until confirmed. 'instant': pay at checkout. */
   bookingMode: "manual" | "instant";
   defaults: { checkIn?: string; checkOut?: string; guests?: string; numRooms?: string };
@@ -88,24 +109,40 @@ export function BookingReviewForm({
   // Rooms left for the chosen dates, re-read whenever they change. Keyed by
   // the date pair so a stale answer for earlier dates is never shown.
   const stayKey = checkIn && checkOut && checkOut > checkIn ? `${checkIn}|${checkOut}` : null;
-  const [units, setUnits] = useState<{ key: string | null; left: number | null; price: number | null }>({
+  const [units, setUnits] = useState<{
+    key: string | null;
+    left: number | null;
+    price: number | null;
+    nightly: StayQuote["nights"];
+  }>({
     key: defaults.checkIn && defaults.checkOut ? `${defaults.checkIn}|${defaults.checkOut}` : null,
     left: initialUnitsLeft,
     price: initialPricePerRoom,
+    nightly: initialNightly,
   });
   useEffect(() => {
     if (!stayKey || stayKey === units.key) return;
     let live = true;
     const [from, to] = stayKey.split("|");
     getStayQuote(room.id, from, to)
-      .then((quote) => live && setUnits({ key: stayKey, left: quote?.unitsLeft ?? null, price: quote?.pricePerRoom ?? null }))
-      .catch(() => live && setUnits({ key: stayKey, left: null, price: null }));
+      .then(
+        (quote) =>
+          live &&
+          setUnits({
+            key: stayKey,
+            left: quote?.unitsLeft ?? null,
+            price: quote?.pricePerRoom ?? null,
+            nightly: quote?.nights ?? [],
+          }),
+      )
+      .catch(() => live && setUnits({ key: stayKey, left: null, price: null, nightly: [] }));
     return () => {
       live = false;
     };
   }, [stayKey, units.key, room.id]);
 
   const checking = stayKey !== null && units.key !== stayKey;
+  const nightly = stayKey && !checking ? units.nightly : [];
   const unitsLeft = stayKey && !checking ? units.left : null;
   const roomCap = Math.min(20, unitsLeft ?? room.total_units ?? 20);
   const soldOut = unitsLeft === 0;
@@ -347,12 +384,25 @@ export function BookingReviewForm({
               <p className="text-sm text-muted-foreground">Price on request</p>
             ) : (
               <div className="space-y-2 text-sm">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-muted-foreground">Per night</span>
-                  <span className="font-semibold tabular-nums">
-                    {room.currency} {(nights > 0 ? pricePerRoom / nights : room.base_price).toFixed(0)}
-                  </span>
-                </div>
+                {nightly.length > 0 && nightly.length <= MAX_NIGHT_LINES ? (
+                  <ul className="space-y-1">
+                    {nightly.map((n) => (
+                      <li key={n.night} className="flex items-baseline justify-between">
+                        <span className="text-muted-foreground">{nightLabel(n.night)}</span>
+                        <span className="tabular-nums">
+                          {room.currency} {formatMoney(n.rate)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-muted-foreground">{nights > 0 ? "Average per night" : "Per night"}</span>
+                    <span className="font-semibold tabular-nums">
+                      {room.currency} {formatMoney(nights > 0 ? pricePerRoom / nights : room.base_price)}
+                    </span>
+                  </div>
+                )}
                 <Separator />
                 {/* Before dates are picked there is no stay length to multiply
                     by — a "× 0 nights" line reads as a broken total. */}
@@ -366,7 +416,7 @@ export function BookingReviewForm({
                     <div className="flex items-center justify-between text-base font-semibold">
                       <span>Total</span>
                       <span className="text-primary tabular-nums">
-                        {room.currency} {total.toFixed(0)}
+                        {room.currency} {formatMoney(total)}
                       </span>
                     </div>
                   </>

@@ -10,7 +10,7 @@ import { MediaPlaceholder } from "@/components/media-placeholder";
 import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 import { getServerTrpc } from "@/lib/trpc/server";
 import { venueImageUrls } from "@/modules/events/images";
-import { amenityInfo, eventTypeLabel, priceUnitLabel } from "@/modules/events/components/amenities";
+import { amenityInfo, eventTypeLabel, priceUnitLabel, venueMoney } from "@/modules/events/components/amenities";
 
 export const metadata: Metadata = { title: "Event & Hall Booking" };
 
@@ -59,11 +59,11 @@ export default async function EventsPage({
               Events &amp; Halls
             </Badge>
             <h1 className="mt-4 font-heading text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-              Venues that make your day <span className="text-brand-accent">unforgettable</span>
+              Event halls <span className="text-brand-accent">across Somalia</span>
             </h1>
             <p className="mt-4 text-base leading-relaxed text-sidebar-foreground/80">
-              Weddings, conferences, graduations, and community events — book premium halls with
-              staging, sound, and catering handled by the STS events team.
+              Weddings, conferences, graduations and community events. Compare capacity and price,
+              then reserve online.
             </p>
             <form className="mt-7 flex max-w-lg gap-2 rounded-2xl bg-background/95 p-2 shadow-lg">
               <Input
@@ -194,7 +194,7 @@ export default async function EventsPage({
                             <>
                               <p className="text-xs text-muted-foreground">From</p>
                               <p className="font-heading text-lg font-bold text-primary">
-                                {venue.currency} {Number(venue.base_price).toFixed(0)}
+                                {venueMoney(venue.currency, venue.base_price)}
                                 <span className="text-xs font-normal text-muted-foreground">
                                   {" "}
                                   {priceUnitLabel(venue.price_unit)}

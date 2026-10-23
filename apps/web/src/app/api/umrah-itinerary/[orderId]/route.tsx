@@ -1,7 +1,6 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/session";
-import { createClient } from "@/lib/supabase/server";
 import { getServerTrpc } from "@/lib/trpc/server";
 import type { CheckoutOrderRow } from "api/dist/modules/payments/checkout.service";
 import { getBookingTravel } from "@/modules/umrah/itinerary-queries";
@@ -54,8 +53,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ord
     );
   }
 
-  const supabase = await createClient();
-  const travel = await getBookingTravel(supabase, booking.id);
+  const travel = await getBookingTravel(booking.id);
   if (!travel) return NextResponse.json({ error: "Booking not found." }, { status: 404 });
 
   const departure = booking.departure;

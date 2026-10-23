@@ -35,44 +35,52 @@ export function AgentLoginForm({
     }
   }, [state]);
 
-  if (demoAccount) {
-    return <DemoLoginButton action={action} email={demoAccount.email} password={demoAccount.password} label={demoAccount.label} />;
-  }
-
   return (
-    <form action={formAction} className="space-y-4">
-      {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
-      {state?.error ? (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
+    <div className="space-y-5">
+      <form action={formAction} className="space-y-4">
+        {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
+        {state?.error ? (
+          <Alert variant="destructive">
+            <AlertCircle />
+            <AlertDescription>{state.error}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        <div className="space-y-1.5">
+          <Label htmlFor="email">Email</Label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input id="email" name="email" type="email" autoComplete="email" required className="pl-9" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
+            <PasswordInput id="password" name="password" autoComplete="current-password" required className="pl-9" />
+          </div>
+        </div>
+
+        <SubmitButton className="w-full gap-2" pendingText="Signing in…">
+          <LogIn className="size-4" /> Login
+        </SubmitButton>
+      </form>
+      {demoAccount ? (
+        <div className="border-t border-border pt-5">
+          <DemoLoginButton
+            action={action}
+            email={demoAccount.email}
+            password={demoAccount.password}
+            label={demoAccount.label}
+          />
+        </div>
       ) : null}
-
-      <div className="space-y-1.5">
-        <Label htmlFor="email">Email</Label>
-        <div className="relative">
-          <Mail className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input id="email" name="email" type="email" autoComplete="email" required className="pl-9" />
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="password">Password</Label>
-          <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">
-            Forgot password?
-          </Link>
-        </div>
-        <div className="relative">
-          <Lock className="pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
-          <PasswordInput id="password" name="password" autoComplete="current-password" required className="pl-9" />
-        </div>
-      </div>
-
-      <SubmitButton className="w-full gap-2" pendingText="Signing in…">
-        <LogIn className="size-4" /> Login
-      </SubmitButton>
-    </form>
+    </div>
   );
 }

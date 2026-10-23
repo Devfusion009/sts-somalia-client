@@ -84,7 +84,15 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
     .sort((a, b) => labelFor(a.document_type).localeCompare(labelFor(b.document_type)));
   const result = application.documents.find((d) => d.document_type === "visa_result" && d.is_current);
   const letter = decision?.letter_document_id ?? null;
-  const updates = application.events.filter((e) => !e.event_type.startsWith("message.") && e.customer_summary);
+  // Submit logs both the submission and the stage change with the same customer text.
+  const updates = application.events.filter(
+    (e, i, all) =>
+      !e.event_type.startsWith("message.") &&
+      e.customer_summary &&
+      e.customer_summary !== all[i - 1]?.customer_summary
+  );
+  const balance = order ? Number(order.total) - Number(order.paid) : 0;
+  const balanceDue = !!order && balance > 0.005 && ["pending_payment", "held", "partially_paid"].includes(order.status);
   const approved = application.status === "approved" || application.status === "issued";
   const travellers = application.applicant_type === "single" ? 1 : Math.max(application.members.length, 1);
 
@@ -353,6 +361,17 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                       <dt className="text-muted-foreground">Paid{order.method ? ` · ${order.method}` : ""}</dt>
                       <dd className="font-medium tabular-nums">{fmtMoney(order.paid, order.currency)}</dd>
                     </div>
+                    {balanceDue ? (
+                      <div className="flex items-center justify-between py-2 last:pb-0">
+                        <dt className="font-medium">Balance due</dt>
+                        <dd className="flex items-center gap-3">
+                          <span className="font-semibold tabular-nums">{fmtMoney(balance, order.currency)}</span>
+                          <Button size="sm" render={<Link href={`/checkout/${order.id}`} />}>
+                            Pay
+                          </Button>
+                        </dd>
+                      </div>
+                    ) : null}
                   </dl>
                 </CardContent>
               </Card>

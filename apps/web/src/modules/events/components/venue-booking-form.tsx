@@ -13,7 +13,7 @@ import {
   Smartphone,
   type LucideIcon,
 } from "lucide-react";
-import { computeHallPrice } from "@sts/shared-types";
+import { computeHallPrice, eventTypeLabel } from "@sts/shared-types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -90,17 +90,21 @@ export function VenueBookingForm({
   venue,
   today,
   initialDate,
+  base,
 }: {
   venue: DeskVenue;
   today: string;
   initialDate?: string;
+  /** Console root for this venue: /admin/events/<id> or /manager/venues/<id>. */
+  base: string;
 }) {
-  const [eventType, setEventType] = useState(venue.eventTypes[0] ?? "");
+  const defaultGuests = Math.min(100, venue.capacity ?? 100);
+  const [eventType, setEventType] = useState(venue.eventTypes[0] ? eventTypeLabel(venue.eventTypes[0]) : "");
   const [startDate, setStartDate] = useState(initialDate ?? "");
   const [endDate, setEndDate] = useState(initialDate ?? "");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [guests, setGuests] = useState(100);
+  const [guests, setGuests] = useState(defaultGuests);
   const [price, setPrice] = useState<string>("");
   const [priceTouched, setPriceTouched] = useState(false);
   const [method, setMethod] = useState<OfflinePaymentMethod>("cash");
@@ -133,7 +137,8 @@ export function VenueBookingForm({
     slot.status !== "taken" &&
     slot.status !== "checking" &&
     Number.isFinite(finalPrice) &&
-    finalPrice >= 0 &&
+    finalPrice > 0 &&
+    guests >= 1 &&
     eventType.trim().length >= 2 &&
     !submitting;
 
@@ -187,7 +192,7 @@ export function VenueBookingForm({
     setEndDate("");
     setStartTime("");
     setEndTime("");
-    setGuests(100);
+    setGuests(defaultGuests);
     setPrice("");
     setPriceTouched(false);
     setMethod("cash");
@@ -222,7 +227,7 @@ export function VenueBookingForm({
             <dd className="font-medium">{confirmation.clientName}</dd>
             <dt className="text-muted-foreground">Event</dt>
             <dd>
-              {confirmation.eventType} · {confirmation.guests} guests
+              {eventTypeLabel(confirmation.eventType)} · {confirmation.guests} guests
             </dd>
             <dt className="text-muted-foreground">Date</dt>
             <dd>
@@ -242,7 +247,7 @@ export function VenueBookingForm({
             <Button type="button" onClick={startOver}>
               Record another booking
             </Button>
-            <Button variant="outline" render={<Link href={`/manager/venues/${venue.id}/bookings`} />}>
+            <Button variant="outline" render={<Link href={`${base}/bookings`} />}>
               View bookings
             </Button>
           </div>
@@ -282,7 +287,7 @@ export function VenueBookingForm({
                 />
                 <datalist id="vb-type-options">
                   {venue.eventTypes.map((t) => (
-                    <option key={t} value={t} />
+                    <option key={t} value={eventTypeLabel(t)} />
                   ))}
                 </datalist>
               </div>
@@ -478,7 +483,7 @@ export function VenueBookingForm({
           <h2 className="font-heading text-base font-semibold">Summary</h2>
           {datesValid ? (
             <div className="space-y-0.5">
-              <p className="font-medium">{eventType || "Event"}</p>
+              <p className="font-medium">{eventType ? eventTypeLabel(eventType) : "Event"}</p>
               <p className="text-sm text-muted-foreground">
                 {day(startDate)}
                 {endDate !== startDate ? ` – ${day(endDate)}` : ""}
@@ -489,7 +494,7 @@ export function VenueBookingForm({
               </p>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Choose the event date.</p>
+            <p className="text-sm text-muted-foreground">No date yet</p>
           )}
 
           <dl className="space-y-1.5 border-t border-border pt-4 text-sm">

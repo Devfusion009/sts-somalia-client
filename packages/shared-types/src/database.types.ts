@@ -7369,6 +7369,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["app_role"]
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      expire_past_hall_requests: { Args: { p_venue_id?: string }; Returns: number }
       expire_stale_holds: { Args: Record<PropertyKey, never>; Returns: number }
       fail_agency_payout_request: {
         Args: { p_reason: string; p_request_id: string }

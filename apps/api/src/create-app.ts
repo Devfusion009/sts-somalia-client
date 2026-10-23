@@ -5,6 +5,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { AppModule } from "./app.module";
 import { appRouter } from "./trpc/router";
 import { createContextFactory } from "./trpc/context";
+import { env } from "./config/env";
 
 /**
  * Builds and initializes the Nest app without binding it to a port —
@@ -22,7 +23,7 @@ export async function createApp(): Promise<NestExpressApplication> {
 
   // WEB_ORIGIN is a comma-separated list: the public site plus every portal
   // origin (admin., agent., manager., ...) that calls tRPC from the browser.
-  const origins = (process.env.WEB_ORIGIN ?? "http://localhost:3000")
+  const origins = (env().WEB_ORIGIN ?? "http://localhost:3000")
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean);

@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getManagersForVenues } from "@/modules/events/venue-manager-queries";
 import { VenuePartnerForm, type EditableVenue } from "./venue-partner-form";
 import { VenueManagersDialog } from "./venue-managers-dialog";
+import { venueMoney } from "@/modules/events/components/amenities";
 
 export const metadata = { title: "My Venues" };
 
@@ -34,7 +35,7 @@ export default async function MyVenuesPage() {
       {venues.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No venues yet — add your first venue to get started.
+            No venues yet.
           </CardContent>
         </Card>
       ) : (
@@ -64,7 +65,7 @@ export default async function MyVenuesPage() {
                     {venue.capacity_standing ? `${venue.capacity_standing} standing` : ""}
                   </TableCell>
                   <TableCell className="text-sm">
-                    {venue.currency} {Number(venue.base_price).toFixed(0)}{" "}
+                    {venueMoney(venue.currency, venue.base_price)}{" "}
                     <span className="text-xs text-muted-foreground">/ {venue.price_unit.replace("per_", "")}</span>
                   </TableCell>
                   <TableCell>

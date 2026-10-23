@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { format, parseISO } from "date-fns";
 import { CheckCircle2, CircleDashed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -78,6 +79,14 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
   const contact = (app.contact_details ?? {}) as Record<string, string>;
   const travel = (app.travel_details ?? {}) as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+  const day = (v: unknown) => {
+    const value = str(v);
+    return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? format(parseISO(value), "d MMM yyyy") : value;
+  };
+  const label = (v: unknown) => {
+    const value = str(v)?.replace(/_/g, " ");
+    return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+  };
   const questions = parseApplicationQuestions(app.visa_type?.application_questions);
   const answers = (app.custom_answers ?? {}) as Record<string, string>;
   const answered = questions.filter((q) => answers[q.key]);
@@ -91,11 +100,11 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
             <DetailGrid
               rows={[
                 ["Full name", traveler.full_name],
-                ["Date of birth", traveler.date_of_birth],
-                ["Gender", traveler.gender],
+                ["Date of birth", day(traveler.date_of_birth)],
+                ["Gender", label(traveler.gender)],
                 ["Nationality", traveler.nationality ? countryName(traveler.nationality) : undefined],
                 ["Passport number", traveler.passport_number],
-                ["Passport expiry", traveler.passport_expiry],
+                ["Passport expiry", day(traveler.passport_expiry)],
                 ["Email", contact.email],
                 ["Mobile", contact.mobile],
               ]}
@@ -107,9 +116,9 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
             <SectionHeading>Travel</SectionHeading>
             <DetailGrid
               rows={[
-                ["Arrival", str(travel.arrival_date)],
-                ["Departure", str(travel.departure_date)],
-                ["Purpose", str(travel.purpose)?.replace(/_/g, " ")],
+                ["Arrival", day(travel.arrival_date)],
+                ["Departure", day(travel.departure_date)],
+                ["Purpose", label(travel.purpose)],
                 ["Address", str(travel.address)],
                 ["Booked by", data.application.submitter?.full_name ?? data.application.submitter?.email],
                 ["Booking channel", app.agency_id ? "Agency" : "Direct"],
@@ -145,7 +154,7 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
                       ) : null}
                     </TableCell>
                     <TableCell className="capitalize">{member.relationship.replace(/_/g, " ")}</TableCell>
-                    <TableCell>{member.date_of_birth ?? "—"}</TableCell>
+                    <TableCell>{day(member.date_of_birth) ?? "—"}</TableCell>
                     <TableCell>{member.nationality ? countryName(member.nationality) : "—"}</TableCell>
                     <TableCell className="font-mono text-xs">{member.passport_number ?? "—"}</TableCell>
                   </TableRow>

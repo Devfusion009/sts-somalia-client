@@ -253,9 +253,6 @@ export default async function VisaDetailPage({
                 <SubmitButton size="lg" className="w-full gap-2" pendingText="Starting application…">
                   Apply Now <ArrowRight className="size-4" />
                 </SubmitButton>
-                <p className="text-center text-xs text-muted-foreground">
-                  Sign in required — your progress is saved automatically.
-                </p>
               </form>
 
               <Separator className="my-4" />

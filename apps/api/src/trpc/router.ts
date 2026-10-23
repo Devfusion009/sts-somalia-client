@@ -8,7 +8,8 @@ import { ordersRouter } from "../modules/orders/orders.router";
 import { travelersRouter } from "../modules/travelers/travelers.router";
 import { bookingsRouter } from "../modules/bookings/bookings.router";
 import { flightsRouter } from "../modules/flights/flights.router";
-import { eventsRouter } from "../modules/events/events.router";
+import { eventsRouter } from "../modules/events";
+import { umrahRouter } from "../modules/umrah";
 import { paymentsRouter } from "../modules/payments/payments.router";
 
 export const appRouter = router({
@@ -22,6 +23,7 @@ export const appRouter = router({
   bookings: bookingsRouter,
   flights: flightsRouter,
   events: eventsRouter,
+  umrah: umrahRouter,
   payments: paymentsRouter,
 });
 

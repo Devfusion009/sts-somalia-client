@@ -14,7 +14,9 @@ import {
   amenityInfo,
   eventTypeLabel,
   priceUnitLabel,
+  venueMoney,
 } from "@/modules/events/components/amenities";
+import { venueCapacity } from "@sts/shared-types";
 import { HallBookingForm } from "@/modules/events/components/booking-form";
 import { AgencyBookingSlot } from "@/modules/agencies/components/agency-booking-slot";
 
@@ -107,7 +109,7 @@ export default async function VenueDetailPage({
                 <>
                   <p className="text-xs text-white/70">From</p>
                   <p className="font-heading text-xl font-bold text-white">
-                    {venue.currency} {Number(venue.base_price).toFixed(0)}
+                    {venueMoney(venue.currency, venue.base_price)}
                     <span className="text-xs font-normal text-white/70">
                       {" "}
                       {priceUnitLabel(venue.price_unit)}
@@ -211,6 +213,13 @@ export default async function VenueDetailPage({
             </section>
           ) : null}
 
+          {venue.policies ? (
+            <section>
+              <h2 className="font-heading text-xl font-bold">Policies</h2>
+              <p className="mt-2 leading-relaxed whitespace-pre-wrap text-muted-foreground">{venue.policies}</p>
+            </section>
+          ) : null}
+
           <PropertyReviews reviews={venue.property_reviews} />
         </div>
 
@@ -219,9 +228,6 @@ export default async function VenueDetailPage({
           <Card className="sticky top-24">
             <CardHeader>
               <CardTitle className="text-base">Reserve this venue</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Tell us about your event — pay securely online and our team takes it from there.
-              </p>
             </CardHeader>
             <CardContent>
               <HallBookingForm
@@ -230,7 +236,7 @@ export default async function VenueDetailPage({
                 basePrice={Number(venue.base_price)}
                 priceUnit={venue.price_unit}
                 eventTypes={eventTypes}
-                maxGuests={venue.capacity_standing ?? venue.capacity_seated}
+                maxGuests={venueCapacity(venue)}
                 bookedForSlot={<AgencyBookingSlot />}
               />
             </CardContent>

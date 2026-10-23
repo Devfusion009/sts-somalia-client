@@ -2,7 +2,7 @@ import { Inject, Injectable, Scope, UnauthorizedException } from "@nestjs/common
 import { REQUEST } from "@nestjs/core";
 import type { Request } from "express";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createRlsClient } from "./supabase-clients";
+import { createAnonClient, createRlsClient } from "./supabase-clients";
 
 /**
  * Request-scoped: one RLS-bound Supabase client per HTTP request, built
@@ -28,6 +28,15 @@ export class RlsSupabaseService {
    * `this.rls.get() as SupabaseClient<Database>`. Scope the complexity to
    * where it's earned, not globally.
    */
+  /**
+   * The caller's client when signed in, otherwise the anon client — for
+   * public reads that RLS already scopes to published rows.
+   */
+  getOrAnon(): SupabaseClient {
+    const header = this.request.headers.authorization;
+    return header?.startsWith("Bearer ") ? this.get() : createAnonClient();
+  }
+
   get(): SupabaseClient {
     if (this.client) return this.client;
     const header = this.request.headers.authorization;

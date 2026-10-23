@@ -48,6 +48,36 @@ export class OrdersService {
     return getActivePartnerId(this.rls.get(), profileId);
   }
 
+  /**
+   * Re-prices a quoted, still-unpaid order to a new net price; an agency
+   * order keeps its markup on top. Port of apps/web's repriceQuotedOrder.
+   */
+  async repriceQuotedOrder(
+    order: { id: string; agency_id: string | null },
+    itemId: string,
+    itemType: OrderItemType,
+    netPrice: number
+  ) {
+    const supabase = this.rls.get();
+    const markup = order.agency_id ? await getAgencyMarkupAmount(supabase, order.agency_id, itemType, netPrice) : 0;
+    await supabase.from("order_items").update({ unit_price: netPrice, quantity: 1, total_price: netPrice }).eq("id", itemId);
+    await supabase
+      .from("orders")
+      .update({ subtotal: netPrice, markup_amount: markup, total: netPrice + markup })
+      .eq("id", order.id);
+  }
+
+  /** Name and contact of an agency's customer — who a desk booking is really for. */
+  async getAgencyCustomerContact(agencyCustomerId: string) {
+    const { data } = await this.rls
+      .get()
+      .from("agency_customers")
+      .select("full_name, phone, email")
+      .eq("id", agencyCustomerId)
+      .maybeSingle();
+    return data as { full_name: string; phone: string | null; email: string | null } | null;
+  }
+
   async getAgencyMarkupAmount(agencyId: string, itemType: OrderItemType, netPrice: number) {
     return getAgencyMarkupAmount(this.rls.get(), agencyId, itemType, netPrice);
   }

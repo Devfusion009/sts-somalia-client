@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { format, parseISO } from "date-fns";
 import {
   AlertCircle,
   ArrowLeft,
@@ -51,6 +52,7 @@ import {
 import { SubmitButton } from "@/components/submit-button";
 import { cn } from "@/lib/utils";
 import { countryName } from "@/lib/countries";
+import { fmtMoney } from "@/modules/visa/components/visa-shared";
 import {
   saveApplicantType,
   saveVisaMember,
@@ -64,10 +66,23 @@ import {
   submitVisaApplication,
   type ActionState,
 } from "@/modules/visa/actions";
-import { RELATIONSHIPS, parseDocumentSlots, parseApplicationQuestions, type DocumentSlot } from "@/modules/visa/schemas";
+import { RELATIONSHIPS, parseDocumentSlots, parseApplicationQuestions, todayIso, type DocumentSlot } from "@/modules/visa/schemas";
 import type { WizardApplication } from "@/modules/visa/queries";
 import { FileField } from "@/components/ui/upload";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+
+const GENDER_LABELS: Record<string, string> = { male: "Male", female: "Female" };
+
+const PURPOSE_OPTIONS = [
+  { value: "tourism", label: "Tourism" },
+  { value: "business", label: "Business" },
+  { value: "family_visit", label: "Family visit" },
+  { value: "medical", label: "Medical" },
+  { value: "transit", label: "Transit" },
+  { value: "umrah", label: "Umrah" },
+  { value: "other", label: "Other" },
+];
+const PURPOSE_LABELS: Record<string, string> = Object.fromEntries(PURPOSE_OPTIONS.map((o) => [o.value, o.label]));
 
 /* ------------------------------------------------------------------------- */
 /* Shared bits                                                               */
@@ -186,15 +201,6 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
   other: "Other Relative",
 };
 
-const RELATIONSHIP_BADGE_STYLES: Record<string, string> = {
-  self: "bg-chart-3/10 text-chart-3",
-  spouse: "bg-chart-4/10 text-chart-4",
-  son: "bg-primary/10 text-primary",
-  daughter: "bg-primary/10 text-primary",
-  grandfather: "bg-brand-gold/15 text-brand-gold",
-  grandmother: "bg-brand-gold/15 text-brand-gold",
-};
-
 /* ------------------------------------------------------------------------- */
 /* Step 1 — applicant type + members                                          */
 /* ------------------------------------------------------------------------- */
@@ -273,6 +279,7 @@ function MemberDialog({
               id={`member-dob-${member?.id ?? "new"}`}
               name="dateOfBirth"
               type="date"
+              max={todayIso()}
               defaultValue={member?.date_of_birth ?? ""}
               required
             />
@@ -298,6 +305,7 @@ function MemberDialog({
               id={`member-expiry-${member?.id ?? "new"}`}
               name="passportExpiry"
               type="date"
+              min={todayIso()}
               defaultValue={member?.passport_expiry ?? ""}
             />
           </Field>
@@ -378,15 +386,7 @@ export function StepApplicantType({
       {applicantType !== "single" ? (
         <section className="space-y-4">
           <StepHeading title={applicantType === "family" ? "Family details" : "Group details"} />
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-chart-3/10 px-4 py-3">
-            <p className="flex items-start gap-2 text-sm">
-              <Info className="mt-0.5 size-4 shrink-0 text-chart-3" />
-              <span>
-                {applicantType === "family"
-                  ? "Spouse, children, parents and other dependents."
-                  : "Each member needs their own passport details."}
-              </span>
-            </p>
+          <div className="flex justify-end">
             <MemberDialog
               applicationId={application.id}
               trigger={
@@ -421,19 +421,11 @@ export function StepApplicantType({
                           </span>
                           <span>
                             <span className="block text-sm font-medium">{member.full_name}</span>
-                            <Badge
-                              className={cn(
-                                "mt-0.5 border-transparent text-[10px]",
-                                member.is_primary
-                                  ? "bg-chart-3/10 text-chart-3"
-                                  : (RELATIONSHIP_BADGE_STYLES[member.relationship] ??
-                                      "bg-muted text-muted-foreground")
-                              )}
-                            >
-                              {member.is_primary
-                                ? "Primary Applicant"
-                                : (RELATIONSHIP_LABELS[member.relationship] ?? member.relationship)}
-                            </Badge>
+                            {member.is_primary ? (
+                              <Badge className="mt-0.5 border-transparent bg-chart-3/10 text-[10px] text-chart-3">
+                                Primary Applicant
+                              </Badge>
+                            ) : null}
                           </span>
                         </span>
                       </TableCell>
@@ -480,9 +472,7 @@ export function StepApplicantType({
             </div>
           ) : (
             <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              No members yet — your details are added automatically in the next step, and you can
-              add {applicantType === "family" ? "family members" : "group members"} with the button
-              above.
+              No members yet.
             </p>
           )}
         </section>
@@ -534,7 +524,7 @@ export function StepPersonalInfo({
           <Input id="fullName" name="fullName" defaultValue={v.fullName ?? t.full_name ?? ""} placeholder="Enter full name" required />
         </Field>
         <Field label="Date of birth" htmlFor="dateOfBirth" required>
-          <Input id="dateOfBirth" name="dateOfBirth" type="date" defaultValue={v.dateOfBirth ?? t.date_of_birth ?? ""} required />
+          <Input id="dateOfBirth" name="dateOfBirth" type="date" max={todayIso()} defaultValue={v.dateOfBirth ?? t.date_of_birth ?? ""} required />
         </Field>
         <Field label="Gender" required>
           <LabeledSelect
@@ -554,7 +544,7 @@ export function StepPersonalInfo({
           <Input id="passportNumber" name="passportNumber" defaultValue={v.passportNumber ?? t.passport_number ?? ""} placeholder="Enter passport number" required />
         </Field>
         <Field label="Passport expiry date" htmlFor="passportExpiry" required>
-          <Input id="passportExpiry" name="passportExpiry" type="date" defaultValue={v.passportExpiry ?? t.passport_expiry ?? ""} required />
+          <Input id="passportExpiry" name="passportExpiry" type="date" min={todayIso()} defaultValue={v.passportExpiry ?? t.passport_expiry ?? ""} required />
         </Field>
         <Field label="Email address" htmlFor="email" required>
           <Input id="email" name="email" type="email" defaultValue={v.email ?? c.email ?? ""} placeholder="Enter email address" required />
@@ -643,25 +633,17 @@ export function StepTravelInfo({
 
       <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
         <Field label={`Arrival in ${destination}`} htmlFor="arrivalDate" required>
-          <Input id="arrivalDate" name="arrivalDate" type="date" defaultValue={v.arrivalDate ?? str("arrival_date")} required />
+          <Input id="arrivalDate" name="arrivalDate" type="date" min={todayIso()} defaultValue={v.arrivalDate ?? str("arrival_date")} required />
         </Field>
         <Field label={`Departure from ${destination}`} htmlFor="departureDate" required>
-          <Input id="departureDate" name="departureDate" type="date" defaultValue={v.departureDate ?? str("departure_date")} required />
+          <Input id="departureDate" name="departureDate" type="date" min={todayIso()} defaultValue={v.departureDate ?? str("departure_date")} required />
         </Field>
         <Field label="Purpose of visit" required className="sm:col-span-2">
           <LabeledSelect
             name="purposeOfVisit"
             defaultValue={v.purposeOfVisit ?? str("purpose")}
             placeholder="Select purpose of visit"
-            options={[
-              { value: "tourism", label: "Tourism" },
-              { value: "business", label: "Business" },
-              { value: "family_visit", label: "Family visit" },
-              { value: "medical", label: "Medical" },
-              { value: "transit", label: "Transit" },
-              { value: "umrah", label: "Umrah" },
-              { value: "other", label: "Other" },
-            ]}
+            options={PURPOSE_OPTIONS}
           />
         </Field>
       </div>
@@ -968,6 +950,17 @@ export function StepReview({
   const editBase = `${wizardBasePath(desk)}/${application.id}?step=`;
 
   const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const date = (v: unknown) => {
+    const value = str(v);
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) ? format(parseISO(value), "d MMM yyyy") : value;
+  };
+
+  // Same arithmetic as submit_visa_application(): unit price and fee per traveller.
+  const travellers = application.applicant_type === "single" ? 1 : Math.max(application.members.length, 1);
+  const unitPrice = Number(application.resolved_price ?? application.price ?? application.visa_type?.price ?? 0);
+  const unitFee = Number(application.resolved_processing_fee ?? application.visa_type?.processing_fee ?? 0);
+  const total = (unitPrice + unitFee) * travellers;
+  const currency = application.visa_type?.currency ?? application.currency;
 
   return (
     <div className="space-y-6">
@@ -977,11 +970,11 @@ export function StepReview({
         <ReviewGrid
           rows={[
             ["Full Name", t.full_name],
-            ["Date of Birth", t.date_of_birth],
-            ["Gender", t.gender],
+            ["Date of Birth", date(t.date_of_birth)],
+            ["Gender", GENDER_LABELS[t.gender] ?? t.gender],
             ["Nationality", t.nationality ? countryName(t.nationality) : ""],
             ["Passport Number", t.passport_number],
-            ["Passport Expiry Date", t.passport_expiry],
+            ["Passport Expiry Date", date(t.passport_expiry)],
             ["Email", c.email],
             ["Mobile", c.mobile],
           ]}
@@ -1011,9 +1004,9 @@ export function StepReview({
       <ReviewSection icon={MapPin} title="Travel information" editHref={`${editBase}3`}>
         <ReviewGrid
           rows={[
-            ["Date of Arrival", str(travel.arrival_date)],
-            ["Date of Departure", str(travel.departure_date)],
-            ["Purpose of Visit", str(travel.purpose).replace("_", " ")],
+            ["Date of Arrival", date(travel.arrival_date)],
+            ["Date of Departure", date(travel.departure_date)],
+            ["Purpose of Visit", PURPOSE_LABELS[str(travel.purpose)] ?? str(travel.purpose)],
             ["Address / Hotel", str(travel.address)],
           ]}
         />
@@ -1045,6 +1038,13 @@ export function StepReview({
           })}
         </div>
       </ReviewSection>
+
+      <div className="flex items-center justify-between rounded-2xl border border-border px-5 py-4">
+        <p className="text-sm font-semibold">
+          Total{travellers > 1 ? ` · ${travellers} travellers × ${fmtMoney(unitPrice + unitFee, currency)}` : ""}
+        </p>
+        <p className="font-heading text-xl font-bold text-primary">{fmtMoney(total, currency)}</p>
+      </div>
 
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="applicationId" value={application.id} />

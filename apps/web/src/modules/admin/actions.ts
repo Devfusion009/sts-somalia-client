@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { getServerTrpcForActions, trpcErrorMessage } from "@/lib/trpc/server";
+import { inventoryRows, parseInventoryDetail } from "@/modules/hotels/inventory-rows";
 import { z } from "zod";
 import { phoneSchema } from "@/modules/partner-applications/schemas";
 import { applyHotelBookingMove } from "@/modules/hotels/booking-status";
@@ -11,8 +13,6 @@ import { nextHallBookingMoves } from "@/modules/events/hall-transitions";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
 import type { Database } from "@/lib/types/database.types";
-import { UMRAH_INCLUDE_KEYS } from "@/modules/umrah/includes";
-import { notifyUmrahBooking } from "@/modules/umrah/notify";
 import { rememberRoomType } from "@/modules/hotels/room-types";
 import { uploadImages } from "@/modules/admin/property-gallery-actions";
 import { TARGETS } from "@/modules/admin/gallery-targets";
@@ -299,221 +299,71 @@ function slugify(input: string) {
   );
 }
 
-// Checkboxes in the admin form only ever post values from UMRAH_INCLUDE_OPTIONS,
-// but this filters defensively rather than erroring — a stray/unknown value
-// (e.g. a stale form after the option list changes) is just dropped instead
-// of blocking the whole save.
-const includesSchema = z
-  .array(z.string())
-  .transform((values) => values.filter((v) => (UMRAH_INCLUDE_KEYS as string[]).includes(v)));
+// ---------------------------------------------------------------------------
+// Umrah packages and departures — form adapters; apps/api validates and writes.
+// ---------------------------------------------------------------------------
 
-const umrahPackageSchema = z.object({
-  name: z.string().min(2),
-  description: z.string().optional(),
-  durationDays: z.coerce.number().int().min(1),
-  includes: includesSchema,
-  basePrice: z.coerce.number().min(0),
-  currency: z.string().min(3).max(3),
-  status: z.enum(["draft", "pending_review", "published", "suspended"]),
-});
+function umrahPackageInput(formData: FormData) {
+  return {
+    name: String(formData.get("name") ?? ""),
+    description: String(formData.get("description") ?? "") || undefined,
+    durationDays: Number(formData.get("durationDays")),
+    includes: formData.getAll("includes").map(String),
+    basePrice: Number(formData.get("basePrice")),
+    currency: String(formData.get("currency") ?? ""),
+    status: String(formData.get("status")) as "draft",
+  };
+}
 
 export async function createUmrahPackage(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requirePlatformAdmin();
-  const parsed = umrahPackageSchema.safeParse({
-    name: formData.get("name"),
-    description: formData.get("description") || undefined,
-    durationDays: formData.get("durationDays"),
-    includes: formData.getAll("includes"),
-    basePrice: formData.get("basePrice"),
-    currency: formData.get("currency"),
-    status: formData.get("status"),
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
-  const supabase = await createClient();
-  const { error } = await supabase.from("umrah_packages").insert({
-    name: parsed.data.name,
-    slug: slugify(parsed.data.name),
-    description: parsed.data.description ?? null,
-    duration_days: parsed.data.durationDays,
-    includes: parsed.data.includes,
-    base_price: parsed.data.basePrice,
-    currency: parsed.data.currency.toUpperCase(),
-    status: parsed.data.status as ListingStatus,
-  });
-  if (error) return { error: error.message };
+  try {
+    await (await getServerTrpcForActions()).umrah.admin.packages.upsert.mutate(umrahPackageInput(formData));
+  } catch (error) {
+    return { error: trpcErrorMessage(error, "The package could not be saved.") };
+  }
   revalidatePath("/admin/catalog/umrah");
   return { error: null };
 }
 
 export async function updateUmrahPackage(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requirePlatformAdmin();
-  const id = String(formData.get("id"));
-  const parsed = umrahPackageSchema.safeParse({
-    name: formData.get("name"),
-    description: formData.get("description") || undefined,
-    durationDays: formData.get("durationDays"),
-    includes: formData.getAll("includes"),
-    basePrice: formData.get("basePrice"),
-    currency: formData.get("currency"),
-    status: formData.get("status"),
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("umrah_packages")
-    .update({
-      name: parsed.data.name,
-      description: parsed.data.description ?? null,
-      duration_days: parsed.data.durationDays,
-      includes: parsed.data.includes,
-      base_price: parsed.data.basePrice,
-      currency: parsed.data.currency.toUpperCase(),
-      status: parsed.data.status as ListingStatus,
-    })
-    .eq("id", id);
-  if (error) return { error: error.message };
+  try {
+    await (await getServerTrpcForActions()).umrah.admin.packages.upsert.mutate({
+      id: String(formData.get("id")),
+      ...umrahPackageInput(formData),
+    });
+  } catch (error) {
+    return { error: trpcErrorMessage(error, "The package could not be saved.") };
+  }
   revalidatePath("/admin/catalog/umrah");
   return { error: null };
 }
 
-const optionalText = (max: number) =>
-  z
-    .string()
-    .trim()
-    .max(max)
-    .transform((v) => (v === "" ? null : v));
-
-/**
- * datetime-local carries no zone; flight times are the airport's wall clock,
- * so they are stored UTC-tagged as entered and always read back in UTC.
- */
-const optionalFlightTime = z
-  .string()
-  .trim()
-  .refine((v) => v === "" || /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v), "Enter a valid flight time.")
-  .transform((v) => (v === "" ? null : `${v}:00Z`));
-
-const departureSchema = z.object({
-  packageId: z.string().uuid(),
-  departureDate: z.string().min(1, "Pick a departure date."),
-  returnDate: z.string().min(1, "Pick a return date."),
-  totalSeats: z.coerce.number().int().min(1, "Total seats must be at least 1."),
-  offlineSeats: z.coerce.number().int().min(0, "Offline seats cannot be negative."),
-  priceOverride: z
-    .string()
-    .trim()
-    .transform((v) => (v === "" ? null : Number(v)))
-    .refine((v) => v === null || (Number.isFinite(v) && v >= 0), "Enter a valid price."),
-  outboundAirline: optionalText(80),
-  outboundFlightNumber: optionalText(20),
-  outboundDepartsAt: optionalFlightTime,
-  outboundArrivesAt: optionalFlightTime,
-  returnAirline: optionalText(80),
-  returnFlightNumber: optionalText(20),
-  returnDepartsAt: optionalFlightTime,
-  returnArrivesAt: optionalFlightTime,
-  baggageNote: optionalText(200),
-  salesCloseDays: z.coerce.number().int().min(0, "Sales close must be 0 to 120 days.").max(120, "Sales close must be 0 to 120 days."),
-  status: z.union([z.enum(["open", "closed"]), z.literal("")]),
-});
-
-type ParsedDeparture =
-  | { ok: false; error: string }
-  | { ok: true; packageId: string; row: Omit<Database["public"]["Tables"]["umrah_package_departures"]["Insert"], "package_id"> };
-
-function parseDeparture(formData: FormData): ParsedDeparture {
-  const text = (key: string) => String(formData.get(key) ?? "");
-  const parsed = departureSchema.safeParse({
-    packageId: formData.get("packageId"),
-    departureDate: formData.get("departureDate"),
-    returnDate: formData.get("returnDate"),
-    totalSeats: formData.get("totalSeats"),
-    offlineSeats: text("offlineSeats") || "0",
-    priceOverride: text("priceOverride"),
-    outboundAirline: text("outboundAirline"),
-    outboundFlightNumber: text("outboundFlightNumber"),
-    outboundDepartsAt: text("outboundDepartsAt"),
-    outboundArrivesAt: text("outboundArrivesAt"),
-    returnAirline: text("returnAirline"),
-    returnFlightNumber: text("returnFlightNumber"),
-    returnDepartsAt: text("returnDepartsAt"),
-    returnArrivesAt: text("returnArrivesAt"),
-    baggageNote: text("baggageNote"),
-    salesCloseDays: text("salesCloseDays") || "0",
-    status: text("status"),
-  });
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const d = parsed.data;
-  if (d.returnDate <= d.departureDate) return { ok: false, error: "Return date must be after the departure date." };
-  if (d.offlineSeats > d.totalSeats) return { ok: false, error: "Seats sold exceed total seats." };
-  if (d.outboundDepartsAt && d.outboundArrivesAt && d.outboundArrivesAt <= d.outboundDepartsAt) {
-    return { ok: false, error: "Outbound arrival must be after departure." };
-  }
-  if (d.returnDepartsAt && d.returnArrivesAt && d.returnArrivesAt <= d.returnDepartsAt) {
-    return { ok: false, error: "Return arrival must be after departure." };
-  }
+function departureInput(formData: FormData) {
+  const text = (key: string) => String(formData.get(key) ?? "").trim();
+  const orNull = (key: string) => text(key) || null;
   return {
-    ok: true,
-    packageId: d.packageId,
-    row: {
-        departure_date: d.departureDate,
-        return_date: d.returnDate,
-        total_seats: d.totalSeats,
-        offline_seats: d.offlineSeats,
-        price_override: d.priceOverride,
-        outbound_airline: d.outboundAirline,
-        outbound_flight_number: d.outboundFlightNumber,
-        outbound_departs_at: d.outboundDepartsAt,
-        outbound_arrives_at: d.outboundArrivesAt,
-        return_airline: d.returnAirline,
-        return_flight_number: d.returnFlightNumber,
-        return_departs_at: d.returnDepartsAt,
-        return_arrives_at: d.returnArrivesAt,
-      baggage_note: d.baggageNote,
-      sales_close_days: d.salesCloseDays,
-      // A cancelled departure posts no status (the field is disabled) and stays cancelled.
-      ...(d.status ? { status: d.status } : {}),
-    },
+    departureId: text("departureId") || undefined,
+    packageId: text("packageId"),
+    departureDate: text("departureDate"),
+    returnDate: text("returnDate"),
+    totalSeats: Number(text("totalSeats")),
+    offlineSeats: Number(text("offlineSeats") || 0),
+    priceOverride: text("priceOverride") === "" ? null : Number(text("priceOverride")),
+    outboundAirline: orNull("outboundAirline"),
+    outboundFlightNumber: orNull("outboundFlightNumber"),
+    outboundDepartsAt: orNull("outboundDepartsAt"),
+    outboundArrivesAt: orNull("outboundArrivesAt"),
+    returnAirline: orNull("returnAirline"),
+    returnFlightNumber: orNull("returnFlightNumber"),
+    returnDepartsAt: orNull("returnDepartsAt"),
+    returnArrivesAt: orNull("returnArrivesAt"),
+    baggageNote: orNull("baggageNote"),
+    salesCloseDays: Number(text("salesCloseDays") || 0),
+    // A cancelled departure posts no status (the field is disabled) and stays cancelled.
+    status: (text("status") || null) as "open" | null,
   };
-}
-
-/**
- * A package with a room-sharing rate card is charged from the rate card, so a
- * departure price override would be shown in admin but never charged.
- */
-async function rateCardOverrideError(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  packageId: string,
-  priceOverride: number | null | undefined
-) {
-  if (priceOverride === null || priceOverride === undefined) return null;
-  const { count } = await supabase
-    .from("umrah_package_pricing")
-    .select("id", { count: "exact", head: true })
-    .eq("package_id", packageId);
-  return count && count > 0 ? "This package is priced by room sharing." : null;
-}
-
-const FLIGHT_FIELDS = [
-  "departure_date",
-  "return_date",
-  "outbound_airline",
-  "outbound_flight_number",
-  "outbound_departs_at",
-  "outbound_arrives_at",
-  "return_airline",
-  "return_flight_number",
-  "return_departs_at",
-  "return_arrives_at",
-] as const;
-
-function departureErrorMessage(error: { message: string; code?: string }) {
-  if (error.message.includes("seats_within_total")) return "Seats sold exceed total seats.";
-  if (error.message.includes("umrah_package_departures_check")) return "Return date must be after the departure date.";
-  if (error.code === "23503") return "This departure has bookings and cannot be deleted.";
-  return error.message;
 }
 
 function revalidateUmrahPackage(packageId: string) {
@@ -521,95 +371,40 @@ function revalidateUmrahPackage(packageId: string) {
   revalidatePath(`/admin/catalog/umrah/${packageId}`);
 }
 
+async function saveUmrahDepartureFrom(formData: FormData): Promise<ActionState> {
+  const input = departureInput(formData);
+  try {
+    await (await getServerTrpcForActions()).umrah.admin.packages.saveDeparture.mutate(input);
+  } catch (error) {
+    return { error: trpcErrorMessage(error, "The departure could not be saved.") };
+  }
+  revalidateUmrahPackage(input.packageId);
+  return { error: null };
+}
+
 export async function createUmrahDeparture(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requirePlatformAdmin();
-  const parsed = parseDeparture(formData);
-  if (!parsed.ok) return { error: parsed.error };
-
-  const supabase = await createClient();
-  const overrideError = await rateCardOverrideError(supabase, parsed.packageId, parsed.row.price_override);
-  if (overrideError) return { error: overrideError };
-  const { error } = await supabase
-    .from("umrah_package_departures")
-    .insert({ package_id: parsed.packageId, ...parsed.row });
-  if (error) return { error: departureErrorMessage(error) };
-  revalidateUmrahPackage(parsed.packageId);
-  return { error: null };
+  formData.delete("departureId");
+  return saveUmrahDepartureFrom(formData);
 }
 
 export async function updateUmrahDeparture(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requirePlatformAdmin();
-  const departureId = z.string().uuid().safeParse(formData.get("departureId"));
-  if (!departureId.success) return { error: "Invalid departure." };
-  const parsed = parseDeparture(formData);
-  if (!parsed.ok) return { error: parsed.error };
-
-  const supabase = await createClient();
-  const { data: before } = await supabase
-    .from("umrah_package_departures")
-    .select(
-      "price_override, departure_date, return_date, outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at, return_airline, return_flight_number, return_departs_at, return_arrives_at"
-    )
-    .eq("id", departureId.data)
-    .maybeSingle();
-  // Clearing or keeping an existing override is allowed; setting a new one on
-  // a rate-card package is not.
-  if (parsed.row.price_override !== before?.price_override) {
-    const overrideError = await rateCardOverrideError(supabase, parsed.packageId, parsed.row.price_override);
-    if (overrideError) return { error: overrideError };
-  }
-  const { data, error } = await supabase
-    .from("umrah_package_departures")
-    .update(parsed.row)
-    .eq("id", departureId.data)
-    .eq("package_id", parsed.packageId)
-    .select("id");
-  if (error) return { error: departureErrorMessage(error) };
-  if (!data?.length) return { error: "Departure not found." };
-
-  // In-app alerts come from the umrah_departures_notify_change trigger; this
-  // adds email / WhatsApp for every live booking on the departure.
-  const changed =
-    before &&
-    FLIGHT_FIELDS.some((field) => {
-      const next = (parsed.row as Record<string, unknown>)[field] ?? null;
-      const prev = (before as Record<string, unknown>)[field] ?? null;
-      return field.endsWith("_at") && next && prev
-        ? new Date(String(next)).getTime() !== new Date(String(prev)).getTime()
-        : next !== prev;
-    });
-  if (changed) {
-    const { data: live } = await supabase
-      .from("umrah_bookings")
-      .select("id")
-      .eq("departure_id", departureId.data)
-      .in("status", ["pending", "confirmed"])
-      .limit(1000);
-    for (const booking of live ?? []) void notifyUmrahBooking(booking.id, "flight_changed");
-  }
-
-  revalidateUmrahPackage(parsed.packageId);
-  return { error: null };
+  if (!String(formData.get("departureId") ?? "")) return { error: "Invalid departure." };
+  return saveUmrahDepartureFrom(formData);
 }
 
 export async function deleteUmrahDeparture(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requirePlatformAdmin();
-  const departureId = z.string().uuid().safeParse(formData.get("departureId"));
-  if (!departureId.success) return { error: "Invalid departure." };
-
-  const supabase = await createClient();
-  const { data: departure } = await supabase
-    .from("umrah_package_departures")
-    .select("id, package_id, booked_seats")
-    .eq("id", departureId.data)
-    .maybeSingle();
-  if (!departure) return { error: "Departure not found." };
-  if (departure.booked_seats > 0) return { error: "This departure has bookings and cannot be deleted." };
-
-  const { error } = await supabase.from("umrah_package_departures").delete().eq("id", departure.id);
-  if (error) return { error: departureErrorMessage(error) };
-  revalidateUmrahPackage(departure.package_id);
-  return { error: null };
+  try {
+    const { packageId } = await (await getServerTrpcForActions()).umrah.admin.packages.deleteDeparture.mutate({
+      departureId: String(formData.get("departureId") ?? ""),
+    });
+    revalidateUmrahPackage(packageId);
+    return { error: null };
+  } catch (error) {
+    return { error: trpcErrorMessage(error, "The departure could not be deleted.") };
+  }
 }
 
 export async function toggleUserStatus(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -628,22 +423,22 @@ export async function toggleUserStatus(_prev: ActionState, formData: FormData): 
 // Event venues & hall bookings
 // ---------------------------------------------------------------------------
 const venueSchema = z.object({
-  name: z.string().min(2),
+  name: z.string().trim().min(2, "Enter the venue name."),
   tagline: z.string().optional(),
   description: z.string().optional(),
-  city: z.string().min(2),
+  city: z.string().trim().min(2, "Enter the city."),
   address: z.string().optional(),
   phone: z.string().optional(),
-  contactEmail: z.string().email().optional().or(z.literal("")),
-  capacitySeated: z.coerce.number().int().min(1).optional(),
-  capacityStanding: z.coerce.number().int().min(1).optional(),
-  sizeSqm: z.coerce.number().min(0).optional(),
+  contactEmail: z.string().email("Enter a valid contact email.").optional().or(z.literal("")),
+  capacitySeated: z.coerce.number().int("Capacity must be a whole number.").min(1, "Capacity must be at least 1.").optional(),
+  capacityStanding: z.coerce.number().int("Capacity must be a whole number.").min(1, "Capacity must be at least 1.").optional(),
+  sizeSqm: z.coerce.number().min(0, "Size can't be negative.").optional(),
   amenities: z.string().optional(),
   eventTypes: z.string().optional(),
   policies: z.string().optional(),
   links: z.string().optional(),
-  basePrice: z.coerce.number().min(0),
-  currency: z.string().min(3).max(3),
+  basePrice: z.coerce.number().min(0, "The price can't be negative."),
+  currency: z.string().trim().regex(/^[A-Za-z]{3}$/, "Enter a 3-letter currency code."),
   priceUnit: z.enum(["per_event", "per_day", "per_hour", "per_person"]),
   isFeatured: z.boolean(),
   status: z.enum(["draft", "pending_review", "published", "suspended"]),
@@ -707,7 +502,7 @@ export async function createVenue(_prev: ActionState, formData: FormData): Promi
     .insert({ ...venueRow(parsed.data), slug: slugify(parsed.data.name) })
     .select("id")
     .single();
-  if (error || !venue) return { error: error?.message ?? "Could not create the venue." };
+  if (error || !venue) return { error: error?.code === "23505" ? "A venue with this name already exists." : "Could not create the venue." };
   await replacePropertyLinks(supabase, { venueId: venue.id }, parseLinks(parsed.data.links));
   revalidatePath("/admin/events");
   revalidatePath("/events");
@@ -722,7 +517,7 @@ export async function updateVenue(_prev: ActionState, formData: FormData): Promi
 
   const supabase = await createClient();
   const { error } = await supabase.from("event_venues").update(venueRow(parsed.data)).eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: "Could not save the venue." };
   await replacePropertyLinks(supabase, { venueId: id }, parseLinks(parsed.data.links));
   revalidatePath("/admin/events");
   revalidatePath("/events");
@@ -789,7 +584,7 @@ export async function updateHallBookingStatus(
     .update({ status: status as (typeof hallBookingStatuses)[number] })
     .eq("id", bookingId)
     .eq("status", booking.status);
-  if (error) return { error: error.message };
+  if (error) return { error: error.code === "P0001" ? error.message : "The booking could not be updated." };
   revalidatePath(`/admin/events/${booking.venue_id}`, "layout");
   revalidatePath(`/manager/venues/${booking.venue_id}`, "layout");
   if (status === "cancelled") await cancelUnpaidOrderForBooking(supabase, "hall_booking_id", bookingId);
@@ -839,15 +634,27 @@ export async function updateHallBookingPrice(
   if (!Number.isFinite(price) || price < 0) return { error: "Enter a valid price." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("hall_bookings").update({ price }).eq("id", bookingId);
-  if (error) return { error: error.message };
-
+  // Same rule as hotels: the quote moves only while nothing is paid.
   const { data: item } = await supabase
     .from("order_items")
     .select("id, order:order_id (id, status, agency_id)")
     .eq("hall_booking_id", bookingId)
     .maybeSingle();
-  if (item?.order && item.order.status === "pending_payment") {
+  if (item?.order && item.order.status !== "pending_payment" && item.order.status !== "held") {
+    return { error: "Only unpaid bookings can be repriced." };
+  }
+
+  const { data: updated, error } = await supabase
+    .from("hall_bookings")
+    .update({ price })
+    .eq("id", bookingId)
+    .in("status", ["pending", "waitlisted"])
+    .select("id")
+    .maybeSingle();
+  if (error) return { error: "Could not save the price." };
+  if (!updated) return { error: "Only an open request can be repriced." };
+
+  if (item?.order) {
     await repriceQuotedOrder(supabase, item.order, item.id, "hall", price);
   }
 
@@ -872,18 +679,24 @@ export async function updateHotelBookingPrice(
   if (!Number.isFinite(price) || price < 0) return { error: "Enter a valid price." };
 
   const supabase = await createClient();
+  // A quote can only change while nothing has been paid against it: once the
+  // order moves on, the booking total must keep matching what was charged.
+  const { data: item } = await supabase
+    .from("order_items")
+    .select("id, order:order_id (id, status, agency_id)")
+    .eq("hotel_booking_id", bookingId)
+    .maybeSingle();
+  if (item?.order && item.order.status !== "pending_payment" && item.order.status !== "held") {
+    return { error: "Only unpaid bookings can be repriced." };
+  }
+
   const { error } = await supabase
     .from("hotel_bookings")
     .update({ total_price: price })
     .eq("id", bookingId);
   if (error) return { error: error.message };
 
-  const { data: item } = await supabase
-    .from("order_items")
-    .select("id, order:order_id (id, status, agency_id)")
-    .eq("hotel_booking_id", bookingId)
-    .maybeSingle();
-  if (item?.order && item.order.status === "pending_payment") {
+  if (item?.order) {
     await repriceQuotedOrder(supabase, item.order, item.id, "hotel", price);
   }
 
@@ -1190,30 +1003,16 @@ export async function setRoomInventoryAdmin(_prev: ActionState, formData: FormDa
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const detail = z
-    .object({
-      totalUnits: z.coerce.number().int().min(0, "Units can't be negative.").max(1000),
-      priceOverride: z.coerce.number().min(0).optional(),
-    })
-    .safeParse({
-      totalUnits: formData.get("totalUnits"),
-      priceOverride: formData.get("priceOverride") || undefined,
-    });
+  const detail = parseInventoryDetail(formData);
   if (!detail.success) return { error: detail.error.issues[0].message };
 
   const dates = datesInRange(parsed.data.startDate, parsed.data.endDate);
   if (!dates) return { error: `Choose a range of at most ${MAX_INVENTORY_RANGE_DAYS} days.` };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("hotel_room_inventory").upsert(
-    dates.map((date) => ({
-      room_id: parsed.data.roomId,
-      date,
-      total_units: detail.data.totalUnits,
-      price_override: detail.data.priceOverride ?? null,
-    })),
-    { onConflict: "room_id,date" }
-  );
+  const built = await inventoryRows(supabase, parsed.data.roomId, dates, detail.data);
+  if ("error" in built) return { error: built.error };
+  const { error } = await supabase.from("hotel_room_inventory").upsert(built.rows, { onConflict: "room_id,date" });
   if (error) return { error: error.message };
 
   revalidatePath(`/admin/hotels/${parsed.data.hotelId}/rooms/${parsed.data.roomId}`);
