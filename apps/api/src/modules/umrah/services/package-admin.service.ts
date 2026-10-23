@@ -277,3 +277,5 @@ export class PackageAdminService {
 
 /** The admin package page's row, exported for apps/web: tRPC's client inference is too deep for it (TS2589). */
 export type UmrahPackageAdmin = Awaited<ReturnType<PackageAdminService["get"]>>;
+/** One row of the admin package list, exported for the same reason. */
+export type UmrahPackageAdminListItem = Awaited<ReturnType<PackageAdminService["list"]>>[number];
