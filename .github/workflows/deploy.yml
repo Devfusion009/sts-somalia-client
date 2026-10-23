@@ -1,7 +1,9 @@
 name: Deploy to AWS
 
-# apps/api builds fast (plain tsc) so it builds in place on the EC2 box
-# itself, the same way it was deployed manually. apps/web does NOT: a full
+# Neither app builds on its box. apps/api used to build in place on EC2,
+# which only stayed cheap because the box kept tsc's incremental state; a
+# full type-check of the umrah/events modules needs ~0.9GB and hung the box
+# until SSH dropped (run 39952309723). apps/web never could: a full
 # `next build` OOM'd the Lightsail box's 913MB RAM even with swap and a
 # raised V8 heap limit, and a raised-heap retry swap-thrashed it badly
 # enough to need a reboot. So apps/web builds here on the runner (7GB RAM)
@@ -18,6 +20,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build -w api
 
       - name: Set up SSH key
         run: |
@@ -46,13 +58,19 @@ jobs:
           NEXT_PUBLIC_SITE_URL=${{ secrets.NEXT_PUBLIC_SITE_URL }}
           EOF
 
-      - name: Install, build, restart
+      - name: Ship build artifacts
+        run: |
+          rsync -az --delete -e "ssh -i ~/.ssh/ec2.pem" \
+            packages/shared-types/dist/ ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/app/packages/shared-types/dist/
+          rsync -az --delete -e "ssh -i ~/.ssh/ec2.pem" \
+            apps/api/dist/ ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/app/apps/api/dist/
+
+      - name: Install, restart
         run: |
           ssh -i ~/.ssh/ec2.pem ubuntu@${{ secrets.EC2_HOST }} '
             set -e
             cd /home/ubuntu/app
             npm install
-            npm run build -w api
             pm2 describe sts-somalia-api > /dev/null 2>&1 \
               && pm2 restart sts-somalia-api \
               || pm2 start apps/api/dist/main.js --name sts-somalia-api --cwd /home/ubuntu/app/apps/api
