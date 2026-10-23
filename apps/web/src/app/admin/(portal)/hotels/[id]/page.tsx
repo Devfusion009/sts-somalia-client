@@ -313,11 +313,17 @@ export default async function AdminHotelDetailPage({
                         {booking.check_in} → {booking.check_out}
                       </TableCell>
                       <TableCell>
-                        <HotelBookingPriceForm
-                          bookingId={booking.id}
-                          price={Number(booking.total_price)}
-                          currency={booking.currency}
-                        />
+                        {hotel.booking_mode === "manual" && (orderStatus === "pending_payment" || orderStatus === "held") ? (
+                          <HotelBookingPriceForm
+                            bookingId={booking.id}
+                            price={Number(booking.total_price)}
+                            currency={booking.currency}
+                          />
+                        ) : (
+                          <span className="tabular-nums">
+                            {booking.currency} {Number(booking.total_price).toFixed(2)}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge className={cn("border-transparent", PIPELINE_STATUS_STYLES[stage])}>{stage}</Badge>

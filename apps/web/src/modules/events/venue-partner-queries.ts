@@ -58,11 +58,13 @@ export async function getVenueBookings(partnerId: string) {
   const { data: venues } = await supabase.from("event_venues").select("id").eq("partner_id", partnerId);
   const venueIds = (venues ?? []).map((v) => v.id);
   if (venueIds.length === 0) return [];
+  // Requests whose date passed are closed before the queue is read.
+  await Promise.all(venueIds.map((id) => supabase.rpc("expire_past_hall_requests", { p_venue_id: id })));
 
   const { data } = await supabase
     .from("hall_bookings")
     .select(
-      "id, booking_ref, event_type, event_name, start_date, end_date, start_time, end_time, expected_guests, setup_requirements, price, currency, status, created_at, contact_name, contact_phone, contact_email, venue:event_venues(name), customer:profiles!hall_bookings_customer_id_fkey(full_name, email, phone)"
+      "id, venue_id, booking_ref, event_type, event_name, start_date, end_date, start_time, end_time, expected_guests, setup_requirements, price, currency, status, source, created_at, contact_name, contact_phone, contact_email, venue:event_venues(name), customer:profiles!hall_bookings_customer_id_fkey(full_name, email, phone), order_items(order:orders(status))"
     )
     .in("venue_id", venueIds)
     .order("created_at", { ascending: false });

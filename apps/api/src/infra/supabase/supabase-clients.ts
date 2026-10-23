@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { env } from "../../config/env";
 
 /**
  * Framework-agnostic Supabase client builders — the direct backend
@@ -9,10 +10,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * share Nest's per-request injection scope.
  */
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing required env var: ${name}`);
-  return value;
+function requireEnv(name: "SUPABASE_URL" | "SUPABASE_ANON_KEY" | "SUPABASE_SECRET_KEY"): string {
+  return env()[name];
 }
 
 /**

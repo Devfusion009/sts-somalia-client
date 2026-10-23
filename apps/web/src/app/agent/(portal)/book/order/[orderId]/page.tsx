@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { PayFromWalletForm } from "./pay-from-wallet-form";
+import { hallAwaitingQuote } from "@sts/shared-types";
 
 const ORDER_STATUS_STYLES: Record<string, string> = {
   held: "bg-brand-gold/15 text-brand-gold",
@@ -56,7 +57,9 @@ export default async function DeskOrderPage({
   const balance = Math.max(total - paid, 0);
   const available =
     Number(membership.agency.credit_balance ?? 0) + Number(membership.agency.credit_limit ?? 0);
-  const payable = PAYABLE.includes(order.status) && balance > 0;
+  // Same rule as customer checkout: no paying an estimate the venue hasn't set.
+  const awaitingConfirmation = order.order_items.some((item) => item.hall_booking && hallAwaitingQuote(item.hall_booking));
+  const payable = PAYABLE.includes(order.status) && balance > 0 && !awaitingConfirmation;
   // A manual hotel seeded at "price on request" reaches here with total 0:
   // nothing is owed yet because STS hasn't quoted the rate (admin queue →
   // updateHotelBookingPrice), and rendering that as a payable USD 0 reads as
@@ -91,7 +94,7 @@ export default async function DeskOrderPage({
             ORDER_STATUS_STYLES[order.status] ?? "bg-muted text-muted-foreground"
           )}
         >
-          {awaitingPrice ? "Awaiting price" : order.status.replace(/_/g, " ")}
+          {awaitingPrice ? "Awaiting price" : awaitingConfirmation ? "Awaiting confirmation" : order.status.replace(/_/g, " ")}
         </Badge>
       </div>
 
@@ -99,13 +102,13 @@ export default async function DeskOrderPage({
         <div>
           <dt className="text-xs text-muted-foreground">Net</dt>
           <dd className="font-medium tabular-nums">
-            {order.currency} {Number(order.subtotal).toFixed(0)}
+            {order.currency} {Number(order.subtotal).toFixed(2)}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Your margin</dt>
           <dd className="font-medium tabular-nums">
-            {order.currency} {Number(order.markup_amount ?? 0).toFixed(0)}
+            {order.currency} {Number(order.markup_amount ?? 0).toFixed(2)}
           </dd>
         </div>
         <div>
@@ -113,13 +116,13 @@ export default async function DeskOrderPage({
             Customer pays
           </dt>
           <dd className="font-semibold tabular-nums">
-            {awaitingPrice ? "On request" : `${order.currency} ${total.toFixed(0)}`}
+            {awaitingPrice ? "On request" : `${order.currency} ${total.toFixed(2)}`}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Balance</dt>
           <dd className="font-semibold tabular-nums">
-            {awaitingPrice ? "On request" : `${order.currency} ${balance.toFixed(0)}`}
+            {awaitingPrice ? "On request" : `${order.currency} ${balance.toFixed(2)}`}
           </dd>
         </div>
       </dl>

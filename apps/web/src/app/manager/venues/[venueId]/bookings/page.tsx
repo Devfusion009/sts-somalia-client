@@ -9,11 +9,15 @@ export default async function VenueBookingsPage({
   searchParams,
 }: {
   params: Promise<{ venueId: string }>;
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; q?: string }>;
 }) {
-  const { venueId } = await params;
-  const { view } = await searchParams;
+  const [{ venueId }, { view, q }] = await Promise.all([params, searchParams]);
   const access = await getVenueAccess(venueId);
   if (!access) notFound();
-  return <VenueBookingsView venueId={venueId} base={`/manager/venues/${venueId}`} access={access} view={view} allowNewBooking />;
+  return (
+    <div className="mx-auto max-w-6xl space-y-5">
+      <h1 className="font-heading text-2xl font-semibold">Bookings</h1>
+      <VenueBookingsView venueId={venueId} base={`/manager/venues/${venueId}`} access={access} view={view} q={q} />
+    </div>
+  );
 }

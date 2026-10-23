@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { eventTypeLabel } from "@sts/shared-types";
 
 /**
  * The manual-booking work queue: every hotel, hall and private-Umrah request
@@ -148,7 +149,7 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
         displaced: b.displaced_by !== null,
         title: venue?.name ?? "Hall booking",
         dates: { from: b.start_date, to: b.end_date && b.end_date !== b.start_date ? b.end_date : null },
-        subtitle: `${b.event_name ?? b.event_type}${b.expected_guests ? ` · ${b.expected_guests} guests` : ""}`,
+        subtitle: `${b.event_name ?? eventTypeLabel(b.event_type)}${b.expected_guests ? ` · ${b.expected_guests} guests` : ""}`,
         customerName: customer?.full_name ?? null,
         customerEmail: customer?.email ?? null,
         travellerName: travellerByBooking.get(b.id) ?? null,

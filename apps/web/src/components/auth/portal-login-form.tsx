@@ -29,7 +29,7 @@ export function PortalLoginForm({
   title: string;
   action: (prevState: ActionState, formData: FormData) => Promise<ActionState>;
   redirectTo?: string;
-  /** Set only when DEMO_LOGIN_ENABLED is true (hosted) — replaces the credential form below with a one-click button. */
+  /** Set only when DEMO_LOGIN_ENABLED is true (hosted): a one-click button under the credential form, never instead of it. */
   demoAccount?: { email: string; password: string; label: string };
 }) {
   const [state, formAction] = useActionState(action, null);
@@ -56,40 +56,41 @@ export function PortalLoginForm({
         <CardTitle className="font-heading text-2xl">{title}</CardTitle>
       </CardHeader>
       <CardContent>
+        <form action={formAction} className="space-y-4">
+          {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
+          {state?.error ? (
+            <Alert variant="destructive">
+              <AlertCircle />
+              <AlertDescription>{state.error}</AlertDescription>
+            </Alert>
+          ) : null}
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" name="email" type="email" autoComplete="email" required />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+            <PasswordInput id="password" name="password" autoComplete="current-password" required />
+          </div>
+          <SubmitButton className="w-full" pendingText="Signing in…">
+            Sign in
+          </SubmitButton>
+        </form>
         {demoAccount ? (
-          <DemoLoginButton
-            action={action}
-            email={demoAccount.email}
-            password={demoAccount.password}
-            label={demoAccount.label}
-          />
-        ) : (
-          <form action={formAction} className="space-y-4">
-            {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
-            {state?.error ? (
-              <Alert variant="destructive">
-                <AlertCircle />
-                <AlertDescription>{state.error}</AlertDescription>
-              </Alert>
-            ) : null}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" autoComplete="email" required />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link href="/forgot-password" className="text-xs text-primary hover:underline">
-                  Forgot password?
-                </Link>
-              </div>
-              <PasswordInput id="password" name="password" autoComplete="current-password" required />
-            </div>
-            <SubmitButton className="w-full" pendingText="Signing in…">
-              Sign in
-            </SubmitButton>
-          </form>
-        )}
+          <div className="mt-5 border-t border-border pt-5">
+            <DemoLoginButton
+              action={action}
+              email={demoAccount.email}
+              password={demoAccount.password}
+              label={demoAccount.label}
+            />
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

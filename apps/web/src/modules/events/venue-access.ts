@@ -1,7 +1,9 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
 import { getMyManagedVenue } from "@/modules/events/venue-manager-queries";
+import { getMyVenuePartnerId } from "@/modules/events/venue-partner-queries";
 import type { VenueManagerPermission } from "@/modules/events/venue-manager-permissions";
 
 export type VenueAccess = {
@@ -11,14 +13,25 @@ export type VenueAccess = {
   can: (permission: VenueManagerPermission) => boolean;
 };
 
-/** A platform admin (every permission) or an active manager of this venue (granted permissions). */
+/**
+ * A platform admin or the venue's owning partner (every permission), or an
+ * active manager of this venue (granted permissions).
+ */
 export async function getVenueAccess(venueId: string): Promise<VenueAccess | null> {
   const profile = await requireUser();
   if (profile.is_platform_admin) {
     return { profileId: profile.id, venueId, isAdmin: true, can: () => true };
   }
   const managed = await getMyManagedVenue(profile.id, venueId);
-  if (!managed) return null;
+  if (!managed) {
+    const supabase = await createClient();
+    const [{ data: venue }, partnerId] = await Promise.all([
+      supabase.from("event_venues").select("partner_id").eq("id", venueId).maybeSingle(),
+      getMyVenuePartnerId(profile.id),
+    ]);
+    if (!venue?.partner_id || venue.partner_id !== partnerId) return null;
+    return { profileId: profile.id, venueId, isAdmin: false, can: () => true };
+  }
   return {
     profileId: profile.id,
     venueId,

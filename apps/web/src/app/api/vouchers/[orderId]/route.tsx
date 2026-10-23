@@ -53,7 +53,7 @@ export async function GET(
   }
 
   const supabase = await createClient();
-  const umrahTravel = umrahBooking ? await getBookingTravel(supabase, umrahBooking.id) : null;
+  const umrahTravel = umrahBooking ? await getBookingTravel(umrahBooking.id) : null;
   const { data: customer } = await supabase
     .from("profiles")
     .select("full_name, email")

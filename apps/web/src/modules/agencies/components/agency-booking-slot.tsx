@@ -11,13 +11,24 @@ import { BookedForFields } from "./booked-for-fields";
  * so B2C visitors never see B2B chrome.
  */
 export async function AgencyBookingSlot() {
-  const profile = await getCurrentProfile();
-  if (!profile) return null;
+  const agencyId = await viewerAgencyId();
+  if (!agencyId) return null;
 
   const supabase = await createClient();
-  const agencyId = await getActiveAgencyId(supabase, profile.id);
-  if (!agencyId) return null;
 
   const customers = await getAgencyCustomers(supabase, agencyId);
   return <BookedForFields customers={customers} />;
+}
+
+/**
+ * The viewer's active agency, or null for B2C visitors. Pages pass the slot
+ * only when this is set: a form's `bookedForSlot ? … : null` check sees a
+ * React element (always truthy) even when the slot itself renders nothing,
+ * which showed agency-only controls such as "Hold" to B2C customers.
+ */
+export async function viewerAgencyId(): Promise<string | null> {
+  const profile = await getCurrentProfile();
+  if (!profile) return null;
+  const supabase = await createClient();
+  return getActiveAgencyId(supabase, profile.id);
 }

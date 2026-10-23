@@ -1,6 +1,8 @@
 import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { getServerTrpc } from "@/lib/trpc/server";
+import type { UmrahPackageAdmin } from "api/dist/modules/umrah/services/package-admin.service";
 import { bucketLabel, enumerateBuckets, hourlyBucketKey, roundMoney } from "@/lib/date-range";
 import { ADMIN_PAGE_SIZE, pageRange, searchTerm } from "@/lib/pagination";
 import type { Database } from "@/lib/types/database.types";
@@ -375,30 +377,20 @@ export async function getVisaNationalityRulesAdmin(visaTypeId: string) {
 }
 
 export async function getUmrahPackagesAdmin() {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("umrah_packages")
-    .select("*, umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, price_override)")
-    .order("created_at", { ascending: false });
-  return data ?? [];
+  const trpc = await getServerTrpc();
+  return trpc.umrah.admin.packages.list.query();
 }
 
-/** Full package config for the admin detail page — departures plus every child table added in 20260809000004. */
-export async function getUmrahPackageById(id: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("umrah_packages")
-    .select(
-      `*,
-       umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, offline_seats, price_override, sales_close_days, status, outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at, return_airline, return_flight_number, return_departs_at, return_arrives_at, baggage_note),
-       umrah_package_hotels(id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order),
-       umrah_itinerary_days(id, day_number, title, description),
-       umrah_package_pricing(id, sharing, price),
-       umrah_package_agencies(agency_id)`
-    )
-    .eq("id", id)
-    .maybeSingle();
-  return data;
+/** Full package config for the admin detail page; null when it doesn't exist. */
+export async function getUmrahPackageById(id: string): Promise<UmrahPackageAdmin | null> {
+  const trpc = await getServerTrpc();
+  // Typed through the API's exported row: the procedure's inferred output is too deep for tRPC's client (TS2589).
+  const query = trpc.umrah.admin.packages.get.query as unknown as (input: { packageId: string }) => Promise<UmrahPackageAdmin>;
+  try {
+    return await query({ packageId: id });
+  } catch {
+    return null;
+  }
 }
 
 /** Active agencies for the "local agencies" picker on the Umrah config page. */
@@ -558,16 +550,28 @@ export async function getVenueByIdAdmin(venueId: string) {
   return data;
 }
 
-export async function getHallBookingsAdmin() {
+/** Live hall bookings from today on, soonest first, plus how many await a decision. */
+export async function getUpcomingHallBookingsAdmin(today: string) {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("hall_bookings")
-    .select(
-      "*, venue:venue_id(name, city), customer:profiles!hall_bookings_customer_id_fkey(full_name, email)"
-    )
-    .order("start_date", { ascending: true })
-    .limit(300);
-  return data ?? [];
+  const [{ data, error }, { count, error: countError }] = await Promise.all([
+    supabase
+      .from("hall_bookings")
+      .select(
+        "id, venue_id, booking_ref, event_type, event_name, start_date, end_date, start_time, end_time, expected_guests, status, contact_name, agency:agencies(name), venue:venue_id(name, city)"
+      )
+      .in("status", ["pending", "waitlisted", "confirmed"])
+      .gte("end_date", today)
+      .order("start_date", { ascending: true })
+      .order("start_time", { ascending: true, nullsFirst: true })
+      .limit(25),
+    supabase
+      .from("hall_bookings")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["pending", "waitlisted"]),
+  ]);
+  if (error) throw error;
+  if (countError) throw countError;
+  return { bookings: data ?? [], awaiting: count ?? 0 };
 }
 
 // ---------------------------------------------------------------------------

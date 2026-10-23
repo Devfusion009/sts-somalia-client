@@ -7,7 +7,7 @@ import { SifaloService, type SifaloSettlement } from "./sifalo.service";
 import { getPaymentMethod } from "./registry";
 import { initiateWithProvider } from "./providers";
 import type { InitiationResult, InitiatePaymentInput, RecordPaymentInput } from "@sts/shared-types";
-import { MIN_DEPOSIT_FRACTION } from "@sts/shared-types";
+import { MIN_DEPOSIT_FRACTION, hallAwaitingQuote } from "@sts/shared-types";
 
 const PAYABLE_ORDER_STATUSES = ["pending_payment", "held", "partially_paid"] as const;
 const phonePattern = /^\+?[0-9][0-9\s-]{6,14}$/;
@@ -48,6 +48,17 @@ export class PaymentsService {
     if (!order) return { error: "We could not find this order." };
     if (!PAYABLE_ORDER_STATUSES.includes(order.status as (typeof PAYABLE_ORDER_STATUSES)[number])) {
       return { error: "This order is not awaiting payment." };
+    }
+
+    const { data: hallItems } = await supabase
+      .from("order_items")
+      .select("hall_booking:hall_booking_id (status, start_time, venue:venue_id (price_unit, base_price))")
+      .eq("order_id", order.id)
+      .not("hall_booking_id", "is", null);
+    type HallQuoteRow = Parameters<typeof hallAwaitingQuote>[0];
+    const halls = (hallItems ?? []).map((item) => item.hall_booking as unknown as HallQuoteRow | null);
+    if (halls.some((hall) => hall !== null && hallAwaitingQuote(hall))) {
+      return { error: "The venue hasn't confirmed the price yet." };
     }
 
     const paidTotal = await this.getPaidTotal(supabase, order.id);

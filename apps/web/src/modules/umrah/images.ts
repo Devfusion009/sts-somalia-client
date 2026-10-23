@@ -30,17 +30,4 @@ export function umrahImagePaths(images: unknown): string[] {
   return images.filter((p): p is string => typeof p === "string" && p.length > 0);
 }
 
-export const MEAL_PLAN_LABELS: Record<string, string> = {
-  none: "No meals included",
-  breakfast: "Breakfast only",
-  half_board: "Half board (breakfast + dinner)",
-  full_board: "Full board (all meals)",
-};
-
-export function sharingLabel(sharing: number): string {
-  if (sharing === 1) return "Single occupancy";
-  if (sharing === 2) return "Double sharing";
-  if (sharing === 3) return "Triple sharing";
-  if (sharing === 4) return "Quad sharing";
-  return `${sharing} sharing`;
-}
+export { MEAL_PLAN_LABELS, sharingLabel } from "@sts/shared-types";

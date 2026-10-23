@@ -1,33 +1,8 @@
 import { FileText, Landmark, Plane, Send, Ticket, Users } from "lucide-react";
 import type { TimelineStage } from "@/modules/bookings/components/status-timeline";
 
-export type UmrahFulfillmentStage =
-  | "booked"
-  | "confirmed"
-  | "visa_processing"
-  | "visa_issued"
-  | "travel_confirmed"
-  | "documents_ready"
-  | "completed";
-
-export const UMRAH_STAGE_LABEL: Record<UmrahFulfillmentStage, string> = {
-  booked: "Booking received",
-  confirmed: "Confirmed",
-  visa_processing: "Visa processing",
-  visa_issued: "Visa issued",
-  travel_confirmed: "Travel confirmed",
-  documents_ready: "Documents ready",
-  completed: "Completed",
-};
-
-export const UMRAH_DOC_TYPE_LABEL: Record<string, string> = {
-  visa: "Visa",
-  e_ticket: "E-ticket",
-  hotel_voucher: "Hotel voucher",
-  itinerary: "Itinerary",
-  insurance: "Insurance",
-  other: "Document",
-};
+export { UMRAH_STAGE_LABEL, UMRAH_DOC_TYPE_LABEL, type UmrahFulfillmentStage } from "@sts/shared-types";
+import type { UmrahFulfillmentStage } from "@sts/shared-types";
 
 /**
  * Seven fulfillment stages on a six-step track: visa_processing and

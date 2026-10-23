@@ -1,5 +1,6 @@
 import { createAdminClient } from "./supabase/supabase-clients";
 import { decryptCredentials } from "./provider-credentials/crypto";
+import { env } from "../config/env";
 
 /**
  * Twin of apps/web's lib/provider-runtime/payments.ts. Where customer money
@@ -60,11 +61,11 @@ async function activeCredentials(): Promise<Record<string, Record<string, string
 }
 
 async function bankTransfer(): Promise<BankTransferDetails> {
-  const env = process.env;
+  const config = env();
   const fallback = {
-    bankName: env.BANK_TRANSFER_BANK_NAME ?? "Premier Bank",
-    accountName: env.BANK_TRANSFER_ACCOUNT_NAME ?? "Scout Travel Solution LTD",
-    accountNumber: env.BANK_TRANSFER_ACCOUNT_NUMBER ?? "020160002200",
+    bankName: config.BANK_TRANSFER_BANK_NAME ?? "Premier Bank",
+    accountName: config.BANK_TRANSFER_ACCOUNT_NAME ?? "Scout Travel Solution LTD",
+    accountNumber: config.BANK_TRANSFER_ACCOUNT_NUMBER ?? "020160002200",
   };
   try {
     const { data } = await createAdminClient().from("platform_settings").select("value").eq("key", "bank_transfer").maybeSingle();
@@ -84,37 +85,37 @@ export async function getPaymentGateways(): Promise<PaymentGateways> {
     activeCredentials().catch((): Record<string, Record<string, string>> => ({})),
     bankTransfer(),
   ]);
-  const env = process.env;
+  const config = env();
 
   const stripeDb = db.stripe;
-  const stripeSecret = stripeDb?.secret_key ?? env.STRIPE_SECRET_KEY;
+  const stripeSecret = stripeDb?.secret_key ?? config.STRIPE_SECRET_KEY;
   const razorDb = db.razorpay;
   const sifaloDb = db.sifalo;
   const waafiDb = db.waafi;
   const edahabDb = db.edahab;
   const waafi = {
-    merchantUid: waafiDb?.merchant_uid ?? env.WAAFI_MERCHANT_UID,
-    apiUserId: waafiDb?.api_user_id ?? env.WAAFI_API_USER_ID,
-    apiKey: waafiDb?.api_key ?? env.WAAFI_API_KEY,
+    merchantUid: waafiDb?.merchant_uid ?? config.WAAFI_MERCHANT_UID,
+    apiUserId: waafiDb?.api_user_id ?? config.WAAFI_API_USER_ID,
+    apiKey: waafiDb?.api_key ?? config.WAAFI_API_KEY,
   };
   const edahab = {
-    apiKey: edahabDb?.api_key ?? env.EDAHAB_API_KEY,
-    agentCode: edahabDb?.agent_code ?? env.EDAHAB_AGENT_CODE,
+    apiKey: edahabDb?.api_key ?? config.EDAHAB_API_KEY,
+    agentCode: edahabDb?.agent_code ?? config.EDAHAB_AGENT_CODE,
   };
 
   // An admin switching card payments to Razorpay overrides a leftover env Stripe key.
   const stripeOverridden = !!razorDb && !stripeDb;
 
-  const sifaloUser = sifaloDb?.api_user ?? env.SIFALO_API_USER;
-  const sifaloKey = sifaloDb?.api_key ?? env.SIFALO_API_KEY;
-  const sifaloGatewayUrl = (env.SIFALO_GATEWAY_URL ?? "https://api.sifalopay.com/gateway/").replace(/\/?$/, "/");
-  const apiPublicUrl = env.API_PUBLIC_URL ?? env.NEXT_PUBLIC_API_URL ?? null;
+  const sifaloUser = sifaloDb?.api_user ?? config.SIFALO_API_USER;
+  const sifaloKey = sifaloDb?.api_key ?? config.SIFALO_API_KEY;
+  const sifaloGatewayUrl = (config.SIFALO_GATEWAY_URL ?? "https://api.sifalopay.com/gateway/").replace(/\/?$/, "/");
+  const apiPublicUrl = config.API_PUBLIC_URL ?? config.NEXT_PUBLIC_API_URL ?? null;
 
-  const explicitTestMode = env.PAYMENTS_TEST_MODE;
+  const explicitTestMode = config.PAYMENTS_TEST_MODE;
   return {
     stripe:
       stripeSecret && !stripeOverridden
-        ? { secretKey: stripeSecret, webhookSecret: stripeDb?.webhook_secret ?? env.STRIPE_WEBHOOK_SECRET ?? null }
+        ? { secretKey: stripeSecret, webhookSecret: stripeDb?.webhook_secret ?? config.STRIPE_WEBHOOK_SECRET ?? null }
         : null,
     razorpay:
       razorDb?.key_id && razorDb?.key_secret
@@ -126,7 +127,7 @@ export async function getPaymentGateways(): Promise<PaymentGateways> {
             apiUser: sifaloUser,
             apiKey: sifaloKey,
             gatewayUrl: sifaloGatewayUrl,
-            checkoutUrl: env.SIFALO_CHECKOUT_URL ?? "https://pay.sifalo.com/checkout/",
+            checkoutUrl: config.SIFALO_CHECKOUT_URL ?? "https://pay.sifalo.com/checkout/",
             verifyUrl: `${sifaloGatewayUrl}verify.php`,
             webhookBaseUrl: apiPublicUrl && apiPublicUrl.startsWith("https://") ? apiPublicUrl.replace(/\/$/, "") : null,
           }
@@ -137,15 +138,15 @@ export async function getPaymentGateways(): Promise<PaymentGateways> {
             merchantUid: waafi.merchantUid,
             apiUserId: waafi.apiUserId,
             apiKey: waafi.apiKey,
-            apiUrl: env.WAAFI_API_URL ?? "https://api.waafipay.net/asm",
+            apiUrl: config.WAAFI_API_URL ?? "https://api.waafipay.net/asm",
           }
         : null,
     edahab:
       edahab.apiKey && edahab.agentCode
-        ? { apiKey: edahab.apiKey, agentCode: edahab.agentCode, apiUrl: env.EDAHAB_API_URL ?? "https://edahab.net/api/api/issueinvoice" }
+        ? { apiKey: edahab.apiKey, agentCode: edahab.agentCode, apiUrl: config.EDAHAB_API_URL ?? "https://edahab.net/api/api/issueinvoice" }
         : null,
-    testMode: explicitTestMode !== undefined ? bool(explicitTestMode) : env.NODE_ENV !== "production",
-    siteUrl: env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+    testMode: explicitTestMode !== undefined ? bool(explicitTestMode) : config.NODE_ENV !== "production",
+    siteUrl: config.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
     bankTransfer: bank,
   };
 }

@@ -8,6 +8,7 @@ import { RequestDecision } from "@/modules/hotels/components/request-decision";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { hallSlotLabel } from "@/modules/events/venue-desk-types";
 
 const KIND_LABEL: Record<VenueRequest["kind"], string> = {
   cancellation: "Cancellation",
@@ -41,7 +42,7 @@ function RequestCard({
 }) {
   const open = request.status === "requested" || request.status === "in_review";
   const quote = request.quote;
-  const dates = request.startDate === request.endDate ? request.startDate : `${request.startDate} → ${request.endDate}`;
+  const dates = hallSlotLabel({ start_date: request.startDate, end_date: request.endDate, start_time: null, end_time: null });
 
   return (
     <li className="space-y-3 py-4 first:pt-0 last:pb-0">
@@ -70,7 +71,7 @@ function RequestCard({
             kind={request.kind}
             currency={request.currency}
             suggestedAmount={quote?.refundAmount ?? request.requestedAmount ?? 0}
-            maxAmount={request.price}
+            maxAmount={quote?.paidAmount ?? request.price}
           />
         ) : null}
       </div>
@@ -116,61 +117,64 @@ export async function VenueRefundsView({ venueId, base, access }: { venueId: str
   const open = requests.filter((r) => r.status === "requested" || r.status === "in_review");
   const closed = requests.filter((r) => r.status !== "requested" && r.status !== "in_review");
 
+  const rulesCard = (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Refund rules</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <RefundRulesEditor
+          scopeId={venueId}
+          scopeName="venueId"
+          rules={rules}
+          canEdit={access.can("profile")}
+          saveAction={saveVenueRefundRule}
+          deleteAction={deleteVenueRefundRule}
+          anchor="the event"
+        />
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <h1 className="font-heading text-2xl font-semibold">Refunds</h1>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            Requests
-            {open.length > 0 ? <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">{open.length}</Badge> : null}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {open.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No open requests.</p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {open.map((r) => (
-                <RequestCard key={r.id} request={r} venueId={venueId} base={base} canDecide={access.can("bookings")} />
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Refund rules</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <RefundRulesEditor
-            scopeId={venueId}
-            scopeName="venueId"
-            rules={rules}
-            canEdit={access.can("profile")}
-            saveAction={saveVenueRefundRule}
-            deleteAction={deleteVenueRefundRule}
-            anchor="the event"
-          />
-        </CardContent>
-      </Card>
-
-      {closed.length > 0 ? (
+    <div className="grid items-start gap-6 lg:grid-cols-3">
+      <div className="space-y-6 lg:col-span-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">History</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              Requests
+              {open.length > 0 ? <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">{open.length}</Badge> : null}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="divide-y divide-border">
-              {closed.map((r) => (
-                <RequestCard key={r.id} request={r} venueId={venueId} base={base} canDecide={false} />
-              ))}
-            </ul>
+            {open.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No open requests.</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {open.map((r) => (
+                  <RequestCard key={r.id} request={r} venueId={venueId} base={base} canDecide={access.can("bookings")} />
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
-      ) : null}
+
+        {closed.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="divide-y divide-border">
+                {closed.map((r) => (
+                  <RequestCard key={r.id} request={r} venueId={venueId} base={base} canDecide={false} />
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ) : null}
+      </div>
+      {rulesCard}
     </div>
   );
 }

@@ -33,7 +33,7 @@ export default async function AgentPrivateUmrahLauncherPage({
   const membership = await getMyAgency(profile.id);
   if (!membership) redirect("/agent");
 
-  const draft = await getMyDraftUmrahRequest(profile.id);
+  const draft = await getMyDraftUmrahRequest();
 
   return (
     <div className="space-y-6">

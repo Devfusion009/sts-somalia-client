@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { env } from "../../config/env";
 
 /**
  * Direct port of apps/web's lib/integrations-crypto.ts — AES-256-GCM for
@@ -9,7 +10,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
  */
 
 function getKey(): Buffer {
-  const secret = process.env.INTEGRATIONS_ENCRYPTION_KEY;
+  const secret = env().INTEGRATIONS_ENCRYPTION_KEY;
   if (!secret) throw new Error("INTEGRATIONS_ENCRYPTION_KEY is not set.");
   return createHash("sha256").update(secret).digest();
 }

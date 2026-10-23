@@ -7,9 +7,11 @@ import { updateVenueBookingStatus } from "@/modules/events/venue-partner-actions
 export function VenueBookingStatusControl({
   booking,
   today,
+  paid,
 }: {
   booking: { id: string; status: string; start_date: string; end_date: string; price: number | string };
   today: string;
+  paid: boolean;
 }) {
-  return <HallMoveActions booking={booking} today={today} action={updateVenueBookingStatus} />;
+  return <HallMoveActions booking={booking} today={today} paid={paid} action={updateVenueBookingStatus} />;
 }

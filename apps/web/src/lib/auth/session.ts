@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { rootOrigin, portalLoginHref, type PortalSubdomain } from "@/lib/subdomain";
 import { createClient } from "@/lib/supabase/server";
 import { mfaChallengePending } from "@/lib/auth/mfa";
@@ -22,13 +23,18 @@ export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   // authenticated page). The id used for the read comes from the cookie, so it
   // is only trusted if getUser() — the authoritative check — agrees.
   const claimedId = await sessionUserId(supabase);
-  const [{ data: { user } }, { data: profile }] = await Promise.all([
+  const [{ data: { user }, error: userError }, { data: profile, error: profileError }] = await Promise.all([
     supabase.auth.getUser(),
     claimedId
       ? supabase.from("profiles").select("*").eq("id", claimedId).single()
-      : Promise.resolve({ data: null }),
+      : Promise.resolve({ data: null, error: null }),
   ]);
+  // An unreachable auth server is an outage, not a sign-out: returning null
+  // here sent signed-in users to the login page whenever Supabase was slow.
+  if (isAuthRetryableFetchError(userError)) throw userError;
   if (!user || user.id !== claimedId) return null;
+  // PGRST116 = no profile row; anything else is a failed read.
+  if (profileError && profileError.code !== "PGRST116") throw profileError;
   return profile;
 });
 

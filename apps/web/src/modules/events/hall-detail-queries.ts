@@ -30,18 +30,20 @@ export async function getHallRefundQuote(bookingId: string): Promise<RefundQuote
 /** One hall booking with its order, payment, open requests and activity. RLS scopes it to the caller. */
 export async function getHallBookingDetail(venueId: string, bookingId: string) {
   const supabase = await createClient();
-  const { data: booking } = await supabase
+  const { data: booking, error } = await supabase
     .from("hall_bookings")
     .select(
       `id, venue_id, booking_ref, event_type, event_name, start_date, end_date, start_time, end_time, expected_guests,
-       setup_requirements, customer_notes, admin_notes, price, currency, status, source, channel, contact_name,
+       setup_requirements, customer_notes, admin_notes, price, currency, status, source, channel, contact_name, customer_id,
        contact_phone, contact_email, payment_method, paid_at, payment_reference, displaced_at, created_at,
        agency:agencies(name),
-       order_items(order:orders(id, order_number, status, payments(provider, method_label, status, amount)))`
+       order_items(order:orders(id, order_number, status, total, payments(id, provider, method_label, status, amount, created_at)))`
     )
     .eq("id", bookingId)
     .eq("venue_id", venueId)
     .maybeSingle();
+  // A failed read must not render as "not found".
+  if (error) throw error;
   if (!booking) return null;
 
   const [{ data: events }, { data: requests }] = await Promise.all([
@@ -58,12 +60,22 @@ export async function getHallBookingDetail(venueId: string, bookingId: string) {
   ]);
 
   const order = booking.order_items?.[0]?.order ?? null;
-  const succeeded = order?.payments?.find((p) => p.status === "succeeded") ?? null;
+  const succeededPayments = order?.payments?.filter((p) => p.status === "succeeded") ?? [];
+  const succeeded = succeededPayments.at(-1) ?? null;
   const live = booking.status === "pending" || booking.status === "confirmed";
 
   return {
     booking,
-    order: order ? { id: order.id, number: order.order_number, status: order.status } : null,
+    order: order
+      ? {
+          id: order.id,
+          number: order.order_number,
+          status: order.status,
+          total: Number(order.total),
+          paid: succeededPayments.reduce((sum, p) => sum + Number(p.amount), 0),
+          payments: [...(order.payments ?? [])].sort((a, z) => a.created_at.localeCompare(z.created_at)),
+        }
+      : null,
     onlinePayment: succeeded ? { provider: succeeded.provider, label: succeeded.method_label } : null,
     requests: requests ?? [],
     events: (events ?? []).map<HallEvent>((e) => ({

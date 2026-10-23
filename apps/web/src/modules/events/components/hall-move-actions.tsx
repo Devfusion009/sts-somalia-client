@@ -26,12 +26,15 @@ export function HallMoveActions({
   booking,
   today,
   isAdmin = false,
+  paid = true,
   action,
   fields,
 }: {
   booking: { id: string; status: string; start_date: string; end_date: string; price: number | string };
   today: string;
   isAdmin?: boolean;
+  /** False hides "Mark refunded": nothing was paid, so nothing goes back. */
+  paid?: boolean;
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   fields?: Record<string, string>;
 }) {
@@ -41,7 +44,7 @@ export function HallMoveActions({
     else toast.success(MOVE_MESSAGES[String(formData.get("status"))] ?? "Saved.", { position: "top-center" });
     return result;
   }, null);
-  const moves = nextHallBookingMoves(booking, today, isAdmin);
+  const moves = nextHallBookingMoves(booking, today, isAdmin).filter((m) => paid || m !== "refunded");
   if (moves.length === 0) return null;
   const isRequest = booking.status === "pending" || booking.status === "waitlisted";
 

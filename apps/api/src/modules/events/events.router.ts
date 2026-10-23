@@ -1,89 +1,78 @@
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "../../trpc/trpc";
 import {
-  venueFiltersSchema,
-  venueOccupiedRangesSchema,
+  createHallBookingResultSchema,
   createHallBookingSchema,
-  venueUpsertSchema,
+  partnerVenueRefSchema,
+  publicVenueDetailSchema,
+  publicVenueSchema,
   updateMyVenueSchema,
   updateVenueBookingStatusSchema,
+  venueFiltersSchema,
+  venueOccupiedRangesSchema,
+  venueUpsertSchema,
 } from "@sts/shared-types";
+import { router, publicProcedure, protectedProcedure } from "../../trpc/trpc";
 import { EventsService } from "./events.service";
 import { VenuePartnerService } from "./venue-partner.service";
 
+/**
+ * Transport only: each procedure declares its input and output DTO, resolves
+ * the service and passes the caller's id. No rules and no queries here.
+ */
 export const eventsRouter = router({
-  venues: publicProcedure.input(venueFiltersSchema.optional()).query(async ({ ctx, input }) => {
-    const svc = await ctx.resolve(EventsService);
-    return svc.getVenues(input ?? {});
-  }),
+  venues: publicProcedure
+    .input(venueFiltersSchema.optional())
+    .output(z.array(publicVenueSchema))
+    .query(async ({ ctx, input }) => (await ctx.resolve(EventsService)).getVenues(input ?? {})),
 
-  venueBySlug: publicProcedure.input(z.object({ slug: z.string() })).query(async ({ ctx, input }) => {
-    const svc = await ctx.resolve(EventsService);
-    return svc.getVenueBySlug(input.slug);
-  }),
+  venueBySlug: publicProcedure
+    .input(z.object({ slug: z.string().min(1) }))
+    .output(publicVenueDetailSchema.nullable())
+    .query(async ({ ctx, input }) => (await ctx.resolve(EventsService)).getVenueBySlug(input.slug)),
 
-  venueEventTypes: publicProcedure.query(async ({ ctx }) => {
-    const svc = await ctx.resolve(EventsService);
-    return svc.getVenueEventTypes();
-  }),
+  venueEventTypes: publicProcedure
+    .output(z.array(z.string()))
+    .query(async ({ ctx }) => (await ctx.resolve(EventsService)).getVenueEventTypes()),
 
-  venueOccupiedRanges: protectedProcedure.input(venueOccupiedRangesSchema).query(async ({ ctx, input }) => {
-    const svc = await ctx.resolve(EventsService);
-    return svc.getVenueOccupiedRanges(input);
-  }),
+  venueOccupiedRanges: protectedProcedure
+    .input(venueOccupiedRangesSchema)
+    .query(async ({ ctx, input }) => (await ctx.resolve(EventsService)).getVenueOccupiedRanges(input)),
 
-  createHallBooking: protectedProcedure.input(createHallBookingSchema).mutation(async ({ ctx, input }) => {
-    const svc = await ctx.resolve(EventsService);
-    return svc.createHallBooking(ctx.user!.id, input);
-  }),
+  createHallBooking: protectedProcedure
+    .input(createHallBookingSchema)
+    .output(createHallBookingResultSchema)
+    .mutation(async ({ ctx, input }) => (await ctx.resolve(EventsService)).createHallBooking(ctx.user.id, input)),
 
-  /** Venue Portal — different audience (venue owners), same module, separate service. */
+  /** Venue Portal — the partner comes from the session, never from the input. */
   partner: router({
-    myPartnerId: protectedProcedure.query(async ({ ctx }) => {
-      const svc = await ctx.resolve(VenuePartnerService);
-      return svc.getMyVenuePartnerId(ctx.user!.id);
-    }),
+    me: protectedProcedure.query(async ({ ctx }) => (await ctx.resolve(VenuePartnerService)).getMyPartner(ctx.user.id)),
 
-    myPartner: protectedProcedure.input(z.object({ partnerId: z.string().uuid() })).query(async ({ ctx, input }) => {
-      const svc = await ctx.resolve(VenuePartnerService);
-      return svc.getMyVenuePartner(input.partnerId);
-    }),
+    venues: protectedProcedure.query(async ({ ctx }) =>
+      (await ctx.resolve(VenuePartnerService)).getMyVenues(ctx.user.id)
+    ),
 
-    myVenues: protectedProcedure.input(z.object({ partnerId: z.string().uuid() })).query(async ({ ctx, input }) => {
-      const svc = await ctx.resolve(VenuePartnerService);
-      return svc.getMyVenues(input.partnerId);
-    }),
+    venue: protectedProcedure
+      .input(partnerVenueRefSchema)
+      .query(async ({ ctx, input }) => (await ctx.resolve(VenuePartnerService)).getVenueForEdit(ctx.user.id, input.venueId)),
 
-    venueForEdit: protectedProcedure
-      .input(z.object({ partnerId: z.string().uuid(), venueId: z.string().uuid() }))
-      .query(async ({ ctx, input }) => {
-        const svc = await ctx.resolve(VenuePartnerService);
-        return svc.getVenueForEdit(input.partnerId, input.venueId);
-      }),
+    bookings: protectedProcedure.query(async ({ ctx }) =>
+      (await ctx.resolve(VenuePartnerService)).getVenueBookings(ctx.user.id)
+    ),
 
-    venueBookings: protectedProcedure.input(z.object({ partnerId: z.string().uuid() })).query(async ({ ctx, input }) => {
-      const svc = await ctx.resolve(VenuePartnerService);
-      return svc.getVenueBookings(input.partnerId);
-    }),
+    stats: protectedProcedure.query(async ({ ctx }) => (await ctx.resolve(VenuePartnerService)).getStats(ctx.user.id)),
 
-    stats: protectedProcedure.input(z.object({ partnerId: z.string().uuid() })).query(async ({ ctx, input }) => {
-      const svc = await ctx.resolve(VenuePartnerService);
-      return svc.getVenuePartnerStats(input.partnerId);
-    }),
+    createVenue: protectedProcedure
+      .input(venueUpsertSchema)
+      .mutation(async ({ ctx, input }) => (await ctx.resolve(VenuePartnerService)).createVenue(ctx.user.id, input)),
 
-    createVenue: protectedProcedure.input(venueUpsertSchema).mutation(async ({ ctx, input }) => {
-      const svc = await ctx.resolve(VenuePartnerService);
-      return svc.createMyVenue(ctx.user!.id, input);
-    }),
+    updateVenue: protectedProcedure
+      .input(updateMyVenueSchema)
+      .mutation(async ({ ctx, input }) => (await ctx.resolve(VenuePartnerService)).updateVenue(ctx.user.id, input)),
 
-    updateVenue: protectedProcedure.input(updateMyVenueSchema).mutation(async ({ ctx, input }) => {
-      const svc = await ctx.resolve(VenuePartnerService);
-      return svc.updateMyVenue(ctx.user!.id, input);
-    }),
-
-    updateBookingStatus: protectedProcedure.input(updateVenueBookingStatusSchema).mutation(async ({ ctx, input }) => {
-      const svc = await ctx.resolve(VenuePartnerService);
-      return svc.updateVenueBookingStatus(ctx.user!.id, input.bookingId, input.status);
-    }),
+    updateBookingStatus: protectedProcedure
+      .input(updateVenueBookingStatusSchema)
+      .mutation(async ({ ctx, input }) =>
+        (await ctx.resolve(VenuePartnerService)).updateBookingStatus(ctx.user.id, input)
+      ),
   }),
 });

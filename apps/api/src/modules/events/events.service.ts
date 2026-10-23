@@ -1,76 +1,64 @@
 import { Injectable, BadRequestException } from "@nestjs/common";
-import { RlsSupabaseService } from "../../infra/supabase/rls-supabase.service";
-import { createAnonClient } from "../../infra/supabase/supabase-clients";
+import { computeHallPrice, venueCapacity } from "@sts/shared-types";
+import type {
+  CreateHallBookingInput,
+  CreateHallBookingResult,
+  PublicVenue,
+  PublicVenueDetail,
+  VenueFilters,
+  VenueOccupiedRangesInput,
+} from "@sts/shared-types";
 import { OrdersService } from "../orders/orders.service";
 import { notifyPartnerOfBooking } from "../../infra/notify/partner-booking-notify";
-import { computeHallPrice } from "@sts/shared-types";
-import type { VenueFilters, VenueOccupiedRangesInput, CreateHallBookingInput } from "@sts/shared-types";
+import { VenueRepository } from "./repositories/venue.repository";
+import { HallBookingRepository } from "./repositories/hall-booking.repository";
+import { VenuePartnerRepository } from "./repositories/venue-partner.repository";
+import { toPublicVenue, toPublicVenueDetail } from "./mappers/venue.mapper";
 
 /**
- * Direct port of apps/web's modules/events/{queries,actions}.ts — the
- * customer-facing half. venue-partner-{queries,actions}.ts is the separate
- * VenuePartnerService (different audience: venue owners, not customers).
+ * Customer-facing events rules: browsing published venues and placing a hall
+ * booking. Data access lives in the repositories; this file holds the
+ * decisions (dates, capacity, availability, price, who the booking is for).
  */
 @Injectable()
 export class EventsService {
   constructor(
-    private readonly rls: RlsSupabaseService,
+    private readonly venues: VenueRepository,
+    private readonly bookings: HallBookingRepository,
+    private readonly partners: VenuePartnerRepository,
     private readonly orders: OrdersService
   ) {}
 
-  /** Public marketing browsing — anon client, same reasoning as flights.airports. */
-  async getVenues(filters: VenueFilters = {}) {
-    const { data } = await createAnonClient()
-      .from("event_venues")
-      .select("*")
-      .eq("status", "published")
-      .order("is_featured", { ascending: false })
-      .order("name");
-
-    let venues = data ?? [];
+  async getVenues(filters: VenueFilters = {}): Promise<PublicVenue[]> {
+    let venues = (await this.venues.findPublished()).map(toPublicVenue);
     if (filters.city) {
       const needle = filters.city.trim().toLowerCase();
       venues = venues.filter((v) => v.city.toLowerCase().includes(needle));
     }
     if (filters.eventType) {
       const type = filters.eventType;
-      venues = venues.filter((v) => Array.isArray(v.event_types) && (v.event_types as string[]).includes(type));
+      venues = venues.filter((v) => v.event_types.includes(type));
     }
     return venues;
   }
 
-  async getVenueBySlug(slug: string) {
-    const { data } = await createAnonClient()
-      .from("event_venues")
-      .select("*, property_links(label, url, sort_order), property_reviews(id, author_name, rating, body, created_at)")
-      .eq("slug", slug)
-      .eq("status", "published")
-      .maybeSingle();
-    return data;
+  async getVenueBySlug(slug: string): Promise<PublicVenueDetail | null> {
+    const row = await this.venues.findPublishedBySlug(slug);
+    return row ? toPublicVenueDetail(row as Record<string, unknown>) : null;
   }
 
-  async getVenueEventTypes() {
-    const venues = await this.getVenues();
+  async getVenueEventTypes(): Promise<string[]> {
     const set = new Set<string>();
-    for (const venue of venues) {
-      if (Array.isArray(venue.event_types)) {
-        for (const t of venue.event_types as string[]) set.add(t);
-      }
-    }
+    for (const venue of await this.getVenues()) for (const t of venue.event_types) set.add(t);
     return [...set].sort();
   }
 
-  /** Requires login — called by agents checking availability, not public browsing. */
+  /** Requires login — agents checking availability, not public browsing. */
   async getVenueOccupiedRanges(input: VenueOccupiedRangesInput) {
-    const { data } = await this.rls.get().rpc("get_venue_occupied_ranges", {
-      target_venue_id: input.venueId,
-      from_date: input.from,
-      to_date: input.to,
-    });
-    return data ?? [];
+    return this.venues.findOccupiedRanges(input.venueId, input.from, input.to);
   }
 
-  async createHallBooking(userId: string, input: CreateHallBookingInput) {
+  async createHallBooking(userId: string, input: CreateHallBookingInput): Promise<CreateHallBookingResult> {
     const startDate = new Date(`${input.startDate}T00:00:00`);
     const endDate = new Date(`${input.endDate}T00:00:00`);
     if (Number.isNaN(startDate.getTime()) || startDate < new Date(new Date().toDateString())) {
@@ -80,37 +68,25 @@ export class EventsService {
       throw new BadRequestException("The end date can't be before the start date.");
     }
 
-    const supabase = this.rls.get();
-
-    const { data: venue } = await supabase
-      .from("event_venues")
-      .select("*")
-      .eq("id", input.venueId)
-      .eq("status", "published")
-      .maybeSingle();
+    const venue = await this.venues.findPublishedForBooking(input.venueId);
     if (!venue) throw new BadRequestException("This venue is no longer available.");
 
-    if (venue.capacity_standing && input.expectedGuests > venue.capacity_standing) {
-      throw new BadRequestException(
-        `This venue hosts up to ${venue.capacity_standing} guests — please adjust the guest count or contact us for alternatives.`
-      );
-    }
-
-    // security definer: sees every booking and blocked range at the venue,
-    // which the caller's own RLS can't. The insert trigger stays the
-    // authority under concurrency (it refuses instead of double-booking).
-    const { data: available } = await supabase.rpc("venue_slot_available", {
-      p_venue_id: venue.id,
-      p_start: input.startDate,
-      p_end: input.endDate,
-      p_from: input.startTime ?? undefined,
-      p_to: input.endTime ?? undefined,
-    });
-    if (available === false) {
-      throw new BadRequestException("These dates are no longer available at this venue — contact us for alternatives.");
+    const capacity = venueCapacity(venue);
+    if (capacity && input.expectedGuests > capacity) {
+      throw new BadRequestException(`This venue holds up to ${capacity} guests.`);
     }
 
     const agencyId = await this.orders.getActiveAgencyId(userId);
+
+    // The insert trigger is the authority under concurrency; this early
+    // check only gives a customer a clean message. Agency bookings skip it:
+    // the allocator may seat them by displacing unpaid online requests,
+    // which a plain overlap check can't see.
+    if (!agencyId) {
+      const free = await this.venues.isSlotAvailable(venue.id, input.startDate, input.endDate, input.startTime, input.endTime);
+      if (!free) throw new BadRequestException("This venue is already booked for that slot.");
+    }
+
     const access = await this.orders.assertAgencyCanBookProduct(agencyId, "hall");
     if (!access.ok) throw new BadRequestException(access.message);
     const agencyCustomerId = await this.orders.resolveBookedForCustomer(agencyId, {
@@ -118,8 +94,11 @@ export class EventsService {
       newCustomerName: input.newCustomerName,
       newCustomerPhone: input.newCustomerPhone,
     });
+    // An agency books for its own customer: the venue sees that person as
+    // the client, not the agent who typed the booking in.
+    const bookedFor = agencyCustomerId ? await this.orders.getAgencyCustomerContact(agencyCustomerId) : null;
 
-    const priceBreakdown = computeHallPrice({
+    const price = computeHallPrice({
       basePrice: Number(venue.base_price),
       priceUnit: venue.price_unit,
       expectedGuests: input.expectedGuests,
@@ -128,42 +107,37 @@ export class EventsService {
       startTime: input.startTime,
       endTime: input.endTime,
     });
-    const estimatedPrice = priceBreakdown.total;
 
-    const { data: booking, error: bookingError } = await supabase
-      .from("hall_bookings")
-      .insert({
-        venue_id: venue.id,
-        customer_id: userId,
-        booked_by: userId,
-        agency_id: agencyId,
-        event_type: input.eventType,
-        event_name: input.eventName ?? null,
-        start_date: input.startDate,
-        end_date: input.endDate,
-        start_time: input.startTime ?? null,
-        end_time: input.endTime ?? null,
-        expected_guests: input.expectedGuests,
-        setup_requirements: input.setupRequirements ?? null,
-        price: estimatedPrice,
-        currency: venue.currency,
-      })
-      .select()
-      .single();
-    if (bookingError || !booking) {
-      throw new BadRequestException(bookingError?.message ?? "Could not create the booking. Please try again.");
-    }
+    const booking = await this.bookings.insert({
+      venue_id: venue.id,
+      customer_id: userId,
+      booked_by: userId,
+      agency_id: agencyId,
+      event_type: input.eventType,
+      event_name: input.eventName ?? null,
+      start_date: input.startDate,
+      end_date: input.endDate,
+      start_time: input.startTime ?? null,
+      end_time: input.endTime ?? null,
+      expected_guests: input.expectedGuests,
+      setup_requirements: input.setupRequirements ?? null,
+      ...(bookedFor
+        ? {
+            contact_name: bookedFor.full_name,
+            contact_phone: bookedFor.phone ? bookedFor.phone.slice(0, 30) : null,
+            contact_email: bookedFor.email ? bookedFor.email.slice(0, 160) : null,
+          }
+        : {}),
+      price: price.total,
+      currency: venue.currency,
+    });
 
     if (venue.partner_id) {
-      const { data: venuePartner } = await supabase
-        .from("venue_partners")
-        .select("contact_email, contact_phone")
-        .eq("id", venue.partner_id)
-        .maybeSingle();
-      if (venuePartner) {
+      const partner = await this.partners.findPartner(venue.partner_id).catch(() => null);
+      if (partner) {
         void notifyPartnerOfBooking({
-          partnerEmail: venuePartner.contact_email,
-          partnerPhone: venuePartner.contact_phone,
+          partnerEmail: partner.contact_email,
+          partnerPhone: partner.contact_phone,
           propertyName: venue.name,
           summary: `${input.eventType}, ${input.expectedGuests} guests, ${input.startDate}${input.endDate !== input.startDate ? ` → ${input.endDate}` : ""}`,
         }).catch(() => {});
@@ -177,19 +151,14 @@ export class EventsService {
       agencyCustomerId,
       currency: venue.currency,
       itemType: "hall",
-      price: estimatedPrice,
+      price: price.total,
       hallBookingId: booking.id,
     });
 
-    // Per-person / price-on-request venues confirm the final price before
-    // completing — matches the original's skip-checkout branch. per_hour
-    // bookings submitted without start/end times are the same case: the
-    // total written above is a placeholder single-unit charge, not the real
-    // price, so the caller must not let checkout proceed on it either.
+    // Per-person and price-on-request venues, and per-hour bookings sent
+    // without times, are quoted by the venue before anything is paid.
     const requiresPriceConfirmation =
-      venue.price_unit === "per_person" ||
-      Number(venue.base_price) === 0 ||
-      priceBreakdown.needsTimes;
+      venue.price_unit === "per_person" || Number(venue.base_price) === 0 || price.needsTimes;
     return { orderId: order.id, requiresPriceConfirmation };
   }
 }

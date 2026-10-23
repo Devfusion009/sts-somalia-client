@@ -10,6 +10,7 @@ import { createBatchBooking } from "@/modules/agencies/batch-booking-actions";
 import { HallBookingForm } from "@/modules/events/components/booking-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { UnavailableNotice } from "@/components/portal/unavailable-notice";
+import { venueCapacity } from "@sts/shared-types";
 
 export default async function AgentVenueBookingPage({
   params,
@@ -51,9 +52,7 @@ export default async function AgentVenueBookingPage({
         <p className="mt-0.5 text-sm text-muted-foreground">
           {[
             venue.city,
-            venue.capacity_standing ?? venue.capacity_seated
-              ? `up to ${venue.capacity_standing ?? venue.capacity_seated} guests`
-              : null,
+            venueCapacity(venue) ? `up to ${venueCapacity(venue)} guests` : null,
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -68,7 +67,7 @@ export default async function AgentVenueBookingPage({
             basePrice={Number(venue.base_price)}
             priceUnit={venue.price_unit}
             eventTypes={eventTypes}
-            maxGuests={venue.capacity_standing ?? venue.capacity_seated}
+            maxGuests={venueCapacity(venue)}
             action={isGroup ? createBatchBooking : undefined}
             bookedForSlot={
               <>

@@ -40,7 +40,19 @@ export type FlightOffer = {
   changePenalty: FarePenalty;
   /** Checked bags for the first passenger's first segment — a summary, not a per-passenger/per-segment breakdown. */
   checkedBagsIncluded: number | null;
+  /** The inbound leg of a round trip; totalAmount already covers both legs. */
+  returnLeg: FlightLeg | null;
 };
+
+export type FlightLeg = {
+  departAt: string;
+  arriveAt: string;
+  durationMinutes: number | null;
+  stops: number;
+};
+
+/** Duffel's supplier timeout is ~20s; past this the page renders the quote flow instead of hanging. */
+const SEARCH_TIMEOUT_MS = 25_000;
 
 export type FlightSearchResult = {
   live: boolean;
@@ -127,10 +139,13 @@ export async function searchLiveFlights(params: FlightSearchParams): Promise<Fli
       }),
       // Live fares are point-in-time; never cache.
       cache: "no-store",
+      signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
     });
 
     if (!res.ok) {
-      return { live: true, offers: [], providerError: `Fare search failed (${res.status}).` };
+      // The status is for operators (401 = bad key, 422 = bad search), not for travellers.
+      console.error(`[flights] Duffel offer request failed: ${res.status}`);
+      return { live: true, offers: [], providerError: "Live fares are unavailable right now" };
     }
 
     const payload = (await res.json()) as { data?: { offers?: DuffelOffer[] } };
@@ -143,6 +158,16 @@ export async function searchLiveFlights(params: FlightSearchParams): Promise<Fli
 
       const refund = offer.conditions?.refund_before_departure;
       const change = offer.conditions?.change_before_departure;
+      const inbound = offer.slices?.[1]?.segments ?? [];
+      const returnLeg: FlightLeg | null =
+        inbound[0]?.departing_at && inbound[inbound.length - 1]?.arriving_at
+          ? {
+              departAt: inbound[0].departing_at,
+              arriveAt: inbound[inbound.length - 1].arriving_at!,
+              durationMinutes: parseDuration(offer.slices?.[1]?.duration),
+              stops: Math.max(inbound.length - 1, 0),
+            }
+          : null;
       const checkedBags = first.passengers?.[0]?.baggages
         ?.filter((b) => b.type === "checked")
         .reduce((sum, b) => sum + (b.quantity ?? 0), 0);
@@ -165,13 +190,15 @@ export async function searchLiveFlights(params: FlightSearchParams): Promise<Fli
           changeable: change ? Boolean(change.allowed) : null,
           changePenalty: mapPenalty(change),
           checkedBagsIncluded: checkedBags ?? null,
+          returnLeg,
         },
       ];
     });
 
     offers.sort((a, b) => a.totalAmount - b.totalAmount);
     return { live: true, offers: offers.slice(0, 20) };
-  } catch {
-    return { live: true, offers: [], providerError: "The fare provider did not respond." };
+  } catch (err) {
+    console.error("[flights] Duffel offer request did not complete:", err instanceof Error ? err.message : err);
+    return { live: true, offers: [], providerError: "Live fares are unavailable right now" };
   }
 }

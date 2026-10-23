@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getBookingQueue } from "@/modules/admin/queue-queries";
 import { QueueEntryActions, PriceQuoteForm } from "./queue-actions";
+import { expirePastHallRequests } from "@/modules/events/venue-manager-queries";
 
 const formatQueueDate = (iso: string) => format(new Date(`${iso}T00:00:00`), "EEE d MMM yyyy");
 
@@ -15,6 +16,7 @@ export const metadata = { title: "Order Queue | Admin Console" };
  * APIs — every request is confirmed by a human. Newest request first.
  */
 export default async function OrderQueuePage() {
+  await expirePastHallRequests(null);
   const queue = await getBookingQueue();
   const waitlisted = queue.filter((q) => q.status === "waitlisted").length;
   // Rank is arrival order (oldest = #1); the list itself stays newest first.

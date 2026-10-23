@@ -11,9 +11,10 @@ import { todayIso } from "@/modules/hotels/availability";
 import { repriceQuotedOrder } from "@/modules/orders/helpers";
 import { uploadImages, removeImage, setCoverImage, type GalleryUploadState } from "@/modules/admin/property-gallery-actions";
 import { TARGETS } from "@/modules/admin/gallery-targets";
-import { getMyManagedVenue, hasVenuePermission, type ManagedVenue } from "./venue-manager-queries";
+import { getDeskVenue, getMyManagedVenue, hasVenuePermission, type ManagedVenue } from "./venue-manager-queries";
+import { venueCapacity } from "@sts/shared-types";
 import type { VenueManagerPermission } from "./venue-manager-permissions";
-import { OFFLINE_PAYMENT_METHODS, type VenueBookingResult } from "./venue-desk-types";
+import { OFFLINE_PAYMENT_METHODS, hallSlotLabel, type VenueBookingResult } from "./venue-desk-types";
 import { requireVenueAccess, revalidateVenueDesk } from "./venue-access";
 import { nextHallBookingMoves } from "./hall-transitions";
 
@@ -36,6 +37,19 @@ function revalidateDesk(venueId: string) {
   revalidateVenueDesk(venueId);
 }
 
+/**
+ * Desk actions open to a platform admin and to the venue's manager with the
+ * permission. Only a guard's own one-line message (P0001) reaches the screen.
+ */
+async function requireDesk(venueId: string, permission: VenueManagerPermission) {
+  if (!z.string().uuid().safeParse(venueId).success) return null;
+  return requireVenueAccess(venueId, permission);
+}
+
+function dbMessage(error: { code?: string; message: string } | null, fallback: string) {
+  return error?.code === "P0001" ? error.message : fallback;
+}
+
 function optionalText(formData: FormData, key: string) {
   const value = formData.get(key)?.toString().trim();
   return value ? value : undefined;
@@ -54,7 +68,7 @@ const bookingSchema = z
     contactName: z.string().trim().min(2, "Enter the client's full name.").max(120),
     contactPhone: z.string().trim().min(5, "Enter the client's phone number.").max(30),
     contactEmail: z.string().trim().email("Enter a valid email address.").max(160).optional(),
-    price: z.coerce.number().min(0, "Enter a valid price.").max(10_000_000),
+    price: z.coerce.number().positive("Enter the agreed price.").max(10_000_000),
     paymentMethod: z.enum(OFFLINE_PAYMENT_METHODS, { message: "Choose a payment method." }),
     paymentStatus: z.enum(["paid", "unpaid"]),
     paymentReference: z.string().trim().max(120).optional(),
@@ -98,10 +112,12 @@ export async function createVenueBooking(formData: FormData): Promise<VenueBooki
 
   if (d.startDate < todayIso()) return { error: "The event date can't be in the past." };
 
-  const gate = await requireVenuePermission(d.venueId, "bookings");
+  const gate = await requireDesk(d.venueId, "bookings");
   if (!gate) return { error: "You don't have permission to create bookings for this venue." };
+  const venue = await getDeskVenue(d.venueId);
+  if (!venue) return { error: "Venue not found." };
 
-  const capacity = gate.managed.venue.capacity_standing ?? gate.managed.venue.capacity_seated;
+  const capacity = venueCapacity(venue);
   if (capacity && d.expectedGuests > capacity) {
     return { error: `This venue holds up to ${capacity} guests.` };
   }
@@ -114,7 +130,7 @@ export async function createVenueBooking(formData: FormData): Promise<VenueBooki
     p_from: d.startTime,
     p_to: d.endTime,
   });
-  if (available === false) return { error: "The venue is already booked or blocked for this slot." };
+  if (available === false) return { error: "This venue is already booked or blocked for that slot." };
 
   const { data: booking, error } = await supabase
     .from("hall_bookings")
@@ -136,14 +152,14 @@ export async function createVenueBooking(formData: FormData): Promise<VenueBooki
       contact_phone: d.contactPhone,
       contact_email: d.contactEmail ?? null,
       price: d.price,
-      currency: gate.managed.venue.currency,
+      currency: venue.currency,
       payment_method: d.paymentMethod,
       paid_at: d.paymentStatus === "paid" ? new Date().toISOString() : null,
       payment_reference: d.paymentReference ?? null,
     })
     .select("id, booking_ref, status")
     .single();
-  if (error || !booking) return { error: error?.message ?? "The booking could not be saved." };
+  if (error || !booking) return { error: dbMessage(error, "The booking could not be saved.") };
 
   revalidateDesk(d.venueId);
   return {
@@ -164,7 +180,7 @@ export async function checkVenueSlot(
 ): Promise<{ available: boolean } | { error: string }> {
   if (!isoDate.safeParse(startDate).success || !isoDate.safeParse(endDate).success) return { error: "Pick valid dates." };
   if (endDate < startDate) return { error: "The end date can't be before the start date." };
-  if (!(await requireVenuePermission(venueId, "bookings"))) return { error: "Not permitted." };
+  if (!(await requireDesk(venueId, "bookings"))) return { error: "Not permitted." };
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("venue_slot_available", {
@@ -174,7 +190,7 @@ export async function checkVenueSlot(
     p_from: clockTime.safeParse(startTime).success ? startTime : undefined,
     p_to: clockTime.safeParse(endTime).success ? endTime : undefined,
   });
-  if (error) return { error: error.message };
+  if (error) return { error: "Availability could not be checked." };
   return { available: !!data };
 }
 
@@ -229,7 +245,7 @@ export async function setHallBookingStatus(_prev: ActionState, formData: FormDat
     .eq("status", booking.status)
     .select("id")
     .maybeSingle();
-  if (error) return { error: error.message };
+  if (error) return { error: dbMessage(error, "The booking could not be updated.") };
   if (!updated) return { error: "This booking was just changed. Refresh and try again." };
 
   revalidateDesk(parsed.data.venueId);
@@ -255,24 +271,31 @@ export async function quoteHallBookingPrice(_prev: ActionState, formData: FormDa
     return { error: "You don't have permission to manage bookings for this venue." };
   }
 
-  const supabase = await createClient();
-  const { data: updated, error } = await supabase
-    .from("hall_bookings")
-    .update({ price: parsed.data.price })
-    .eq("id", parsed.data.bookingId)
-    .eq("venue_id", parsed.data.venueId)
-    .select("id")
-    .maybeSingle();
-  if (error) return { error: error.message };
-  if (!updated) return { error: "Booking not found." };
-
+  // The order total follows the quote only while nothing is paid; after a
+  // payment the two would drift apart and the balance due would be wrong.
   const admin = createAdminClient();
   const { data: item } = await admin
     .from("order_items")
     .select("id, order:order_id (id, status, agency_id)")
     .eq("hall_booking_id", parsed.data.bookingId)
     .maybeSingle();
-  if (item?.order && item.order.status === "pending_payment") {
+  if (item?.order && item.order.status !== "pending_payment" && item.order.status !== "held") {
+    return { error: "Only unpaid bookings can be repriced." };
+  }
+
+  const supabase = await createClient();
+  const { data: updated, error } = await supabase
+    .from("hall_bookings")
+    .update({ price: parsed.data.price })
+    .eq("id", parsed.data.bookingId)
+    .eq("venue_id", parsed.data.venueId)
+    .in("status", ["pending", "waitlisted"])
+    .select("id")
+    .maybeSingle();
+  if (error) return { error: "Could not save the price." };
+  if (!updated) return { error: "Only an open request can be repriced." };
+
+  if (item?.order) {
     await repriceQuotedOrder(admin, item.order, item.id, "hall", parsed.data.price);
   }
 
@@ -299,6 +322,111 @@ export async function markHallBookingPaid(formData: FormData): Promise<void> {
   revalidateDesk(venueId);
 }
 
+const rescheduleSchema = z
+  .object({
+    venueId: z.string().uuid(),
+    bookingId: z.string().uuid(),
+    startDate: isoDate,
+    endDate: isoDate,
+    startTime: clockTime.optional(),
+    endTime: clockTime.optional(),
+  })
+  .refine((d) => d.endDate >= d.startDate, { message: "The end date can't be before the start date.", path: ["endDate"] })
+  .refine((d) => !d.startTime || !d.endTime || d.startDate !== d.endDate || d.endTime > d.startTime, {
+    message: "The end time must be after the start time.",
+    path: ["endTime"],
+  });
+
+/**
+ * Moves a live booking to a new slot — the follow-through on a client's
+ * change request. The slot trigger re-runs the allocator and refuses a slot
+ * that is taken or blocked; the price is left as agreed.
+ */
+export async function rescheduleHallBooking(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = rescheduleSchema.safeParse({
+    venueId: formData.get("venueId"),
+    bookingId: formData.get("bookingId"),
+    startDate: formData.get("startDate"),
+    endDate: formData.get("endDate") || formData.get("startDate"),
+    startTime: optionalText(formData, "startTime"),
+    endTime: optionalText(formData, "endTime"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const d = parsed.data;
+  if (d.startDate < todayIso()) return { error: "The new date can't be in the past." };
+  if (Boolean(d.startTime) !== Boolean(d.endTime)) return { error: "Enter both times or neither." };
+
+  if (!(await requireDesk(d.venueId, "bookings"))) {
+    return { error: "You don't have permission to manage bookings for this venue." };
+  }
+
+  const supabase = await createClient();
+  const { data: updated, error } = await supabase
+    .from("hall_bookings")
+    .update({
+      start_date: d.startDate,
+      end_date: d.endDate,
+      start_time: d.startTime ?? null,
+      end_time: d.endTime ?? null,
+    })
+    .eq("id", d.bookingId)
+    .eq("venue_id", d.venueId)
+    .in("status", ["pending", "waitlisted", "confirmed"])
+    .gte("end_date", todayIso())
+    .select("id, source, customer_id, venue:event_venues(name)")
+    .maybeSingle();
+  if (error) return { error: dbMessage(error, "The booking could not be moved.") };
+  if (!updated) return { error: "Only an upcoming booking can be moved." };
+
+  // An online client learns of the new slot; a desk client was on the phone.
+  if (updated.source === "online" && updated.customer_id) {
+    await createAdminClient()
+      .from("notifications")
+      .insert({
+        profile_id: updated.customer_id,
+        type: "booking_rescheduled",
+        title: `Booking moved — ${updated.venue?.name ?? "venue"}`,
+        body: hallSlotLabel({ start_date: d.startDate, end_date: d.endDate, start_time: d.startTime ?? null, end_time: d.endTime ?? null }),
+        data: { hall_booking_id: d.bookingId },
+      });
+  }
+
+  revalidateDesk(d.venueId);
+  return { error: null };
+}
+
+const notesSchema = z.object({
+  venueId: z.string().uuid(),
+  bookingId: z.string().uuid(),
+  notes: z.string().trim().max(2000, "Notes are limited to 2,000 characters."),
+});
+
+/** Staff-only notes on a booking (setup, catering, contacts); never shown to the client. */
+export async function saveHallBookingNotes(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = notesSchema.safeParse({
+    venueId: formData.get("venueId"),
+    bookingId: formData.get("bookingId"),
+    notes: formData.get("notes") ?? "",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!(await requireDesk(parsed.data.venueId, "bookings"))) {
+    return { error: "You don't have permission to manage bookings for this venue." };
+  }
+
+  const supabase = await createClient();
+  const { data: updated, error } = await supabase
+    .from("hall_bookings")
+    .update({ admin_notes: parsed.data.notes || null })
+    .eq("id", parsed.data.bookingId)
+    .eq("venue_id", parsed.data.venueId)
+    .select("id")
+    .maybeSingle();
+  if (error || !updated) return { error: "The notes could not be saved." };
+
+  revalidateDesk(parsed.data.venueId);
+  return { error: null };
+}
+
 const blockSchema = z
   .object({
     venueId: z.string().uuid(),
@@ -318,7 +446,7 @@ export async function blockVenueDates(_prev: ActionState, formData: FormData): P
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   if (parsed.data.dateStart < todayIso()) return { error: "Past dates can't be blocked." };
 
-  const gate = await requireVenuePermission(parsed.data.venueId, "calendar");
+  const gate = await requireDesk(parsed.data.venueId, "calendar");
   if (!gate) return { error: "You don't have permission to block dates for this venue." };
 
   const supabase = await createClient();
@@ -329,7 +457,7 @@ export async function blockVenueDates(_prev: ActionState, formData: FormData): P
     reason: parsed.data.reason ?? null,
     created_by: gate.profileId,
   });
-  if (error) return { error: error.message };
+  if (error) return { error: dbMessage(error, "The dates could not be blocked.") };
 
   revalidateDesk(parsed.data.venueId);
   return { error: null };
@@ -339,7 +467,7 @@ export async function unblockVenueDates(formData: FormData): Promise<void> {
   const blockId = z.string().uuid().safeParse(formData.get("blockId"));
   const venueId = String(formData.get("venueId") ?? "");
   if (!blockId.success) return;
-  if (!(await requireVenuePermission(venueId, "calendar"))) return;
+  if (!(await requireDesk(venueId, "calendar"))) return;
 
   const supabase = await createClient();
   await supabase.from("venue_blocked_dates").delete().eq("id", blockId.data).eq("venue_id", venueId);
@@ -389,9 +517,10 @@ export async function updateVenueProfileAsManager(_prev: ActionState, formData: 
       policies: parsed.data.policies ?? null,
     })
     .eq("id", parsed.data.venueId);
-  if (error) return { error: error.message };
+  if (error) return { error: "The profile could not be saved." };
 
   revalidatePath(`/manager/venues/${parsed.data.venueId}/profile`);
+  revalidatePath("/events", "layout");
   return { error: null };
 }
 

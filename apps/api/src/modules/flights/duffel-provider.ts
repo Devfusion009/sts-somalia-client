@@ -1,5 +1,6 @@
 import type { FlightSearchParams, FlightSearchResult, FlightOffer } from "@sts/shared-types";
 import { getActiveProviderCredentials } from "../../infra/provider-credentials/credentials";
+import { env } from "../../config/env";
 
 /**
  * Direct port of apps/web's modules/flights/provider.ts. DB-configured key
@@ -10,7 +11,7 @@ import { getActiveProviderCredentials } from "../../infra/provider-credentials/c
 async function resolveDuffelApiKey(): Promise<string | null> {
   const credentials = await getActiveProviderCredentials("duffel");
   if (credentials?.api_key) return credentials.api_key;
-  return process.env.DUFFEL_API_KEY ?? null;
+  return env().DUFFEL_API_KEY ?? null;
 }
 
 type DuffelBaggage = { type?: string; quantity?: number };
@@ -77,10 +78,12 @@ export async function searchLiveFlights(params: FlightSearchParams): Promise<Fli
           cabin_class: params.cabinClass,
         },
       }),
+      signal: AbortSignal.timeout(25_000),
     });
 
     if (!res.ok) {
-      return { live: true, offers: [], providerError: `Fare search failed (${res.status}).` };
+      console.error(`[flights] Duffel offer request failed: ${res.status}`);
+      return { live: true, offers: [], providerError: "Live fares are unavailable right now" };
     }
 
     const payload = (await res.json()) as { data?: { offers?: DuffelOffer[] } };
@@ -121,7 +124,8 @@ export async function searchLiveFlights(params: FlightSearchParams): Promise<Fli
 
     offers.sort((a, b) => a.totalAmount - b.totalAmount);
     return { live: true, offers: offers.slice(0, 20) };
-  } catch {
-    return { live: true, offers: [], providerError: "The fare provider did not respond." };
+  } catch (err) {
+    console.error("[flights] Duffel offer request did not complete:", err instanceof Error ? err.message : err);
+    return { live: true, offers: [], providerError: "Live fares are unavailable right now" };
   }
 }

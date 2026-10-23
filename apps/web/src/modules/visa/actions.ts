@@ -411,6 +411,10 @@ export async function saveTravelInfo(
   }
 
   const d = parsed.data;
+  const passportExpiry = (application.traveler_details as Record<string, string> | null)?.passport_expiry;
+  if (passportExpiry && passportExpiry <= d.departureDate) {
+    return { error: "The passport expires before the departure date.", values: formValues(formData) };
+  }
   await supabase
     .from("visa_applications")
     .update({
@@ -679,11 +683,20 @@ export async function submitVisaApplication(
     occupation: traveler.occupation,
   });
   if (!personal.success) {
-    return { error: "Personal information is incomplete — please review step 2." };
+    return { error: `${personal.error.issues[0].message} Review step 2.` };
   }
-  const travel = (application.travel_details ?? {}) as Record<string, unknown>;
-  if (Object.keys(travel).length === 0) {
-    return { error: "Travel information is incomplete — please review step 3." };
+  const travel = (application.travel_details ?? {}) as Record<string, string>;
+  const travelCheck = travelInfoSchema.safeParse({
+    arrivalDate: travel.arrival_date,
+    departureDate: travel.departure_date,
+    purposeOfVisit: travel.purpose,
+    addressAtDestination: travel.address,
+  });
+  if (!travelCheck.success) {
+    return { error: `${travelCheck.error.issues[0].message} Review step 3.` };
+  }
+  if (personal.data.passportExpiry <= travelCheck.data.departureDate) {
+    return { error: "The passport expires before the departure date. Review step 2." };
   }
   const questions = parseApplicationQuestions(visaType.application_questions);
   const answers = (application.custom_answers ?? {}) as Record<string, string>;

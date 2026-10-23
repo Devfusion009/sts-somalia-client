@@ -80,7 +80,10 @@ export function LoginForm({
         {/* Fine dot-grid texture, evoking a world map graticule. */}
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.08]"
-          style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "22px 22px" }}
+          style={{
+            backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)",
+            backgroundSize: "22px 22px",
+          }}
         />
 
         {/* Dashed flight route connecting two waypoints, plane mid-flight — a
@@ -140,68 +143,73 @@ export function LoginForm({
               <AlertDescription>{notice}</AlertDescription>
             </Alert>
           ) : null}
+          <>
+            {personalState?.error ? (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle />
+                <AlertDescription>{personalState.error}</AlertDescription>
+              </Alert>
+            ) : null}
+            <form action={personalAction} className="space-y-4">
+              {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" name="email" type="email" autoComplete="email" required />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
+                <PasswordInput id="password" name="password" autoComplete="current-password" required />
+              </div>
+              <SubmitButton className="w-full" pendingText="Logging in…">
+                Log in
+              </SubmitButton>
+            </form>
+            <p className="mt-4 text-center text-sm text-muted-foreground">
+              Don&apos;t have an account?{" "}
+              <Link href="/signup" className="font-medium text-primary hover:underline">
+                Sign up
+              </Link>
+            </p>
+          </>
           {demoAccounts ? (
-            <DemoAccountsList accounts={demoAccounts} />
-          ) : (
-            <>
-              {personalState?.error ? (
-                <Alert variant="destructive" className="mb-4">
-                  <AlertCircle />
-                  <AlertDescription>{personalState.error}</AlertDescription>
-                </Alert>
-              ) : null}
-              <form action={personalAction} className="space-y-4">
-                {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" autoComplete="email" required />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    <Link href="/forgot-password" className="text-xs text-primary hover:underline">
-                      Forgot password?
-                    </Link>
-                  </div>
-                  <PasswordInput id="password" name="password" autoComplete="current-password" required />
-                </div>
-                <SubmitButton className="w-full" pendingText="Logging in…">
-                  Log in
-                </SubmitButton>
-              </form>
-              <p className="mt-4 text-center text-sm text-muted-foreground">
-                Don&apos;t have an account?{" "}
-                <Link href="/signup" className="font-medium text-primary hover:underline">
-                  Sign up
-                </Link>
-              </p>
-            </>
-          )}
-          {demoAccounts ? null : (
-            <>
-              {/* A real <a>, not <Link>: the Agent Portal is a separate origin
+            <div className="mt-6 border-t border-border pt-5">
+              <DemoAccountsList accounts={demoAccounts} />
+            </div>
+          ) : null}
+          <>
+            {/* A real <a>, not <Link>: the Agent Portal is a separate origin
                   once subdomains are configured, which a client-side route push
                   cannot cross. Quiet footnote, not a tab — signing in here
                   already reaches an approved agent's dashboard via the account
                   switcher, this is only for people who want to skip straight
                   there. */}
-              <p className="mt-3 text-center text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">Agent:</span> Signing in as a travel agent?{" "}
-                <a href={AGENT_LOGIN_HREF} className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">
-                  Continue to Agent Portal <ArrowRight className="size-3" />
-                </a>
-              </p>
-              {/* A real <a>, not <Link> — same reasoning as the Agent Portal link
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Agent:</span> Signing in as a travel agent?{" "}
+              <a
+                href={AGENT_LOGIN_HREF}
+                className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
+              >
+                Continue to Agent Portal <ArrowRight className="size-3" />
+              </a>
+            </p>
+            {/* A real <a>, not <Link> — same reasoning as the Agent Portal link
                   above: the Manager Portal is a separate origin once subdomains
                   are configured, which a client-side route push cannot cross. */}
-              <p className="mt-1.5 text-center text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">Hotel Manager:</span> Signing in as a hotel manager?{" "}
-                <a href={MANAGER_LOGIN_HREF} className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">
-                  Continue to Hotel Manager Portal <ArrowRight className="size-3" />
-                </a>
-              </p>
-            </>
-          )}
+            <p className="mt-1.5 text-center text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Manager:</span> Signing in as a hotel or venue manager?{" "}
+              <a
+                href={MANAGER_LOGIN_HREF}
+                className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
+              >
+                Continue to Manager Portal <ArrowRight className="size-3" />
+              </a>
+            </p>
+          </>
         </CardContent>
       </Card>
     </div>

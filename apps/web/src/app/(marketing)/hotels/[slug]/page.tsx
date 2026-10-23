@@ -25,6 +25,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { todayIso } from "@/modules/hotels/availability";
+import { getStayPrices } from "@/modules/hotels/rates";
+import { createClient } from "@/lib/supabase/server";
 import { BookingForm } from "./booking-form";
 import { HotelGallery } from "./hotel-gallery";
 
@@ -37,6 +39,24 @@ export async function generateMetadata({
   const hotel = await getHotelBySlug(slug);
   return { title: hotel?.name ?? "Hotel" };
 }
+
+const MAX_STAY_NIGHTS = 60;
+
+/** Nights between two YYYY-MM-DD dates, or 0 when the pair isn't a bookable stay. */
+function stayNights(checkIn: string, checkOut: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(checkIn) || !/^\d{4}-\d{2}-\d{2}$/.test(checkOut)) return 0;
+  const n = Math.round((Date.parse(`${checkOut}T00:00:00Z`) - Date.parse(`${checkIn}T00:00:00Z`)) / 86_400_000);
+  return n > 0 && n <= MAX_STAY_NIGHTS ? n : 0;
+}
+
+/** Whole amounts without decimals, fractional ones to the cent — never round a charged figure away. */
+function formatMoney(amount: number) {
+  const cents = Math.round(amount * 100) / 100;
+  return Number.isInteger(cents) ? cents.toFixed(0) : cents.toFixed(2);
+}
+
+/** Scarcity only when it is real: a few rooms left, and fewer than the hotel has. */
+const LOW_STOCK = 3;
 
 /** "14:00:00" from the database → "14:00". */
 function clockTime(value: string | null) {
@@ -86,8 +106,22 @@ export default async function HotelDetailPage({
   );
 
   const priced = rooms.filter((r) => r.base_price > 0);
-  const minPrice = priced.length > 0 ? Math.min(...priced.map((r) => r.base_price)) : null;
   const currency = priced[0]?.currency ?? "USD";
+
+  // With valid dates, every price on the page is the stay's real price (rate
+  // rules and per-date overrides included) — the base rate alone understates
+  // or overstates what the review page and checkout will charge.
+  const nights = stayNights(checkIn, checkOut);
+  const stayPrices =
+    nights > 0 && priced.length > 0
+      ? await getStayPrices(await createClient(), priced, checkIn, checkOut)
+      : new Map<string, { total: number }>();
+  const minPrice =
+    priced.length === 0
+      ? null
+      : stayPrices.size > 0
+        ? Math.min(...priced.map((r) => stayPrices.get(r.id)?.total ?? r.base_price * nights))
+        : Math.min(...priced.map((r) => r.base_price));
   const reviewCount = hotel.property_reviews.length;
   const averageRating =
     reviewCount > 0
@@ -219,6 +253,12 @@ export default async function HotelDetailPage({
                     : [];
                   const unitsLeft = availability.get(room.id);
                   const soldOut = unitsLeft !== undefined && unitsLeft <= 0;
+                  const lowStock =
+                    unitsLeft !== undefined &&
+                    unitsLeft > 0 &&
+                    unitsLeft <= LOW_STOCK &&
+                    (room.total_units === null || unitsLeft < room.total_units);
+                  const stayTotal = stayPrices.get(room.id)?.total;
                   return (
                     <Card key={room.id} className="overflow-hidden py-0">
                       <CardContent className="flex flex-col gap-0 p-0 sm:flex-row">
@@ -277,10 +317,19 @@ export default async function HotelDetailPage({
                         </div>
                         <div className="flex items-center justify-between gap-3 border-t border-border p-5 sm:w-48 sm:flex-col sm:items-end sm:justify-center sm:border-t-0 sm:border-l">
                           <p className="text-right">
-                            {room.base_price > 0 ? (
+                            {room.base_price > 0 && stayTotal !== undefined ? (
                               <>
                                 <span className="font-heading text-xl font-bold text-primary">
-                                  {room.currency} {room.base_price.toFixed(0)}
+                                  {room.currency} {formatMoney(stayTotal)}
+                                </span>
+                                <span className="block text-xs text-muted-foreground">
+                                  {nights} night{nights === 1 ? "" : "s"}
+                                </span>
+                              </>
+                            ) : room.base_price > 0 ? (
+                              <>
+                                <span className="font-heading text-xl font-bold text-primary">
+                                  {room.currency} {formatMoney(room.base_price)}
                                 </span>
                                 <span className="block text-xs text-muted-foreground">per night</span>
                               </>
@@ -293,7 +342,7 @@ export default async function HotelDetailPage({
                               <span className="mt-1 block text-xs font-semibold text-destructive">
                                 Sold out for your dates
                               </span>
-                            ) : unitsLeft !== undefined && unitsLeft <= 5 ? (
+                            ) : lowStock ? (
                               <span className="mt-1 block text-xs font-semibold text-brand-gold">
                                 Only {unitsLeft} left for your dates
                               </span>
@@ -337,8 +386,10 @@ export default async function HotelDetailPage({
                 </p>
                 {minPrice !== null ? (
                   <p className="font-heading text-2xl font-bold text-primary">
-                    {currency} {minPrice.toFixed(0)}
-                    <span className="ml-1 text-sm font-normal text-muted-foreground">/ night</span>
+                    {currency} {formatMoney(minPrice)}
+                    <span className="ml-1 text-sm font-normal text-muted-foreground">
+                      {stayPrices.size > 0 ? `/ ${nights} night${nights === 1 ? "" : "s"}` : "/ night"}
+                    </span>
                   </p>
                 ) : (
                   <p className="font-heading text-lg font-bold text-primary">Price on request</p>

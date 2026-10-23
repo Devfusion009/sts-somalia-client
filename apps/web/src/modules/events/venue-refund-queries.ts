@@ -1,4 +1,5 @@
 import "server-only";
+import { eventTypeLabel } from "@sts/shared-types";
 import { createClient } from "@/lib/supabase/server";
 import type { RefundRule } from "@/modules/hotels/refund-queries";
 import type { RefundQuote } from "@/modules/hotels/refund-queries";
@@ -66,7 +67,7 @@ export async function getVenueRequests(venueId: string): Promise<VenueRequest[]>
     orderNumber: r.order?.order_number ?? null,
     bookingId: r.booking.id,
     clientName: r.booking.contact_name ?? "Client",
-    eventLabel: r.booking.event_name || r.booking.event_type,
+    eventLabel: r.booking.event_name || eventTypeLabel(r.booking.event_type),
     startDate: r.booking.start_date,
     endDate: r.booking.end_date,
     price: Number(r.booking.price),

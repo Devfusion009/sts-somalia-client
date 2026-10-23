@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { getMyAgency, getAgencyOrder } from "@/modules/agencies/queries";
 import { describeOrderItem, hotelGuestNames } from "@/modules/orders/format";
 import { StatusTimeline } from "@/modules/bookings/components/status-timeline";
@@ -32,7 +33,6 @@ import {
 import { cn } from "@/lib/utils";
 import { CancelOrderButton } from "@/modules/orders/components/cancel-order-button";
 import { BookingRequestDialog } from "@/modules/bookings/components/booking-request-dialog";
-import { getBookingTravel } from "@/modules/umrah/itinerary-queries";
 import { HotelStayList, ItineraryList, contactLine } from "@/modules/umrah/components/travel-details";
 import { PilgrimEditor } from "@/modules/umrah/components/pilgrim-editor";
 import { PilgrimDocuments } from "@/modules/umrah/components/pilgrim-documents";
@@ -99,32 +99,10 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
   const umrahDeparture = umrahBooking?.departure ?? null;
 
   const supabase = await createClient();
-  const [umrahPilgrims, umrahHistory, umrahDocumentRows, umrahReadinessRows, umrahTravel, openRequests] = umrahBooking
+  // Pilgrims, history, documents (signed links), readiness and travel — one API read under the agent's access.
+  const [umrahFile, openRequests] = umrahBooking
     ? await Promise.all([
-        supabase
-          .from("umrah_pilgrims")
-          .select(
-            "id, full_name, gender, date_of_birth, nationality, passport_number, passport_expiry, passport_issue_country, mahram_name, mahram_relation, phone"
-          )
-          .eq("booking_id", umrahBooking.id)
-          .order("full_name")
-          .then(({ data }) => data ?? []),
-        supabase
-          .from("umrah_booking_stage_history")
-          .select("id, stage, note, created_at")
-          .eq("booking_id", umrahBooking.id)
-          .order("created_at", { ascending: false })
-          .then(({ data }) => data ?? []),
-        supabase
-          .from("umrah_booking_documents")
-          .select("id, pilgrim_id, doc_type, title, storage_path, file_name, file_size, created_at, source, review_status, review_note")
-          .eq("booking_id", umrahBooking.id)
-          .order("created_at", { ascending: false })
-          .then(({ data }) => data ?? []),
-        supabase
-          .rpc("umrah_pilgrim_readiness", { p_booking_id: umrahBooking.id })
-          .then(({ data }) => data ?? []),
-        getBookingTravel(supabase, umrahBooking.id),
+        (await getServerTrpc()).umrah.bookingFile.query({ bookingId: umrahBooking.id }),
         supabase
           .from("booking_requests")
           .select("kind")
@@ -132,10 +110,12 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
           .in("status", ["requested", "in_review"])
           .then(({ data }) => data ?? []),
       ])
-    : [[], [], [], [], null, []];
-  const umrahReadiness: Record<string, PilgrimReadiness> = Object.fromEntries(
-    umrahReadinessRows.map((r) => [r.pilgrim_id, { missing: r.missing, warnings: r.warnings }])
-  );
+    : [null, []];
+  const umrahPilgrims = umrahFile?.pilgrims ?? [];
+  const umrahHistory = umrahFile?.history ?? [];
+  const umrahDocumentRows = umrahFile?.documents ?? [];
+  const umrahTravel = umrahFile?.travel ?? null;
+  const umrahReadiness: Record<string, PilgrimReadiness> = umrahFile?.readiness ?? {};
   const umrahOpenForChanges =
     canBook &&
     !!umrahBooking &&
@@ -147,19 +127,9 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
     canBook && !!umrahBooking && ["paid", "partially_paid", "processing"].includes(order.status) &&
     ["pending", "confirmed"].includes(umrahBooking.status);
 
-  // Private bucket: links are signed per render and expire after an hour.
-  const signedUrls = new Map<string, string>();
-  if (umrahDocumentRows.length > 0) {
-    const { data: signed } = await supabase.storage
-      .from("umrah-documents")
-      .createSignedUrls(
-        umrahDocumentRows.map((doc) => doc.storage_path),
-        60 * 60
-      );
-    for (const entry of signed ?? []) {
-      if (entry.path && entry.signedUrl) signedUrls.set(entry.path, entry.signedUrl);
-    }
-  }
+  const signedUrls = new Map<string, string>(
+    umrahDocumentRows.filter((doc) => doc.url).map((doc) => [doc.storage_path, doc.url as string])
+  );
   const pilgrimNames = new Map(umrahPilgrims.map((pilgrim) => [pilgrim.id, pilgrim.full_name]));
   const umrahDocuments = umrahDocumentRows.filter(
     (doc) => doc.source !== "customer" && signedUrls.has(doc.storage_path)

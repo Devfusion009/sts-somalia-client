@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, CalendarDays } from "lucide-react";
+import { AlertCircle, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { SubmitButton } from "@/components/submit-button";
 import { trpc } from "@/lib/trpc/react";
 import { computeHallPrice, createHallBookingSchema } from "@sts/shared-types";
-import { eventTypeLabel } from "./amenities";
+import { eventTypeLabel, venueMoney } from "./amenities";
 
 export type ActionState = { error: string | null; destination?: string; orderId?: string } | null;
 
@@ -89,18 +89,20 @@ export function HallBookingForm({
       return { error: null, destination, orderId: result.orderId };
     } catch (err) {
       return {
-        error: err instanceof Error ? err.message : "Could not create the booking. Please try again.",
+        error: err instanceof Error ? err.message : "Could not create the booking.",
       };
     }
   }
 
   const [state, formAction] = useActionState(action ?? submitBooking, null);
-  const [guests, setGuests] = useState(100);
+  const [guests, setGuests] = useState(Math.min(100, maxGuests ?? 100));
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const router = useRouter();
+  // Local date, so the picker doesn't offer yesterday east of UTC.
+  const [today] = useState(() => new Date().toLocaleDateString("en-CA"));
 
   // Desk submissions get a path back instead of a redirect, because a Server
   // Action redirect into the agent portal lands on the wrong host.
@@ -161,6 +163,7 @@ export function HallBookingForm({
             id="startDate"
             name="startDate"
             type="date"
+            min={today}
             required
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
@@ -172,16 +175,13 @@ export function HallBookingForm({
             id="endDate"
             name="endDate"
             type="date"
-            min={startDate || undefined}
+            min={startDate || today}
             required
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
           />
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Multi-day events (e.g. setup through teardown) are supported — set the same date for both if it&apos;s a one-day event.
-      </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
@@ -214,7 +214,7 @@ export function HallBookingForm({
 
       <div className="space-y-1.5">
         <Label htmlFor="expectedGuests">
-          Expected Guests <span className="text-destructive">*</span>
+          Expected Guests{maxGuests ? ` (max ${maxGuests})` : ""} <span className="text-destructive">*</span>
         </Label>
         <Input
           id="expectedGuests"
@@ -226,9 +226,6 @@ export function HallBookingForm({
           onChange={(e) => setGuests(Math.max(1, Number(e.target.value) || 1))}
           required
         />
-        {maxGuests ? (
-          <p className="text-xs text-muted-foreground">Up to {maxGuests} guests</p>
-        ) : null}
       </div>
 
       <div className="space-y-1.5">
@@ -259,20 +256,16 @@ export function HallBookingForm({
             {!price.onRequest ? (
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  {currency} {price.unitPrice.toFixed(0)} × {formatUnitQuantity(price.quantity, price.unitNoun)}
+                  {venueMoney(currency, price.unitPrice)} × {formatUnitQuantity(price.quantity, price.unitNoun)}
                 </p>
                 <p className="font-heading text-xl font-bold text-primary">
-                  {currency} {price.total.toFixed(0)}
+                  {venueMoney(currency, price.total)}
                   <span className="ml-1 text-xs font-normal text-muted-foreground">estimated</span>
                 </p>
               </div>
             ) : (
               <p className="text-sm font-medium">Price on request</p>
             )}
-            <p className="mt-1 text-xs text-muted-foreground">
-              The venue confirms your final price before the booking is completed — you won&apos;t pay
-              anything until then.
-            </p>
           </div>
           <SubmitButton pendingText="Sending request…" className="w-full gap-1.5">
             Request Booking <ArrowRight className="size-4" />
@@ -285,12 +278,12 @@ export function HallBookingForm({
               {!price.needsTimes ? (
                 <p className="text-xs text-muted-foreground">
                   {price.unitNoun
-                    ? `${currency} ${price.unitPrice.toFixed(0)} × ${formatUnitQuantity(price.quantity, price.unitNoun)}`
+                    ? `${venueMoney(currency, price.unitPrice)} × ${formatUnitQuantity(price.quantity, price.unitNoun)}`
                     : "Venue fee"}
                 </p>
               ) : null}
               <p className="font-heading text-xl font-bold text-primary">
-                {currency} {(price.needsTimes ? price.unitPrice : price.total).toFixed(0)}
+                {venueMoney(currency, price.needsTimes ? price.unitPrice : price.total)}
                 {price.needsTimes ? (
                   <span className="text-xs font-normal text-muted-foreground"> per hour</span>
                 ) : null}
@@ -300,16 +293,8 @@ export function HallBookingForm({
               Reserve &amp; Pay <ArrowRight className="size-4" />
             </SubmitButton>
           </div>
-          {price.needsTimes ? (
-            <p className="text-xs text-muted-foreground">Total shown once start and end time are set.</p>
-          ) : null}
         </div>
       )}
-
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <CalendarDays className="size-3.5" />
-        Our events team confirms availability within one working day.
-      </p>
     </form>
   );
 }

@@ -50,28 +50,12 @@ export function amenityInfo(key: string): { icon: LucideIcon; label: string } {
   );
 }
 
-export const EVENT_TYPE_LABELS: Record<string, string> = {
-  wedding: "Wedding",
-  engagement: "Engagement",
-  gala_dinner: "Gala Dinner",
-  graduation: "Graduation",
-  conference: "Conference",
-  seminar: "Seminar",
-  product_launch: "Product Launch",
-  training: "Training",
-  ngo_summit: "NGO Summit",
-  eid_celebration: "Eid Celebration",
-  fundraiser: "Fundraiser",
-  birthday: "Birthday",
-  community_event: "Community Event",
-  corporate_event: "Corporate Event",
-  other: "Other",
-};
+export { EVENT_TYPE_LABELS, eventTypeLabel } from "@sts/shared-types";
 
-export function eventTypeLabel(key: string) {
-  return (
-    EVENT_TYPE_LABELS[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-  );
+/** "USD 400.50", "USD 1,200" — cents only when there are any. */
+export function venueMoney(currency: string, amount: number | string) {
+  const n = Number(amount);
+  return `${currency} ${n.toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
 }
 
 export function priceUnitLabel(unit: string) {

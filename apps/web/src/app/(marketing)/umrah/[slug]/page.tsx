@@ -24,7 +24,7 @@ import { INCLUDE_DETAILS } from "@/modules/umrah/includes";
 import { cn } from "@/lib/utils";
 import { BookingForm } from "./booking-form";
 import { FlightDetails, hasFlightDetails } from "./flight-details";
-import { AgencyBookingSlot } from "@/modules/agencies/components/agency-booking-slot";
+import { AgencyBookingSlot, viewerAgencyId } from "@/modules/agencies/components/agency-booking-slot";
 
 export async function generateMetadata({
   params,
@@ -42,7 +42,7 @@ export default async function UmrahPackagePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const pkg = await getPackageBySlug(slug);
+  const [pkg, viewerAgency] = await Promise.all([getPackageBySlug(slug), viewerAgencyId()]);
   if (!pkg) notFound();
 
   const upcomingDepartures = bookableDepartures(pkg.umrah_package_departures ?? []);
@@ -281,7 +281,7 @@ export default async function UmrahPackagePage({
             basePrice={pkg.base_price}
             departures={upcomingDepartures}
             pricing={rateCard}
-            bookedForSlot={<AgencyBookingSlot />}
+            bookedForSlot={viewerAgency ? <AgencyBookingSlot /> : null}
           />
         </div>
 

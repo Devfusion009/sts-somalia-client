@@ -23,7 +23,7 @@ import {
   type FlightSearchDefaults,
 } from "@/modules/flights/components/flight-search-form";
 import { QuoteRequestForm } from "@/modules/flights/components/quote-request-form";
-import { AgencyBookingSlot } from "@/modules/agencies/components/agency-booking-slot";
+import { AgencyBookingSlot, viewerAgencyId } from "@/modules/agencies/components/agency-booking-slot";
 
 export const metadata: Metadata = { title: "Flights" };
 
@@ -37,12 +37,23 @@ const faqJsonLd = (faqs: Array<{ question: string; answer: string }>) => ({
   })),
 });
 
+// Duffel times are the airport's local wall clock with no offset
+// ("2026-11-21T09:45:00"). Read them as-is — converting through the server's
+// timezone would shift every flight on a server that isn't on that zone.
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return iso.slice(11, 16);
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-GB", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function formatMoney(amount: number) {
+  return Number.isInteger(amount) ? amount.toFixed(0) : amount.toFixed(2);
 }
 
 function formatDuration(minutes: number | null) {
@@ -52,7 +63,7 @@ function formatDuration(minutes: number | null) {
 
 function formatPenalty(penalty: { amount: number; currency: string } | null) {
   if (!penalty) return null;
-  return `${penalty.currency} ${penalty.amount.toFixed(0)} fee`;
+  return `${penalty.currency} ${formatMoney(penalty.amount)} fee`;
 }
 
 export default async function FlightsPage({
@@ -81,9 +92,10 @@ export default async function FlightsPage({
 
   const hasSearch = Boolean(params.origin && params.destination && params.depart_date);
   const trpc = await getServerTrpc();
-  const [airports, profile] = await Promise.all([
+  const [airports, profile, viewerAgency] = await Promise.all([
     trpc.flights.airports.query().catch(() => []),
     getCurrentProfile(),
+    viewerAgencyId(),
   ]);
 
   let result: FlightSearchResult | null = null;
@@ -188,10 +200,30 @@ export default async function FlightsPage({
                       </div>
                       <div className="text-right">
                         <p className="font-heading text-xl font-bold text-primary">
-                          {offer.currency} {offer.totalAmount.toFixed(0)}
+                          {offer.currency} {formatMoney(offer.totalAmount)}
                         </p>
                         <p className="text-[10px] text-muted-foreground">total, all passengers</p>
                       </div>
+
+                      {offer.returnLeg ? (
+                        <div className="flex w-full items-center gap-4 text-sm">
+                          <span className="w-16 text-xs font-medium text-muted-foreground">Return</span>
+                          <span className="font-semibold tabular-nums">{formatTime(offer.returnLeg.departAt)}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {offer.destination} · {formatDate(offer.returnLeg.departAt)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDuration(offer.returnLeg.durationMinutes)} ·{" "}
+                            {offer.returnLeg.stops === 0
+                              ? "Non-stop"
+                              : `${offer.returnLeg.stops} stop${offer.returnLeg.stops > 1 ? "s" : ""}`}
+                          </span>
+                          <span className="font-semibold tabular-nums">{formatTime(offer.returnLeg.arriveAt)}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {offer.origin} · {formatDate(offer.returnLeg.arriveAt)}
+                          </span>
+                        </div>
+                      ) : null}
 
                       <div className="flex w-full flex-wrap items-center gap-1.5 border-t border-border pt-3">
                         {offer.checkedBagsIncluded !== null ? (
@@ -245,7 +277,7 @@ export default async function FlightsPage({
                   <p className="mb-4 text-xs text-muted-foreground">
                     Send a quote request and our team will hold the fare and arrange payment.
                   </p>
-                  <QuoteRequestForm defaults={defaults} signedIn={Boolean(profile)} bookedForSlot={<AgencyBookingSlot />} />
+                  <QuoteRequestForm defaults={defaults} signedIn={Boolean(profile)} bookedForSlot={viewerAgency ? <AgencyBookingSlot /> : null} />
                 </CardContent>
               </Card>
             </div>
@@ -270,7 +302,7 @@ export default async function FlightsPage({
                 </p>
               </CardHeader>
               <CardContent>
-                <QuoteRequestForm defaults={defaults} signedIn={Boolean(profile)} bookedForSlot={<AgencyBookingSlot />} />
+                <QuoteRequestForm defaults={defaults} signedIn={Boolean(profile)} bookedForSlot={viewerAgency ? <AgencyBookingSlot /> : null} />
               </CardContent>
             </Card>
           )}

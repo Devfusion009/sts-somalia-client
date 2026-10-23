@@ -1,246 +1,93 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
-import { repriceQuotedOrder } from "@/modules/orders/helpers";
-import { notifyUmrahBooking } from "@/modules/umrah/notify";
+import { getServerTrpcForActions, trpcErrorMessage } from "@/lib/trpc/server";
 
 function revalidateCatalog() {
   revalidatePath("/admin/catalog/umrah/services");
   revalidatePath("/umrah/private");
 }
 
-const optionalNumber = (max: number) =>
-  z.union([z.literal(""), z.coerce.number().int().min(0).max(max)]).optional();
+function str(formData: FormData, key: string) {
+  return String(formData.get(key) ?? "").trim();
+}
 
-const SHARINGS = [1, 2, 3, 4] as const;
-const HOTEL_CATEGORIES = new Set(["hotel_makkah", "hotel_madinah"]);
-
-// "" clears that occupancy's price, so the hotel falls back to its base price.
-const sharingPriceSchema = z.union([
-  z.literal(""),
-  z.coerce.number().positive("Room type prices must be greater than zero."),
-]);
-
-const serviceSchema = z.object({
-  serviceId: z.union([z.string().uuid(), z.literal("")]).optional(),
-  category: z.enum([
-    "hotel_makkah",
-    "hotel_madinah",
-    "flight",
-    "visa",
-    "transport",
-    "intercity",
-    "extra",
-  ]),
-  name: z.string().trim().min(2, "Enter a name customers will recognise."),
-  description: z.union([z.string().trim().max(500), z.literal("")]).optional(),
-  // "" is the "all tiers" choice, not a missing value — an Umrah visa is the
-  // same product whichever standard the trip is booked at.
-  tier: z.union([z.enum(["basic", "standard", "premium"]), z.literal("")]).optional(),
-  price: z.coerce.number().min(0, "Enter a price of zero or more."),
-  priceUnit: z.enum(["per_person", "per_person_per_night", "per_night", "per_booking"]),
-  starRating: optionalNumber(5),
-  distanceToHaram: optionalNumber(100000),
-  isDefault: z.boolean(),
-  sortOrder: z.coerce.number().int().min(0).max(9999),
-  status: z.enum(["draft", "published", "suspended"]),
-});
+function numOrNull(formData: FormData, key: string) {
+  const v = str(formData, key);
+  return v === "" ? null : Number(v);
+}
 
 export async function saveUmrahService(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requirePlatformAdmin();
-
-  const parsed = serviceSchema.safeParse({
-    serviceId: formData.get("serviceId") ?? "",
-    category: formData.get("category"),
-    name: formData.get("name"),
-    description: formData.get("description") ?? "",
-    tier: formData.get("tier") ?? "",
-    price: formData.get("price"),
-    priceUnit: formData.get("priceUnit"),
-    starRating: formData.get("starRating") ?? "",
-    distanceToHaram: formData.get("distanceToHaram") ?? "",
-    isDefault: formData.get("isDefault") === "on",
-    sortOrder: formData.get("sortOrder") || 0,
-    status: formData.get("status"),
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-  const d = parsed.data;
-
-  const sharingPrices: { sharing: (typeof SHARINGS)[number]; price: number | null }[] = [];
-  for (const sharing of SHARINGS) {
-    const value = HOTEL_CATEGORIES.has(d.category)
-      ? String(formData.get(`sharingPrice${sharing}`) ?? "").trim()
-      : "";
-    const price = sharingPriceSchema.safeParse(value);
-    if (!price.success) return { error: price.error.issues[0].message };
-    sharingPrices.push({ sharing, price: price.data === "" ? null : price.data });
+  try {
+    const trpc = await getServerTrpcForActions();
+    await trpc.umrah.admin.services.save.mutate({
+      serviceId: str(formData, "serviceId") || undefined,
+      category: str(formData, "category") as "flight",
+      name: str(formData, "name"),
+      description: str(formData, "description") || undefined,
+      tier: (str(formData, "tier") || null) as "basic" | null,
+      price: Number(formData.get("price")),
+      priceUnit: str(formData, "priceUnit") as "per_person",
+      starRating: numOrNull(formData, "starRating"),
+      distanceToHaram: numOrNull(formData, "distanceToHaram"),
+      isDefault: formData.get("isDefault") === "on",
+      sortOrder: Number(str(formData, "sortOrder") || 0),
+      status: str(formData, "status") as "draft",
+      sharingPrices: [1, 2, 3, 4].map((sharing) => ({ sharing, price: numOrNull(formData, `sharingPrice${sharing}`) })),
+    });
+  } catch (error) {
+    return { error: trpcErrorMessage(error, "The service could not be saved.") };
   }
-
-  const supabase = await createClient();
-  const row = {
-    category: d.category,
-    name: d.name,
-    description: d.description || null,
-    tier: d.tier || null,
-    price: d.price,
-    price_unit: d.priceUnit,
-    star_rating: d.starRating === "" || d.starRating === undefined ? null : d.starRating,
-    distance_to_haram_m:
-      d.distanceToHaram === "" || d.distanceToHaram === undefined ? null : d.distanceToHaram,
-    is_default: d.isDefault,
-    sort_order: d.sortOrder,
-    status: d.status,
-  };
-
-  const { data: saved, error } = d.serviceId
-    ? await supabase.from("umrah_services").update(row).eq("id", d.serviceId).select("id").single()
-    : await supabase.from("umrah_services").insert(row).select("id").single();
-
-  if (error) {
-    // The one-default-per-(category, tier) partial unique index is the most
-    // likely failure here, and its raw message names an index rather than the
-    // thing the admin did wrong.
-    if (error.code === "23505") {
-      return {
-        error:
-          "Another published option in this category is already the default for that standard. Clear its default first.",
-      };
-    }
-    return { error: error.message };
-  }
-
-  const sharingError = await saveUmrahSharingPrices(supabase, saved.id, sharingPrices);
-  if (sharingError) return { error: sharingError };
-
   revalidateCatalog();
   return { error: null };
-}
-
-/**
- * Upserts the occupancy prices that are set and deletes the ones that were
- * cleared. A non-hotel service arrives with every price null, so switching a
- * hotel to another category removes its occupancy prices too.
- */
-async function saveUmrahSharingPrices(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  serviceId: string,
-  prices: { sharing: number; price: number | null }[]
-): Promise<string | null> {
-  const upserts = prices
-    .filter((p): p is { sharing: number; price: number } => p.price !== null)
-    .map((p) => ({ service_id: serviceId, sharing: p.sharing, price: p.price }));
-  const cleared = prices.filter((p) => p.price === null).map((p) => p.sharing);
-
-  if (upserts.length) {
-    const { error } = await supabase
-      .from("umrah_service_sharing_prices")
-      .upsert(upserts, { onConflict: "service_id,sharing" });
-    if (error) return error.message;
-  }
-  if (cleared.length) {
-    const { error } = await supabase
-      .from("umrah_service_sharing_prices")
-      .delete()
-      .eq("service_id", serviceId)
-      .in("sharing", cleared);
-    if (error) return error.message;
-  }
-  return null;
 }
 
 export async function deleteUmrahService(formData: FormData): Promise<void> {
   await requirePlatformAdmin();
-  const serviceId = String(formData.get("serviceId"));
-  if (!z.string().uuid().safeParse(serviceId).success) return;
-
-  const supabase = await createClient();
-  // Requests that already chose this service keep their snapshotted line
-  // (umrah_custom_request_services.service_id is ON DELETE SET NULL), so
-  // deleting a service never rewrites a quote a customer already saw.
-  await supabase.from("umrah_services").delete().eq("id", serviceId);
+  try {
+    const trpc = await getServerTrpcForActions();
+    await trpc.umrah.admin.services.delete.mutate({ serviceId: str(formData, "serviceId") });
+  } catch {
+    return;
+  }
   revalidateCatalog();
 }
 
-/**
- * Quote/adjust a private Umrah request's price before the customer pays —
- * the same job updateHotelBookingPrice does for manual hotel requests. The
- * order is re-priced through repriceQuotedOrder so an agency booking keeps
- * its margin on top of the new net price.
- */
-export async function updateUmrahRequestPrice(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  await requirePlatformAdmin();
-  const bookingId = z.string().uuid().safeParse(formData.get("bookingId"));
-  if (!bookingId.success) return { error: "Invalid booking." };
-  const price = z.coerce.number().positive().safeParse(formData.get("price"));
-  if (!price.success) return { error: "Enter a price greater than zero." };
-
-  const supabase = await createClient();
-  const { data: item } = await supabase
-    .from("order_items")
-    .select("id, order:order_id (id, status, agency_id)")
-    .eq("umrah_booking_id", bookingId.data)
-    .maybeSingle();
-  if (item?.order && item.order.status !== "pending_payment") {
-    return { error: "This order already has a payment." };
-  }
-
-  const { error } = await supabase
-    .from("umrah_bookings")
-    .update({ total_price: price.data })
-    .eq("id", bookingId.data);
-  if (error) return { error: error.message };
-
-  if (item?.order) {
-    await repriceQuotedOrder(supabase, item.order, item.id, "umrah", price.data);
-  }
-
-  void notifyUmrahBooking(bookingId.data, "request_quoted");
+function revalidateRequests() {
   revalidatePath("/admin/umrah/requests");
   revalidatePath("/admin/queue");
   revalidatePath("/admin/orders");
+}
+
+/** Quote a private request before the customer pays; an agency order keeps its margin. */
+export async function updateUmrahRequestPrice(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requirePlatformAdmin();
+  try {
+    const trpc = await getServerTrpcForActions();
+    await trpc.umrah.admin.requests.quote.mutate({ bookingId: str(formData, "bookingId"), price: Number(formData.get("price")) });
+  } catch (error) {
+    return { error: trpcErrorMessage(error, "The price could not be saved.") };
+  }
+  revalidateRequests();
   return { error: null };
 }
 
-/**
- * Confirm or decline a private Umrah request. Declining goes through
- * decline_umrah_private_request, which cancels the order while it is still
- * unpaid (a paid order is left to the refund flow, as hotel/hall declines
- * are) and notifies the customer.
- */
-export async function updateUmrahBookingStatus(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
+/** Confirm or decline a private request. */
+export async function updateUmrahBookingStatus(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requirePlatformAdmin();
-  const bookingId = String(formData.get("bookingId"));
-  const status = String(formData.get("status"));
-  if (!["confirmed", "cancelled"].includes(status)) return { error: "Unknown status." };
-  const note = String(formData.get("note") ?? "").trim().slice(0, 500);
-
-  const supabase = await createClient();
-  // Confirming goes through the stage machine so it writes the timeline and
-  // notifies the customer; it also moves status to confirmed.
-  const { error } =
-    status === "confirmed"
-      ? await supabase.rpc("set_umrah_booking_stage", {
-          p_booking_id: bookingId,
-          p_stage: "confirmed",
-        })
-      : await supabase.rpc("decline_umrah_private_request", {
-          p_booking_id: bookingId,
-          p_note: note || undefined,
-        });
-  if (error) return { error: error.message };
-
-  void notifyUmrahBooking(bookingId, status === "confirmed" ? "stage_changed" : "request_declined", note || undefined);
-  revalidatePath("/admin/umrah/requests");
-  revalidatePath("/admin/queue");
+  try {
+    const trpc = await getServerTrpcForActions();
+    await trpc.umrah.admin.requests.decide.mutate({
+      bookingId: str(formData, "bookingId"),
+      status: str(formData, "status") as "confirmed" | "cancelled",
+      note: str(formData, "note").slice(0, 500) || undefined,
+    });
+  } catch (error) {
+    return { error: trpcErrorMessage(error, "The request could not be updated.") };
+  }
+  revalidateRequests();
   return { error: null };
 }

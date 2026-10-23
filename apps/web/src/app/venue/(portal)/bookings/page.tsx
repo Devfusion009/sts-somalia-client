@@ -1,61 +1,76 @@
-import { format, formatDistanceToNow } from "date-fns";
-import { Inbox } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { Inbox, Phone } from "lucide-react";
+import { eventTypeLabel } from "@sts/shared-types";
 import { requireUser } from "@/lib/auth/session";
 import { getMyVenuePartnerId, getVenueBookings } from "@/modules/events/venue-partner-queries";
+import { hallSlotLabel } from "@/modules/events/venue-desk-types";
+import { venueMoney } from "@/modules/events/components/amenities";
+import { HallStatusBadge } from "@/modules/events/components/hall-badges";
+import { DeskPriceForm } from "@/modules/events/components/venue-desk-controls";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { VenueBookingStatusControl } from "./venue-booking-status";
 import { todayIso } from "@/modules/hotels/availability";
+import { VenueBookingStatusControl } from "./venue-booking-status";
 
 export const metadata = { title: "Booking Requests" };
 
+type PartnerBooking = Awaited<ReturnType<typeof getVenueBookings>>[number];
+
 /**
- * The venue partner's manual-booking queue: every request for their halls,
- * newest first, same as the admin queue.
- * Confirming or declining here is the supplier's side of the workflow —
- * admin can also decide from the central Order Queue.
+ * The venue partner's manual-booking queue: requests needing a price or a
+ * decision first (soonest event first), then everything already handled.
+ * Admin can also decide from the central Order Queue.
  */
 export default async function VenueBookingsPage() {
   const profile = await requireUser();
   const partnerId = (await getMyVenuePartnerId(profile.id))!;
   const bookings = await getVenueBookings(partnerId);
-  const pending = bookings.filter((b) => b.status === "pending");
-  const rest = bookings.filter((b) => b.status !== "pending");
+  const today = todayIso();
+  const isOpen = (b: PartnerBooking) => b.status === "pending" || b.status === "waitlisted";
+  const open = bookings.filter(isOpen).sort((a, b) => a.start_date.localeCompare(b.start_date));
+  const rest = bookings.filter((b) => !isOpen(b));
 
-  const renderBooking = (b: (typeof bookings)[number]) => {
+  const renderBooking = (b: PartnerBooking) => {
     const venue = b.venue as unknown as { name: string } | null;
     const customer = b.customer as unknown as { full_name: string | null; email: string; phone: string | null } | null;
+    const orderStatus = (b.order_items as unknown as Array<{ order: { status: string } | null }>)?.[0]?.order?.status;
+    const unpaid = !orderStatus || orderStatus === "pending_payment" || orderStatus === "held";
+    const phone = b.contact_phone ?? customer?.phone ?? null;
+    const canQuote = isOpen(b) && b.source === "online" && unpaid;
     return (
-      <Card key={b.id} className={b.status === "pending" ? "border-brand-gold/50" : undefined}>
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4">
-          <div className="min-w-0">
+      <Card key={b.id} className={isOpen(b) ? "border-brand-gold/50" : undefined}>
+        <CardContent className="flex flex-wrap items-start justify-between gap-4 p-4">
+          <div className="min-w-0 space-y-1">
             <p className="flex flex-wrap items-center gap-2 font-medium">
-              {venue?.name ?? "Venue"}
-              <span className="font-mono text-xs font-normal text-muted-foreground">{b.booking_ref}</span>
-              {b.status === "pending" ? (
-                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Needs decision</Badge>
-              ) : null}
+              {b.event_name || eventTypeLabel(b.event_type)}
+              <HallStatusBadge status={b.status} />
             </p>
             <p className="text-sm text-muted-foreground">
-              {b.event_name ?? b.event_type} · {format(new Date(b.start_date), "dd MMM yyyy")}
-              {b.end_date && b.end_date !== b.start_date ? ` → ${format(new Date(b.end_date), "dd MMM yyyy")}` : ""}
-              {b.start_time ? ` · ${b.start_time.slice(0, 5)}${b.end_time ? `–${b.end_time.slice(0, 5)}` : ""}` : ""}
+              {venue?.name ?? "Venue"} · {hallSlotLabel(b)}
               {b.expected_guests ? ` · ${b.expected_guests} guests` : ""}
             </p>
-            <p className="text-xs text-muted-foreground">
-              {b.contact_name ?? customer?.full_name ?? customer?.email ?? "Customer"}
-              {(b.contact_phone ?? customer?.phone) ? ` · ${b.contact_phone ?? customer?.phone}` : ""} · requested{" "}
-              {formatDistanceToNow(new Date(b.created_at), { addSuffix: true })}
+            <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+              <span>{b.contact_name ?? customer?.full_name ?? customer?.email ?? "Client"}</span>
+              {phone ? (
+                <a href={`tel:${phone.replace(/\s+/g, "")}`} className="inline-flex items-center gap-1 hover:text-foreground">
+                  <Phone className="size-3" /> {phone}
+                </a>
+              ) : null}
+              <span className="font-mono">{b.booking_ref}</span>
+              <span>· {formatDistanceToNow(new Date(b.created_at), { addSuffix: true })}</span>
             </p>
             {b.setup_requirements ? (
-              <p className="mt-1 text-xs text-muted-foreground">Setup: {b.setup_requirements}</p>
+              <p className="text-xs whitespace-pre-wrap text-muted-foreground">{b.setup_requirements}</p>
             ) : null}
           </div>
-          <div className="flex items-center gap-4">
-            <p className="font-heading text-lg font-semibold">
-              {b.currency} {Number(b.price).toFixed(2)}
-            </p>
-            <VenueBookingStatusControl booking={b} today={todayIso()} />
+          <div className="flex flex-col items-end gap-2">
+            {canQuote ? (
+              <DeskPriceForm venueId={b.venue_id} bookingId={b.id} price={Number(b.price)} currency={b.currency} />
+            ) : (
+              <p className="font-heading text-lg font-semibold tabular-nums">
+                {Number(b.price) > 0 ? venueMoney(b.currency, b.price) : "Not set"}
+              </p>
+            )}
+            <VenueBookingStatusControl booking={b} today={today} paid={!unpaid} />
           </div>
         </CardContent>
       </Card>
@@ -64,9 +79,7 @@ export default async function VenueBookingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold">Booking Requests</h1>
-      </div>
+      <h1 className="font-heading text-2xl font-semibold">Booking Requests</h1>
 
       {bookings.length === 0 ? (
         <Card>
@@ -77,12 +90,17 @@ export default async function VenueBookingsPage() {
         </Card>
       ) : (
         <>
-          {pending.length > 0 ? <div className="space-y-3">{pending.map(renderBooking)}</div> : null}
+          {open.length > 0 ? (
+            <section className="space-y-3">
+              <h2 className="text-sm font-medium text-muted-foreground">Needs decision · {open.length}</h2>
+              {open.map(renderBooking)}
+            </section>
+          ) : null}
           {rest.length > 0 ? (
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-muted-foreground">Handled</p>
+            <section className="space-y-3">
+              <h2 className="text-sm font-medium text-muted-foreground">Handled</h2>
               {rest.map(renderBooking)}
-            </div>
+            </section>
           ) : null}
         </>
       )}

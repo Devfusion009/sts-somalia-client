@@ -3,6 +3,8 @@
  * venue-manager-actions.ts: a "use server" module may only export async
  * functions.
  */
+import { format, parseISO } from "date-fns";
+
 export { OFFLINE_PAYMENT_METHODS, PAYMENT_METHOD_LABEL, type OfflinePaymentMethod } from "@/modules/hotels/reservation-types";
 
 /** Statuses a manager can move a booking to. */
@@ -29,14 +31,21 @@ export function shortTime(value: string | null | undefined): string | null {
   return value ? value.slice(0, 5) : null;
 }
 
-/** "2027-03-10" or "2027-03-10 → 2027-03-12", with times when set. */
+function slotDay(iso: string, withYear: boolean): string {
+  return format(parseISO(iso), withYear ? "d MMM yyyy" : "d MMM");
+}
+
+/** "10 Mar 2027" or "10 Mar → 12 Mar 2027", with times when set. */
 export function hallSlotLabel(b: {
   start_date: string;
   end_date: string;
   start_time: string | null;
   end_time: string | null;
 }): string {
-  const dates = b.start_date === b.end_date ? b.start_date : `${b.start_date} → ${b.end_date}`;
+  const dates =
+    b.start_date === b.end_date
+      ? slotDay(b.start_date, true)
+      : `${slotDay(b.start_date, b.start_date.slice(0, 4) !== b.end_date.slice(0, 4))} → ${slotDay(b.end_date, true)}`;
   const from = shortTime(b.start_time);
   const to = shortTime(b.end_time);
   return from && to ? `${dates} · ${from}–${to}` : from ? `${dates} · from ${from}` : dates;

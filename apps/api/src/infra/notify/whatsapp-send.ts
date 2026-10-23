@@ -1,4 +1,5 @@
 import { getIntegrations } from "../integrations";
+import { env } from "../../config/env";
 
 /**
  * Direct port of apps/web's lib/notifications/whatsapp-send.ts — outbound
@@ -15,9 +16,9 @@ export async function sendWhatsAppMessage(input: SendWhatsAppInput): Promise<Sen
     return { sent: false, error: "WhatsApp send is not configured yet (Twilio credentials missing)." };
   }
 
-  const accountSid = process.env.TWILIO_ACCOUNT_SID!;
-  const authToken = process.env.TWILIO_AUTH_TOKEN!;
-  const from = process.env.TWILIO_WHATSAPP_FROM!;
+  const accountSid = env().TWILIO_ACCOUNT_SID!;
+  const authToken = env().TWILIO_AUTH_TOKEN!;
+  const from = env().TWILIO_WHATSAPP_FROM!;
 
   try {
     const params = new URLSearchParams({

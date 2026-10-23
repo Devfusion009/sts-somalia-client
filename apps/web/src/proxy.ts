@@ -8,6 +8,7 @@ import {
   type PortalSubdomain,
 } from "@/lib/subdomain";
 import { readEdgeSession } from "@/lib/auth/edge-session";
+import { refreshSession, withSession } from "@/lib/supabase/proxy";
 
 const ALL_PORTALS: readonly PortalSubdomain[] = ["admin", "agent", "manager", "affiliate", "partner", "venue"];
 const ALL_PORTAL_PATHS = ALL_PORTALS.map(pathPrefixFor);
@@ -41,6 +42,9 @@ export async function proxy(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
   const subdomain = portalSubdomainFor(host);
   const { pathname } = request.nextUrl;
+  // Before the edge gate, so an expired-but-refreshable token passes it.
+  const sessionCookies = await refreshSession(request);
+  const forward = { request: { headers: request.headers } };
 
   if (subdomain) {
     // ---- Edge gate -------------------------------------------------------
@@ -70,7 +74,7 @@ export async function proxy(request: NextRequest) {
         loginUrl.pathname = "/login";
         // Preserve where they were headed so the portal login can return them.
         loginUrl.search = pathname === "/" ? "" : `?redirect_to=${encodeURIComponent(pathname)}`;
-        return NextResponse.redirect(loginUrl);
+        return withSession(NextResponse.redirect(loginUrl), sessionCookies);
       }
 
       // claimMissing covers tokens issued before the custom access token hook
@@ -82,7 +86,7 @@ export async function proxy(request: NextRequest) {
         !result.session.isPlatformAdmin &&
         !result.session.claimMissing
       ) {
-        return NextResponse.redirect(rootOrigin() || new URL("/", request.url));
+        return withSession(NextResponse.redirect(rootOrigin() || new URL("/", request.url)), sessionCookies);
       }
     }
     // ---------------------------------------------------------------------
@@ -91,11 +95,11 @@ export async function proxy(request: NextRequest) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
       // Someone hit admin.<host>/admin/... directly (e.g. an old bookmark,
       // or a link that wasn't updated) — avoid double-prefixing.
-      return NextResponse.next();
+      return withSession(NextResponse.next(forward), sessionCookies);
     }
     const url = request.nextUrl.clone();
     url.pathname = `${prefix}${pathname === "/" ? "" : pathname}`;
-    return NextResponse.rewrite(url);
+    return withSession(NextResponse.rewrite(url, forward), sessionCookies);
   }
 
   // Root host: block direct access to every portal's path tree entirely.
@@ -107,7 +111,7 @@ export async function proxy(request: NextRequest) {
     return new NextResponse("Not Found", { status: 404, headers: { "content-type": "text/plain" } });
   }
 
-  return NextResponse.next();
+  return withSession(NextResponse.next(forward), sessionCookies);
 }
 
 export const config = {

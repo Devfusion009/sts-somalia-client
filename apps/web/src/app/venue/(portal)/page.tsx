@@ -58,11 +58,7 @@ export default async function VenueDashboardPage() {
       {venues.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-            <p className="font-medium">List your first venue</p>
-            <p className="max-w-md text-sm text-muted-foreground">
-              Create your venue listing with capacity, pricing and event types. Our team reviews it before it
-              goes live on the public Events &amp; Halls pages.
-            </p>
+            <p className="font-medium">No venues yet</p>
             <Button render={<Link href="/venue/venues" />}>Add a venue</Button>
           </CardContent>
         </Card>

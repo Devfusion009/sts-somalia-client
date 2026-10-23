@@ -1,36 +1,51 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
-import { Check, CircleDot, CreditCard, Mail, PartyPopper, Phone, RotateCcw, StickyNote, User } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { CircleDot, Mail, Phone, StickyNote } from "lucide-react";
+import { eventTypeLabel } from "@sts/shared-types";
 import { todayIso } from "@/modules/hotels/availability";
 import { getHallBookingDetail, type HallEvent } from "@/modules/events/hall-detail-queries";
 import { markHallBookingPaid, setHallBookingStatus } from "@/modules/events/venue-manager-actions";
-import {
-  HALL_STATUS_BADGE,
-  PAYMENT_METHOD_LABEL,
-  shortTime,
-  type OfflinePaymentMethod,
-} from "@/modules/events/venue-desk-types";
+import { PAYMENT_METHOD_LABEL, shortTime, type OfflinePaymentMethod } from "@/modules/events/venue-desk-types";
 import type { VenueAccess } from "@/modules/events/venue-access";
 import { HallMoveActions } from "@/modules/events/components/hall-move-actions";
 import { DeskPriceForm } from "@/modules/events/components/venue-desk-controls";
-import { BackLink } from "@/components/back-link";
+import { BookingNotesForm, RescheduleForm } from "@/modules/events/components/hall-booking-forms";
+import { HallStatusBadge } from "@/modules/events/components/hall-badges";
+import { venueMoney } from "@/modules/events/components/amenities";
 import { SubmitButton } from "@/components/submit-button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 const REQUEST_KIND = { cancellation: "Cancellation", refund: "Refund", modification: "Change" } as const;
 
-function money(currency: string, amount: number | string) {
-  return `${currency} ${Number(amount).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
-}
+const STATUS_WORD: Record<string, string> = {
+  confirmed: "Confirmed",
+  cancelled: "Cancelled",
+  completed: "Completed",
+  no_show: "Marked no-show",
+  refunded: "Marked refunded",
+  waitlisted: "Waitlisted",
+  pending: "Reopened",
+};
+
+const PAYMENT_STATUS: Record<string, string> = {
+  succeeded: "Paid",
+  processing: "Processing",
+  requires_action: "Awaiting",
+  failed: "Failed",
+  cancelled: "Cancelled",
+  refunded: "Refunded",
+  partially_refunded: "Part refunded",
+};
+
+const money = venueMoney;
 
 function day(iso: string) {
-  return format(new Date(`${iso}T00:00:00`), "EEE d MMM yyyy");
+  return format(parseISO(iso), "EEE d MMM yyyy");
 }
 
-function providerLabel(value: string) {
+function methodLabel(value: string) {
   return PAYMENT_METHOD_LABEL[value as OfflinePaymentMethod] ?? value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, " ");
 }
 
@@ -39,32 +54,34 @@ function eventTitle(e: HallEvent, currency: string) {
     case "created":
       return "Booking created";
     case "status":
-      return `Marked ${(e.toValue ?? "").replace(/_/g, " ")}`;
+      return STATUS_WORD[e.toValue ?? ""] ?? `Marked ${(e.toValue ?? "").replace(/_/g, " ")}`;
     case "payment":
-      return e.toValue ? `Payment received · ${providerLabel(e.toValue)}` : "Payment received";
+      return e.toValue ? `Payment received · ${methodLabel(e.toValue)}` : "Payment received";
     case "refund":
       return "Refund sent";
     case "price":
       return `Price set · ${money(currency, e.toValue ?? 0)}`;
     case "rescheduled":
-      return `Dates changed · ${e.toValue ?? ""}`;
+      return "Moved to a new date";
   }
 }
 
-function actor(e: HallEvent, viewerId: string) {
+function actor(e: HallEvent, viewerId: string, customerId: string | null) {
   if (!e.actorId) return "System";
-  return e.actorId === viewerId ? "You" : "Staff";
+  if (e.actorId === viewerId) return "You";
+  return e.actorId === customerId ? "Client" : "Staff";
 }
 
-function Fact({ label, value }: { label: string; value: React.ReactNode }) {
+function Fact({ label, value, tone }: { label: string; value: React.ReactNode; tone?: string }) {
   return (
     <div className="bg-secondary/40 px-4 py-3">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="font-heading text-base font-semibold">{value}</dd>
+      <dd className={cn("font-heading text-base font-semibold tabular-nums", tone)}>{value}</dd>
     </div>
   );
 }
 
+/** One hall booking — shared by the admin console and the venue manager portal. */
 export async function VenueBookingDetailView({
   venueId,
   bookingId,
@@ -78,162 +95,182 @@ export async function VenueBookingDetailView({
 }) {
   const detail = await getHallBookingDetail(venueId, bookingId);
   if (!detail) notFound();
-  const { booking: b, order, onlinePayment, requests, events, quote } = detail;
+  const { booking: b, order, requests, events, quote } = detail;
 
   const today = todayIso();
   const canManage = access.can("bookings");
   const open = b.status === "pending" || b.status === "waitlisted";
   const live = open || b.status === "confirmed";
   const isOffline = b.source === "offline";
-  const paid = Boolean(b.paid_at) || Boolean(onlinePayment);
+  // An online order is paid only when its payments cover the total; a deposit is part paid.
+  const total = isOffline ? Number(b.price) : (order?.total ?? Number(b.price));
+  const paidAmount = isOffline ? (b.paid_at ? Number(b.price) : 0) : (order?.paid ?? 0);
+  const balance = Math.max(total - paidAmount, 0);
+  const refunded = order?.status === "refunded";
+  const priced = Number(b.price) > 0;
   const channel = b.channel === "b2b" ? (b.agency?.name ?? "Agency") : isOffline ? "Desk" : "Online";
   const from = shortTime(b.start_time);
   const to = shortTime(b.end_time);
   const dates = b.start_date === b.end_date ? day(b.start_date) : `${day(b.start_date)} – ${day(b.end_date)}`;
+  const canReprice = canManage && open && !isOffline && paidAmount === 0;
+  const canMove = canManage && live && b.end_date >= today;
+
+  const paymentFact = refunded
+    ? { label: "Payment", value: "Refunded", tone: "text-destructive" }
+    : !priced
+      ? { label: "Payment", value: "—", tone: undefined }
+      : balance <= 0
+        ? { label: "Payment", value: "Paid", tone: "text-primary" }
+        : paidAmount > 0
+          ? { label: "Balance due", value: money(b.currency, balance), tone: "text-brand-gold" }
+          : { label: "Payment", value: "Unpaid", tone: "text-brand-gold" };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <BackLink href={`${base}/bookings`} label="Bookings" />
-          <div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="font-heading text-2xl font-semibold">{b.event_name || b.event_type}</h1>
-              <Badge className={cn("border-transparent capitalize", HALL_STATUS_BADGE[b.status] ?? "bg-muted text-muted-foreground")}>
-                {b.status.replace(/_/g, " ")}
-              </Badge>
-            </div>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              <span className="font-mono">{b.booking_ref}</span> · {channel} · Booked {format(new Date(b.created_at), "d MMM yyyy, HH:mm")}
-            </p>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="font-heading text-2xl font-semibold">{b.event_name || eventTypeLabel(b.event_type)}</h1>
+            <HallStatusBadge status={b.status} />
           </div>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            <span className="font-mono">{b.booking_ref}</span> · {channel} · Booked {format(new Date(b.created_at), "d MMM yyyy, HH:mm")}
+            {order ? (
+              <>
+                {" "}
+                · Order <span className="font-mono">{order.number}</span>
+              </>
+            ) : null}
+          </p>
         </div>
         {canManage ? (
           <HallMoveActions
             booking={b}
             today={today}
             isAdmin={access.isAdmin}
+            paid={paidAmount > 0}
             action={setHallBookingStatus}
             fields={{ venueId }}
           />
         ) : null}
       </div>
 
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border sm:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border sm:grid-cols-5">
         <Fact label="Date" value={dates} />
         <Fact label="Time" value={from && to ? `${from}–${to}` : from ? `From ${from}` : "All day"} />
         <Fact label="Guests" value={b.expected_guests ?? "—"} />
-        <Fact label="Price" value={Number(b.price) > 0 ? money(b.currency, b.price) : "Not set"} />
+        <Fact label="Price" value={priced ? money(b.currency, total) : "Not set"} />
+        <Fact label={paymentFact.label} value={paymentFact.value} tone={paymentFact.tone} />
       </dl>
 
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          <div className="grid gap-6 sm:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Event</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <dl className="grid grid-cols-[5rem_1fr] gap-y-1.5">
+                  <dt className="text-muted-foreground">Type</dt>
+                  <dd className="font-medium">{eventTypeLabel(b.event_type)}</dd>
+                  <dt className="text-muted-foreground">Name</dt>
+                  <dd className="font-medium">{b.event_name || "—"}</dd>
+                </dl>
+                {b.setup_requirements ? (
+                  <p className="flex gap-2 rounded-lg bg-secondary/40 px-3 py-2.5">
+                    <StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <span className="whitespace-pre-wrap">{b.setup_requirements}</span>
+                  </p>
+                ) : null}
+                {b.customer_notes ? (
+                  <p className="flex gap-2 rounded-lg bg-secondary/40 px-3 py-2.5">
+                    <StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <span className="whitespace-pre-wrap">{b.customer_notes}</span>
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Client</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p className="font-medium">{b.contact_name ?? "Client"}</p>
+                {b.agency ? <p className="text-muted-foreground">{b.agency.name}</p> : null}
+                {b.contact_phone ? (
+                  <a
+                    href={`tel:${b.contact_phone.replace(/\s+/g, "")}`}
+                    className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                  >
+                    <Phone className="size-3.5" /> {b.contact_phone}
+                  </a>
+                ) : null}
+                {b.contact_email ? (
+                  <a href={`mailto:${b.contact_email}`} className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
+                    <Mail className="size-3.5" /> {b.contact_email}
+                  </a>
+                ) : null}
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <PartyPopper className="size-4 text-primary" /> Event
-              </CardTitle>
+              <CardTitle className="text-base">Payment</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <dl className="grid gap-px overflow-hidden rounded-lg bg-border sm:grid-cols-2">
-                <div className="bg-card px-3 py-2.5">
-                  <dt className="text-xs text-muted-foreground">Type</dt>
-                  <dd className="font-medium capitalize">{b.event_type}</dd>
-                </div>
-                <div className="bg-card px-3 py-2.5">
-                  <dt className="text-xs text-muted-foreground">Name</dt>
-                  <dd className="font-medium">{b.event_name || "—"}</dd>
-                </div>
-              </dl>
-              {b.setup_requirements ? (
-                <div className="flex gap-2 rounded-lg bg-secondary/40 px-3 py-2.5 text-sm">
-                  <StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                  <span>{b.setup_requirements}</span>
-                </div>
-              ) : null}
-              {b.customer_notes ? (
-                <div className="flex gap-2 rounded-lg bg-secondary/40 px-3 py-2.5 text-sm">
-                  <StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                  <span>{b.customer_notes}</span>
-                </div>
-              ) : null}
-              {canManage && open && !isOffline ? (
-                <div className="border-t border-border pt-4">
-                  <p className="mb-2 text-sm font-medium">Price</p>
+              {canReprice ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-secondary/40 px-3 py-2.5">
+                  <span className="text-sm font-medium">Quoted price</span>
                   <DeskPriceForm venueId={venueId} bookingId={b.id} price={Number(b.price)} currency={b.currency} />
                 </div>
               ) : null}
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <User className="size-4 text-primary" /> Client
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p className="font-medium">{b.contact_name ?? "Client"}</p>
-              {b.contact_phone ? (
-                <a href={`tel:${b.contact_phone.replace(/\s+/g, "")}`} className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
-                  <Phone className="size-3.5" /> {b.contact_phone}
-                </a>
-              ) : null}
-              {b.contact_email ? (
-                <a href={`mailto:${b.contact_email}`} className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
-                  <Mail className="size-3.5" /> {b.contact_email}
-                </a>
-              ) : null}
-            </CardContent>
-          </Card>
+              {isOffline ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                  <span>
+                    {b.payment_method ? methodLabel(b.payment_method) : "—"}
+                    {b.payment_reference ? <span className="text-muted-foreground"> · {b.payment_reference}</span> : null}
+                  </span>
+                  {b.paid_at ? (
+                    <span className="font-medium text-primary">Paid {format(new Date(b.paid_at), "d MMM yyyy")}</span>
+                  ) : canManage && live ? (
+                    <form action={markHallBookingPaid}>
+                      <input type="hidden" name="bookingId" value={b.id} />
+                      <input type="hidden" name="venueId" value={venueId} />
+                      <SubmitButton size="sm" variant="outline" pendingText="Saving…">
+                        Mark paid
+                      </SubmitButton>
+                    </form>
+                  ) : (
+                    <span className="font-medium text-brand-gold">Unpaid</span>
+                  )}
+                </div>
+              ) : order && order.payments.length > 0 ? (
+                <ul className="divide-y divide-border text-sm">
+                  {order.payments.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                      <div>
+                        <p className="font-medium">{p.method_label ?? methodLabel(p.provider)}</p>
+                        <p className="text-xs text-muted-foreground">{format(new Date(p.created_at), "d MMM yyyy, HH:mm")}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="tabular-nums">{money(b.currency, p.amount)}</p>
+                        <p className={cn("text-xs", p.status === "succeeded" ? "text-primary" : "text-muted-foreground")}>
+                          {PAYMENT_STATUS[p.status] ?? p.status}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">No payments.</p>
+              )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <CreditCard className="size-4 text-primary" /> Payment
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <dl className="grid gap-px overflow-hidden rounded-lg bg-border sm:grid-cols-3">
-                <div className="bg-card px-3 py-2.5">
-                  <dt className="text-xs text-muted-foreground">Amount</dt>
-                  <dd className="font-medium">{money(b.currency, b.price)}</dd>
-                </div>
-                <div className="bg-card px-3 py-2.5">
-                  <dt className="text-xs text-muted-foreground">Method</dt>
-                  <dd className="font-medium">
-                    {isOffline
-                      ? b.payment_method
-                        ? PAYMENT_METHOD_LABEL[b.payment_method as OfflinePaymentMethod]
-                        : "—"
-                      : onlinePayment
-                        ? (onlinePayment.label ?? providerLabel(onlinePayment.provider))
-                        : "Online"}
-                  </dd>
-                </div>
-                <div className="bg-card px-3 py-2.5">
-                  <dt className="text-xs text-muted-foreground">Status</dt>
-                  <dd className="font-medium">
-                    {paid ? (
-                      <span className="flex items-center gap-1 text-primary">
-                        <Check className="size-4" /> Paid
-                      </span>
-                    ) : order?.status === "refunded" ? (
-                      <span className="text-destructive">Refunded</span>
-                    ) : (
-                      <span className="text-brand-gold">Unpaid</span>
-                    )}
-                  </dd>
-                </div>
-              </dl>
-              {order ? (
-                <p className="text-sm text-muted-foreground">
-                  Order <span className="font-mono">{order.number}</span> · <span className="capitalize">{order.status.replace(/_/g, " ")}</span>
-                </p>
-              ) : null}
-              {b.payment_reference ? <p className="text-sm text-muted-foreground">Reference {b.payment_reference}</p> : null}
               {quote && quote.paidAmount > 0 && live ? (
-                <p className="text-sm">
+                <p className="border-t border-border pt-3 text-sm">
                   <span className="text-muted-foreground">Refund if cancelled today </span>
                   <span className="font-medium">
                     {quote.refundAmount !== null
@@ -242,24 +279,29 @@ export async function VenueBookingDetailView({
                   </span>
                 </p>
               ) : null}
-              {canManage && isOffline && !b.paid_at && live ? (
-                <form action={markHallBookingPaid}>
-                  <input type="hidden" name="bookingId" value={b.id} />
-                  <input type="hidden" name="venueId" value={venueId} />
-                  <SubmitButton size="sm" variant="outline" pendingText="Saving…">
-                    Mark paid
-                  </SubmitButton>
-                </form>
-              ) : null}
             </CardContent>
           </Card>
+
+          {canMove ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Change date</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RescheduleForm
+                  venueId={venueId}
+                  bookingId={b.id}
+                  today={today}
+                  current={{ startDate: b.start_date, endDate: b.end_date, startTime: from, endTime: to }}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
 
           {requests.length > 0 ? (
             <Card>
               <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <RotateCcw className="size-4 text-primary" /> Requests
-                </CardTitle>
+                <CardTitle className="text-base">Client requests</CardTitle>
                 <Link href={`${base}/refunds`} className="text-sm font-medium text-primary hover:underline">
                   Refunds
                 </Link>
@@ -286,28 +328,41 @@ export async function VenueBookingDetailView({
           ) : null}
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {events.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No activity yet.</p>
-            ) : (
-              <ol className="relative space-y-4 border-l border-border pl-5">
-                {[...events].reverse().map((e) => (
-                  <li key={e.id} className="relative">
-                    <CircleDot className="absolute -left-[1.6rem] top-0.5 size-3.5 bg-card text-primary" />
-                    <p className="text-sm font-medium">{eventTitle(e, b.currency)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(e.createdAt), "d MMM, HH:mm")} · {actor(e, access.profileId)}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          {canManage ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Internal notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <BookingNotesForm venueId={venueId} bookingId={b.id} notes={b.admin_notes} />
+              </CardContent>
+            </Card>
+          ) : null}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {events.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No activity yet.</p>
+              ) : (
+                <ol className="relative space-y-4 border-l border-border pl-5">
+                  {[...events].reverse().map((e) => (
+                    <li key={e.id} className="relative">
+                      <CircleDot className="absolute top-0.5 -left-[1.6rem] size-3.5 bg-card text-primary" />
+                      <p className="text-sm font-medium">{eventTitle(e, b.currency)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(e.createdAt), "d MMM, HH:mm")} · {actor(e, access.profileId, b.customer_id)}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
