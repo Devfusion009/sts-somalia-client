@@ -11,7 +11,7 @@ export default async function VenueBookingDetailPage({ params }: { params: Promi
   if (!access) notFound();
   const base = `/manager/venues/${venueId}`;
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-6">
       <BackLink href={`${base}/bookings`} label="Bookings" />
       <VenueBookingDetailView venueId={venueId} bookingId={bookingId} base={base} access={access} />
     </div>

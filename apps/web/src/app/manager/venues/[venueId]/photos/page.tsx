@@ -7,6 +7,7 @@ import {
   uploadVenueImagesAsManager,
 } from "@/modules/events/venue-manager-actions";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { GalleryManager } from "@/components/admin/gallery-manager";
 
 export const metadata = { title: "Photos" };
@@ -23,9 +24,9 @@ export default async function ManagerVenuePhotosPage({ params }: { params: Promi
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="font-heading text-2xl font-semibold">Photos</h1>
+      <PageHeader title="Photos" />
       <Card>
-        <CardContent className="p-6">
+        <CardContent>
           <GalleryManager
             id={venue.id}
             paths={images}

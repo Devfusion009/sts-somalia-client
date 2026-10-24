@@ -3,22 +3,14 @@
 import { useActionState } from "react";
 import { AlertCircle, CalendarCheck2, Eraser } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
 import { setRoomInventory, clearRoomInventory } from "@/modules/hotels/inventory-actions";
 
 const today = new Date().toISOString().slice(0, 10);
 
-export function InventoryRangeForm({
-  hotelId,
-  roomId,
-  currency,
-}: {
-  hotelId: string;
-  roomId: string;
-  currency: string;
-}) {
+export function InventoryRangeForm({ hotelId, roomId, currency }: { hotelId: string; roomId: string; currency: string }) {
   const [state, formAction] = useActionState(setRoomInventory, null);
 
   return (
@@ -34,25 +26,19 @@ export function InventoryRangeForm({
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="startDate">
-            From <span className="text-destructive">*</span>
-          </Label>
+        <Field>
+          <FieldLabel htmlFor="startDate">From</FieldLabel>
           <Input id="startDate" name="startDate" type="date" min={today} required />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="endDate">
-            To (inclusive) <span className="text-destructive">*</span>
-          </Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="endDate">To (inclusive)</FieldLabel>
           <Input id="endDate" name="endDate" type="date" min={today} required />
-        </div>
+        </Field>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="totalUnits">
-            Rooms to sell
-          </Label>
+        <Field>
+          <FieldLabel htmlFor="totalUnits">Rooms to sell</FieldLabel>
           <Input
             id="totalUnits"
             name="totalUnits"
@@ -60,10 +46,11 @@ export function InventoryRangeForm({
             min={0}
             max={1000}
             placeholder="Unchanged"
+            className="tabular-nums"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="priceOverride">Price per night ({currency})</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="priceOverride">Price per night ({currency})</FieldLabel>
           <Input
             id="priceOverride"
             name="priceOverride"
@@ -71,13 +58,16 @@ export function InventoryRangeForm({
             min={0.01}
             step="0.01"
             placeholder="Unchanged"
+            className="tabular-nums"
           />
-        </div>
+        </Field>
       </div>
 
-      <SubmitButton className="gap-1.5" pendingText="Saving…">
-        <CalendarCheck2 className="size-4" /> Save override
-      </SubmitButton>
+      <div className="flex justify-end">
+        <SubmitButton pendingText="Saving…">
+          <CalendarCheck2 aria-hidden="true" /> Save override
+        </SubmitButton>
+      </div>
     </form>
   );
 }
@@ -98,18 +88,20 @@ export function ClearInventoryForm({ hotelId, roomId }: { hotelId: string; roomI
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="clearStartDate">From</Label>
+        <Field>
+          <FieldLabel htmlFor="clearStartDate">From</FieldLabel>
           <Input id="clearStartDate" name="startDate" type="date" min={today} required />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="clearEndDate">To (inclusive)</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="clearEndDate">To (inclusive)</FieldLabel>
           <Input id="clearEndDate" name="endDate" type="date" min={today} required />
-        </div>
+        </Field>
       </div>
-      <SubmitButton variant="outline" className="gap-1.5" pendingText="Clearing…">
-        <Eraser className="size-4" /> Clear overrides
-      </SubmitButton>
+      <div className="flex justify-end">
+        <SubmitButton variant="outline" pendingText="Clearing…">
+          <Eraser aria-hidden="true" /> Clear overrides
+        </SubmitButton>
+      </div>
     </form>
   );
 }

@@ -5,7 +5,10 @@ import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getServerTrpc } from "@/lib/trpc/server";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
-import { Card, CardContent } from "@/components/ui/card";
+import { Link2 } from "lucide-react";
+import { UnavailableNotice } from "@/components/portal/unavailable-notice";
+import { Card } from "@/components/ui/card";
+import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
 
 /** Portal-scoped title — see the admin portal layout for why this lives on the layout. */
@@ -44,30 +47,29 @@ export default async function AffiliateLayout({ children }: { children: React.Re
     affiliate = await trpc.affiliates.me.query();
   } catch {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
-        <Card>
-          <CardContent className="space-y-3 p-6 text-center">
-            <p className="font-medium">Affiliate Dashboard is temporarily unavailable</p>
-            <p className="text-sm text-muted-foreground">Try again in a moment.</p>
-          </CardContent>
-        </Card>
-      </div>
+      <main className="mx-auto flex min-h-dvh w-full max-w-md items-center justify-center px-4">
+        <div className="w-full">
+          <UnavailableNotice label="Affiliate Dashboard" />
+        </div>
+      </main>
     );
   }
 
   if (!affiliate) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
-        <Card>
-          <CardContent className="space-y-3 p-6 text-center">
-            <p className="font-medium">No affiliate account found</p>
-            <p className="text-sm text-muted-foreground">
-              You don&apos;t currently have an active affiliate account.
-            </p>
-            <Button render={<Link href="/account/become" />}>Apply to become an affiliate</Button>
-          </CardContent>
+      <main className="mx-auto flex min-h-dvh w-full max-w-md items-center justify-center px-4">
+        <Card className="w-full">
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Link2 />
+            </EmptyMedia>
+            <EmptyTitle>No affiliate account</EmptyTitle>
+            <EmptyContent>
+              <Button render={<Link href="/account/become?program=affiliate" />}>Apply to become an affiliate</Button>
+            </EmptyContent>
+          </Empty>
         </Card>
-      </div>
+      </main>
     );
   }
 

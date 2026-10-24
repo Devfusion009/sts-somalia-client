@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { format } from "date-fns";
-import { ArrowRight, BedDouble, Building2, CalendarClock, Plus, Ticket, Wallet } from "lucide-react";
+import { ArrowRight, Plus, Ticket } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
   getMyHotelScope,
@@ -8,10 +7,12 @@ import {
   getPartnerStats,
   getRecentPartnerBookings,
 } from "@/modules/hotels/partner-queries";
-import { StatTile } from "@/components/dashboard/stat-tile";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   Table,
   TableBody,
@@ -20,14 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-
-const BOOKING_BADGE: Record<string, string> = {
-  pending: "bg-brand-gold/15 text-brand-gold",
-  confirmed: "bg-primary/10 text-primary",
-  completed: "bg-primary/10 text-primary",
-  cancelled: "bg-destructive/10 text-destructive",
-};
+import { dateSpan, money } from "@/lib/money";
 
 export default async function PartnerDashboardPage() {
   const profile = await requireUser();
@@ -41,100 +35,111 @@ export default async function PartnerDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-heading text-2xl font-bold">{partner?.name ?? "Your properties"}</h1>
-            {partner ? (
-              <Badge variant="secondary" className="capitalize">
-                {partner.status}
-              </Badge>
-            ) : (
-              <Badge variant="secondary">Manager</Badge>
-            )}
-          </div>
-          {partner ? <p className="mt-0.5 text-sm text-muted-foreground">Commission rate: {partner.commission_rate}%</p> : null}
-        </div>
-        {scope.partnerId ? (
-          <Button render={<Link href="/partner/hotels/new" />} className="gap-1.5">
-            <Plus className="size-4" /> Add hotel
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title={partner?.name ?? "Dashboard"}
+        status={
+          partner ? (
+            <Badge variant={statusBadgeVariant(partner.status)} className="capitalize">
+              {partner.status.replace(/_/g, " ")}
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Manager</Badge>
+          )
+        }
+        meta={partner ? <span className="tabular-nums">{partner.commission_rate}% commission</span> : undefined}
+        actions={
+          <>
+            {stats.pendingCount > 0 ? (
+              <Button variant="outline" render={<Link href="/partner/bookings" />}>
+                Review requests
+                <Badge variant="warning" className="tabular-nums">
+                  {stats.pendingCount}
+                </Badge>
+              </Button>
+            ) : null}
+            {scope.partnerId ? (
+              <Button render={<Link href="/partner/hotels/new" />}>
+                <Plus aria-hidden="true" /> Add hotel
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <StatTile icon={Building2} label="Hotels" value={String(stats.hotelCount)} />
-        <StatTile icon={BedDouble} label="Rooms" value={String(stats.roomCount)} />
-        <StatTile icon={Ticket} label="Total bookings" value={String(stats.bookingCount)} />
-        <StatTile
-          icon={CalendarClock}
-          label="Pending bookings"
-          value={String(stats.pendingCount)}
+      <StatRail>
+        <StatRailItem
+          label="Hotels"
+          value={stats.hotelCount}
+          sub={`${stats.roomCount} room type${stats.roomCount === 1 ? "" : "s"}`}
+        />
+        <StatRailItem label="Bookings" value={stats.bookingCount} />
+        <StatRailItem
+          label="Pending"
+          value={stats.pendingCount}
           tone={stats.pendingCount > 0 ? "warn" : undefined}
         />
-        <StatTile
-          icon={Wallet}
-          label="Confirmed revenue"
-          value={`${stats.revenueCurrency} ${stats.revenue.toFixed(0)}`}
-        />
-      </div>
+        <StatRailItem label="Confirmed revenue" value={money(stats.revenue, stats.revenueCurrency)} />
+      </StatRail>
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
+      <Card className="pb-0">
+        <CardHeader>
           <CardTitle className="text-base">Recent bookings</CardTitle>
-          <Button variant="ghost" size="sm" className="gap-1 text-primary" render={<Link href="/partner/bookings" />}>
-            View all <ArrowRight className="size-3.5" />
-          </Button>
+          {recent.length > 0 ? (
+            <CardAction>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="All bookings"
+                title="All bookings"
+                render={<Link href="/partner/bookings" />}
+              >
+                <ArrowRight />
+              </Button>
+            </CardAction>
+          ) : null}
         </CardHeader>
-        <CardContent>
-          {recent.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <span className="flex size-11 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-                <Ticket className="size-5" />
-              </span>
-              <p className="text-sm text-muted-foreground">No bookings yet.</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Hotel</TableHead>
-                  <TableHead>Room</TableHead>
-                  <TableHead>Dates</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
+        {recent.length === 0 ? (
+          <CardContent className="pb-6">
+            <Empty>
+              <EmptyMedia variant="icon">
+                <Ticket />
+              </EmptyMedia>
+              <EmptyTitle>No bookings</EmptyTitle>
+            </Empty>
+          </CardContent>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Hotel</TableHead>
+                <TableHead>Room</TableHead>
+                <TableHead>Dates</TableHead>
+                <TableHead numeric>Amount</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recent.map((b) => (
+                <TableRow key={b.id}>
+                  <TableCell className="font-medium">{b.hotels?.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{b.hotel_rooms?.name}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {dateSpan(b.check_in, b.check_out)}
+                  </TableCell>
+                  <TableCell numeric className="font-medium">
+                    {money(b.total_price, b.currency)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={statusBadgeVariant(b.status)} className="capitalize">
+                      {b.status.replace(/_/g, " ")}
+                    </Badge>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recent.map((b) => (
-                  <TableRow key={b.id}>
-                    <TableCell className="font-medium">{b.hotels?.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{b.hotel_rooms?.name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(b.check_in), "d MMM")} →{" "}
-                      {format(new Date(b.check_out), "d MMM yyyy")}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {b.currency} {b.total_price.toFixed(0)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={cn(
-                          "border-transparent capitalize",
-                          BOOKING_BADGE[b.status] ?? "bg-muted text-muted-foreground"
-                        )}
-                      >
-                        {b.status.replace(/_/g, " ")}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </div>
   );
 }
-

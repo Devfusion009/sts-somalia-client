@@ -1,16 +1,14 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { NewHotelForm } from "./new-hotel-form";
+
+export const metadata = { title: "Add hotel" };
 
 export default function NewHotelPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold">Add a hotel</h1>
-      </div>
+      <PageHeader title="Add hotel" back={{ href: "/partner/hotels", label: "My Hotels" }} />
       <Card>
-        <CardHeader>
-          <CardTitle>Hotel details</CardTitle>
-        </CardHeader>
         <CardContent>
           <NewHotelForm />
         </CardContent>

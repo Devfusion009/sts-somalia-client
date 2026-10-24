@@ -15,7 +15,7 @@ export default async function AffiliateLoginPage({
   return (
     <PortalLoginShell portalLabel="Affiliate Dashboard" accent="affiliate">
       <PortalLoginForm
-        title="Affiliate sign-in"
+        title="Sign in"
         action={signInToAffiliatePortalAction}
         redirectTo={redirect_to}
       />

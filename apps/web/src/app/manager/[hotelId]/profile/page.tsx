@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
 import { getHotelForEdit } from "@/modules/hotels/partner-queries";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { ManagerHotelProfileForm } from "./profile-form";
 
 export const metadata = { title: "Hotel Profile" };
@@ -18,9 +19,9 @@ export default async function ManagerProfilePage({ params }: { params: Promise<{
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="font-heading text-2xl font-semibold">Hotel Profile</h1>
+      <PageHeader title="Hotel Profile" />
       <Card>
-        <CardContent className="p-6">
+        <CardContent>
           <ManagerHotelProfileForm
             hotel={{
               id: hotel.id,

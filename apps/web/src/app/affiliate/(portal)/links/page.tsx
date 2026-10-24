@@ -1,6 +1,10 @@
+import { Link2 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getServerTrpc } from "@/lib/trpc/server";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
@@ -13,6 +17,8 @@ import {
 import { NewLinkForm } from "./new-link-form";
 import { CopyLinkButton } from "./copy-link-button";
 
+export const metadata = { title: "My Links" };
+
 export default async function AffiliateLinksPage() {
   await requireUser();
   const trpc = await getServerTrpc();
@@ -21,7 +27,7 @@ export default async function AffiliateLinksPage() {
   if (!affiliate) {
     return (
       <Alert variant="destructive">
-        <AlertDescription>No affiliate account found for your profile. Please contact support.</AlertDescription>
+        <AlertDescription>No affiliate account.</AlertDescription>
       </Alert>
     );
   }
@@ -31,29 +37,37 @@ export default async function AffiliateLinksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold">My Links</h1>
-        </div>
-        <NewLinkForm />
-      </div>
+      <PageHeader
+        title="My Links"
+        status={
+          links.length > 0 ? (
+            <Badge variant="secondary" className="tabular-nums">
+              {links.length}
+            </Badge>
+          ) : null
+        }
+        actions={links.length > 0 ? <NewLinkForm /> : null}
+      />
 
-      {links.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-16 text-center">
-            <p className="font-medium">No links yet</p>
-            <p className="text-sm text-muted-foreground">Create your first tracked link to start earning.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="overflow-hidden py-0">
+      <Card className="py-0">
+        {links.length === 0 ? (
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Link2 />
+            </EmptyMedia>
+            <EmptyTitle>No links</EmptyTitle>
+            <EmptyContent>
+              <NewLinkForm />
+            </EmptyContent>
+          </Empty>
+        ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Campaign</TableHead>
                 <TableHead>Destination</TableHead>
-                <TableHead>Shareable URL</TableHead>
-                <TableHead className="text-right">Clicks</TableHead>
+                <TableHead>Link</TableHead>
+                <TableHead numeric>Clicks</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -64,21 +78,27 @@ export default async function AffiliateLinksPage() {
                 return (
                   <TableRow key={link.id}>
                     <TableCell className="font-medium">{link.campaign_name ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{link.target_path}</TableCell>
+                    <TableCell className="max-w-[16rem] truncate font-mono text-xs text-muted-foreground" title={link.target_path}>
+                      {link.target_path}
+                    </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <code className="max-w-[220px] truncate text-xs text-muted-foreground">{url}</code>
+                      <div className="flex items-center gap-1">
+                        <code className="max-w-[14rem] truncate font-mono text-xs text-muted-foreground" title={url}>
+                          {url}
+                        </code>
                         <CopyLinkButton url={url} />
                       </div>
                     </TableCell>
-                    <TableCell className="text-right font-medium">{link.clicks_count}</TableCell>
+                    <TableCell numeric className="font-medium">
+                      {link.clicks_count.toLocaleString("en-US")}
+                    </TableCell>
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
-        </Card>
-      )}
+        )}
+      </Card>
     </div>
   );
 }

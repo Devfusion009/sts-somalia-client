@@ -7,7 +7,9 @@ import { getMyPartnerAccountId, getPartnerAccount } from "@/modules/admin/partne
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
 import { OnboardingStatusBanner } from "@/components/portal/onboarding-status-banner";
-import { Card, CardContent } from "@/components/ui/card";
+import { PartyPopper } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
 
 /** Portal-scoped title — see the admin portal layout for why this lives on the layout. */
@@ -40,14 +42,19 @@ export default async function VenuePartnerLayout({ children }: { children: React
 
   if (!partnerId) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
-        <Card>
-          <CardContent className="space-y-3 p-6 text-center">
-            <p className="font-medium">No active venue partner membership</p>
-            <Button render={<Link href="/account/become?program=venue" />}>Apply to list your venue</Button>
-          </CardContent>
+      <main className="mx-auto flex min-h-dvh w-full max-w-md items-center justify-center px-4">
+        <Card className="w-full">
+          <Empty>
+            <EmptyMedia variant="icon">
+              <PartyPopper />
+            </EmptyMedia>
+            <EmptyTitle>No venue partner membership</EmptyTitle>
+            <EmptyContent>
+              <Button render={<Link href="/account/become?program=venue" />}>Apply to list your venue</Button>
+            </EmptyContent>
+          </Empty>
         </Card>
-      </div>
+      </main>
     );
   }
 
