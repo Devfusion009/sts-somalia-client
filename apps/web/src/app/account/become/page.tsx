@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { CheckCircle2, Clock, XCircle, FileEdit, PartyPopper, AlertTriangle, Inbox, MessageSquareWarning } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Inbox, MessageSquareWarning, XCircle } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { APP_CONFIG, REJECT_COOLDOWN_DAYS, canApplicantEdit, docSlotsFor, type ApplicationKind } from "@/modules/partner-applications/config";
@@ -45,14 +46,15 @@ const STATUS_LABEL: Record<string, string> = {
   approved: "Approved",
 };
 
-const STATUS_BADGE_CLASS: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  pending: "bg-brand-gold/15 text-brand-gold",
-  under_review: "bg-chart-3/10 text-chart-3",
-  more_info_requested: "bg-destructive/10 text-destructive",
-  rejected: "bg-muted text-muted-foreground",
-  approved: "bg-primary/10 text-primary",
+const STATUS_VARIANT: Partial<Record<string, BadgeVariant>> = {
+  under_review: "info",
+  more_info_requested: "destructive",
+  rejected: "neutral",
 };
+
+function StatusPill({ status }: { status: string }) {
+  return <Badge variant={statusBadgeVariant(status, STATUS_VARIANT)}>{STATUS_LABEL[status] ?? status}</Badge>;
+}
 
 function RecentApplicationsSection({
   applications,
@@ -64,97 +66,80 @@ function RecentApplicationsSection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Applications</CardTitle>
+        <CardTitle>Recent applications</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-0">
         {applications.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
-            <Inbox className="size-6" />
-            You haven&apos;t submitted an application yet.
-          </div>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Inbox />
+              </EmptyMedia>
+              <EmptyTitle>No applications</EmptyTitle>
+            </EmptyHeader>
+          </Empty>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Program</TableHead>
-                <TableHead>Reference</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Submitted</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {applications.map((app) => {
-                const cfg = APP_CONFIG[app.kind];
-                const editable = canApplicantEdit(app.status, app.submitted_at);
-                const editLabel =
-                  app.status === "draft" ? "Resume" : app.status === "more_info_requested" ? "Continue" : "Edit";
-                const adminMessage = app.status === "more_info_requested" ? app.review_notes : null;
-                // A rejected document reopens its own upload even on an
-                // application that is otherwise past the edit window — the
-                // read-only view page carries the replacement form — so this
-                // row stays actionable regardless of `editable`.
-                const rejectedKeys = rejectedDocKeys[app.id] ?? [];
-                const slotLabels = new Map(docSlotsFor(app.kind).map((slot) => [slot.key, slot.label]));
-                return (
-                  <TableRow key={app.id}>
-                    <TableCell className="font-medium">
+          <ul className="divide-y divide-border border-t border-border">
+            {applications.map((app) => {
+              const cfg = APP_CONFIG[app.kind];
+              const editable = canApplicantEdit(app.status, app.submitted_at);
+              const editLabel =
+                app.status === "draft" ? "Resume" : app.status === "more_info_requested" ? "Continue" : "Edit";
+              const adminMessage = app.status === "more_info_requested" ? app.review_notes : null;
+              // A rejected document reopens its own upload even on an
+              // application that is otherwise past the edit window — the
+              // read-only view page carries the replacement form — so this
+              // row stays actionable regardless of `editable`.
+              const rejectedKeys = rejectedDocKeys[app.id] ?? [];
+              const slotLabels = new Map(docSlotsFor(app.kind).map((slot) => [slot.key, slot.label]));
+              const needsAction = app.status === "more_info_requested" || rejectedKeys.length > 0;
+              const href = editable
+                ? rejectedKeys.length > 0
+                  ? `/account/become/${app.kind}/${app.id}?step=5`
+                  : `/account/become/${app.kind}/${app.id}`
+                : `/account/become/${app.kind}/${app.id}/view`;
+              const label = rejectedKeys.length > 0 ? "Re-upload" : editable ? editLabel : "View";
+
+              return (
+                <li key={app.id} className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-start sm:gap-4">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="flex flex-wrap items-center gap-2 font-medium">
                       {cfg.label}
-                      {app.name ? <span className="block text-xs font-normal text-muted-foreground">{app.name}</span> : null}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{app.reference_number ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge className={`border-transparent ${STATUS_BADGE_CLASS[app.status] ?? "bg-muted text-muted-foreground"}`}>
-                        {STATUS_LABEL[app.status] ?? app.status}
-                      </Badge>
-                      {adminMessage ? (
-                        <span className="mt-1.5 flex max-w-xs items-start gap-1.5 text-xs text-destructive">
-                          <MessageSquareWarning className="mt-0.5 size-3.5 shrink-0" />
-                          {adminMessage}
-                        </span>
-                      ) : null}
-                      {rejectedKeys.length > 0 ? (
-                        <span className="mt-1.5 flex max-w-xs items-start gap-1.5 text-xs text-destructive">
-                          <XCircle className="mt-0.5 size-3.5 shrink-0" />
-                          Re-upload: {rejectedKeys.map((key) => slotLabels.get(key) ?? key).join(", ")}
-                        </span>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {app.submitted_at ? format(new Date(app.submitted_at), "dd MMM yyyy") : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {editable ? (
-                        <Button
-                          size="sm"
-                          variant={app.status === "more_info_requested" || rejectedKeys.length > 0 ? "default" : "outline"}
-                          render={
-                            <Link
-                              href={
-                                rejectedKeys.length > 0
-                                  ? `/account/become/${app.kind}/${app.id}?step=5`
-                                  : `/account/become/${app.kind}/${app.id}`
-                              }
-                            />
-                          }
-                        >
-                          {rejectedKeys.length > 0 ? "Re-upload" : editLabel}
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant={rejectedKeys.length > 0 ? "default" : "outline"}
-                          render={<Link href={`/account/become/${app.kind}/${app.id}/view`} />}
-                        >
-                          {rejectedKeys.length > 0 ? "Re-upload" : "View"}
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      <StatusPill status={app.status} />
+                    </p>
+                    <p className="truncate text-sm text-muted-foreground tabular-nums">
+                      {[
+                        app.name,
+                        app.reference_number,
+                        app.submitted_at ? format(new Date(app.submitted_at), "d MMM yyyy") : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                    {adminMessage ? (
+                      <p className="flex items-start gap-1.5 text-sm text-destructive">
+                        <MessageSquareWarning className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                        {adminMessage}
+                      </p>
+                    ) : null}
+                    {rejectedKeys.length > 0 ? (
+                      <p className="flex items-start gap-1.5 text-sm text-destructive">
+                        <XCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                        Re-upload: {rejectedKeys.map((key) => slotLabels.get(key) ?? key).join(", ")}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Button
+                    variant={needsAction ? "default" : "outline"}
+                    className="self-start"
+                    render={<Link href={href} />}
+                  >
+                    {label}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </CardContent>
     </Card>
@@ -164,6 +149,41 @@ function RecentApplicationsSection({
 function cooldownEndsAt(reviewedAt: string | null): Date | null {
   if (!reviewedAt) return null;
   return new Date(new Date(reviewedAt).getTime() + REJECT_COOLDOWN_DAYS * 86_400_000);
+}
+
+/** One program's state: what it is, where the applicant stands, and the one next action. */
+function PanelRow({
+  title,
+  status,
+  meta,
+  action,
+}: {
+  title: string;
+  status?: React.ReactNode;
+  meta?: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <div className="min-w-0 space-y-1">
+        <h2 className="flex flex-wrap items-center gap-2 font-heading text-base font-semibold">
+          {title}
+          {status}
+        </h2>
+        {meta ? <p className="text-sm text-muted-foreground tabular-nums">{meta}</p> : null}
+      </div>
+      {action ? <div className="shrink-0 max-sm:[&>*]:w-full max-sm:[&_button]:w-full">{action}</div> : null}
+    </div>
+  );
+}
+
+function StartForm({ kind, label }: { kind: ApplicationKind; label: string }) {
+  return (
+    <form action={startApplication}>
+      <input type="hidden" name="kind" value={kind} />
+      <SubmitButton pendingText="Starting…">{label}</SubmitButton>
+    </form>
+  );
 }
 
 function ProgramPanel({
@@ -181,54 +201,50 @@ function ProgramPanel({
 }) {
   const cfg = APP_CONFIG[kind];
   const status: Status = isMember || isApproved ? "approved" : ((app?.status as Status) ?? "none");
+  const reference = app?.reference_number ? <span className="font-mono">{app.reference_number}</span> : null;
 
   if (status === "approved") {
     return (
-      <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="flex items-center justify-between gap-3 p-4">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <CheckCircle2 className="size-4 text-primary" /> You&apos;re approved.
-          </div>
-          {/* Plain <a> — the agent target is a different origin, which a
-              client-side <Link> push cannot cross. */}
-          <Button size="sm" render={<a href={openPortalHref(kind)} />}>
-            Open {cfg.portalLabel}
-          </Button>
-        </CardContent>
-      </Card>
+      <PanelRow
+        title={cfg.label}
+        status={
+          <Badge variant="success">
+            <CheckCircle2 aria-hidden="true" /> Approved
+          </Badge>
+        }
+        action={
+          // Plain <a> — the agent target is a different origin, which a
+          // client-side <Link> push cannot cross.
+          <Button render={<a href={openPortalHref(kind)} />}>Open {cfg.portalLabel}</Button>
+        }
+      />
     );
   }
 
   if (status === "pending" || status === "under_review") {
-    return (
-      <Alert>
-        <Clock />
-        <AlertDescription>
-          Your application {app?.reference_number ? <span className="font-mono">({app.reference_number})</span> : null} is under review.
-          We&apos;ll notify you by email once it&apos;s decided.
-        </AlertDescription>
-      </Alert>
-    );
+    return <PanelRow title={cfg.label} status={<StatusPill status={status} />} meta={reference} />;
   }
 
   if (status === "draft" || status === "more_info_requested") {
     return (
-      <div className="space-y-3">
-        {status === "more_info_requested" ? (
+      <div className="space-y-4">
+        <PanelRow
+          title={cfg.label}
+          status={<StatusPill status={status} />}
+          meta={reference}
+          action={
+            <Button render={<Link href={`/account/become/${kind}/${app!.id}`} />}>
+              {status === "more_info_requested" ? "Continue application" : "Resume application"}
+            </Button>
+          }
+        />
+        {status === "more_info_requested" && app?.review_notes ? (
           <Alert variant="destructive">
             <AlertTriangle />
-            <AlertTitle>More information needed</AlertTitle>
-            <AlertDescription>{app?.review_notes || "Please review and update your application, then resubmit."}</AlertDescription>
+            <AlertTitle>Message from STS</AlertTitle>
+            <AlertDescription>{app.review_notes}</AlertDescription>
           </Alert>
-        ) : (
-          <Alert>
-            <FileEdit />
-            <AlertDescription>You have a draft application in progress.</AlertDescription>
-          </Alert>
-        )}
-        <Button className="gap-1.5" render={<Link href={`/account/become/${kind}/${app!.id}`} />}>
-          {status === "more_info_requested" ? "Continue Application" : "Resume Application"}
-        </Button>
+        ) : null}
       </div>
     );
   }
@@ -237,39 +253,32 @@ function ProgramPanel({
     const cooldownEnd = cooldownEndsAt(app?.reviewed_at ?? null);
     const inCooldown = cooldownEnd ? now < cooldownEnd.getTime() : false;
 
-    if (inCooldown) {
-      return (
-        <Alert variant="destructive">
-          <XCircle />
-          <AlertTitle>Application not approved</AlertTitle>
-          <AlertDescription>
-            {app?.review_notes ? <p className="mb-1">{app.review_notes}</p> : null}
-            You can submit a new application starting {cooldownEnd!.toLocaleDateString()}.
-          </AlertDescription>
-        </Alert>
-      );
-    }
-
     return (
-      <div className="space-y-3">
-        <Alert variant="destructive">
-          <XCircle />
-          <AlertDescription>{app?.review_notes || "Your previous application wasn't approved. You can submit a new one below."}</AlertDescription>
-        </Alert>
-        <form action={startApplication}>
-          <input type="hidden" name="kind" value={kind} />
-          <SubmitButton pendingText="Starting…">Start New Application</SubmitButton>
-        </form>
+      <div className="space-y-4">
+        <PanelRow
+          title={cfg.label}
+          status={<StatusPill status="rejected" />}
+          meta={
+            inCooldown ? (
+              <>Reapply from {cooldownEnd!.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</>
+            ) : (
+              reference
+            )
+          }
+          action={inCooldown ? null : <StartForm kind={kind} label="Start new application" />}
+        />
+        {app?.review_notes ? (
+          <Alert variant="destructive">
+            <XCircle />
+            <AlertTitle>Message from STS</AlertTitle>
+            <AlertDescription>{app.review_notes}</AlertDescription>
+          </Alert>
+        ) : null}
       </div>
     );
   }
 
-  return (
-    <form action={startApplication}>
-      <input type="hidden" name="kind" value={kind} />
-      <SubmitButton pendingText="Starting…">Start Application</SubmitButton>
-    </form>
-  );
+  return <PanelRow title={cfg.label} action={<StartForm kind={kind} label="Start application" />} />;
 }
 
 const VALID_PROGRAMS = ["agent", "partner", "venue", "affiliate"] as const;
@@ -325,86 +334,59 @@ export default async function BecomePartnerPage({
   );
   const defaultTab = requestedTab ?? needsActionTab ?? "agent";
 
+  const programs = [
+    { tab: "agent", label: "Travel agent", app: agencyApp, isMember: !!agencyMember.data },
+    { tab: "partner", label: "Hotel partner", app: hotelApp, isMember: !!hotelPartnerMember.data },
+    { tab: "venue", label: "Event venue", app: venueApp, isMember: !!venuePartnerMember.data },
+    { tab: "affiliate", label: "Affiliate", app: affiliateApp, isMember: !!affiliate.data },
+  ] as const;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold">Become a Partner</h1>
-      </div>
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <PageHeader title="Become a partner" />
 
       {submitted ? (
-        <Alert className="border-primary/30 bg-primary/5">
-          <PartyPopper />
+        <Alert>
+          <CheckCircle2 className="text-primary" />
           <AlertTitle>Application submitted</AlertTitle>
           <AlertDescription>
-            Your reference number is <span className="font-mono font-medium">{submitted}</span>. Save it for your records — we&apos;ll email you once
-            it&apos;s reviewed.
+            Reference <span className="font-mono font-medium text-foreground">{submitted}</span>
           </AlertDescription>
         </Alert>
       ) : null}
       {cooldown ? (
         <Alert variant="destructive">
           <AlertTriangle />
-          <AlertDescription>You recently applied and were not approved. Please wait out the reapplication period shown below before trying again.</AlertDescription>
+          <AlertDescription>The reapplication period has not ended yet.</AlertDescription>
         </Alert>
       ) : null}
       {error ? (
         <Alert variant="destructive">
           <AlertTriangle />
-          <AlertDescription>Something went wrong starting your application. Please try again.</AlertDescription>
+          <AlertDescription>Could not start the application. Try again.</AlertDescription>
         </Alert>
       ) : null}
 
       <Tabs defaultValue={defaultTab}>
-        <TabsList>
-          <TabsTrigger value="agent">Travel Agent</TabsTrigger>
-          <TabsTrigger value="partner">Hotel Partner</TabsTrigger>
-          <TabsTrigger value="venue">Event Venue</TabsTrigger>
-          <TabsTrigger value="affiliate">Affiliate</TabsTrigger>
-        </TabsList>
+        <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 sm:pb-0">
+          <TabsList>
+            {programs.map((p) => (
+              <TabsTrigger key={p.tab} value={p.tab} className="whitespace-nowrap">
+                {p.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
-        <TabsContent value="agent" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Travel Agent</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ProgramPanel kind={TAB_TO_KIND.agent} app={agencyApp} isMember={!!agencyMember.data} isApproved={false} now={now} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="partner" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Hotel Partner</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ProgramPanel kind={TAB_TO_KIND.partner} app={hotelApp} isMember={!!hotelPartnerMember.data} isApproved={false} now={now} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="venue" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Event Venue Partner</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ProgramPanel kind={TAB_TO_KIND.venue} app={venueApp} isMember={!!venuePartnerMember.data} isApproved={false} now={now} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="affiliate" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Affiliate</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ProgramPanel kind={TAB_TO_KIND.affiliate} app={affiliateApp} isMember={!!affiliate.data} isApproved={false} now={now} />
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {programs.map((p) => (
+          <TabsContent key={p.tab} value={p.tab} className="mt-4">
+            <Card>
+              <CardContent>
+                <ProgramPanel kind={TAB_TO_KIND[p.tab]} app={p.app} isMember={p.isMember} isApproved={false} now={now} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
       </Tabs>
 
       <RecentApplicationsSection applications={recentApplications} rejectedDocKeys={rejectedDocKeys} />

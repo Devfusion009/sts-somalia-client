@@ -20,16 +20,10 @@ export default async function AccountDocumentsPage() {
     return <UnavailableNotice label="Document Vault" />;
   }
 
+  // DocumentVault owns the page header: its "Upload document" action opens
+  // the dialog it holds.
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Document Vault</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Store passports, photos and supporting paperwork once, then attach them to any visa or
-          Umrah application without uploading again.
-        </p>
-      </div>
-
+    <div className="mx-auto w-full max-w-3xl">
       <DocumentVault documents={documents} travelers={travelers} />
     </div>
   );

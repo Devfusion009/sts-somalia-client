@@ -8,6 +8,8 @@ import { StatusBadge, formatMoney } from "@/modules/bookings/components/booking-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UnavailableNotice } from "@/components/portal/unavailable-notice";
+import { PageHeader } from "@/components/ui/page-header";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 
 export const metadata: Metadata = { title: "Payments & Receipts" };
 
@@ -27,141 +29,129 @@ export default async function AccountPaymentsPage() {
   const hasRefundActivity = refunds.requests.length > 0 || refunds.settled.length > 0;
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Payments &amp; Receipts</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Your saved payment details, every receipt, and the status of any refund.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <PageHeader title="Payments & receipts" />
 
-      <section className="space-y-4">
-        <h2 className="font-heading text-lg font-bold">Saved payment methods</h2>
-        <SavedMethodsManager methods={methods} />
-      </section>
+      <SavedMethodsManager methods={methods} />
 
-      <section className="space-y-4">
-        <h2 className="font-heading text-lg font-bold">Receipts &amp; invoices</h2>
+      <Card>
+        <CardHeader>
+          <CardTitle>Receipts &amp; invoices</CardTitle>
+        </CardHeader>
+        <CardContent className="px-0">
+          {receipts.length === 0 ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <ReceiptText />
+                </EmptyMedia>
+                <EmptyTitle>No receipts</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <ul className="divide-y divide-border border-t border-border">
+              {receipts.map((receipt) => {
+                const invoice = Array.isArray(receipt.invoices)
+                  ? receipt.invoices[0]
+                  : receipt.invoices;
 
-        {receipts.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
-              <span className="flex size-12 items-center justify-center rounded-full bg-secondary text-primary">
-                <ReceiptText className="size-5" />
-              </span>
-              <p className="font-medium">No receipts yet</p>
-              <p className="max-w-sm text-sm text-muted-foreground">
-                Once you complete a booking, its invoice and payment record appear here.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="overflow-hidden">
-            <CardContent className="p-0">
-              <ul className="divide-y divide-border">
-                {receipts.map((receipt) => {
-                  const invoice = Array.isArray(receipt.invoices)
-                    ? receipt.invoices[0]
-                    : receipt.invoices;
-
-                  return (
-                    <li
-                      key={receipt.id}
-                      className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          href={`/account/bookings/${receipt.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {receipt.order_number}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">
-                          {receipt.paid_at
-                            ? `Paid ${format(new Date(receipt.paid_at), "d MMM yyyy")}`
-                            : `Created ${format(new Date(receipt.created_at), "d MMM yyyy")}`}
-                          {invoice ? ` · Invoice ${invoice.invoice_number}` : ""}
-                        </p>
-                      </div>
+                return (
+                  <li key={receipt.id} className="flex items-center gap-3 px-4 py-3.5 sm:gap-4">
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/account/bookings/${receipt.id}`}
+                        className="rounded-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        {receipt.order_number}
+                      </Link>
+                      <p className="truncate text-sm text-muted-foreground tabular-nums">
+                        {receipt.paid_at
+                          ? `Paid ${format(new Date(receipt.paid_at), "d MMM yyyy")}`
+                          : `Created ${format(new Date(receipt.created_at), "d MMM yyyy")}`}
+                        {invoice ? ` · ${invoice.invoice_number}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-4">
                       <StatusBadge status={receipt.status} />
                       <span className="font-medium tabular-nums">
                         {formatMoney(receipt.total, receipt.currency)}
                       </span>
+                    </div>
+                    {invoice ? (
                       <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5"
-                        disabled={!invoice}
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Download invoice ${invoice.invoice_number}`}
+                        title="Download invoice"
                         render={
-                          invoice ? (
-                            <a
-                              href={`/api/invoices/${receipt.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            />
-                          ) : undefined
+                          <a
+                            href={`/api/invoices/${receipt.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          />
                         }
                       >
-                        <Download className="size-3.5" /> Invoice
+                        <Download />
                       </Button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
-      </section>
+                    ) : (
+                      <span className="size-8 shrink-0 max-sm:size-10" aria-hidden="true" />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
-      <section className="space-y-4">
-        <h2 className="font-heading text-lg font-bold">Refunds</h2>
-
-        {!hasRefundActivity ? (
-          <Card>
-            <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
-              <span className="flex size-12 items-center justify-center rounded-full bg-secondary text-primary">
-                <RotateCcw className="size-5" />
-              </span>
-              <p className="font-medium">No refunds in progress</p>
-              <p className="max-w-sm text-sm text-muted-foreground">
-                You can request a refund from any paid booking&apos;s detail page.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {refunds.requests.length > 0 ? (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Your requests</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <ul className="divide-y divide-border border-t border-border">
-                    {refunds.requests.map((request) => (
-                      <li
-                        key={request.id}
-                        className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <Link
-                            href={`/account/bookings/${request.order_id}`}
-                            className="font-medium hover:underline"
-                          >
-                            {request.orders?.order_number ?? "Booking"}
-                          </Link>
-                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                            {request.reason}
+      {!hasRefundActivity ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Refunds</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <RotateCcw />
+                </EmptyMedia>
+                <EmptyTitle>No refunds</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid items-start gap-6 lg:grid-cols-2">
+          {refunds.requests.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Refund requests</CardTitle>
+              </CardHeader>
+              <CardContent className="px-0">
+                <ul className="divide-y divide-border border-t border-border">
+                  {refunds.requests.map((request) => (
+                    <li key={request.id} className="flex items-start gap-3 px-4 py-3.5">
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/account/bookings/${request.order_id}`}
+                          className="rounded-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                        >
+                          {request.orders?.order_number ?? "Booking"}
+                        </Link>
+                        <p className="text-sm text-muted-foreground tabular-nums">
+                          Requested {format(new Date(request.created_at), "d MMM yyyy")}
+                        </p>
+                        {request.reason ? (
+                          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{request.reason}</p>
+                        ) : null}
+                        {request.staff_note ? (
+                          <p className="mt-1 text-sm">
+                            <span className="font-medium">STS: </span>
+                            {request.staff_note}
                           </p>
-                          {request.staff_note ? (
-                            <p className="mt-1 text-xs">
-                              <span className="font-medium">STS: </span>
-                              {request.staff_note}
-                            </p>
-                          ) : null}
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Requested {format(new Date(request.created_at), "d MMM yyyy")}
-                          </p>
-                        </div>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
                         <StatusBadge status={request.status} />
                         <span className="text-sm font-medium tabular-nums">
                           {/* Approved amount wins once staff have set one — that
@@ -173,44 +163,43 @@ export default async function AccountPaymentsPage() {
                               ? formatMoney(request.requested_amount, request.currency)
                               : "To be assessed"}
                         </span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          ) : null}
 
-            {refunds.settled.length > 0 ? (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Refunds processed</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <ul className="divide-y divide-border border-t border-border">
-                    {refunds.settled.map((payment) => (
-                      <li
-                        key={payment.id}
-                        className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium">{payment.orders.order_number}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(payment.updated_at), "d MMM yyyy")}
-                          </p>
-                        </div>
+          {refunds.settled.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Refunds paid</CardTitle>
+              </CardHeader>
+              <CardContent className="px-0">
+                <ul className="divide-y divide-border border-t border-border">
+                  {refunds.settled.map((payment) => (
+                    <li key={payment.id} className="flex items-center gap-3 px-4 py-3.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">{payment.orders.order_number}</p>
+                        <p className="text-sm text-muted-foreground tabular-nums">
+                          {format(new Date(payment.updated_at), "d MMM yyyy")}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
                         <StatusBadge status={payment.status} />
                         <span className="text-sm font-medium tabular-nums">
                           {formatMoney(payment.amount, payment.currency)}
                         </span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ) : null}
-          </div>
-        )}
-      </section>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,6 @@ import { notFound, redirect } from "next/navigation";
 import {
   ArrowLeft,
   Headset,
-  ArrowRight,
   AlertTriangle,
   Plane,
   Building2,
@@ -91,7 +90,7 @@ export default async function PartnerApplicationWizardPage({
   const requiredDocs = docSlotsFor(type).filter((slot) => !slot.optional);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-6xl">
       <div className="relative mb-6 overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6 sm:p-8">
         <svg
           aria-hidden="true"
@@ -116,9 +115,9 @@ export default async function PartnerApplicationWizardPage({
         <Link
           href="/account/become"
           aria-label="Back to Become a Partner"
-          className="absolute top-6 left-6 z-10 inline-flex size-9 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors hover:bg-accent sm:top-8 sm:left-8"
+          className="absolute top-6 left-6 z-10 inline-flex size-9 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors outline-none hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 sm:top-8 sm:left-8"
         >
-          <ArrowLeft className="size-5" strokeWidth={2.5} />
+          <ArrowLeft className="size-5" strokeWidth={2.5} aria-hidden="true" />
         </Link>
 
         <div className="relative flex items-center justify-between gap-4 pt-10">
@@ -134,7 +133,7 @@ export default async function PartnerApplicationWizardPage({
       {application.status === "more_info_requested" && application.review_notes ? (
         <Alert variant="destructive" className="mb-6">
           <AlertTriangle />
-          <AlertTitle>Action needed from STS</AlertTitle>
+          <AlertTitle>Message from STS</AlertTitle>
           <AlertDescription>{application.review_notes}</AlertDescription>
         </Alert>
       ) : null}
@@ -145,11 +144,11 @@ export default async function PartnerApplicationWizardPage({
 
           {requiredDocs.length > 0 ? (
             <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-              <p className="text-sm font-semibold">What you&apos;ll need</p>
+              <p className="text-sm font-semibold">Required documents</p>
               <ul className="mt-3 space-y-2.5">
                 {requiredDocs.map((slot) => (
                   <li key={slot.key} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <FileText className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                    <FileText className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                     {slot.label}
                   </li>
                 ))}
@@ -158,11 +157,9 @@ export default async function PartnerApplicationWizardPage({
           ) : null}
 
           <div className="rounded-2xl border border-border bg-secondary/50 p-5">
-            <p className="flex items-center gap-2 text-sm font-semibold">
-              <Headset className="size-4 text-primary" /> Need help?
-            </p>
-            <Button variant="outline" size="sm" className="mt-3 w-full gap-1.5" render={<a href="tel:+252611444420" />}>
-              Contact Support <ArrowRight className="size-3.5" />
+            <p className="text-sm font-semibold">Need help?</p>
+            <Button variant="outline" className="mt-3 w-full" render={<a href="tel:+252611444420" />}>
+              <Headset data-icon="inline-start" aria-hidden="true" /> Call support
             </Button>
           </div>
         </div>
@@ -170,7 +167,7 @@ export default async function PartnerApplicationWizardPage({
         <main className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7 lg:order-1">
           <div className="mb-6 flex items-center gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <StepIcon className="size-5" />
+              <StepIcon className="size-5" aria-hidden="true" />
             </span>
             <h2 className="font-heading text-lg font-semibold">{stepLabel(type, step)}</h2>
           </div>
