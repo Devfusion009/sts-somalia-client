@@ -20,28 +20,28 @@ const MODES: Array<{ key: string; label: string; href: string; icon: SvgIconComp
 const COLLAGE = [
   {
     src: "/marketing/dubai.webp",
-    alt: "Dubai skyline at sunset",
+    alt: "",
     frame: "right-[-6%] top-[-10%] size-64",
     echo: "right-[-10%] top-[-6%] size-64",
   },
   {
     src: "/marketing/airport.webp",
-    alt: "Aircraft on the runway",
+    alt: "",
     frame: "right-[34%] top-[30%] size-48",
     echo: "right-[30%] top-[34%] size-48",
   },
   {
     src: "/marketing/beach.webp",
-    alt: "Tropical coastline at sunrise",
+    alt: "",
     frame: "right-[-2%] top-[56%] size-56",
     echo: "right-[-6%] top-[60%] size-56",
   },
 ];
 
 const TRUST_POINTS = [
-  { icon: "shield", title: "Fair, transparent fares", detail: "No card fees or last-minute mark-ups" },
+  { icon: "shield", title: "Fare rules before you pay", detail: "Bags, refunds and changes on every fare" },
   { icon: "badge", title: "IATA-experienced booking team", detail: "Staff who've worked airline reservation desks" },
-  { icon: "headset", title: "24/7 support before and during travel", detail: "WhatsApp and phone, staffed around the clock" },
+  { icon: "headset", title: "Support in Somali", detail: "WhatsApp and phone, emergencies around the clock" },
 ] as const;
 
 function TrustIcon({ kind }: { kind: (typeof TRUST_POINTS)[number]["icon"] }) {
@@ -51,7 +51,7 @@ function TrustIcon({ kind }: { kind: (typeof TRUST_POINTS)[number]["icon"] }) {
     headset: <path d="M4 13v-1a8 8 0 0116 0v1M4 13v4a2 2 0 002 2h1v-6H5a1 1 0 00-1 1zm16 0v4a2 2 0 01-2 2h-1v-6h2a1 1 0 011 1z" />,
   };
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="size-5">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="size-5" aria-hidden>
       {paths[kind]}
     </svg>
   );
@@ -84,20 +84,14 @@ export function FlightsHero({ children }: { children: React.ReactNode }) {
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 pt-12 pb-14 sm:px-6 lg:px-8 lg:pt-16 lg:pb-20">
         <div className="lg:max-w-[72%] xl:max-w-[64%]">
-          <p className="text-sm font-semibold tracking-wide text-sidebar-primary">
-            A full-service Somali travel agency
-          </p>
-          <h1 className="mt-2 font-heading text-3xl font-bold tracking-tight text-balance text-white sm:text-4xl lg:text-[2.75rem]">
+          <h1 className="font-heading text-3xl font-bold tracking-tight text-balance text-white sm:text-4xl lg:text-[2.75rem]">
             Where do you want to go?
           </h1>
-          <p className="mt-2 max-w-md text-base text-white/70">
-            Flights, hotels, visas, Umrah and more — all in one place.
-          </p>
 
           {/* Mode switcher — one segmented pill, not disconnected tiles, so the
               active mode reads as a state change within one control rather
               than three separate buttons competing for weight. */}
-          <div className="mt-7 inline-flex items-center gap-1 rounded-full bg-white/10 p-1 ring-1 ring-white/15 backdrop-blur-sm">
+          <nav aria-label="Booking type" className="mt-6 inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-white/10 p-1 ring-1 ring-white/15 backdrop-blur-sm">
             {MODES.map((mode) => {
               const active = pathname.startsWith(mode.href);
               return (
@@ -106,19 +100,19 @@ export function FlightsHero({ children }: { children: React.ReactNode }) {
                   href={mode.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold whitespace-nowrap transition-colors duration-200",
+                    "flex h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold whitespace-nowrap transition-colors duration-200",
                     "focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar focus-visible:outline-none",
                     active
                       ? "bg-white text-sidebar shadow-sm"
                       : "text-white/75 hover:bg-white/10 hover:text-white"
                   )}
                 >
-                  <mode.icon sx={{ fontSize: 18 }} />
+                  <mode.icon sx={{ fontSize: 18 }} aria-hidden />
                   {mode.label}
                 </Link>
               );
             })}
-          </div>
+          </nav>
 
           <div className="mt-6">{children}</div>
 

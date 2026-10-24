@@ -148,65 +148,66 @@ export default async function FlightsPage({
         </>
       ) : null}
 
+      {hasSearch ? (
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="py-10">
-          {!hasSearch ? null : result && result.live && result.offers.length > 0 ? (
+          {result && result.live && result.offers.length > 0 ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-heading text-xl font-bold">
-                  {params.origin!.toUpperCase()} <MoveRight className="inline size-4" />{" "}
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h2 className="flex items-center gap-2 font-heading text-xl font-bold">
+                  {params.origin!.toUpperCase()} <MoveRight className="size-4" aria-label="to" />
                   {params.destination!.toUpperCase()}
-                  <span className="ml-2 text-sm font-normal text-muted-foreground">
-                    {result.offers.length} fares found
-                  </span>
                 </h2>
+                <p className="text-sm text-muted-foreground tabular-nums">
+                  {result.offers.length} fare{result.offers.length === 1 ? "" : "s"}
+                </p>
               </div>
               {result.offers.map((offer) => {
                 const hasFareDetail =
                   offer.refundPenalty || offer.changePenalty || offer.refundable === false || offer.changeable === false;
                 return (
                   <Card key={offer.id} className="transition-shadow hover:shadow-md">
-                    <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-4 p-5">
+                    <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-4 p-4 sm:p-5">
                       <div className="min-w-32">
                         <p className="text-sm font-bold">{offer.airline}</p>
                         <p className="text-xs text-muted-foreground capitalize">
                           {offer.cabinClass.replace("_", " ")}
                         </p>
                       </div>
-                      <div className="flex flex-1 items-center gap-4">
+                      <div className="flex min-w-0 flex-1 basis-64 items-center gap-3 sm:gap-4">
                         <div className="text-right">
-                          <p className="font-heading text-lg font-bold">{formatTime(offer.departAt)}</p>
+                          <p className="font-heading text-lg font-bold tabular-nums">{formatTime(offer.departAt)}</p>
                           <p className="text-xs text-muted-foreground">
                             {offer.origin} · {formatDate(offer.departAt)}
                           </p>
                         </div>
                         <div className="flex flex-1 flex-col items-center px-2">
-                          <p className="text-[10px] text-muted-foreground">
+                          <p className="text-xs text-muted-foreground tabular-nums">
                             {formatDuration(offer.durationMinutes)}
                           </p>
                           <div className="relative h-px w-full min-w-16 bg-border">
-                            <Plane className="absolute -top-1.5 left-1/2 size-3 -translate-x-1/2 text-primary" />
+                            <Plane className="absolute -top-1.5 left-1/2 size-3 -translate-x-1/2 text-primary" aria-hidden />
                           </div>
-                          <p className="text-[10px] text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             {offer.stops === 0 ? "Non-stop" : `${offer.stops} stop${offer.stops > 1 ? "s" : ""}`}
                           </p>
                         </div>
                         <div>
-                          <p className="font-heading text-lg font-bold">{formatTime(offer.arriveAt)}</p>
+                          <p className="font-heading text-lg font-bold tabular-nums">{formatTime(offer.arriveAt)}</p>
                           <p className="text-xs text-muted-foreground">
                             {offer.destination} · {formatDate(offer.arriveAt)}
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-heading text-xl font-bold text-primary">
+                      <div className="ml-auto text-right">
+                        <p className="font-heading text-xl font-bold text-primary tabular-nums">
                           {offer.currency} {formatMoney(offer.totalAmount)}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">total, all passengers</p>
+                        <p className="text-xs text-muted-foreground">total, all passengers</p>
                       </div>
 
                       {offer.returnLeg ? (
-                        <div className="flex w-full items-center gap-4 text-sm">
+                        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-sm">
                           <span className="w-16 text-xs font-medium text-muted-foreground">Return</span>
                           <span className="font-semibold tabular-nums">{formatTime(offer.returnLeg.departAt)}</span>
                           <span className="text-xs text-muted-foreground">
@@ -227,22 +228,22 @@ export default async function FlightsPage({
 
                       <div className="flex w-full flex-wrap items-center gap-1.5 border-t border-border pt-3">
                         {offer.checkedBagsIncluded !== null ? (
-                          <Badge variant="outline" className="gap-1 text-[10px] font-normal">
-                            <Luggage className="size-3" />
+                          <Badge variant="outline" className="gap-1 text-xs font-normal">
+                            <Luggage className="size-3" aria-hidden />
                             {offer.checkedBagsIncluded === 0
                               ? "Carry-on only"
                               : `${offer.checkedBagsIncluded} checked bag${offer.checkedBagsIncluded > 1 ? "s" : ""}`}
                           </Badge>
                         ) : null}
                         {offer.refundable !== null ? (
-                          <Badge variant="outline" className="gap-1 text-[10px] font-normal">
-                            <ShieldCheck className="size-3" />
+                          <Badge variant="outline" className="gap-1 text-xs font-normal">
+                            <ShieldCheck className="size-3" aria-hidden />
                             {offer.refundable ? "Refundable" : "Non-refundable"}
                           </Badge>
                         ) : null}
                         {offer.changeable !== null ? (
-                          <Badge variant="outline" className="gap-1 text-[10px] font-normal">
-                            <RefreshCcw className="size-3" />
+                          <Badge variant="outline" className="gap-1 text-xs font-normal">
+                            <RefreshCcw className="size-3" aria-hidden />
                             {offer.changeable ? "Changeable" : "No changes"}
                           </Badge>
                         ) : null}
@@ -250,7 +251,7 @@ export default async function FlightsPage({
 
                       {hasFareDetail ? (
                         <details className="w-full text-xs">
-                          <summary className="cursor-pointer font-medium text-primary">
+                          <summary className="inline-flex min-h-8 cursor-pointer items-center rounded-sm font-medium text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
                             Fare rules
                           </summary>
                           <ul className="mt-1.5 space-y-0.5 text-muted-foreground">
@@ -271,12 +272,11 @@ export default async function FlightsPage({
                   </Card>
                 );
               })}
-              <Card className="border-dashed">
-                <CardContent className="p-5">
-                  <p className="text-sm font-semibold">Want us to book one of these fares?</p>
-                  <p className="mb-4 text-xs text-muted-foreground">
-                    Send a quote request and our team will hold the fare and arrange payment.
-                  </p>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-heading text-base">Book one of these fares</CardTitle>
+                </CardHeader>
+                <CardContent>
                   <QuoteRequestForm defaults={defaults} signedIn={Boolean(profile)} bookedForSlot={viewerAgency ? <AgencyBookingSlot /> : null} />
                 </CardContent>
               </Card>
@@ -284,21 +284,16 @@ export default async function FlightsPage({
           ) : (
             <Card className="mx-auto max-w-2xl">
               <CardHeader className="items-center text-center">
-                <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-secondary text-primary">
-                  <Clock3 className="size-6" />
+                <span className="mx-auto flex size-12 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <Clock3 className="size-5" aria-hidden />
                 </span>
-                <CardTitle className="font-heading text-xl">
+                <CardTitle className="font-heading text-xl text-balance">
                   {result?.live
-                    ? (result.providerError ?? "No live fares found for this route and date")
-                    : "Live fares for this route are coming online soon"}
+                    ? (result.providerError ?? "No live fares for this route and date")
+                    : "Request a quote for this route"}
                 </CardTitle>
-                <p className="mx-auto max-w-md text-sm text-muted-foreground">
-                  Our booking team finds fares that never show up in public searches — request a
-                  quote and we&apos;ll send options for{" "}
-                  <span className="font-medium text-foreground">
-                    {params.origin?.toUpperCase()} → {params.destination?.toUpperCase()}
-                  </span>{" "}
-                  within a few hours.
+                <p className="text-sm font-semibold text-foreground tabular-nums">
+                  {params.origin?.toUpperCase()} → {params.destination?.toUpperCase()}
                 </p>
               </CardHeader>
               <CardContent>
@@ -308,6 +303,7 @@ export default async function FlightsPage({
           )}
         </div>
       </div>
+      ) : null}
     </div>
   );
 }

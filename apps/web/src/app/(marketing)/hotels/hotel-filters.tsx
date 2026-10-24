@@ -3,7 +3,9 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback } from "react";
 import { StarIcon, TuneIcon } from "@/components/ui/mui-icons";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { PRICE_BANDS } from "@/modules/hotels/price-bands";
@@ -22,19 +24,54 @@ function FilterGroup({ title, children }: { title: string; children: React.React
   return (
     <div className="border-b border-border px-4 py-4 last:border-b-0">
       <h3 className="mb-3 text-sm font-bold">{title}</h3>
-      <div className="space-y-2.5">{children}</div>
+      <div className="space-y-1">{children}</div>
     </div>
   );
 }
 
-export function HotelFilters({
-  amenities,
-  counts,
-}: {
+type HotelFiltersProps = {
   /** Distinct amenity keys present in the current result set, with labels. */
   amenities: Array<{ key: string; label: string; count: number }>;
   counts: { stars: Record<string, number>; price: Record<string, number> };
-}) {
+};
+
+const FILTER_PARAMS = ["stars", "price", "amenities"];
+
+/**
+ * Phone/tablet entry point: the same filter panel in a left-hand sheet, so results start right under the search instead of below a tall
+ * sidebar. Below lg only; the page renders the inline panel from lg up.
+ */
+export function HotelFiltersSheet(props: HotelFiltersProps) {
+  const searchParams = useSearchParams();
+  const activeCount = FILTER_PARAMS.reduce(
+    (sum, p) => sum + (searchParams.get(p) ?? "").split(",").filter(Boolean).length,
+    0
+  );
+
+  return (
+    <Sheet>
+      <SheetTrigger render={<Button variant="outline" size="lg" className="gap-2 lg:hidden" />}>
+        <TuneIcon sx={{ fontSize: 18 }} aria-hidden />
+        Filters
+        {activeCount > 0 ? (
+          <span className="grid min-w-5 place-items-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground tabular-nums">
+            {activeCount}
+          </span>
+        ) : null}
+      </SheetTrigger>
+      <SheetContent side="left" className="w-full gap-0 overflow-y-auto sm:max-w-sm">
+        <SheetHeader>
+          <SheetTitle>Filters</SheetTitle>
+        </SheetHeader>
+        <div className="px-4 pb-6">
+          <HotelFilters {...props} />
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+export function HotelFilters({ amenities, counts }: HotelFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -58,7 +95,7 @@ export function HotelFilters({
     (searchParams.get(param) ?? "").split(",").filter(Boolean).includes(value);
 
   const activeCount =
-    ["stars", "price", "amenities"].reduce(
+    FILTER_PARAMS.reduce(
       (sum, p) => sum + (searchParams.get(p) ?? "").split(",").filter(Boolean).length,
       0
     );
@@ -67,7 +104,6 @@ export function HotelFilters({
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border bg-secondary/50 px-4 py-3">
         <h2 className="flex items-center gap-2 text-sm font-bold">
-          <TuneIcon sx={{ fontSize: 18 }} className="text-primary" />
           Filter by
         </h2>
         {activeCount > 0 ? (
@@ -75,10 +111,10 @@ export function HotelFilters({
             type="button"
             onClick={() => {
               const params = new URLSearchParams(searchParams.toString());
-              ["stars", "price", "amenities"].forEach((p) => params.delete(p));
+              FILTER_PARAMS.forEach((p) => params.delete(p));
               router.push(`${pathname}?${params.toString()}`, { scroll: false });
             }}
-            className="text-xs font-semibold text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="-my-2 rounded-sm px-1 py-2 text-xs font-semibold text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
             Clear all
           </button>
@@ -90,7 +126,7 @@ export function HotelFilters({
           const value = String(stars);
           const count = counts.stars[value] ?? 0;
           return (
-            <div key={stars} className="flex items-center gap-2.5">
+            <div key={stars} className="flex min-h-8 items-center gap-2.5">
               <Checkbox
                 id={`stars-${stars}`}
                 checked={isOn("stars", value)}
@@ -101,12 +137,13 @@ export function HotelFilters({
                 htmlFor={`stars-${stars}`}
                 className={cn("flex flex-1 cursor-pointer items-center gap-1 text-sm", count === 0 && "opacity-40")}
               >
-                <span className="flex" aria-label={`${stars} star`}>
+                <span className="sr-only">{stars} star</span>
+                <span className="flex" aria-hidden>
                   {Array.from({ length: stars }).map((_, i) => (
                     <StarIcon key={i} sx={{ fontSize: 14 }} className="text-brand-gold" />
                   ))}
                 </span>
-                <span className="ml-auto text-xs text-muted-foreground">{count}</span>
+                <span className="ml-auto text-xs text-muted-foreground tabular-nums">{count}</span>
               </Label>
             </div>
           );
@@ -117,7 +154,7 @@ export function HotelFilters({
         {PRICE_BANDS.map((band) => {
           const count = counts.price[band.key] ?? 0;
           return (
-            <div key={band.key} className="flex items-center gap-2.5">
+            <div key={band.key} className="flex min-h-8 items-center gap-2.5">
               <Checkbox
                 id={`price-${band.key}`}
                 checked={isOn("price", band.key)}
@@ -129,7 +166,7 @@ export function HotelFilters({
                 className={cn("flex flex-1 cursor-pointer text-sm", count === 0 && "opacity-40")}
               >
                 {band.label}
-                <span className="ml-auto text-xs text-muted-foreground">{count}</span>
+                <span className="ml-auto text-xs text-muted-foreground tabular-nums">{count}</span>
               </Label>
             </div>
           );
@@ -139,7 +176,7 @@ export function HotelFilters({
       {amenities.length > 0 ? (
         <FilterGroup title="Facilities">
           {amenities.slice(0, 8).map((amenity) => (
-            <div key={amenity.key} className="flex items-center gap-2.5">
+            <div key={amenity.key} className="flex min-h-8 items-center gap-2.5">
               <Checkbox
                 id={`amenity-${amenity.key}`}
                 checked={isOn("amenities", amenity.key)}
@@ -147,7 +184,7 @@ export function HotelFilters({
               />
               <Label htmlFor={`amenity-${amenity.key}`} className="flex flex-1 cursor-pointer text-sm">
                 {amenity.label}
-                <span className="ml-auto text-xs text-muted-foreground">{amenity.count}</span>
+                <span className="ml-auto text-xs text-muted-foreground tabular-nums">{amenity.count}</span>
               </Label>
             </div>
           ))}

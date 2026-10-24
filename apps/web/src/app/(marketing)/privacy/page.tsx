@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { LegalPage, type LegalSection } from "@/components/marketing/legal-page";
 
-export const metadata: Metadata = { title: "Privacy Policy" };
+export const metadata: Metadata = { title: "Privacy policy" };
 
-const SECTIONS: Array<{ title: string; body: string }> = [
+const SECTIONS: LegalSection[] = [
   {
     title: "1. What we collect",
     body: "To process bookings and visa applications we collect the details you provide: names, dates of birth, passport information, contact details, travel plans, and the documents you upload (passport scans, photos, supporting documents).",
@@ -30,18 +31,5 @@ const SECTIONS: Array<{ title: string; body: string }> = [
 ];
 
 export default function PrivacyPage() {
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-      <h1 className="font-heading text-3xl font-bold">Privacy Policy</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Last updated: August 2026</p>
-      <div className="mt-8 space-y-7">
-        {SECTIONS.map((section) => (
-          <section key={section.title}>
-            <h2 className="font-heading text-lg font-semibold">{section.title}</h2>
-            <p className="mt-2 leading-relaxed text-muted-foreground">{section.body}</p>
-          </section>
-        ))}
-      </div>
-    </div>
-  );
+  return <LegalPage title="Privacy policy" meta="Last updated: August 2026" sections={SECTIONS} />;
 }

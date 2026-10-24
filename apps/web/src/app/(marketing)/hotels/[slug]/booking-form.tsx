@@ -26,8 +26,8 @@ export function BookingForm({
   if (defaults?.guests) params.set("guests", defaults.guests);
 
   return (
-    <Link href={`/hotels/${hotelSlug}/book?${params.toString()}`} className={buttonVariants({ className: "gap-1.5" })}>
-      {bookingMode === "manual" ? "Request Booking" : "Book"} <ArrowRight className="size-3.5" />
+    <Link href={`/hotels/${hotelSlug}/book?${params.toString()}`} className={buttonVariants({ size: "lg", className: "gap-1.5" })}>
+      {bookingMode === "manual" ? "Request booking" : "Book"} <ArrowRight className="size-3.5" aria-hidden />
     </Link>
   );
 }

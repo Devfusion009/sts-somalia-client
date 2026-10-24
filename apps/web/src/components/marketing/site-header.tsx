@@ -41,12 +41,12 @@ export async function SiteHeader() {
             href={SUPPORT_PHONE_TEL}
             className="flex items-center gap-1.5 font-semibold text-secondary-foreground transition-colors hover:text-primary"
           >
-            <PhoneInTalkIcon sx={{ fontSize: 15 }} className="text-primary" />
-            Toll free: {SUPPORT_PHONE_DISPLAY}
+            <PhoneInTalkIcon sx={{ fontSize: 15 }} className="text-primary" aria-hidden />
+            {SUPPORT_PHONE_DISPLAY}
           </a>
           <nav aria-label="Secondary" className="flex items-center gap-5 font-medium text-muted-foreground">
             <Link href="/about" className="flex items-center gap-1 transition-colors hover:text-primary">
-              <InfoOutlinedIcon sx={{ fontSize: 15 }} /> About us
+              <InfoOutlinedIcon sx={{ fontSize: 15 }} aria-hidden /> About us
             </Link>
             <a
               href={whatsappLink("Hello STS! I need help with a booking.")}
@@ -54,10 +54,10 @@ export async function SiteHeader() {
               rel="noopener noreferrer"
               className="flex items-center gap-1 transition-colors hover:text-primary"
             >
-              <SupportAgentIcon sx={{ fontSize: 15 }} /> Customer support
+              <SupportAgentIcon sx={{ fontSize: 15 }} aria-hidden /> Customer support
             </a>
-            <Link href="/#stores" className="flex items-center gap-1 transition-colors hover:text-primary">
-              <StorefrontIcon sx={{ fontSize: 15 }} /> Our office
+            <Link href="/about#offices" className="flex items-center gap-1 transition-colors hover:text-primary">
+              <StorefrontIcon sx={{ fontSize: 15 }} aria-hidden /> Our offices
             </Link>
             {profile ? null : (
               <Link href="/signup" className="font-semibold text-primary transition-colors hover:underline">

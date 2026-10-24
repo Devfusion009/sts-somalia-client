@@ -1,27 +1,7 @@
 import Link from "next/link";
-import { ExpandMoreIcon, FormatQuoteIcon, MapIcon } from "@/components/ui/mui-icons";
+import { ExpandMoreIcon, FormatQuoteIcon } from "@/components/ui/mui-icons";
 import { FadeIn } from "@/components/ui/aceternity/motion-primitives";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-
-/** Static map teaser above the filters, as on the reference results page. */
-export function MapCard({ city }: { city: string }) {
-  return (
-    <div className="relative overflow-hidden rounded-xl border border-border">
-      {/* Placeholder rather than an embedded map — no maps provider is wired up
-          yet, and a fake interactive map would be worse than an honest teaser. */}
-      <div
-        className="h-32 w-full bg-secondary [background-image:linear-gradient(rgba(0,148,124,0.10)_1px,transparent_1px),linear-gradient(90deg,rgba(0,148,124,0.10)_1px,transparent_1px)] [background-size:18px_18px]"
-        aria-hidden
-      />
-      <div className="absolute inset-0 grid place-items-center bg-gradient-to-t from-black/45 to-transparent">
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-card px-4 py-2 font-heading text-sm font-bold text-primary shadow-lg">
-          <MapIcon sx={{ fontSize: 17 }} />
-          {city ? `${city} on the map` : "Show on map"}
-        </span>
-      </div>
-    </div>
-  );
-}
 
 export const HOTEL_FAQS = [
   {
@@ -63,7 +43,7 @@ export function HotelsFaq({ city }: { city?: string }) {
     <section className="bg-muted/40 py-12 sm:py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <FadeIn>
-          <h2 className="font-heading text-xl font-bold tracking-tight sm:text-2xl">
+          <h2 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
             FAQs about hotels {city ? `in ${city}` : "in Somalia"}
           </h2>
         </FadeIn>
@@ -117,7 +97,7 @@ export function GuestVoices({ city }: { city?: string }) {
     <section className="bg-background py-12 sm:py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <FadeIn>
-          <h2 className="font-heading text-xl font-bold tracking-tight sm:text-2xl">
+          <h2 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
             What guests said about {city || "staying with us"}
           </h2>
         </FadeIn>
@@ -126,7 +106,7 @@ export function GuestVoices({ city }: { city?: string }) {
           {GUEST_QUOTES.map((guest, i) => (
             <FadeIn key={guest.name} delay={i * 0.08}>
               <figure className="flex h-full flex-col rounded-xl border border-border bg-card p-5">
-                <FormatQuoteIcon sx={{ fontSize: 28 }} className="text-primary/30" />
+                <FormatQuoteIcon sx={{ fontSize: 28 }} className="text-primary/30" aria-hidden />
                 <blockquote className="mt-1 flex-1 text-sm leading-relaxed text-muted-foreground">
                   {guest.quote}
                 </blockquote>
@@ -195,7 +175,7 @@ const EXPLORE_LINKS: Array<{ heading: string; links: Array<{ label: string; href
 
 export function ExploreMore() {
   return (
-    <section className="border-t border-border bg-muted/40 py-12">
+    <section className="border-t border-border bg-muted/40 py-12 sm:py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <h2 className="font-heading text-lg font-bold">More places to explore</h2>
         <div className="mt-5 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
@@ -207,7 +187,7 @@ export function ExploreMore() {
                   <li key={link.href + link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-muted-foreground underline-offset-2 transition-colors hover:text-primary hover:underline"
+                      className="rounded-sm text-sm text-muted-foreground underline-offset-2 transition-colors hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
                       {link.label}
                     </Link>

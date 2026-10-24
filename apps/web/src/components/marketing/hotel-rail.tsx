@@ -33,27 +33,27 @@ export function HotelRail({
 }) {
   return (
     <section className={className}>
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         <FadeIn className="flex items-center justify-between gap-4">
-          <h2 className="font-heading text-lg font-bold tracking-tight sm:text-xl">{title}</h2>
+          <h2 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>
           <Link
             href={seeAll.href}
-            className="flex shrink-0 items-center gap-1 text-sm font-semibold text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="flex h-11 shrink-0 items-center gap-1 rounded-md text-sm font-semibold text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
             {seeAll.label}
-            <ArrowForwardIcon sx={{ fontSize: 15 }} />
+            <ArrowForwardIcon sx={{ fontSize: 15 }} aria-hidden />
           </Link>
         </FadeIn>
 
-        <FadeIn delay={0.08} className="mt-4">
+        <FadeIn delay={0.08} className="mt-6">
           <CarouselRail ariaLabel={title} itemClassName="w-[228px] sm:w-[250px]">
             {properties.map((property) => (
               <Link
                 key={property.name + property.href}
                 href={property.href}
-                className="group flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card transition-shadow duration-300 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
               >
-                <div className="relative aspect-4/3 overflow-hidden">
+                <div className="relative aspect-4/3 overflow-hidden bg-muted">
                   <Image
                     src={property.image}
                     alt=""
@@ -67,7 +67,7 @@ export function HotelRail({
                     {property.name}
                   </h3>
                   {property.stars ? (
-                    <span className="mt-1 flex" aria-label={`${property.stars} star`}>
+                    <span className="mt-1 flex" role="img" aria-label={`${property.stars} star`}>
                       {Array.from({ length: property.stars }).map((_, i) => (
                         <StarIcon key={i} sx={{ fontSize: 13 }} className="text-brand-gold" />
                       ))}
@@ -80,7 +80,7 @@ export function HotelRail({
                   <p className="mt-auto pt-3 text-xs text-muted-foreground">
                     {property.price ? (
                       <>
-                        From <span className="font-heading text-sm font-bold text-foreground">{property.price}</span>{" "}
+                        From <span className="font-heading text-sm font-bold text-foreground tabular-nums">{property.price}</span>{" "}
                         per night
                       </>
                     ) : (

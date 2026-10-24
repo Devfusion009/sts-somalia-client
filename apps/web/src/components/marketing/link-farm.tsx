@@ -9,7 +9,7 @@ import { ReportProblemIcon } from "@/components/ui/mui-icons";
  */
 export function LinkFarm() {
   return (
-    <section className="border-t border-border bg-background py-12">
+    <section className="border-t border-border bg-background py-12 sm:py-16">
       <div className="mx-auto max-w-7xl space-y-7 px-4 sm:px-6 lg:px-8">
         {FOOTER_GROUPS.map((group) => (
           <div key={group.heading}>
@@ -28,16 +28,15 @@ export function LinkFarm() {
         ))}
 
         <div className="flex gap-3 rounded-xl border border-brand-accent/25 bg-brand-accent/5 p-5">
-          <ReportProblemIcon sx={{ fontSize: 22 }} className="mt-0.5 shrink-0 text-brand-accent" />
+          <ReportProblemIcon sx={{ fontSize: 22 }} className="mt-0.5 shrink-0 text-brand-accent" aria-hidden />
           <div>
-            <h2 className="font-heading text-base font-bold text-brand-accent">Attention valued customers</h2>
+            <h2 className="font-heading text-base font-bold text-brand-accent">Payment safety notice</h2>
             <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
               Scout Travel Solution only collects payment through this website and at our Mogadishu office.
-              We never ask for payment via any other website, personal account or payment link. Please
-              exercise caution before transacting or sharing information anywhere else — STS accepts no
-              responsibility for losses arising from payments made outside our official channels. If in
-              doubt, call{" "}
-              <a href="tel:+252611444420" className="font-semibold text-brand-accent hover:underline">
+              We never ask for payment via any other website, personal account or payment link, and STS
+              accepts no responsibility for losses from payments made outside these channels. If in doubt,
+              call{" "}
+              <a href="tel:+252611444420" className="font-semibold whitespace-nowrap text-brand-accent hover:underline">
                 +252 611 444 420
               </a>{" "}
               before you pay.

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { ShieldCheck, Headset, Hourglass, CalendarClock, X } from "lucide-react";
+import { CalendarClock, Hourglass, X } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getServerTrpc } from "@/lib/trpc/server";
@@ -12,18 +13,14 @@ import { CheckoutForm, type CheckoutMethod } from "@/modules/payments/components
 import { CancelPendingPaymentButton } from "@/modules/payments/components/cancel-pending-payment-button";
 import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 import { WhatsAppInlineLink } from "@/components/marketing/whatsapp-button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { money } from "@/lib/money";
 import { CancelOrderButton } from "@/modules/orders/components/cancel-order-button";
 import { ConvertHoldButton } from "@/modules/orders/components/convert-hold-button";
 import { umrahSeatHoldEnd } from "@/modules/umrah/settings";
 import { hallAwaitingQuote } from "@sts/shared-types";
 
 export const metadata: Metadata = { title: "Checkout" };
-
-function money(amount: number | string, currency: string) {
-  return `${currency} ${Number(amount).toFixed(2)}`;
-}
 
 export default async function CheckoutPage({
   params,
@@ -117,227 +114,172 @@ export default async function CheckoutPage({
     })
   );
 
+  const ROW = "flex items-baseline justify-between gap-4";
+  const holdUntil = order.hold_expires_at
+    ? new Date(order.hold_expires_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+    : null;
+
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 lg:py-12">
-      <div className="mb-6">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <header className="mb-6 flex flex-wrap items-baseline gap-x-3 gap-y-1 lg:mb-8">
         <h1 className="font-heading text-2xl font-bold tracking-tight lg:text-3xl">Payment</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Order <span className="font-medium text-foreground">{order.order_number}</span>
-        </p>
-      </div>
+        <span className="font-mono text-sm text-muted-foreground">{order.order_number}</span>
+      </header>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 rounded-lg bg-secondary px-4 py-3 text-sm text-secondary-foreground">
-            <ShieldCheck className="size-4 shrink-0 text-primary" />
-            All payments are secure and encrypted. We do not store your card details.
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Payment Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-10">
+        {/* Summary first in reading order (phones see what they pay before how);
+            lg places it in the right column. */}
+        <aside aria-labelledby="order-summary-heading" className="lg:col-start-2 lg:row-start-1">
+          <section className="rounded-2xl border border-border bg-card shadow-xs lg:sticky lg:top-24">
+            <h2 id="order-summary-heading" className="border-b border-border px-5 py-4 font-heading text-base font-semibold">
+              Order summary
+            </h2>
+            <ul className="divide-y divide-border px-5">
               {order.order_items.map((item) => {
                 const info = describeOrderItem(item);
                 return (
-                  <div key={item.id} className="flex items-start justify-between gap-4">
-                    <div>
+                  <li key={item.id} className="flex items-start justify-between gap-4 py-3 text-sm">
+                    <div className="min-w-0">
                       <p className="font-medium">{info.title}</p>
-                      {info.subtitle ? (
-                        <p className="text-xs text-muted-foreground">{info.subtitle}</p>
-                      ) : null}
+                      {info.subtitle ? <p className="text-xs text-muted-foreground">{info.subtitle}</p> : null}
                     </div>
-                    <p className="shrink-0 font-medium">
-                      {money(item.total_price, order.currency)}
-                    </p>
-                  </div>
+                    <p className="shrink-0 font-medium tabular-nums">{money(item.total_price, order.currency)}</p>
+                  </li>
                 );
               })}
+            </ul>
+            <dl className="space-y-2 border-t border-border px-5 py-4 text-sm tabular-nums">
               {Number(order.markup_amount) > 0 ? (
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Service fee</span>
-                  <span>{money(order.markup_amount, order.currency)}</span>
+                <div className={ROW}>
+                  <dt className="text-muted-foreground">Service fee</dt>
+                  <dd>{money(order.markup_amount, order.currency)}</dd>
                 </div>
               ) : null}
               {Number(order.fee_total) > 0 ? (
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Processing fee</span>
-                  <span>{money(order.fee_total, order.currency)}</span>
+                <div className={ROW}>
+                  <dt className="text-muted-foreground">Processing fee</dt>
+                  <dd>{money(order.fee_total, order.currency)}</dd>
                 </div>
               ) : null}
-              <Separator />
-              <div className="flex items-center justify-between text-base font-semibold">
-                <span>Total Fee</span>
-                <span className="text-primary">{money(order.total, order.currency)}</span>
+              <div className={`${ROW} font-semibold`}>
+                <dt>Total</dt>
+                <dd>{money(order.total, order.currency)}</dd>
               </div>
               {paidTotal > 0 ? (
-                <>
-                  <div className="flex items-center justify-between text-muted-foreground">
-                    <span>Paid so far</span>
-                    <span>{money(paidTotal, order.currency)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-base font-semibold">
-                    <span>Balance due</span>
-                    <span className="text-primary">{money(remaining, order.currency)}</span>
-                  </div>
-                </>
+                <div className={ROW}>
+                  <dt className="text-muted-foreground">Paid so far</dt>
+                  <dd>−{money(paidTotal, order.currency)}</dd>
+                </div>
               ) : null}
+            </dl>
+            <div className="rounded-b-2xl border-t border-border bg-secondary/40 px-5 py-4">
+              <div className={ROW}>
+                <span className="text-sm font-semibold">{paidTotal > 0 ? "Balance due" : "Amount due"}</span>
+                <span className="font-heading text-2xl font-bold text-primary tabular-nums">
+                  {money(remaining, order.currency)}
+                </span>
+              </div>
               {order.balance_due_at && umrahItem ? (
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Balance due by</span>
-                  <span>
-                    {new Date(`${order.balance_due_at}T00:00:00`).toLocaleDateString(undefined, { dateStyle: "medium" })}
-                  </span>
-                </div>
+                <p className="mt-1 text-right text-xs text-muted-foreground tabular-nums">
+                  Balance due by {format(parseISO(order.balance_due_at), "d MMM yyyy")}
+                </p>
               ) : null}
-            </CardContent>
-          </Card>
+              {umrahItem ? null : <p className="mt-2 text-xs text-muted-foreground">All fees are non-refundable.</p>}
+            </div>
+          </section>
+        </aside>
 
+        <div className="min-w-0 space-y-6 lg:col-start-1 lg:row-start-1">
           {holdExpired ? (
-            <Card className="border-destructive/40 bg-destructive/5">
-              <CardHeader className="flex-row items-center gap-2 space-y-0">
-                <X className="size-4 text-destructive" />
-                <CardTitle className="text-base">This hold has expired</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <p className="leading-relaxed">
-                  The {HOLD_DURATION_HOURS}-hour hold window closed before payment was completed —
-                  the reservation and any held inventory have been released. Search again to book a
-                  new one.
-                </p>
-              </CardContent>
-            </Card>
+            <Alert variant="destructive">
+              <X />
+              <AlertTitle>This hold has expired</AlertTitle>
+              <AlertDescription>
+                The {HOLD_DURATION_HOURS}-hour hold closed before payment and the reservation was released.
+              </AlertDescription>
+            </Alert>
           ) : isHeld ? (
-            <Card className="border-brand-gold/50 bg-brand-gold/5">
-              <CardHeader className="flex-row items-center gap-2 space-y-0">
-                <CalendarClock className="size-4 text-brand-gold" />
-                <CardTitle className="text-base">Held — not yet paid</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p className="leading-relaxed">
-                  This booking is reserved until{" "}
-                  <span className="font-medium text-foreground">
-                    {order.hold_expires_at
-                      ? new Date(order.hold_expires_at).toLocaleString(undefined, {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        })
-                      : "—"}
-                  </span>
-                  . Pay now to confirm it, or cancel to release the hold.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <ConvertHoldButton orderId={order.id} />
-                  <CancelOrderButton orderId={order.id} label="Release Hold" redirectTo="/account/bookings" />
-                </div>
-              </CardContent>
-            </Card>
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+              <Alert variant="warning">
+                <CalendarClock />
+                <AlertTitle className="tabular-nums">Held until {holdUntil ?? "—"}</AlertTitle>
+                <AlertDescription>Not yet paid.</AlertDescription>
+              </Alert>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <ConvertHoldButton orderId={order.id} />
+                <CancelOrderButton orderId={order.id} label="Release hold" redirectTo="/account/bookings" />
+              </div>
+            </section>
           ) : pendingPayment ? (
-            <Card className="border-brand-gold/50 bg-brand-gold/5">
-              <CardHeader className="flex-row items-center gap-2 space-y-0">
-                <Hourglass className="size-4 text-brand-gold" />
-                <CardTitle className="text-base">
-                  {pendingPayment.method_label} — awaiting payment
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <p className="leading-relaxed">{pendingPayment.instructions}</p>
-                <p className="text-xs text-muted-foreground">
-                  Our team confirms the payment as soon as it arrives — you&apos;ll see the status
-                  update in your account automatically.
-                </p>
-                <CancelPendingPaymentButton paymentId={pendingPayment.id} />
-              </CardContent>
-            </Card>
-          ) : awaitingQuote ? (
-            <Card className="border-brand-gold/50 bg-brand-gold/5">
-              <CardHeader className="flex-row items-center gap-2 space-y-0">
-                <Hourglass className="size-4 text-brand-gold" />
-                <CardTitle className="text-base">Awaiting the venue&apos;s price</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CancelOrderButton orderId={order.id} redirectTo="/account/bookings" />
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {umrahSeatsHeldUntil ? (
-                <Card className="border-brand-gold/50 bg-brand-gold/5">
-                  <CardHeader className="flex-row items-center gap-2 space-y-0">
-                    <CalendarClock className="size-4 text-brand-gold" />
-                    <CardTitle className="text-base">
-                      Seats held until{" "}
-                      {umrahSeatsHeldUntil.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
-                    </CardTitle>
-                  </CardHeader>
-                </Card>
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+              <Alert variant="warning">
+                <Hourglass />
+                <AlertTitle>{pendingPayment.method_label} — awaiting payment</AlertTitle>
+              </Alert>
+              {pendingPayment.instructions ? (
+                <p className="mt-4 text-sm leading-relaxed whitespace-pre-line">{pendingPayment.instructions}</p>
               ) : null}
-              <CheckoutForm
-                orderId={order.id}
-                methods={methods}
-                amountLabel={money(remaining, order.currency)}
-                currency={order.currency}
-                remaining={remaining}
-                isFirstPayment={isFirstPayment}
-                minDeposit={minDeposit}
-              />
+              <div className="mt-4">
+                <CancelPendingPaymentButton paymentId={pendingPayment.id} />
+              </div>
+            </section>
+          ) : awaitingQuote ? (
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+              <Alert variant="warning">
+                <Hourglass />
+                <AlertTitle>Awaiting the venue&apos;s price</AlertTitle>
+              </Alert>
+              <div className="mt-4">
+                <CancelOrderButton orderId={order.id} redirectTo="/account/bookings" />
+              </div>
+            </section>
+          ) : (
+            <>
+              {umrahSeatsHeldUntil ? (
+                <Alert variant="warning">
+                  <CalendarClock />
+                  <AlertTitle className="tabular-nums">
+                    Seats held until{" "}
+                    {umrahSeatsHeldUntil.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                  </AlertTitle>
+                </Alert>
+              ) : null}
+              <section className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-6">
+                <CheckoutForm
+                  orderId={order.id}
+                  methods={methods}
+                  amountLabel={money(remaining, order.currency)}
+                  currency={order.currency}
+                  remaining={remaining}
+                  isFirstPayment={isFirstPayment}
+                  minDeposit={minDeposit}
+                />
+              </section>
               <div className="flex justify-end">
                 <CancelOrderButton orderId={order.id} redirectTo="/account/bookings" />
               </div>
-            </div>
+            </>
           )}
-        </div>
 
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Order Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Order Number</span>
-                <span className="font-medium">{order.order_number}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Items</span>
-                <span className="font-medium">{order.order_items.length}</span>
-              </div>
-              <Separator className="my-2" />
-              {paidTotal > 0 ? (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Paid so far</span>
-                  <span className="font-medium">{money(paidTotal, order.currency)}</span>
-                </div>
-              ) : null}
-              <div className="flex justify-between text-base font-semibold">
-                <span>{paidTotal > 0 ? "Balance due" : "Total Fee"}</span>
-                <span className="text-primary">{money(remaining, order.currency)}</span>
-              </div>
-              {umrahItem ? null : (
-                <p className="pt-1 text-xs text-muted-foreground">All fees are non-refundable.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-secondary/60">
-            <CardContent className="flex gap-3 pt-6 text-sm">
-              <Headset className="size-5 shrink-0 text-primary" />
-              <div>
-                <p className="font-semibold">Need Help?</p>
-                <p className="mt-1 text-muted-foreground">
-                  If you have any questions about the payment process, our support team is here to
-                  help — call +252 611 444 420 or{" "}
-                  <WhatsAppInlineLink
-                    message={`Hello STS! I need help paying for order ${order.order_number}.`}
-                  >
-                    chat with us on WhatsApp
-                  </WhatsAppInlineLink>
-                  .
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <section aria-labelledby="checkout-help" className="rounded-2xl bg-secondary/40 p-5 text-sm">
+            <h2 id="checkout-help" className="font-semibold">
+              Questions about this payment?
+            </h2>
+            <p className="mt-1 text-muted-foreground">
+              Call{" "}
+              <a
+                href="tel:+252611444420"
+                className="rounded-sm font-medium whitespace-nowrap text-foreground tabular-nums hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              >
+                +252 611 444 420
+              </a>{" "}
+              or{" "}
+              <WhatsAppInlineLink message={`Hello STS! I need help paying for order ${order.order_number}.`}>
+                chat on WhatsApp
+              </WhatsAppInlineLink>
+              .
+            </p>
+          </section>
         </div>
       </div>
     </div>

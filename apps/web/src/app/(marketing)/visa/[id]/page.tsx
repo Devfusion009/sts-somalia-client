@@ -1,24 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  ArrowRight,
-  CalendarCheck2,
-  CalendarRange,
-  CheckCircle2,
-  ChevronRight,
-  ClipboardList,
-  Clock3,
-  CreditCard,
-  FileCheck2,
-  Home,
-  Send,
-  ShieldCheck,
-  Sparkles,
-  Timer,
-  Wallet,
-} from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+import { ArrowRight, Check, CheckCircle2, ShieldCheck, Timer, Users } from "lucide-react";
+import { MarketingBreadcrumb } from "@/components/marketing/marketing-breadcrumb";
 import { CountrySearchSelect } from "@/components/ui/country-select";
 import { getVisaTypeById, getResolvedVisaPricing } from "@/modules/visa/queries";
 import { startVisaApplication } from "@/modules/visa/actions";
@@ -43,31 +26,27 @@ export async function generateMetadata({
 
 const HOW_IT_WORKS = [
   {
-    icon: ClipboardList,
     title: "Fill the application",
     text: "Complete the guided online form — for yourself, your family, or a group.",
   },
   {
-    icon: FileCheck2,
     title: "Upload documents",
     text: "Attach clear scans of the required documents; our team reviews every file.",
   },
   {
-    icon: CreditCard,
-    title: "Pay securely",
-    text: "Pay by card, mobile money, or bank transfer — whatever suits you.",
+    title: "Pay",
+    text: "Card, mobile money or bank transfer.",
   },
   {
-    icon: Send,
     title: "We handle the rest",
-    text: "STS submits to the immigration authority and you track progress in real time.",
+    text: "STS submits to the immigration authority and you track progress in your account.",
   },
 ];
 
 const SIDEBAR_ASSURANCES = [
   { icon: ShieldCheck, text: "Documents checked before they reach the consulate" },
-  { icon: Timer, text: "Real-time tracking on your account" },
-  { icon: Sparkles, text: "Family & group applications handled together" },
+  { icon: Timer, text: "Status tracking in your account" },
+  { icon: Users, text: "Family and group applications handled together" },
 ];
 
 export default async function VisaDetailPage({
@@ -94,95 +73,97 @@ export default async function VisaDetailPage({
   const total = Number(price) + Number(processingFee ?? 0);
 
   const specRows = [
-    { icon: Clock3, label: "Processing time", value: processingText(visa) },
-    { icon: CalendarCheck2, label: "Validity", value: visa.validity_days ? `${visa.validity_days} days` : "Varies" },
-    { icon: CalendarRange, label: "Max stay", value: visa.stay_days ? `${visa.stay_days} days` : "Varies" },
-    { icon: Wallet, label: nationality ? "Price for you" : "Starting price", value: fmtMoney(price, visa.currency) },
+    { label: "Processing time", value: processingText(visa) },
+    { label: "Validity", value: visa.validity_days ? `${visa.validity_days} days` : "Varies" },
+    { label: "Max stay", value: visa.stay_days ? `${visa.stay_days} days` : "Varies" },
+    { label: nationality ? "Price for you" : "Starting price", value: fmtMoney(price, visa.currency) },
   ];
+  const overview = visa.overview ?? visa.description;
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <nav className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Link href="/" className="flex items-center gap-1 hover:text-foreground">
-          <Home className="size-3.5" /> Home
-        </Link>
-        <ChevronRight className="size-3" />
-        <Link href="/visa" className="hover:text-foreground">
-          Visa
-        </Link>
-        <ChevronRight className="size-3" />
-        <span className="font-medium text-foreground">{destination}</span>
-      </nav>
+      <MarketingBreadcrumb className="mb-4" items={[{ label: "Visa", href: "/visa" }, { label: destination }]} />
 
-      {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 lg:p-8">
-        <div className="absolute -top-24 -right-24 size-72 rounded-full bg-primary/5 blur-3xl" aria-hidden />
-        <div className="absolute -bottom-24 left-1/3 size-64 rounded-full bg-brand-gold/10 blur-3xl" aria-hidden />
-
-        <div className="relative flex flex-wrap items-center gap-3">
+      <header className="rounded-2xl border border-border bg-card p-5 sm:p-6 lg:p-8">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1.5">
-            <span className="text-base leading-none">{countryFlag(NATIONALITY_DEFAULT)}</span>
-            <ArrowRight className="size-3.5 text-primary" />
-            <span className="text-base leading-none">{countryFlag(visa.destination_country_code)}</span>
+            <span className="text-base leading-none" aria-hidden>
+              {countryFlag(NATIONALITY_DEFAULT)}
+            </span>
+            <ArrowRight className="size-3.5 text-primary" aria-hidden />
+            <span className="text-base leading-none" aria-hidden>
+              {countryFlag(visa.destination_country_code)}
+            </span>
             <span className="text-sm font-semibold">{destination}</span>
           </div>
-          <Badge className="border-transparent bg-primary/10 text-primary">Licensed Somali travel agency</Badge>
+          <Badge variant="success">Licensed Somali travel agency</Badge>
         </div>
 
-        <h1 className="relative mt-4 font-heading text-2xl font-bold tracking-tight sm:text-3xl">{visa.name}</h1>
-        <p className="relative mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          {visa.overview ?? visa.description ?? `Apply online for the ${visa.name} with STS.`}
-        </p>
+        <h1 className="mt-4 font-heading text-2xl font-bold tracking-tight text-balance sm:text-3xl">{visa.name}</h1>
+        {overview ? (
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">{overview}</p>
+        ) : null}
 
-        <div className="relative mt-6 grid grid-cols-2 gap-3 rounded-xl bg-secondary/50 p-4 sm:grid-cols-4">
+        <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4">
           {specRows.map((row) => (
-            <div key={row.label} className="flex items-center gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-card text-primary shadow-xs">
-                <row.icon className="size-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-muted-foreground">{row.label}</p>
-                <p className="truncate text-sm font-bold">{row.value}</p>
-              </div>
+            <div key={row.label} className="bg-secondary/40 px-4 py-3">
+              <dt className="text-xs font-medium text-muted-foreground">{row.label}</dt>
+              <dd className="mt-0.5 text-sm font-bold tabular-nums">{row.value}</dd>
             </div>
           ))}
-        </div>
-      </div>
+        </dl>
 
-      <form className="mt-4 rounded-2xl border border-border bg-card p-5 sm:p-6">
-        <div className="mx-auto max-w-md space-y-3 text-center">
-          <Label htmlFor="nationality-select" className="text-sm font-semibold text-foreground">
-            Your passport nationality
-          </Label>
-          <CountrySearchSelect
-            id="nationality-select"
-            name="nationality"
-            defaultValue={nationality}
-            placeholder="Search for a country"
-          />
-          <Button type="submit" className="h-11 w-full text-sm">
-            See price &amp; requirements
+        {/* Nationality decides the price and the document list. */}
+        <form className="mt-6 grid gap-3 border-t border-border pt-6 sm:grid-cols-[minmax(0,22rem)_auto] sm:items-end">
+          <div className="space-y-2">
+            <Label htmlFor="nationality-select">Your passport nationality</Label>
+            <CountrySearchSelect
+              id="nationality-select"
+              name="nationality"
+              defaultValue={nationality}
+              placeholder="Search for a country"
+            />
+          </div>
+          <Button type="submit" variant="outline" size="lg">
+            See price and requirements
+          </Button>
+        </form>
+
+        {/* Phones: the price card sits after every section below. */}
+        <div className="mt-6 flex items-center justify-between gap-4 rounded-xl bg-secondary/40 p-4 lg:hidden">
+          <p className="min-w-0">
+            <span className="block text-xs text-muted-foreground">{nationality ? "Total for you" : "Total from"}</span>
+            <span className="font-heading text-xl font-bold text-primary tabular-nums">
+              {fmtMoney(total, visa.currency)}
+            </span>
+          </p>
+          <Button render={<a href="#apply" />} size="lg" className="shrink-0">
+            Apply now
           </Button>
         </div>
-      </form>
+      </header>
 
-      <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_340px]">
-        <div className="space-y-8">
+      <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 space-y-12">
           {visa.eligibility_requirements ? (
-            <section>
-              <h2 className="font-heading text-xl font-bold">Eligibility requirements</h2>
-              <p className="mt-2 leading-relaxed whitespace-pre-wrap text-muted-foreground">
+            <section aria-labelledby="visa-eligibility">
+              <h2 id="visa-eligibility" className="font-heading text-xl font-bold tracking-tight sm:text-2xl">
+                Eligibility requirements
+              </h2>
+              <p className="mt-3 leading-relaxed whitespace-pre-wrap text-muted-foreground">
                 {visa.eligibility_requirements}
               </p>
             </section>
           ) : null}
 
-          <section>
-            <h2 className="font-heading text-xl font-bold">Required documents</h2>
-            <ul className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <section aria-labelledby="visa-documents">
+            <h2 id="visa-documents" className="font-heading text-xl font-bold tracking-tight sm:text-2xl">
+              Required documents
+            </h2>
+            <ul className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
               {slots.map((slot) => (
-                <li key={slot.key} className="flex items-start gap-2.5 rounded-xl border border-border bg-card p-3.5">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                <li key={slot.key} className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
                   <div>
                     <p className="text-sm font-semibold">
                       {slot.label}
@@ -191,7 +172,7 @@ export default async function VisaDetailPage({
                       ) : null}
                     </p>
                     {slot.description ? (
-                      <p className="text-xs text-muted-foreground">{slot.description}</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">{slot.description}</p>
                     ) : null}
                   </div>
                 </li>
@@ -199,79 +180,85 @@ export default async function VisaDetailPage({
             </ul>
           </section>
 
-          <section>
-            <h2 className="font-heading text-xl font-bold">How it works</h2>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <section aria-labelledby="visa-how">
+            <h2 id="visa-how" className="font-heading text-xl font-bold tracking-tight sm:text-2xl">
+              How it works
+            </h2>
+            <ol className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {HOW_IT_WORKS.map((item, i) => (
-                <div key={item.title} className="relative rounded-xl border border-border bg-card p-4">
-                  <span className="flex size-9 items-center justify-center rounded-full bg-secondary text-primary">
-                    <item.icon className="size-4" />
+                <li key={item.title} className="rounded-xl border border-border bg-card p-4">
+                  <span
+                    className="flex size-8 items-center justify-center rounded-full bg-primary font-heading text-sm font-bold text-primary-foreground tabular-nums"
+                    aria-hidden
+                  >
+                    {i + 1}
                   </span>
-                  <p className="mt-3 text-sm font-bold">
-                    {i + 1}. {item.title}
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.text}</p>
-                </div>
+                  <h3 className="mt-3 text-sm font-bold">
+                    <span className="sr-only">Step {i + 1}: </span>
+                    {item.title}
+                  </h3>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.text}</p>
+                </li>
               ))}
-            </div>
+            </ol>
           </section>
         </div>
 
-        <div className="space-y-4">
-          <div className="sticky top-24 space-y-4">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl leading-none">{countryFlag(visa.destination_country_code)}</span>
-                <p className="font-heading text-base font-bold">{visa.name}</p>
-              </div>
-
-              <div className="mt-4 space-y-2.5 border-t border-border pt-4 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Government &amp; service fee</span>
-                  <span className="font-semibold">{fmtMoney(price, visa.currency)}</span>
-                </div>
-                {Number(processingFee) > 0 ? (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Processing fee</span>
-                    <span className="font-semibold">{fmtMoney(processingFee!, visa.currency)}</span>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="mt-4 flex items-baseline justify-between border-t border-border pt-4">
-                <span className="text-sm text-muted-foreground">
-                  {nationality ? "Total for you" : "Total from"}
-                </span>
-                <span className="font-heading text-3xl font-bold text-primary">
-                  {fmtMoney(total, visa.currency)}
-                </span>
-              </div>
-
-              <form action={startVisaApplication} className="mt-4 space-y-3">
-                <input type="hidden" name="visaTypeId" value={visa.id} />
-                {nationality ? <input type="hidden" name="nationality" value={nationality} /> : null}
-                <SubmitButton size="lg" className="w-full gap-2" pendingText="Starting application…">
-                  Apply Now <ArrowRight className="size-4" />
-                </SubmitButton>
-              </form>
-
-              <Separator className="my-4" />
-
-              <ul className="space-y-3">
-                {SIDEBAR_ASSURANCES.map((item) => (
-                  <li key={item.text} className="flex items-center gap-2.5 text-xs text-muted-foreground">
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-primary">
-                      <item.icon className="size-3.5" />
-                    </span>
-                    {item.text}
-                  </li>
-                ))}
-              </ul>
+        <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+          <section
+            id="apply"
+            aria-labelledby="visa-price"
+            className="scroll-mt-24 rounded-2xl border border-border bg-card p-5 shadow-sm"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl leading-none" aria-hidden>
+                {countryFlag(visa.destination_country_code)}
+              </span>
+              <h2 id="visa-price" className="font-heading text-base font-bold">
+                {visa.name}
+              </h2>
             </div>
 
-            <VisaExpertCard visaName={visa.name} />
-          </div>
-        </div>
+            <dl className="mt-4 space-y-2.5 border-t border-border pt-4 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Government and service fee</dt>
+                <dd className="font-semibold tabular-nums">{fmtMoney(price, visa.currency)}</dd>
+              </div>
+              {Number(processingFee) > 0 ? (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Processing fee</dt>
+                  <dd className="font-semibold tabular-nums">{fmtMoney(processingFee!, visa.currency)}</dd>
+                </div>
+              ) : null}
+            </dl>
+
+            <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-border pt-4">
+              <span className="text-sm font-semibold">{nationality ? "Total for you" : "Total from"}</span>
+              <span className="font-heading text-3xl font-bold text-primary tabular-nums">
+                {fmtMoney(total, visa.currency)}
+              </span>
+            </div>
+
+            <form action={startVisaApplication} className="mt-5">
+              <input type="hidden" name="visaTypeId" value={visa.id} />
+              {nationality ? <input type="hidden" name="nationality" value={nationality} /> : null}
+              <SubmitButton size="lg" className="w-full gap-2" pendingText="Starting application…">
+                Apply now <ArrowRight className="size-4" aria-hidden />
+              </SubmitButton>
+            </form>
+
+            <ul className="mt-5 space-y-2.5 border-t border-border pt-4">
+              {SIDEBAR_ASSURANCES.map((item) => (
+                <li key={item.text} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                  {item.text}
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <VisaExpertCard visaName={visa.name} />
+        </aside>
       </div>
     </div>
   );

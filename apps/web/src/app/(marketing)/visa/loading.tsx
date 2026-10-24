@@ -8,7 +8,7 @@
  */
 export default function Loading() {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 px-4 backdrop-blur-sm">
+    <div role="status" className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 px-4 backdrop-blur-sm">
       <div className="flex w-full max-w-sm flex-col items-center rounded-3xl bg-card px-8 py-10 text-center shadow-2xl ring-1 ring-border/60">
         <span className="animate-stamp-thump flex size-20 items-center justify-center">
           <svg viewBox="0 0 64 64" fill="none" strokeWidth={3.1} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="size-full">
@@ -23,10 +23,10 @@ export default function Loading() {
         </span>
 
         <p className="mt-6 text-base leading-snug font-semibold text-foreground">
-          Checking visa requirements across 150+ destinations…
+          Searching visa services…
         </p>
 
-        <div className="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div className="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
           <div className="animate-progress-sweep h-full w-1/3 rounded-full bg-primary" />
         </div>
       </div>

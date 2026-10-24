@@ -1,4 +1,5 @@
 import { StaggerGroup, StaggerItem } from "@/components/ui/aceternity/motion-primitives";
+import { SectionHeading } from "@/components/marketing/section-heading";
 
 import { BeachAccessIcon, Diversity3Icon, HandshakeIcon, SettingsSuggestIcon, ThumbUpAltIcon } from "@/components/ui/mui-icons";
 import type { SvgIconComponent } from "@/components/ui/mui-icons";
@@ -15,12 +16,12 @@ const PILLARS: Array<{ icon: SvgIconComponent; title: string; body: string }> = 
   },
   {
     icon: BeachAccessIcon,
-    title: "Memorable experiences",
+    title: "Built around your trip",
     body: "From Umrah groups to honeymoons and business trips — itineraries built around how your family actually travels.",
   },
   {
     icon: SettingsSuggestIcon,
-    title: "Ease",
+    title: "One account",
     body: "Flights, hotels, visas, Umrah and venues behind one account, one invoice and one support number.",
   },
   {
@@ -32,16 +33,14 @@ const PILLARS: Array<{ icon: SvgIconComponent; title: string; body: string }> = 
 
 export function WhyUsCards() {
   return (
-    <section id="about" className="scroll-mt-32 bg-sidebar py-14 text-sidebar-foreground sm:py-16 lg:py-20">
+    <section id="about" className="scroll-mt-32 bg-sidebar py-16 text-sidebar-foreground sm:py-20 lg:py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <h2 className="font-heading text-2xl font-bold tracking-tight text-balance sm:text-3xl lg:text-4xl">
-          We have served thousands of travellers, and we are here for you
-        </h2>
+        <SectionHeading align="left" tone="dark" title="Why travellers book with STS" />
 
         <StaggerGroup className="mt-11 grid grid-cols-1 gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
           {PILLARS.map((pillar) => (
             <StaggerItem key={pillar.title} className="flex gap-4">
-              <pillar.icon sx={{ fontSize: 28 }} className="shrink-0 text-brand-accent" />
+              <pillar.icon sx={{ fontSize: 28 }} className="shrink-0 text-brand-accent" aria-hidden />
               <div>
                 <h3 className="font-heading text-base font-bold">{pillar.title}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-sidebar-foreground/70">{pillar.body}</p>

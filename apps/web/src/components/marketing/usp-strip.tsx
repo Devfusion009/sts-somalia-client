@@ -8,7 +8,7 @@ const USPS = [
   "ISO 9001:2015 certified",
   "Fully customisable Umrah & holiday packages",
   "Local payment methods — EVC Plus, bank, card",
-  "24/7 support from a Mogadishu-based team",
+  "Support desk based in Mogadishu",
   "Confirmed rates, no hidden fees",
 ];
 

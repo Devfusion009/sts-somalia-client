@@ -1,11 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Link from "next/link";
 import {
   BedDouble,
-  ChevronRight,
   Clock,
-  Home,
   Mail,
   MapPin,
   Phone,
@@ -20,6 +17,8 @@ import { MediaPlaceholder } from "@/components/media-placeholder";
 import { PropertyLinks } from "@/components/property-links";
 import { PropertyReviews } from "@/components/property-reviews";
 import { Badge } from "@/components/ui/badge";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { MarketingBreadcrumb } from "@/components/marketing/marketing-breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -130,17 +129,7 @@ export default async function HotelDetailPage({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-      <nav className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Link href="/" className="flex items-center gap-1 hover:text-foreground">
-          <Home className="size-3.5" /> Home
-        </Link>
-        <ChevronRight className="size-3" />
-        <Link href="/hotels" className="hover:text-foreground">
-          Hotels
-        </Link>
-        <ChevronRight className="size-3" />
-        <span className="font-medium text-foreground">{hotel.name}</span>
-      </nav>
+      <MarketingBreadcrumb className="mb-4" items={[{ label: "Hotels", href: "/hotels" }, { label: hotel.name }]} />
 
       <HotelGallery images={images} hotelId={hotel.id} hotelName={hotel.name} />
 
@@ -150,17 +139,17 @@ export default async function HotelDetailPage({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="font-heading text-3xl font-bold">{hotel.name}</h1>
+                <h1 className="font-heading text-2xl font-bold tracking-tight text-balance sm:text-3xl">{hotel.name}</h1>
                 {hotel.star_rating ? (
-                  <span className="flex" aria-label={`${hotel.star_rating} star hotel`}>
+                  <span className="flex" role="img" aria-label={`${hotel.star_rating} star hotel`}>
                     {Array.from({ length: hotel.star_rating }).map((_, i) => (
-                      <Star key={i} className="size-4 fill-brand-gold text-brand-gold" />
+                      <Star key={i} className="size-4 fill-brand-gold text-brand-gold" aria-hidden />
                     ))}
                   </span>
                 ) : null}
               </div>
-              <p className="mt-1 flex items-center gap-1 text-muted-foreground">
-                <MapPin className="size-4" />
+              <p className="mt-1 flex items-start gap-1 text-sm text-muted-foreground sm:text-base">
+                <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
                 {hotel.address_line ? `${hotel.address_line}, ` : ""}
                 {hotel.city}, {hotel.country_code}
               </p>
@@ -168,7 +157,7 @@ export default async function HotelDetailPage({
             {averageRating !== null ? (
               <a
                 href="#reviews"
-                className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 transition-colors hover:border-primary/40"
+                className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 transition-colors hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               >
                 <span className="grid size-9 shrink-0 place-items-center rounded-md bg-primary font-heading text-sm font-bold text-primary-foreground">
                   {averageRating.toFixed(1)}
@@ -183,6 +172,32 @@ export default async function HotelDetailPage({
             ) : null}
           </div>
 
+          {/* Phones get the price + jump-to-rooms up top; the full summary
+              card sits in the sidebar from lg and at the page end below it. */}
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 pl-4 lg:hidden">
+            <div className="min-w-0">
+              {minPrice !== null ? (
+                <>
+                  <p className="text-xs text-muted-foreground">From</p>
+                  <p className="font-heading text-lg leading-tight font-bold text-primary tabular-nums">
+                    {currency} {formatMoney(minPrice)}
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">
+                      {stayPrices.size > 0 ? `/ ${nights} night${nights === 1 ? "" : "s"}` : "/ night"}
+                    </span>
+                  </p>
+                </>
+              ) : (
+                <p className="font-heading text-base font-bold text-primary">Price on request</p>
+              )}
+            </div>
+            <a
+              href="#rooms"
+              className="inline-flex h-11 shrink-0 items-center rounded-lg bg-brand-accent px-5 font-heading text-sm font-bold text-brand-accent-foreground transition-colors hover:bg-brand-accent/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              View rooms
+            </a>
+          </div>
+
           {hotel.description ? (
             <p className="mt-5 max-w-3xl leading-relaxed text-muted-foreground">{hotel.description}</p>
           ) : null}
@@ -191,14 +206,14 @@ export default async function HotelDetailPage({
           ) : null}
 
           {amenities.length > 0 ? (
-            <div className="mt-6">
-              <h2 className="font-heading text-lg font-bold">Amenities</h2>
+            <div className="mt-8">
+              <h2 className="font-heading text-xl font-bold">Amenities</h2>
               <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
                 {sortAmenities(amenities).map((amenity) => {
                   const Icon = amenityIcon(amenity);
                   return (
                     <span key={amenity} className="flex items-center gap-2 text-sm text-foreground">
-                      <Icon sx={{ fontSize: 18 }} className="shrink-0 text-primary" />
+                      <Icon sx={{ fontSize: 18 }} className="shrink-0 text-primary" aria-hidden />
                       {amenityDisplayLabel(amenity)}
                     </span>
                   );
@@ -208,18 +223,18 @@ export default async function HotelDetailPage({
           ) : null}
 
           {hotel.policies ? (
-            <div className="mt-6">
-              <h2 className="font-heading text-lg font-bold">Hotel policies</h2>
+            <div className="mt-8">
+              <h2 className="font-heading text-xl font-bold">Hotel policies</h2>
               <p className="mt-3 max-w-3xl whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
                 {hotel.policies}
               </p>
             </div>
           ) : null}
 
-          <div id="rooms" className="mt-10 scroll-mt-20">
-            <div className="flex items-baseline justify-between">
-              <h2 className="font-heading text-2xl font-bold">Choose your room</h2>
-              <p className="text-sm text-muted-foreground">
+          <div id="rooms" className="mt-10 scroll-mt-24">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="font-heading text-2xl font-bold tracking-tight">Choose your room</h2>
+              <p className="shrink-0 text-sm text-muted-foreground tabular-nums">
                 {rooms.length} room type{rooms.length === 1 ? "" : "s"}
               </p>
             </div>
@@ -227,21 +242,23 @@ export default async function HotelDetailPage({
             <form
               action={`/hotels/${slug}`}
               method="get"
-              className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4"
+              className="mt-4 grid grid-cols-2 items-end gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_1fr_6rem_auto]"
             >
-              <div className="space-y-1.5">
+              <div className="min-w-0 space-y-1.5">
                 <Label htmlFor="stay-checkIn">Check-in</Label>
                 <Input id="stay-checkIn" name="checkIn" type="date" min={todayIso()} defaultValue={checkIn} required />
               </div>
-              <div className="space-y-1.5">
+              <div className="min-w-0 space-y-1.5">
                 <Label htmlFor="stay-checkOut">Check-out</Label>
                 <Input id="stay-checkOut" name="checkOut" type="date" min={checkIn || todayIso()} defaultValue={checkOut} required />
               </div>
-              <div className="w-24 space-y-1.5">
+              <div className="min-w-0 space-y-1.5">
                 <Label htmlFor="stay-guests">Guests</Label>
                 <Input id="stay-guests" name="guests" type="number" min={1} max={30} defaultValue={guests || "2"} />
               </div>
-              <Button type="submit">Check availability</Button>
+              <Button type="submit" size="lg">
+                Check availability
+              </Button>
             </form>
 
             {rooms.length > 0 ? (
@@ -267,6 +284,8 @@ export default async function HotelDetailPage({
                           <img
                             src={roomImages[0]}
                             alt={room.name}
+                            loading="lazy"
+                            decoding="async"
                             className="h-44 w-full object-cover sm:h-auto sm:w-56 lg:w-64"
                           />
                         ) : (
@@ -283,16 +302,16 @@ export default async function HotelDetailPage({
                           ) : null}
                           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
-                              <Users className="size-3.5" /> Up to {room.max_occupancy} guests
+                              <Users className="size-3.5" aria-hidden /> Up to {room.max_occupancy} guests
                             </span>
                             {room.bed_type ? (
                               <span className="flex items-center gap-1">
-                                <BedDouble className="size-3.5" /> {room.bed_type}
+                                <BedDouble className="size-3.5" aria-hidden /> {room.bed_type}
                               </span>
                             ) : null}
                             {room.size_sqm ? (
                               <span className="flex items-center gap-1">
-                                <Ruler className="size-3.5" /> {room.size_sqm} m²
+                                <Ruler className="size-3.5" aria-hidden /> {room.size_sqm} m²
                               </span>
                             ) : null}
                           </div>
@@ -307,7 +326,7 @@ export default async function HotelDetailPage({
                               {roomAmenities.slice(0, 5).map((a) => (
                                 <span
                                   key={a}
-                                  className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground"
+                                  className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
                                 >
                                   {amenityDisplayLabel(a)}
                                 </span>
@@ -316,10 +335,10 @@ export default async function HotelDetailPage({
                           ) : null}
                         </div>
                         <div className="flex items-center justify-between gap-3 border-t border-border p-5 sm:w-48 sm:flex-col sm:items-end sm:justify-center sm:border-t-0 sm:border-l">
-                          <p className="text-right">
+                          <p className="sm:text-right">
                             {room.base_price > 0 && stayTotal !== undefined ? (
                               <>
-                                <span className="font-heading text-xl font-bold text-primary">
+                                <span className="font-heading text-xl font-bold text-primary tabular-nums">
                                   {room.currency} {formatMoney(stayTotal)}
                                 </span>
                                 <span className="block text-xs text-muted-foreground">
@@ -328,7 +347,7 @@ export default async function HotelDetailPage({
                               </>
                             ) : room.base_price > 0 ? (
                               <>
-                                <span className="font-heading text-xl font-bold text-primary">
+                                <span className="font-heading text-xl font-bold text-primary tabular-nums">
                                   {room.currency} {formatMoney(room.base_price)}
                                 </span>
                                 <span className="block text-xs text-muted-foreground">per night</span>
@@ -339,17 +358,19 @@ export default async function HotelDetailPage({
                               </span>
                             )}
                             {soldOut ? (
-                              <span className="mt-1 block text-xs font-semibold text-destructive">
+                              <Badge variant="destructive" className="mt-1.5">
                                 Sold out for your dates
-                              </span>
+                              </Badge>
                             ) : lowStock ? (
-                              <span className="mt-1 block text-xs font-semibold text-brand-gold">
-                                Only {unitsLeft} left for your dates
-                              </span>
+                              <Badge variant="warning" className="mt-1.5">
+                                {unitsLeft} left for your dates
+                              </Badge>
                             ) : null}
                           </p>
                           {soldOut ? (
-                            <Button disabled>Sold out</Button>
+                            <Button size="lg" disabled>
+                              Sold out
+                            </Button>
                           ) : (
                             <BookingForm
                               hotelSlug={slug}
@@ -365,11 +386,18 @@ export default async function HotelDetailPage({
                 })}
               </div>
             ) : (
-              <p className="mt-4 text-muted-foreground">No rooms are currently available at this hotel.</p>
+              <Empty className="mt-4 border border-border bg-card">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <BedDouble />
+                  </EmptyMedia>
+                  <EmptyTitle className="text-base">No rooms available</EmptyTitle>
+                </EmptyHeader>
+              </Empty>
             )}
           </div>
 
-          <div id="reviews" className="mt-8 scroll-mt-20">
+          <div id="reviews" className="mt-10 scroll-mt-24">
             <PropertyReviews reviews={hotel.property_reviews} />
           </div>
         </div>
@@ -385,7 +413,7 @@ export default async function HotelDetailPage({
                   {minPrice !== null ? "Prices from" : "Pricing"}
                 </p>
                 {minPrice !== null ? (
-                  <p className="font-heading text-2xl font-bold text-primary">
+                  <p className="font-heading text-2xl font-bold text-primary tabular-nums">
                     {currency} {formatMoney(minPrice)}
                     <span className="ml-1 text-sm font-normal text-muted-foreground">
                       {stayPrices.size > 0 ? `/ ${nights} night${nights === 1 ? "" : "s"}` : "/ night"}
@@ -398,7 +426,7 @@ export default async function HotelDetailPage({
 
               <a
                 href="#rooms"
-                className="flex h-10 w-full items-center justify-center rounded-lg bg-brand-accent font-heading text-sm font-bold text-brand-accent-foreground transition-colors hover:bg-brand-accent/90"
+                className="flex h-11 w-full items-center justify-center rounded-lg bg-brand-accent font-heading text-sm font-bold text-brand-accent-foreground transition-colors hover:bg-brand-accent/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
               >
                 View room options
               </a>
@@ -406,7 +434,7 @@ export default async function HotelDetailPage({
               <div className="space-y-2 border-t border-border pt-4 text-sm">
                 {hotel.star_rating ? (
                   <p className="flex items-center gap-2 text-foreground">
-                    <Star className="size-4 fill-brand-gold text-brand-gold" />
+                    <Star className="size-4 fill-brand-gold text-brand-gold" aria-hidden />
                     {hotel.star_rating}-star hotel
                   </p>
                 ) : null}
@@ -416,7 +444,7 @@ export default async function HotelDetailPage({
                   </Badge>
                 ) : null}
                 <p className="flex items-start gap-2 text-muted-foreground">
-                  <MapPin className="mt-0.5 size-4 shrink-0" />
+                  <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
                   {hotel.address_line ? `${hotel.address_line}, ` : ""}
                   {hotel.city}, {hotel.country_code}
                 </p>
@@ -425,7 +453,7 @@ export default async function HotelDetailPage({
                     href={`tel:${hotel.phone}`}
                     className="flex items-center gap-2 text-muted-foreground hover:text-primary"
                   >
-                    <Phone className="size-4" /> {displayPhone(hotel.phone)}
+                    <Phone className="size-4 shrink-0" aria-hidden /> {displayPhone(hotel.phone)}
                   </a>
                 ) : null}
                 {hotel.contact_email ? (
@@ -433,12 +461,12 @@ export default async function HotelDetailPage({
                     href={`mailto:${hotel.contact_email}`}
                     className="flex items-center gap-2 break-all text-muted-foreground hover:text-primary"
                   >
-                    <Mail className="size-4 shrink-0" /> {hotel.contact_email}
+                    <Mail className="size-4 shrink-0" aria-hidden /> {hotel.contact_email}
                   </a>
                 ) : null}
                 {hotel.check_in_time || hotel.check_out_time ? (
                   <p className="flex items-center gap-2 text-muted-foreground">
-                    <Clock className="size-4 shrink-0" />
+                    <Clock className="size-4 shrink-0" aria-hidden />
                     {[
                       clockTime(hotel.check_in_time) ? `Check-in ${clockTime(hotel.check_in_time)}` : null,
                       clockTime(hotel.check_out_time) ? `Check-out ${clockTime(hotel.check_out_time)}` : null,

@@ -31,7 +31,7 @@ export function TrendingGrid({
             <StaggerItem key={entry.name} className="grid">
               <Link
                 href={entry.href}
-                className="group flex items-stretch overflow-hidden rounded-lg bg-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar focus-visible:outline-none"
+                className="group flex items-stretch overflow-hidden rounded-lg bg-white transition-shadow duration-200 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar focus-visible:outline-none"
               >
                 <span className="relative h-14 w-20 shrink-0 overflow-hidden">
                   <Image

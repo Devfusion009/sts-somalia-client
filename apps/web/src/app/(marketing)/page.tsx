@@ -82,7 +82,7 @@ const ORGANIZATION_JSON_LD = {
 
 /* Placeholder "from" prices — replace with live fare/rate data at launch. */
 const INTERNATIONAL = [
-  { title: "Dubai Tour Packages", image: "/marketing/dubai.webp", price: "$620", href: "/hotels?city=Dubai", badge: "Popular" },
+  { title: "Dubai Tour Packages", image: "/marketing/dubai.webp", price: "$620", href: "/hotels?city=Dubai" },
   { title: "Istanbul Tour Packages", image: "/marketing/istanbul.webp", price: "$840", href: "/hotels?city=Istanbul" },
   { title: "Jeddah & Red Sea", image: "/marketing/dest-jeddah.webp", price: "$720", href: "/hotels?city=Jeddah" },
   { title: "Kuala Lumpur Packages", image: "/marketing/dest-kuala-lumpur.webp", price: "$1,140", href: "/hotels?city=Kuala%20Lumpur" },
@@ -129,14 +129,14 @@ export default function HomePage() {
       <DestinationRail
         className="bg-muted/40"
         title="Trending international destinations"
-        blurb="Planning to travel abroad? These are the international routes and packages our desk books most this season — Gulf city breaks, Türkiye and Egypt for shopping and medical trips, Malaysia for study, and Umrah year-round. Every package can be split apart or rebuilt around your dates, your budget and how many of you are travelling; tell us what you need and we price it properly rather than making you fit a fixed itinerary."
+        blurb="Gulf city breaks, Türkiye and Egypt for shopping and medical trips, Malaysia for study, and Umrah year-round. Every package can be split apart or rebuilt around your dates, your budget and how many of you are travelling."
         cards={INTERNATIONAL}
         viewAll={{ label: "View all packages", href: "/umrah" }}
       />
 
       <DestinationRail
         title="Trending Somalia and around destinations"
-        blurb="Looking to travel without going far? Domestic and regional trips are designed for how people here actually move — family visits, business between Mogadishu, Hargeisa and Nairobi, medical travel to Addis and Nairobi, and coastal weekends at home. Short hops, familiar airlines, hotels we have physically checked, and a support desk in your timezone that answers in Somali."
+        blurb="Domestic and regional trips are designed for how people here actually move — family visits, business between Mogadishu, Hargeisa and Nairobi, medical travel to Addis and Nairobi, and coastal weekends at home. Short hops, familiar airlines, partner hotels and a support desk in your timezone that answers in Somali."
         cards={REGIONAL}
         viewAll={{ label: "Browse all hotels", href: "/hotels" }}
       />

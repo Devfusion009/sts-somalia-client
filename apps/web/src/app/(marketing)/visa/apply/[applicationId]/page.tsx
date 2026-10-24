@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronRight, Home } from "lucide-react";
+import { MarketingBreadcrumb } from "@/components/marketing/marketing-breadcrumb";
 import { requireUser } from "@/lib/auth/session";
 import { getApplicationForWizard } from "@/modules/visa/queries";
 import { getServerTrpc } from "@/lib/trpc/server";
@@ -74,28 +73,22 @@ export default async function VisaWizardPage({
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <nav className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Link href="/" className="flex items-center gap-1 hover:text-foreground">
-          <Home className="size-3.5" /> Home
-        </Link>
-        <ChevronRight className="size-3" />
-        <Link href="/visa" className="hover:text-foreground">
-          Visa
-        </Link>
-        <ChevronRight className="size-3" />
-        <Link href={`/visa/${visaType.id}`} className="hover:text-foreground">
-          {destination}
-        </Link>
-        <ChevronRight className="size-3" />
-        <span className="font-medium text-foreground">Apply</span>
-      </nav>
+      <MarketingBreadcrumb
+        className="mb-4"
+        items={[
+          { label: "Visa", href: "/visa" },
+          { label: destination, href: `/visa/${visaType.id}` },
+          { label: "Apply" },
+        ]}
+      />
 
       <VisaTypeBanner visaType={visaType} />
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[270px_1fr]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[270px_minmax(0,1fr)]">
         <WizardStepper applicationId={application.id} currentStep={step} maxStep={maxStep} />
 
-        <main className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7">
+        {/* A <section>, not <main>: the marketing layout already owns <main>. */}
+        <section aria-label="Application step" className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-7">
           {step === 1 ? (
             <StepApplicantType application={application} backHref={`/visa/${visaType.id}`} />
           ) : step === 2 ? (
@@ -107,7 +100,7 @@ export default async function VisaWizardPage({
           ) : (
             <StepReview application={application} />
           )}
-        </main>
+        </section>
       </div>
     </div>
   );

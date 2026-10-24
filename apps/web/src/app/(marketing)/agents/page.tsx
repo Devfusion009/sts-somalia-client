@@ -3,7 +3,7 @@ import { Briefcase, Percent, Users, Headset, LayoutDashboard } from "lucide-reac
 import { ProgramLanding } from "@/components/marketing/program-landing";
 import { portalLoginHref } from "@/lib/subdomain";
 
-export const metadata: Metadata = { title: "Become a Travel Agent" };
+export const metadata: Metadata = { title: "Become a travel agent" };
 
 export default function AgentsLandingPage() {
   // This page is served on the root host, but /agent/login only exists on the
@@ -15,9 +15,9 @@ export default function AgentsLandingPage() {
   return (
     <ProgramLanding
       image={{ src: "/marketing/partner-agent.webp", alt: "A travel agent helping a family plan a trip at his desk" }}
-      eyebrow="B2B Travel Agents"
+      eyebrow="B2B travel agents"
       icon={Briefcase}
-      title="Become a Travel Agent"
+      title="Become a travel agent"
       subtitle="Access B2B rates on hotels, flights, visas, and Umrah packages, and manage every booking for your customers from one dashboard."
       ctaLabel="Apply to become an agent"
       ctaHref="/account/become?program=agent"
@@ -31,7 +31,7 @@ export default function AgentsLandingPage() {
         {
           icon: LayoutDashboard,
           title: "One agent dashboard",
-          description: "Track every booking made through your agency in a single, unified view.",
+          description: "Every booking made through your agency, in one view.",
         },
         {
           icon: Users,
@@ -47,7 +47,7 @@ export default function AgentsLandingPage() {
       steps={[
         {
           title: "Create an account",
-          description: "Sign up with your email — takes less than a minute.",
+          description: "Sign up with your email.",
         },
         {
           title: "Submit your agency details",
@@ -55,14 +55,14 @@ export default function AgentsLandingPage() {
         },
         {
           title: "Get approved",
-          description: "Our team reviews applications and approves most within a couple of business days.",
+          description: "Our team reviews your application.",
         },
         {
           title: "Start booking",
-          description: "Browse hotels, flights, visas, and Umrah packages — every booking you make is automatically attributed to your agency.",
+          description: "Book hotels, flights, visas and Umrah packages under your agency.",
         },
       ]}
-      faqNote="Once approved, you can invite staff to your agency and see every booking your team makes."
+      faqNote="Approved agencies can invite staff and see every booking their team makes."
     />
   );
 }

@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { AnimatePresence, motion } from "motion/react";
 import { CarouselRail } from "@/components/ui/aceternity/carousel-rail";
 import { FadeIn } from "@/components/ui/aceternity/motion-primitives";
+import { SectionHeading } from "@/components/marketing/section-heading";
+import { DestinationCard } from "@/components/marketing/destination-rail";
 import { cn } from "@/lib/utils";
 
 import { AcUnitIcon, GrainIcon, WbSunnyIcon } from "@/components/ui/mui-icons";
@@ -74,17 +74,23 @@ const SEASONS: Season[] = [
 export function SeasonPicker() {
   const [active, setActive] = useState(0);
   const season = SEASONS[active];
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  // Roving tabindex: arrows move between seasons, as the WAI-ARIA tabs pattern expects.
+  function onTabKey(e: React.KeyboardEvent<HTMLButtonElement>, i: number) {
+    const delta = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!delta) return;
+    e.preventDefault();
+    const next = (i + delta + SEASONS.length) % SEASONS.length;
+    setActive(next);
+    tabRefs.current[next]?.focus();
+  }
 
   return (
-    <section className={cn("relative bg-gradient-to-b py-14 transition-colors duration-700 sm:py-16 lg:py-20", season.wash)}>
+    <section className={cn("relative bg-gradient-to-b py-16 transition-colors duration-700 sm:py-20 lg:py-24", season.wash)}>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <FadeIn className="text-center">
-          <h2 className="font-heading text-2xl font-bold tracking-tight text-balance sm:text-3xl lg:text-4xl">
-            Not sure when to go, or where?
-          </h2>
-          <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-            Pick a season and we&rsquo;ll show what travels best in it.
-          </p>
+          <SectionHeading title="Not sure when to go, or where?" />
 
           <div role="tablist" aria-label="Travel season" className="mt-7 flex flex-wrap justify-center gap-2.5">
             {SEASONS.map((s, i) => {
@@ -93,10 +99,17 @@ export function SeasonPicker() {
               return (
                 <button
                   key={s.key}
+                  ref={(el) => {
+                    tabRefs.current[i] = el;
+                  }}
                   role="tab"
                   type="button"
+                  id={`season-tab-${s.key}`}
                   aria-selected={selected}
+                  aria-controls="season-panel"
+                  tabIndex={selected ? 0 : -1}
                   onClick={() => setActive(i)}
+                  onKeyDown={(e) => onTabKey(e, i)}
                   className={cn(
                     "flex h-11 items-center gap-2 rounded-lg px-5 font-heading text-sm font-bold transition-all duration-200",
                     "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none",
@@ -113,7 +126,12 @@ export function SeasonPicker() {
           </div>
         </FadeIn>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-12">
+        <div
+          id="season-panel"
+          role="tabpanel"
+          aria-labelledby={`season-tab-${season.key}`}
+          className="mt-10 grid gap-6 lg:grid-cols-12"
+        >
           <AnimatePresence mode="wait">
             <motion.div
               key={`${season.key}-copy`}
@@ -141,30 +159,7 @@ export function SeasonPicker() {
               >
                 <CarouselRail ariaLabel={`${season.label} packages`} itemClassName="w-[230px] sm:w-[248px]">
                   {season.cards.map((card) => (
-                    <Link
-                      key={card.title}
-                      href={card.href}
-                      className="group block overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-                    >
-                      <div className="relative aspect-4/3 overflow-hidden">
-                        <Image
-                          src={card.image}
-                          alt=""
-                          fill
-                          sizes="248px"
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      </div>
-                      <div className="p-4">
-                        <h4 className="font-heading text-sm leading-snug font-bold transition-colors group-hover:text-primary">
-                          {card.title}
-                        </h4>
-                        <div className="mt-2.5 flex items-end justify-between">
-                          <span className="text-xs text-muted-foreground">{card.days}</span>
-                          <span className="font-heading text-base font-bold text-brand-accent">{card.price}</span>
-                        </div>
-                      </div>
-                    </Link>
+                    <DestinationCard key={card.title} card={{ ...card, meta: card.days }} />
                   ))}
                 </CarouselRail>
               </motion.div>
