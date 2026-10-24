@@ -2,24 +2,24 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, BedDouble } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { createHotelBooking } from "@/modules/hotels/booking-actions";
 import { createBatchBooking } from "@/modules/agencies/batch-booking-actions";
 import type { AgencyMarkupRule } from "@/modules/agencies/markup";
+import { money } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 function nightsBetween(checkIn: string, checkOut: string) {
@@ -84,190 +84,181 @@ export function DeskBookingForm({
       : markup.value
     : 0;
 
+  const customerPays = net + margin;
+  const grandTotal = customerPays * customerCount;
+  const shortBy = bookingMode === "instant" ? grandTotal - available : 0;
+  const nightsLabel = `${nights} night${nights === 1 ? "" : "s"} × ${numRooms} room${numRooms === 1 ? "" : "s"}`;
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size="sm" />}>Book</DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <BedDouble className="size-4 text-primary" /> {room.name}
-          </DialogTitle>
+          <DialogTitle>{room.name}</DialogTitle>
         </DialogHeader>
 
-        <form action={formAction} className="space-y-4">
+        <form action={formAction} className="space-y-5">
           <input type="hidden" name="hotelId" value={hotelId} />
           <input type="hidden" name="roomId" value={room.id} />
           <input type="hidden" name="agencyCustomerId" value={agencyCustomerId} />
           <input type="hidden" name="vertical" value="hotel" />
           <input type="hidden" name="desk" value="1" />
 
-          {state?.error ? (
-            <Alert variant="destructive">
-              <AlertCircle />
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          ) : null}
+          <FieldGroup className="gap-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Field>
+                <FieldLabel htmlFor={`checkIn-${room.id}`}>Check-in</FieldLabel>
+                <Input
+                  id={`checkIn-${room.id}`}
+                  name="checkIn"
+                  type="date"
+                  required
+                  value={checkIn}
+                  onChange={(event) => setCheckIn(event.target.value)}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`checkOut-${room.id}`}>Check-out</FieldLabel>
+                <Input
+                  id={`checkOut-${room.id}`}
+                  name="checkOut"
+                  type="date"
+                  required
+                  min={checkIn || undefined}
+                  value={checkOut}
+                  onChange={(event) => setCheckOut(event.target.value)}
+                />
+              </Field>
+            </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor={`checkIn-${room.id}`}>Check-in</Label>
-              <Input
-                id={`checkIn-${room.id}`}
-                name="checkIn"
-                type="date"
-                required
-                value={checkIn}
-                onChange={(event) => setCheckIn(event.target.value)}
+            <div className="grid grid-cols-3 gap-3">
+              <Field>
+                <FieldLabel htmlFor={`numRooms-${room.id}`}>Rooms</FieldLabel>
+                <Select
+                  name="numRooms"
+                  value={String(numRooms)}
+                  onValueChange={(value) => setNumRooms(Number(value))}
+                >
+                  <SelectTrigger id={`numRooms-${room.id}`} className="w-full tabular-nums">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roomOptions.map((count) => (
+                      <SelectItem key={count} value={String(count)}>
+                        {count}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`numAdults-${room.id}`}>Adults</FieldLabel>
+                <Input
+                  id={`numAdults-${room.id}`}
+                  name="numAdults"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={30}
+                  defaultValue={defaults?.guests || 1}
+                  className="tabular-nums"
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`numChildren-${room.id}`}>Children</FieldLabel>
+                <Input
+                  id={`numChildren-${room.id}`}
+                  name="numChildren"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={30}
+                  defaultValue={0}
+                  className="tabular-nums"
+                />
+              </Field>
+            </div>
+
+            <Field>
+              <FieldLabel htmlFor={`guestNames-${room.id}`}>Guest names</FieldLabel>
+              <Textarea
+                id={`guestNames-${room.id}`}
+                name="guestNames"
+                rows={2}
+                placeholder="One name per line"
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={`checkOut-${room.id}`}>Check-out</Label>
-              <Input
-                id={`checkOut-${room.id}`}
-                name="checkOut"
-                type="date"
-                required
-                value={checkOut}
-                onChange={(event) => setCheckOut(event.target.value)}
-              />
-            </div>
-          </div>
+            </Field>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor={`numRooms-${room.id}`}>Rooms</Label>
-              <Select
-                name="numRooms"
-                value={String(numRooms)}
-                onValueChange={(value) => setNumRooms(Number(value))}
-              >
-                <SelectTrigger id={`numRooms-${room.id}`} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {roomOptions.map((count) => (
-                    <SelectItem key={count} value={String(count)}>
-                      {count}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={`numAdults-${room.id}`}>Adults</Label>
-              <Input
-                id={`numAdults-${room.id}`}
-                name="numAdults"
-                type="number"
-                min={1}
-                max={30}
-                defaultValue={defaults?.guests || 1}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={`numChildren-${room.id}`}>Children</Label>
-              <Input
-                id={`numChildren-${room.id}`}
-                name="numChildren"
-                type="number"
-                min={0}
-                max={30}
-                defaultValue={0}
-              />
-            </div>
-          </div>
+            <Field>
+              <FieldLabel htmlFor={`specialRequests-${room.id}`}>Special requests</FieldLabel>
+              <Textarea id={`specialRequests-${room.id}`} name="specialRequests" rows={2} />
+            </Field>
+          </FieldGroup>
 
-          <div className="space-y-1.5">
-            <Label htmlFor={`guestNames-${room.id}`}>Guest names</Label>
-            <Textarea
-              id={`guestNames-${room.id}`}
-              name="guestNames"
-              rows={2}
-              placeholder="One name per line"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor={`specialRequests-${room.id}`}>Special requests</Label>
-            <Textarea id={`specialRequests-${room.id}`} name="specialRequests" rows={2} />
-          </div>
-
-          {nights > 0 && priceOnRequest ? (
-            <dl className="rounded-lg bg-secondary/40 px-3 py-2.5 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">
-                  {nights} night{nights === 1 ? "" : "s"} × {numRooms}
-                  {isGroup ? ` × ${customerCount}` : ""}
-                </dt>
-                <dd className="font-semibold">Price on request</dd>
-              </div>
-            </dl>
-          ) : nights > 0 ? (
-            <dl className="space-y-1 rounded-lg bg-secondary/40 px-3 py-2.5 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">
-                  Net · {nights} night{nights === 1 ? "" : "s"} × {numRooms}
-                </dt>
-                <dd className="tabular-nums">
-                  {room.currency} {net.toFixed(0)}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Your margin</dt>
-                <dd className="tabular-nums">
-                  {room.currency} {margin.toFixed(0)}
-                </dd>
-              </div>
-              <div
-                className={cn(
-                  "flex justify-between border-t border-border pt-1",
-                  isGroup ? "" : "font-semibold"
-                )}
-              >
-                <dt>Customer pays</dt>
-                <dd className="tabular-nums">
-                  {room.currency} {(net + margin).toFixed(0)}
-                </dd>
-              </div>
-              {isGroup ? (
-                <div className="flex justify-between border-t border-border pt-1 font-semibold">
-                  <dt>Total · {customerCount} customers</dt>
-                  <dd className="tabular-nums">
-                    {room.currency} {((net + margin) * customerCount).toFixed(0)}
-                  </dd>
+          {nights > 0 ? (
+            <dl className="space-y-1.5 rounded-lg bg-secondary/40 px-4 py-3 text-sm">
+              {priceOnRequest ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-muted-foreground tabular-nums">
+                    {nightsLabel}
+                    {isGroup ? ` × ${customerCount}` : ""}
+                  </dt>
+                  <dd className="font-semibold">Price on request</dd>
                 </div>
-              ) : null}
-              {bookingMode === "instant" && (net + margin) * customerCount > available ? (
-                <div className="flex justify-between border-t border-border pt-1 text-destructive">
-                  <dt className="font-medium">Short by</dt>
-                  <dd className="font-semibold tabular-nums">
-                    {room.currency} {((net + margin) * customerCount - available).toFixed(0)}
-                  </dd>
-                </div>
-              ) : null}
+              ) : (
+                <>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-muted-foreground tabular-nums">Net · {nightsLabel}</dt>
+                    <dd className="tabular-nums">{money(net, room.currency)}</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-muted-foreground">Your margin</dt>
+                    <dd className="tabular-nums">{money(margin, room.currency)}</dd>
+                  </div>
+                  <div
+                    className={cn(
+                      "flex items-baseline justify-between gap-3 border-t border-border pt-1.5",
+                      !isGroup && "font-semibold"
+                    )}
+                  >
+                    <dt>{isGroup ? "Per customer" : "Customer pays"}</dt>
+                    <dd className={cn("tabular-nums", !isGroup && "font-heading text-base")}>
+                      {money(customerPays, room.currency)}
+                    </dd>
+                  </div>
+                  {isGroup ? (
+                    <div className="flex items-baseline justify-between gap-3 border-t border-border pt-1.5 font-semibold">
+                      <dt className="tabular-nums">Total · {customerCount} customers</dt>
+                      <dd className="font-heading text-base tabular-nums">{money(grandTotal, room.currency)}</dd>
+                    </div>
+                  ) : null}
+                  {shortBy > 0 ? (
+                    <div className="flex items-baseline justify-between gap-3 border-t border-border pt-1.5 text-destructive">
+                      <dt className="font-medium">Short by</dt>
+                      <dd className="font-semibold tabular-nums">{money(shortBy, room.currency)}</dd>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </dl>
           ) : null}
 
-          <div className="space-y-2">
-            <SubmitButton className="w-full" pendingText="Booking…">
+          <FieldError>{state?.error}</FieldError>
+
+          <DialogFooter>
+            {bookingMode === "instant" ? (
+              <SubmitButton name="intent" value="hold" variant="outline" pendingText="Holding…">
+                Hold 24h
+              </SubmitButton>
+            ) : null}
+            <SubmitButton pendingText="Booking…">
               {isGroup
                 ? `${bookingMode === "manual" ? "Send request" : "Confirm"} for ${customerCount} customers`
                 : bookingMode === "manual"
                   ? "Send request"
                   : "Confirm booking"}
             </SubmitButton>
-            {bookingMode === "instant" ? (
-              <SubmitButton
-                name="intent"
-                value="hold"
-                variant="outline"
-                className="w-full"
-                pendingText="Holding…"
-              >
-                Hold 24h
-              </SubmitButton>
-            ) : null}
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

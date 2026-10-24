@@ -18,6 +18,7 @@ import { StepReview } from "@/modules/umrah/components/step-review";
 import { AgencyBookingSlot } from "@/modules/agencies/components/agency-booking-slot";
 import { BackLink } from "@/components/back-link";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata: Metadata = { title: "Build a private Umrah" };
 
@@ -70,8 +71,14 @@ export default async function AgentPrivateUmrahBuilderPage({
   const pilgrims = Array.isArray(request.pilgrims) ? (request.pilgrims as PilgrimInput[]) : [];
 
   return (
-    <div className="space-y-4">
-      <BackLink href="/agent/book/umrah" label="Umrah" />
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <BackLink href="/agent/book/umrah" label="Umrah" />
+        <PageHeader
+          title="Private Umrah"
+          meta={<span className="font-mono">{request.reference}</span>}
+        />
+      </div>
 
       <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
         <aside className="min-w-0 space-y-4 lg:sticky lg:top-24 lg:self-start">
@@ -98,9 +105,9 @@ export default async function AgentPrivateUmrahBuilderPage({
               confirmLabel="Discard"
               variant="ghost"
               size="sm"
-              className="w-full gap-1.5 text-muted-foreground hover:text-destructive"
+              className="w-full text-muted-foreground hover:text-destructive"
             >
-              <Trash2 className="size-3.5" /> Discard this trip
+              <Trash2 data-icon="inline-start" aria-hidden="true" /> Discard trip
             </ConfirmButton>
           </form>
         </aside>

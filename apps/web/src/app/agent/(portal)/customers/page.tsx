@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
-import { Search } from "lucide-react";
+import { Search, UsersRound } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyCustomersWithStats } from "@/modules/agencies/queries";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { PageHeader } from "@/components/ui/page-header";
+import { money } from "@/lib/money";
 import {
   Table,
   TableBody,
@@ -20,9 +24,7 @@ import { Pager } from "@/components/dashboard/pager";
 import { parsePage } from "@/lib/pagination";
 import { AddCustomerForm } from "./add-customer-form";
 
-function money(amount: number, currency: string) {
-  return `${currency} ${amount.toFixed(0)}`;
-}
+export const metadata = { title: "Customers" };
 
 export default async function AgentCustomersPage({
   searchParams,
@@ -50,98 +52,105 @@ export default async function AgentCustomersPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="font-heading text-2xl font-bold">Customers</h1>
-        <AddCustomerForm />
-      </div>
+      <PageHeader
+        title="Customers"
+        meta={
+          total > 0
+            ? `${total} customer${total === 1 ? "" : "s"} · ${registeredCount} with an STS account`
+            : undefined
+        }
+        actions={<AddCustomerForm />}
+      />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <form className="relative w-full max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+      <form role="search" className="flex items-center gap-2">
+        <InputGroup className="sm:w-72 max-sm:h-10">
+          <InputGroupAddon>
+            <Search aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput
             type="search"
             name="q"
             defaultValue={q ?? ""}
-            placeholder="Search name, email, or phone"
-            className="pl-9"
+            placeholder="Name, email or phone"
+            aria-label="Search customers"
           />
-        </form>
-        {total > 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {total} customer{total === 1 ? "" : "s"} · {registeredCount} with
-            an STS account
-          </p>
-        ) : null}
-      </div>
+        </InputGroup>
+        <Button type="submit" variant="outline">
+          Search
+        </Button>
+      </form>
 
       {customers.length === 0 ? (
         <Card>
-          <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            {q ? `No customers match “${q}”.` : "No customers yet."}
-          </CardContent>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <UsersRound />
+            </EmptyMedia>
+            <EmptyTitle>{q ? `No customers match “${q}”` : "No customers"}</EmptyTitle>
+          </Empty>
         </Card>
       ) : (
         <Card className="overflow-hidden py-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Account</TableHead>
-                  <TableHead className="text-right">Bookings</TableHead>
-                  <TableHead className="text-right">Spent</TableHead>
-                  <TableHead className="text-right">Last booking</TableHead>
-                  <TableHead className="text-right" />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Account</TableHead>
+                <TableHead numeric>Bookings</TableHead>
+                <TableHead numeric>Spent</TableHead>
+                <TableHead numeric>Last booking</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {customers.map((customer) => (
+                <TableRow key={customer.id}>
+                  <TableCell>
+                    <Link
+                      href={`/agent/customers/${customer.id}`}
+                      className="rounded-sm font-medium outline-none hover:text-primary hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      {customer.full_name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {customer.phone ?? customer.email ?? "—"}
+                    {customer.phone && customer.email ? (
+                      <span className="block text-xs">{customer.email}</span>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>
+                    {customer.profile_id ? (
+                      <Badge variant="info">STS account</Badge>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell numeric className="text-sm">
+                    {customer.bookings}
+                  </TableCell>
+                  <TableCell numeric className="text-sm">
+                    {customer.spent > 0 ? money(customer.spent, customer.currency) : "—"}
+                  </TableCell>
+                  <TableCell numeric className="text-sm text-muted-foreground">
+                    {customer.lastBookingAt
+                      ? format(new Date(customer.lastBookingAt), "d MMM yyyy")
+                      : "—"}
+                  </TableCell>
+                  <TableCell numeric>
+                    <SelectCustomerButton
+                      customerId={customer.id}
+                      label="Book"
+                      redirectTo="/agent/book"
+                    />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {customers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell>
-                      <Link
-                        href={`/agent/customers/${customer.id}`}
-                        className="font-medium hover:text-primary hover:underline"
-                      >
-                        {customer.full_name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {customer.phone ?? customer.email ?? "—"}
-                      {customer.phone && customer.email ? (
-                        <span className="block text-xs">{customer.email}</span>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      {customer.profile_id ? (
-                        <Badge className="border-transparent bg-primary/10 text-primary">
-                          STS account
-                        </Badge>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right text-sm">{customer.bookings}</TableCell>
-                    <TableCell className="text-right text-sm">
-                      {customer.spent > 0 ? money(customer.spent, customer.currency) : "—"}
-                    </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {customer.lastBookingAt
-                        ? format(new Date(customer.lastBookingAt), "d MMM yyyy")
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <SelectCustomerButton
-                        customerId={customer.id}
-                        label="Book"
-                        redirectTo="/agent/book"
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
+            </TableBody>
+          </Table>
         </Card>
       )}
 

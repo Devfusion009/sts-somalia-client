@@ -36,6 +36,8 @@ export type PickerRow = {
 export function CustomerPickerTable({ rows }: { rows: PickerRow[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
+  // Which row's "Select" was clicked, so only that button shows the spinner.
+  const [pendingId, setPendingId] = useState<string | null>(null);
   const router = useRouter();
 
   const allChecked = rows.length > 0 && rows.every((row) => selected.has(row.id));
@@ -49,7 +51,8 @@ export function CustomerPickerTable({ rows }: { rows: PickerRow[] }) {
     });
   }
 
-  function commit(ids: string[]) {
+  function commit(ids: string[], rowId: string | null = null) {
+    setPendingId(rowId);
     startTransition(async () => {
       const result = await selectBookingCustomers(ids);
       if (result.error) {
@@ -78,9 +81,11 @@ export function CustomerPickerTable({ rows }: { rows: PickerRow[] }) {
                 </TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Contact</TableHead>
-                <TableHead className="text-right">Bookings</TableHead>
-                <TableHead className="text-right">Last booking</TableHead>
-                <TableHead className="text-right" />
+                <TableHead numeric>Bookings</TableHead>
+                <TableHead numeric>Last booking</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -96,18 +101,16 @@ export function CustomerPickerTable({ rows }: { rows: PickerRow[] }) {
                   <TableCell>
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{row.full_name}</span>
-                      {row.profile_id ? (
-                        <Badge className="border-transparent bg-primary/10 text-primary">
-                          STS account
-                        </Badge>
-                      ) : null}
+                      {row.profile_id ? <Badge variant="info">STS account</Badge> : null}
                     </span>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {row.phone ?? row.email ?? "—"}
                   </TableCell>
-                  <TableCell className="text-right text-sm">{row.bookings}</TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground">
+                  <TableCell numeric className="text-sm">
+                    {row.bookings}
+                  </TableCell>
+                  <TableCell numeric className="text-sm text-muted-foreground">
                     {row.lastBookingAt ? format(new Date(row.lastBookingAt), "d MMM yyyy") : "—"}
                   </TableCell>
                   <TableCell className="text-right">
@@ -115,7 +118,8 @@ export function CustomerPickerTable({ rows }: { rows: PickerRow[] }) {
                       size="sm"
                       variant="outline"
                       disabled={pending}
-                      onClick={() => commit([row.id])}
+                      loading={pending && pendingId === row.id}
+                      onClick={() => commit([row.id], row.id)}
                     >
                       Select
                     </Button>
@@ -128,13 +132,20 @@ export function CustomerPickerTable({ rows }: { rows: PickerRow[] }) {
       </Card>
 
       {selected.size > 0 ? (
-        <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-end gap-2 rounded-lg bg-card px-4 py-3 shadow-md ring-1 ring-foreground/10">
-          <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>
-            Clear
-          </Button>
-          <Button size="sm" disabled={pending} onClick={() => commit([...selected])}>
-            Continue with {selected.size} customer{selected.size === 1 ? "" : "s"}
-          </Button>
+        <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-card px-4 py-3 shadow-md ring-1 ring-foreground/10">
+          <span className="text-sm font-medium tabular-nums">{selected.size} selected</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" disabled={pending} onClick={() => setSelected(new Set())}>
+              Clear
+            </Button>
+            <Button
+              disabled={pending}
+              loading={pending && pendingId === null}
+              onClick={() => commit([...selected])}
+            >
+              Continue with {selected.size} customer{selected.size === 1 ? "" : "s"}
+            </Button>
+          </div>
         </div>
       ) : null}
     </>

@@ -1,10 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckCircle2 } from "lucide-react";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { updateAgencyProfileAction } from "@/modules/agencies/settings-actions";
@@ -33,71 +32,70 @@ export function AgencyProfileForm({
   const [state, formAction] = useActionState(updateAgencyProfileAction, null);
 
   return (
-    <form action={formAction} className="space-y-4">
-      {state?.error ? (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      ) : null}
-      {state?.error === null ? (
-        <Alert>
-          <CheckCircle2 />
-          <AlertDescription>Agency profile updated.</AlertDescription>
-        </Alert>
-      ) : null}
+    <form action={formAction}>
+      <FieldGroup>
+        <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="name">
+              Agency name <span className="text-destructive">*</span>
+            </FieldLabel>
+            <Input id="name" name="name" defaultValue={name} required />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="legalName">Legal name</FieldLabel>
+            <Input id="legalName" name="legalName" defaultValue={legalName ?? ""} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="registrationNumber">Registration number</FieldLabel>
+            <Input id="registrationNumber" name="registrationNumber" defaultValue={registrationNumber ?? ""} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="countryCode">Country code</FieldLabel>
+            <Input
+              id="countryCode"
+              name="countryCode"
+              defaultValue={countryCode ?? ""}
+              placeholder="e.g. SO"
+              maxLength={2}
+              className="uppercase"
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="contactEmail">
+              Contact email <span className="text-destructive">*</span>
+            </FieldLabel>
+            <Input id="contactEmail" name="contactEmail" type="email" defaultValue={contactEmail} required />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="contactPhone">Contact phone</FieldLabel>
+            <Input id="contactPhone" name="contactPhone" type="tel" defaultValue={contactPhone ?? ""} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="website">Website</FieldLabel>
+            <Input id="website" name="website" type="url" defaultValue={website ?? ""} placeholder="https://" />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="address">Office address</FieldLabel>
+            <Input id="address" name="address" defaultValue={address ?? ""} />
+          </Field>
+          <Field className="sm:col-span-2">
+            <FieldLabel htmlFor="about">About the agency</FieldLabel>
+            <Textarea id="about" name="about" rows={3} maxLength={600} defaultValue={about ?? ""} />
+          </Field>
+        </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="name">
-            Agency name <span className="text-destructive">*</span>
-          </Label>
-          <Input id="name" name="name" defaultValue={name} required />
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <FieldError className="sm:mr-auto">{state?.error}</FieldError>
+          {state?.error === null ? (
+            <p role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground sm:mr-auto">
+              <CheckCircle2 className="size-4 text-primary" aria-hidden="true" /> Profile updated.
+            </p>
+          ) : null}
+          <SubmitButton pendingText="Saving…" className="max-sm:w-full">
+            Save changes
+          </SubmitButton>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="legalName">Legal name</Label>
-          <Input id="legalName" name="legalName" defaultValue={legalName ?? ""} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="registrationNumber">Registration number</Label>
-          <Input id="registrationNumber" name="registrationNumber" defaultValue={registrationNumber ?? ""} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="countryCode">Country code</Label>
-          <Input
-            id="countryCode"
-            name="countryCode"
-            defaultValue={countryCode ?? ""}
-            placeholder="e.g. SO"
-            maxLength={2}
-            className="uppercase"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="contactEmail">
-            Contact email <span className="text-destructive">*</span>
-          </Label>
-          <Input id="contactEmail" name="contactEmail" type="email" defaultValue={contactEmail} required />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="contactPhone">Contact phone</Label>
-          <Input id="contactPhone" name="contactPhone" type="tel" defaultValue={contactPhone ?? ""} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="website">Website</Label>
-          <Input id="website" name="website" type="url" defaultValue={website ?? ""} placeholder="https://" />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="address">Office address</Label>
-          <Input id="address" name="address" defaultValue={address ?? ""} />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="about">About the agency</Label>
-          <Textarea id="about" name="about" rows={3} maxLength={600} defaultValue={about ?? ""} />
-        </div>
-      </div>
-
-      <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
+      </FieldGroup>
     </form>
   );
 }

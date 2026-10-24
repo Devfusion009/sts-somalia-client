@@ -1,22 +1,17 @@
+import type { Metadata } from "next";
 import { format } from "date-fns";
-import { Crown, Info, Users } from "lucide-react";
+import { Crown } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyTeam } from "@/modules/agencies/queries";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/page-header";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AddMemberForm } from "./add-member-form";
 import { MemberRowActions } from "./member-row-actions";
+
+export const metadata: Metadata = { title: "Team" };
 
 const ROLE_LEGEND: Record<string, string> = {
   owner: "Full control over the agency; can't be removed.",
@@ -46,30 +41,15 @@ export default async function AgentTeamPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-bold">Team</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge className="gap-1.5 border-transparent bg-secondary text-secondary-foreground">
-            <Users className="size-3.5" /> {team.length} member{team.length === 1 ? "" : "s"}
-          </Badge>
-          {canManage ? <AddMemberForm /> : null}
-        </div>
-      </div>
-
-      <Alert>
-        <Info />
-        <AlertDescription>
-          <span className="font-medium">Owner</span> and <span className="font-medium">Admin</span>{" "}
-          manage the team; <span className="font-medium">Booking Staff</span> book and spend the
-          wallet; <span className="font-medium">Accountant</span> sees financials only;{" "}
-          <span className="font-medium">Viewer</span> is read-only.
-          {!canManage
-            ? " Only an owner or admin can add, edit, or remove team members."
-            : " Adding someone requires them to already have an STS account."}
-        </AlertDescription>
-      </Alert>
+      <PageHeader
+        title="Team"
+        meta={
+          <span className="tabular-nums">
+            {team.length} member{team.length === 1 ? "" : "s"}
+          </span>
+        }
+        actions={canManage ? <AddMemberForm /> : null}
+      />
 
       <Card className="overflow-hidden py-0">
         <Table>
@@ -79,7 +59,11 @@ export default async function AgentTeamPage() {
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Joined</TableHead>
-              {canManage ? <TableHead className="text-right">Actions</TableHead> : null}
+              {canManage ? (
+                <TableHead className="w-0 text-right">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              ) : null}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -90,50 +74,35 @@ export default async function AgentTeamPage() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="size-8">
-                        <AvatarFallback className="bg-secondary text-xs font-semibold text-secondary-foreground">
+                        <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
                           {initials(member.profiles?.full_name ?? null, member.profiles?.email ?? null)}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">{member.profiles?.full_name ?? "—"}</p>
-                        <p className="text-xs text-muted-foreground">{member.profiles?.email}</p>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{member.profiles?.full_name ?? "—"}</p>
+                        <p className="truncate text-xs text-muted-foreground">{member.profiles?.email}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge
+                      variant={isOwnerRow ? "default" : "neutral"}
                       title={ROLE_LEGEND[member.role_in_agency]}
-                      className={cn(
-                        "gap-1 border-transparent capitalize",
-                        isOwnerRow
-                          ? "bg-brand-gold/15 text-brand-gold"
-                          : "bg-secondary text-secondary-foreground"
-                      )}
+                      className="capitalize"
                     >
-                      {isOwnerRow ? <Crown className="size-3" /> : null}
+                      {isOwnerRow ? <Crown aria-hidden="true" /> : null}
                       {member.role_in_agency.replace("_", " ")}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      className={cn(
-                        "border-transparent capitalize",
-                        member.status === "active"
-                          ? "bg-primary/10 text-primary"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
+                    <Badge variant={statusBadgeVariant(member.status)} className="capitalize">
                       {member.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {format(new Date(member.created_at), "d MMM yyyy")}
-                  </TableCell>
+                  <TableCell className="text-muted-foreground">{format(new Date(member.created_at), "d MMM yyyy")}</TableCell>
                   {canManage ? (
                     <TableCell className="text-right">
-                      {isOwnerRow ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : (
+                      {isOwnerRow ? null : (
                         <MemberRowActions memberId={member.id} currentRole={member.role_in_agency} />
                       )}
                     </TableCell>

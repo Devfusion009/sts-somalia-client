@@ -2,8 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FieldError } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
 import { payBatchFromWallet } from "@/modules/agencies/batch-booking-actions";
 
@@ -37,14 +36,9 @@ export function PayBatchForm({
     >
       <input type="hidden" name="batchId" value={batchId} />
 
-      {state?.error ? (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      ) : null}
+      <FieldError>{state?.error}</FieldError>
 
-      <SubmitButton pendingText="Paying…">
+      <SubmitButton size="lg" pendingText="Paying…" className="w-full tabular-nums">
         Pay {count} order{count === 1 ? "" : "s"} · {amountLabel}
       </SubmitButton>
     </form>

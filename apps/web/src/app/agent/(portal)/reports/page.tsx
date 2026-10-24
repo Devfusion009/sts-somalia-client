@@ -1,7 +1,7 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
-import { BadgeDollarSign, Banknote, CalendarClock, Download, FileText, TrendingUp } from "lucide-react";
+import { Banknote, CalendarDays, Download, FileText, Receipt } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
   getMyAgency,
@@ -11,22 +11,20 @@ import {
   getAgencyEarningsSummary,
   type AgencyCommissionEntry,
 } from "@/modules/agencies/queries";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import { ADMIN_PAGE_SIZE, parsePage } from "@/lib/pagination";
+import { Card } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FilterChips, StatStrip, StatStripItem } from "@/components/dashboard/filter-chips";
+import { money } from "@/lib/money";
+import { parsePage } from "@/lib/pagination";
 import { Pager } from "@/components/dashboard/pager";
 import { ReportFilters } from "./report-filters";
 import type { Database } from "@/lib/types/database.types";
+
+export const metadata: Metadata = { title: "Earnings" };
 
 type OrderItemType = Database["public"]["Enums"]["order_item_type"];
 
@@ -38,11 +36,9 @@ const VERTICAL_LABELS: Record<OrderItemType, string> = {
   hall: "Events & Halls",
 };
 
-const ENTRY_STATUS_STYLES: Record<string, string> = {
-  pending: "bg-brand-gold/15 text-brand-gold",
-  confirmed: "bg-primary/10 text-primary",
-  paid_out: "bg-chart-3/10 text-chart-3",
-  reversed: "bg-destructive/10 text-destructive",
+const ENTRY_STATUS_VARIANT: Partial<Record<string, BadgeVariant>> = {
+  paid_out: "neutral",
+  reversed: "destructive",
 };
 
 // The same four words the Finance Overview pipeline uses — an agent should
@@ -54,9 +50,7 @@ const ENTRY_STATUS_LABELS: Record<string, string> = {
   reversed: "Reversed",
 };
 
-function money(amount: number) {
-  return `USD ${amount.toFixed(2)}`;
-}
+const usd = (amount: number) => money(amount, "USD");
 
 export default async function AgentReportsPage({
   searchParams,
@@ -91,143 +85,122 @@ export default async function AgentReportsPage({
   if (page > 1 && entries.length === 0) redirect(hrefFor(1));
   const months = report.months;
 
-  const stats = [
-    {
-      label: "Total Earned",
-      value: money(report.earnedTotal),
-      sub: `${report.earnedCount} settled bookings`,
-      icon: BadgeDollarSign,
-      tint: "bg-primary/10 text-primary",
-    },
-    {
-      label: "Earned This Month",
-      value: money(report.earnedThisMonth),
-      sub: format(new Date(), "MMMM yyyy"),
-      icon: TrendingUp,
-      tint: "bg-chart-3/10 text-chart-3",
-    },
-    {
-      label: "In review by STS",
-      value: money(summary.inReview),
-      sub: undefined,
-      icon: CalendarClock,
-      tint: "bg-brand-gold/15 text-brand-gold",
-    },
-    {
-      label: "Available to withdraw",
-      value: money(summary.available),
-      sub: undefined,
-      icon: Banknote,
-      tint: "bg-chart-3/10 text-chart-3",
-    },
-  ];
+  const query = (extra: Record<string, string | undefined>) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries({ from, to, type, ...extra })) if (value) params.set(key, value);
+    return params.toString();
+  };
+  const withQuery = (qs: string) => (qs ? `/agent/reports?${qs}` : "/agent/reports");
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-bold">Earnings &amp; Reports</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/agent/reports/export" />}>
-            <Download className="size-3.5" /> Export CSV
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            render={
-              <Link
-                href={`/agent/reports/statement?${new URLSearchParams({
-                  ...(from ? { from } : {}),
-                  ...(to ? { to } : {}),
-                  ...(type ? { type } : {}),
-                }).toString()}`}
-              />
-            }
-          >
-            <FileText className="size-3.5" /> PDF Statement
-          </Button>
-        </div>
+      <PageHeader
+        title="Earnings"
+        actions={
+          <>
+            <Button variant="outline" nativeButton={false} render={<a href="/agent/reports/export" />}>
+              <Download data-icon="inline-start" aria-hidden="true" /> Export CSV
+            </Button>
+            <Button variant="outline" nativeButton={false} render={<a href={`/agent/reports/statement?${query({})}`} />}>
+              <FileText data-icon="inline-start" aria-hidden="true" /> PDF statement
+            </Button>
+          </>
+        }
+      />
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <FilterChips
+          label="Filter by product"
+          active={itemType ?? ""}
+          items={[
+            { key: "", label: "All products", href: withQuery(query({ type: undefined })) },
+            ...Object.entries(VERTICAL_LABELS).map(([key, label]) => ({
+              key,
+              label,
+              href: withQuery(query({ type: key })),
+            })),
+          ]}
+        />
+        <ReportFilters defaultFrom={from} defaultTo={to} defaultType={type} />
       </div>
 
-      <ReportFilters defaultFrom={from} defaultTo={to} defaultType={type} verticals={VERTICAL_LABELS} />
+      <StatStrip>
+        <StatStripItem
+          label="Total earned"
+          value={usd(report.earnedTotal)}
+          sub={`${report.earnedCount} settled ${report.earnedCount === 1 ? "booking" : "bookings"}`}
+        />
+        <StatStripItem label="Earned this month" value={usd(report.earnedThisMonth)} sub={format(new Date(), "MMMM yyyy")} />
+        <StatStripItem
+          label="In review by STS"
+          value={usd(summary.inReview)}
+          tone={summary.inReview > 0 ? "warn" : undefined}
+        />
+        <StatStripItem label="Available to withdraw" value={usd(summary.available)} tone="primary" />
+      </StatStrip>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.label}>
-            <CardContent className="flex items-start justify-between gap-3 pt-6">
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
-                <p className="mt-1 truncate font-heading text-2xl font-bold">{stat.value}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{stat.sub}</p>
-              </div>
-              <span
-                className={cn(
-                  "flex size-10 shrink-0 items-center justify-center rounded-xl",
-                  stat.tint
-                )}
-              >
-                <stat.icon className="size-4.5" />
-              </span>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[320px_1fr]">
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle className="text-base">By Month</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <section className="space-y-3">
+          <h2 className="font-heading text-base font-semibold">By month</h2>
+          <Card className="overflow-hidden py-0">
             {months.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">No earnings yet.</p>
+              <Empty>
+                <EmptyMedia variant="icon">
+                  <CalendarDays />
+                </EmptyMedia>
+                <EmptyTitle>No earnings</EmptyTitle>
+              </Empty>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Month</TableHead>
-                    <TableHead className="text-right">Bookings</TableHead>
-                    <TableHead className="text-right">Earned</TableHead>
+                    <TableHead numeric>Bookings</TableHead>
+                    <TableHead numeric>Earned</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {months.map((row) => (
                     <TableRow key={row.month}>
-                      <TableCell className="font-medium">
-                        {format(new Date(`${row.month}-01`), "MMM yyyy")}
-                      </TableCell>
-                      <TableCell className="text-right">{row.bookings}</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {money(row.total)}
+                      <TableCell className="font-medium">{format(new Date(`${row.month}-01`), "MMM yyyy")}</TableCell>
+                      <TableCell numeric>{row.bookings}</TableCell>
+                      <TableCell numeric className="font-medium">
+                        {usd(row.total)}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             )}
-          </CardContent>
-        </Card>
+          </Card>
+        </section>
 
-        <Card className="overflow-hidden py-0">
-          <CardHeader className="border-b border-border !py-4">
-            <CardTitle className="text-base">All Entries</CardTitle>
-          </CardHeader>
-          {entries.length === 0 ? (
-            <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              No commission entries yet.
-            </CardContent>
-          ) : (
-            <div className="overflow-x-auto">
+        <section className="min-w-0 space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-base font-semibold">All entries</h2>
+            {entryTotal > 0 ? (
+              <Badge variant="neutral" className="tabular-nums">
+                {entryTotal}
+              </Badge>
+            ) : null}
+          </div>
+          <Card className="overflow-hidden py-0">
+            {entries.length === 0 ? (
+              <Empty>
+                <EmptyMedia variant="icon">
+                  <Receipt />
+                </EmptyMedia>
+                <EmptyTitle>No commission entries</EmptyTitle>
+              </Empty>
+            ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Order</TableHead>
-                    <TableHead className="text-right">Rate</TableHead>
-                    <TableHead className="text-right">Commission</TableHead>
-                    <TableHead className="text-right">Markup</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead numeric>Rate</TableHead>
+                    <TableHead numeric>Commission</TableHead>
+                    <TableHead numeric>Markup</TableHead>
+                    <TableHead numeric>Total</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -235,30 +208,19 @@ export default async function AgentReportsPage({
                   {entries.map((entry: AgencyCommissionEntry) => (
                     <TableRow key={entry.id}>
                       <TableCell>
-                        <p className="font-mono text-xs font-medium">
-                          {entry.order?.order_number ?? "—"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(entry.created_at), "d MMM yyyy")}
-                        </p>
+                        <p className="font-mono text-xs font-medium">{entry.order?.order_number ?? "—"}</p>
+                        <p className="text-xs text-muted-foreground">{format(new Date(entry.created_at), "d MMM yyyy")}</p>
                       </TableCell>
-                      <TableCell className="text-right text-sm">{entry.rate_applied}%</TableCell>
-                      <TableCell className="text-right text-sm">
-                        {money(Number(entry.commission_amount))}
+                      <TableCell numeric className="text-muted-foreground">
+                        {entry.rate_applied}%
                       </TableCell>
-                      <TableCell className="text-right text-sm">
-                        {money(Number(entry.markup_amount))}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {money(Number(entry.amount))}
+                      <TableCell numeric>{usd(Number(entry.commission_amount))}</TableCell>
+                      <TableCell numeric>{usd(Number(entry.markup_amount))}</TableCell>
+                      <TableCell numeric className="font-medium">
+                        {usd(Number(entry.amount))}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          className={cn(
-                            "border-transparent capitalize",
-                            ENTRY_STATUS_STYLES[entry.status] ?? "bg-muted text-muted-foreground"
-                          )}
-                        >
+                        <Badge variant={statusBadgeVariant(entry.status, ENTRY_STATUS_VARIANT)} className="capitalize">
                           {ENTRY_STATUS_LABELS[entry.status] ?? entry.status.replace(/_/g, " ")}
                         </Badge>
                       </TableCell>
@@ -266,57 +228,54 @@ export default async function AgentReportsPage({
                   ))}
                 </TableBody>
               </Table>
-            </div>
-          )}
-          {entryTotal > ADMIN_PAGE_SIZE ? (
-            <div className="border-t border-border px-4 py-3">
-              <Pager page={page} total={entryTotal} hrefFor={hrefFor} />
-            </div>
-          ) : null}
-        </Card>
+            )}
+          </Card>
+          <Pager page={page} total={entryTotal} hrefFor={hrefFor} />
+        </section>
       </div>
 
-      <Card className="overflow-hidden py-0">
-        <CardHeader className="border-b border-border !py-4">
-          <CardTitle className="text-base">Payout History</CardTitle>
-        </CardHeader>
-        {payouts.length === 0 ? (
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No payouts yet.
-          </CardContent>
-        ) : (
-          <div className="overflow-x-auto">
+      <section className="space-y-3">
+        <h2 className="font-heading text-base font-semibold">Payout history</h2>
+        <Card className="overflow-hidden py-0">
+          {payouts.length === 0 ? (
+            <Empty>
+              <EmptyMedia variant="icon">
+                <Banknote />
+              </EmptyMedia>
+              <EmptyTitle>No payouts</EmptyTitle>
+            </Empty>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date Paid</TableHead>
+                  <TableHead>Paid</TableHead>
                   <TableHead>Method</TableHead>
                   <TableHead>Reference</TableHead>
                   <TableHead>Period</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead numeric>Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {payouts.map((payout) => (
                   <TableRow key={payout.id}>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(payout.paid_at), "d MMM yyyy")}
-                    </TableCell>
-                    <TableCell className="text-sm">{payout.method ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{format(new Date(payout.paid_at), "d MMM yyyy")}</TableCell>
+                    <TableCell>{payout.method ?? "—"}</TableCell>
                     <TableCell className="font-mono text-xs">{payout.payout_reference ?? "—"}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="text-muted-foreground">
                       {payout.period_start && payout.period_end
                         ? `${format(new Date(payout.period_start), "d MMM")} – ${format(new Date(payout.period_end), "d MMM yyyy")}`
                         : "—"}
                     </TableCell>
-                    <TableCell className="text-right font-semibold">{money(Number(payout.amount))}</TableCell>
+                    <TableCell numeric className="font-medium">
+                      {usd(Number(payout.amount))}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
-      </Card>
+          )}
+        </Card>
+      </section>
     </div>
   );
 }

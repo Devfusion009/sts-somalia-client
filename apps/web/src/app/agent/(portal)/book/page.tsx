@@ -1,27 +1,27 @@
 import Link from "next/link";
-import { Hotel, Landmark, PartyPopper, Plane, Search, Stamp } from "lucide-react";
+import { ChevronRight, Hotel, Landmark, PartyPopper, Plane, Search, Stamp, UsersRound } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getMyAgency, getAgencyCustomersWithStats } from "@/modules/agencies/queries";
 import { getBookingCustomers } from "@/modules/agencies/booking-context";
 import { NewBookingCustomerDialog } from "@/modules/agencies/components/new-booking-customer-dialog";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { PageHeader } from "@/components/ui/page-header";
 import { Pager } from "@/components/dashboard/pager";
 import { parsePage } from "@/lib/pagination";
 import { CustomerPickerTable } from "./customer-picker-table";
 
+export const metadata = { title: "New booking" };
+
 const SERVICES = [
-  { href: "/agent/book/flights", label: "Flights", icon: Plane, tint: "bg-primary/10 text-primary" },
-  { href: "/agent/book/hotels", label: "Hotels", icon: Hotel, tint: "bg-chart-2/10 text-chart-2" },
-  { href: "/agent/book/umrah", label: "Umrah", icon: Landmark, tint: "bg-chart-4/10 text-chart-4" },
-  {
-    href: "/agent/book/events",
-    label: "Event halls",
-    icon: PartyPopper,
-    tint: "bg-brand-gold/15 text-brand-gold",
-  },
-  { href: "/agent/book/visa", label: "Visa", icon: Stamp, tint: "bg-chart-3/10 text-chart-3" },
+  { href: "/agent/book/flights", label: "Flights", icon: Plane },
+  { href: "/agent/book/hotels", label: "Hotels", icon: Hotel },
+  { href: "/agent/book/umrah", label: "Umrah", icon: Landmark },
+  { href: "/agent/book/events", label: "Event halls", icon: PartyPopper },
+  { href: "/agent/book/visa", label: "Visa", icon: Stamp },
 ];
 
 export default async function BookingDeskPage({
@@ -39,24 +39,29 @@ export default async function BookingDeskPage({
 
   if (selected.length > 0) {
     return (
-      <div className="space-y-4">
-        <h1 className="font-heading text-2xl font-bold">New booking</h1>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="space-y-6">
+        <PageHeader title="Choose a service" />
+        <nav aria-label="Services" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {SERVICES.map((service) => (
             <Link
               key={service.href}
               href={service.href}
-              className="flex items-center gap-3 rounded-lg bg-card px-4 py-4 ring-1 ring-foreground/10 transition-colors hover:bg-secondary/50"
+              className="group flex min-h-16 items-center gap-3 rounded-xl bg-card px-4 py-3 shadow-xs ring-1 ring-foreground/[0.08] transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <span
-                className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${service.tint}`}
+                aria-hidden="true"
+                className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground"
               >
                 <service.icon className="size-5" />
               </span>
-              <span className="font-medium">{service.label}</span>
+              <span className="flex-1 font-medium">{service.label}</span>
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+              />
             </Link>
           ))}
-        </div>
+        </nav>
       </div>
     );
   }
@@ -77,28 +82,35 @@ export default async function BookingDeskPage({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="font-heading text-2xl font-bold">Who is this booking for?</h1>
-        <NewBookingCustomerDialog />
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Who is this booking for?" actions={<NewBookingCustomerDialog />} />
 
-      <form className="relative w-full max-w-xs">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          type="search"
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="Search name or phone"
-          className="pl-9"
-        />
+      <form role="search" className="flex items-center gap-2">
+        <InputGroup className="sm:w-72 max-sm:h-10">
+          <InputGroupAddon>
+            <Search aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput
+            type="search"
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Name or phone"
+            aria-label="Search customers"
+          />
+        </InputGroup>
+        <Button type="submit" variant="outline">
+          Search
+        </Button>
       </form>
 
       {ordered.length === 0 ? (
         <Card>
-          <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            {q ? `No customers match “${q}”.` : "No customers yet."}
-          </CardContent>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <UsersRound />
+            </EmptyMedia>
+            <EmptyTitle>{q ? `No customers match “${q}”` : "No customers"}</EmptyTitle>
+          </Empty>
         </Card>
       ) : (
         <CustomerPickerTable

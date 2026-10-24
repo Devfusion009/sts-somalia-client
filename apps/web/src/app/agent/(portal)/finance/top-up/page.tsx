@@ -1,28 +1,25 @@
 import type { Metadata } from "next";
 import { format } from "date-fns";
-import { AlertCircle, CheckCircle2, Undo2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, CreditCard, Undo2, Wallet } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyTopupRequests } from "@/modules/agencies/queries";
 import { cancelTopupRequest } from "@/modules/agencies/topup-actions";
 import { getTopupOptions } from "@/modules/payments/topup";
 import { BackLink } from "@/components/back-link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { money } from "@/lib/money";
 import { BankTransferDetails, OfflineTopupForm, OnlineTopupForm } from "./top-up-forms";
 
 export const metadata: Metadata = { title: "Add Money" };
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-brand-gold/15 text-brand-gold",
-  approved: "bg-primary/10 text-primary",
-  rejected: "bg-destructive/10 text-destructive",
-  cancelled: "bg-muted text-muted-foreground",
-  failed: "bg-destructive/10 text-destructive",
-};
+/** A cancelled top-up was withdrawn by the agency itself, not refused. */
+const STATUS_OVERRIDES = { cancelled: "neutral" } as const;
 
 const METHOD_LABELS: Record<string, string> = {
   bank_transfer: "Bank transfer",
@@ -33,10 +30,6 @@ const METHOD_LABELS: Record<string, string> = {
   cash_office: "Cash at office",
   card: "Card",
 };
-
-function money(amount: number) {
-  return `USD ${amount.toFixed(2)}`;
-}
 
 export default async function AgentTopUpPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const profile = await requireUser();
@@ -50,23 +43,23 @@ export default async function AgentTopUpPage({ searchParams }: { searchParams: P
 
   return (
     <div className="space-y-6">
-      <div>
-        <BackLink href="/agent/finance" label="Finance" className="mb-3" />
-        <h1 className="font-heading text-2xl font-bold">Add money</h1>
+      <div className="space-y-3">
+        <BackLink href="/agent/finance" label="Finance" />
+        <PageHeader title="Add money" />
       </div>
 
       {status === "success" ? (
         <Alert>
           <CheckCircle2 />
-          <AlertDescription>Payment received — your wallet is topped up.</AlertDescription>
+          <AlertDescription>Wallet topped up.</AlertDescription>
         </Alert>
       ) : status === "cancelled" ? (
         <Alert>
           <AlertCircle />
-          <AlertDescription>Payment cancelled. Nothing was charged.</AlertDescription>
+          <AlertDescription>Payment cancelled.</AlertDescription>
         </Alert>
       ) : status === "pending" ? (
-        <Alert>
+        <Alert variant="warning">
           <AlertCircle />
           <AlertDescription>Approve the payment on your phone to finish this top-up.</AlertDescription>
         </Alert>
@@ -78,10 +71,10 @@ export default async function AgentTopUpPage({ searchParams }: { searchParams: P
           <AlertDescription>Only the agency owner or an admin can add money.</AlertDescription>
         </Alert>
       ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">I sent money to STS</CardTitle>
+              <CardTitle>I sent money to STS</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <BankTransferDetails bankTransfer={options.bankTransfer} />
@@ -91,13 +84,16 @@ export default async function AgentTopUpPage({ searchParams }: { searchParams: P
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Pay now</CardTitle>
+              <CardTitle>Pay now</CardTitle>
             </CardHeader>
             <CardContent>
               {options.online.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  No online payment method is connected yet.
-                </p>
+                <Empty>
+                  <EmptyMedia variant="icon">
+                    <CreditCard />
+                  </EmptyMedia>
+                  <EmptyTitle>No online payment method</EmptyTitle>
+                </Empty>
               ) : (
                 <OnlineTopupForm methods={options.online} />
               )}
@@ -106,69 +102,92 @@ export default async function AgentTopUpPage({ searchParams }: { searchParams: P
         </div>
       )}
 
-      <Card className="overflow-hidden py-0">
-        <CardHeader className="border-b border-border !py-4">
-          <CardTitle className="text-base">Top-ups</CardTitle>
-        </CardHeader>
-        {requests.length === 0 ? (
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">No top-ups yet.</CardContent>
-        ) : (
-          <div className="overflow-x-auto">
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h2 className="font-heading text-base font-semibold">Top-ups</h2>
+          {requests.length > 0 ? (
+            <Badge variant="neutral" className="tabular-nums">
+              {requests.length}
+            </Badge>
+          ) : null}
+        </div>
+        <Card className="overflow-hidden py-0">
+          {requests.length === 0 ? (
+            <Empty>
+              <EmptyMedia variant="icon">
+                <Wallet />
+              </EmptyMedia>
+              <EmptyTitle>No top-ups</EmptyTitle>
+            </Empty>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Method</TableHead>
                   <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead numeric>Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Note</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="w-0 text-right">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {requests.map((request) => (
                   <TableRow key={request.id}>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                    <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                       {format(new Date(request.requested_at), "d MMM yyyy")}
                     </TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell className="whitespace-nowrap">
                       {METHOD_LABELS[request.method] ?? request.method}
-                      <span className="ml-1.5 text-xs text-muted-foreground">
-                        {request.rail === "online" ? "online" : "offline"}
-                      </span>
+                      {request.rail === "online" ? (
+                        <Badge variant="outline" className="ml-2">
+                          Online
+                        </Badge>
+                      ) : null}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {request.reference ?? request.provider_ref ?? "—"}
                     </TableCell>
-                    <TableCell className="text-right font-semibold">{money(Number(request.amount))}</TableCell>
+                    <TableCell className="text-right font-medium whitespace-nowrap tabular-nums">
+                      {money(Number(request.amount), "USD")}
+                    </TableCell>
                     <TableCell>
-                      <Badge className={cn("border-transparent capitalize", STATUS_STYLES[request.status] ?? "")}>
+                      <Badge variant={statusBadgeVariant(request.status, STATUS_OVERRIDES)} className="capitalize">
                         {request.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground" title={request.review_note ?? request.note ?? ""}>
+                    <TableCell
+                      className="max-w-[220px] truncate text-muted-foreground"
+                      title={request.review_note ?? request.note ?? ""}
+                    >
                       {request.review_note ?? request.note ?? "—"}
                     </TableCell>
                     <TableCell className="text-right">
                       {request.status === "pending" && canTopUp ? (
                         <form action={cancelTopupRequest}>
                           <input type="hidden" name="requestId" value={request.id} />
-                          <Button type="submit" size="sm" variant="ghost" className="gap-1.5">
-                            <Undo2 className="size-3.5" /> Cancel
+                          <Button
+                            type="submit"
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label="Cancel top-up"
+                            title="Cancel top-up"
+                          >
+                            <Undo2 aria-hidden="true" />
                           </Button>
                         </form>
-                      ) : (
-                        "—"
-                      )}
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
-      </Card>
+          )}
+        </Card>
+      </section>
     </div>
   );
 }

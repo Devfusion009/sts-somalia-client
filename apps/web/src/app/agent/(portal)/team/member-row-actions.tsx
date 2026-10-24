@@ -1,10 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Trash2 } from "lucide-react";
 import { SubmitButton } from "@/components/submit-button";
 import { updateTeamMemberRole, removeTeamMember } from "@/modules/agencies/team-actions";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 const ROLES = [
   { value: "admin", label: "Admin" },
@@ -12,9 +13,6 @@ const ROLES = [
   { value: "accountant", label: "Accountant" },
   { value: "viewer", label: "Viewer" },
 ] as const;
-
-const selectClass =
-  "border-input h-8 rounded-md border bg-transparent px-2 text-xs shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 export function MemberRowActions({
   memberId,
@@ -26,22 +24,29 @@ export function MemberRowActions({
   const [roleState, roleAction] = useActionState(updateTeamMemberRole, null);
 
   return (
-    <div className="flex items-center justify-end gap-2">
+    <div className="flex items-center justify-end gap-1.5">
       <form action={roleAction} className="flex items-center gap-1.5">
         <input type="hidden" name="memberId" value={memberId} />
         {roleState?.error ? (
-          <span title={roleState.error}>
-            <AlertCircle className="size-3.5 text-destructive" />
+          <span title={roleState.error} role="alert" className="flex items-center">
+            <AlertCircle className="size-4 text-destructive" aria-hidden="true" />
+            <span className="sr-only">{roleState.error}</span>
           </span>
         ) : null}
-        <select name="role" defaultValue={currentRole} className={selectClass}>
+        <select
+          name="role"
+          defaultValue={currentRole}
+          aria-label="Role"
+          aria-invalid={roleState?.error ? true : undefined}
+          className={`${NATIVE_SELECT_CLASS} w-36`}
+        >
           {ROLES.map((r) => (
             <option key={r.value} value={r.value}>
               {r.label}
             </option>
           ))}
         </select>
-        <SubmitButton size="sm" variant="outline" pendingText="…">
+        <SubmitButton variant="outline" pendingText="Saving…">
           Save
         </SubmitButton>
       </form>
@@ -50,11 +55,12 @@ export function MemberRowActions({
         <ConfirmButton
           title="Remove this team member?"
           confirmLabel="Remove"
-          size="sm"
+          size="icon"
           variant="ghost"
+          aria-label="Remove member"
           className="text-destructive hover:text-destructive"
         >
-          Remove
+          <Trash2 aria-hidden="true" />
         </ConfirmButton>
       </form>
     </div>

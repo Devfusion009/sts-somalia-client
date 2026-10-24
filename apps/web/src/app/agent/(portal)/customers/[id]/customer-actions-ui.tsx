@@ -2,18 +2,18 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { deleteAgencyCustomer, updateAgencyCustomer } from "@/modules/agencies/customer-actions";
@@ -41,8 +41,10 @@ export function EditCustomerDialog({ customer }: { customer: Customer }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" size="sm" className="gap-1.5" />}>
-        <Pencil className="size-3.5" /> Edit
+      <DialogTrigger
+        render={<Button variant="outline" size="icon" aria-label="Edit customer" title="Edit customer" />}
+      >
+        <Pencil aria-hidden="true" />
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -53,45 +55,37 @@ export function EditCustomerDialog({ customer }: { customer: Customer }) {
             submitted.current = true;
             formAction(formData);
           }}
-          className="space-y-4"
+          className="space-y-5"
         >
-          {state?.error ? (
-            <Alert variant="destructive">
-              <AlertCircle />
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          ) : null}
-
           <input type="hidden" name="customerId" value={customer.id} />
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-fullName">
-              Full name <span className="text-destructive">*</span>
-            </Label>
-            <Input id="edit-fullName" name="fullName" defaultValue={customer.full_name} required />
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Phone</Label>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="edit-fullName">
+                Full name <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input id="edit-fullName" name="fullName" defaultValue={customer.full_name} required />
+            </Field>
+            <Field>
+              <FieldLabel>Phone</FieldLabel>
               <PhoneField name="phone" defaultValue={customer.phone ?? ""} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input
-                id="edit-email"
-                name="email"
-                type="email"
-                defaultValue={customer.email ?? ""}
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-notes">Notes</Label>
-            <Textarea id="edit-notes" name="notes" rows={2} defaultValue={customer.notes ?? ""} />
-          </div>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="edit-email">Email</FieldLabel>
+              <Input id="edit-email" name="email" type="email" defaultValue={customer.email ?? ""} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="edit-notes">Notes</FieldLabel>
+              <Textarea id="edit-notes" name="notes" rows={2} defaultValue={customer.notes ?? ""} />
+            </Field>
+            <FieldError>{state?.error}</FieldError>
+          </FieldGroup>
 
-          <SubmitButton className="w-full" pendingText="Saving…">
-            Save changes
-          </SubmitButton>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
@@ -121,9 +115,17 @@ export function DeleteCustomerButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        render={<Button variant="outline" size="sm" className="gap-1.5 text-destructive" />}
+        render={
+          <Button
+            variant="outline"
+            size="icon"
+            className="text-destructive hover:text-destructive"
+            aria-label="Delete customer"
+            title="Delete customer"
+          />
+        }
       >
-        <Trash2 className="size-3.5" /> Delete
+        <Trash2 aria-hidden="true" />
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
@@ -136,21 +138,16 @@ export function DeleteCustomerButton({
           }}
           className="space-y-4"
         >
-          {state?.error ? (
-            <Alert variant="destructive">
-              <AlertCircle />
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          ) : null}
           <input type="hidden" name="customerId" value={customerId} />
-          <div className="flex justify-end gap-2">
+          <FieldError>{state?.error}</FieldError>
+          <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
             <SubmitButton variant="destructive" pendingText="Deleting…">
               Delete
             </SubmitButton>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

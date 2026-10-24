@@ -17,7 +17,8 @@ import {
   parseISO,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, Mail, MapPin, Phone, Plane, BedDouble, Landmark, PartyPopper, Flag } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { money } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -36,17 +37,13 @@ const KIND_META: Record<
   hall: { label: "Event Hall", icon: PartyPopper, dot: "bg-chart-5", iconColor: "text-chart-5", chip: "bg-chart-5/15 text-chart-5" },
 };
 
-const HOLIDAY_CHIP = "bg-primary text-primary-foreground";
+const HOLIDAY_CHIP = "bg-primary/10 text-primary";
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-brand-gold/15 text-brand-gold",
-  confirmed: "bg-primary/10 text-primary",
-  completed: "bg-primary/10 text-primary",
-  cancelled: "bg-destructive/10 text-destructive",
-  refunded: "bg-destructive/10 text-destructive",
-  no_show: "bg-muted text-muted-foreground",
-  failed: "bg-destructive/10 text-destructive",
-};
+const FILTER_CHIP =
+  "flex h-7 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:h-9";
+const FILTER_OFF = "border-border bg-card text-muted-foreground hover:text-foreground";
+
+const STATUS_OVERRIDES = { refunded: "destructive", no_show: "neutral" } as const;
 
 /**
  * Agent-portal counterpart to AdminEventCalendar — same booking shape and
@@ -107,26 +104,36 @@ export function EventCalendar({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => navigateMonth(subMonths(monthStart, 1))}>
-            <ChevronLeft className="size-4" />
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Previous month"
+            onClick={() => navigateMonth(subMonths(monthStart, 1))}
+          >
+            <ChevronLeft aria-hidden="true" />
           </Button>
-          <span className="min-w-36 text-center font-heading text-lg font-semibold">{format(monthStart, "MMMM yyyy")}</span>
-          <Button variant="outline" size="icon" onClick={() => navigateMonth(addMonths(monthStart, 1))}>
-            <ChevronRight className="size-4" />
+          <h2 className="min-w-36 text-center font-heading text-lg font-semibold tabular-nums" aria-live="polite">
+            {format(monthStart, "MMMM yyyy")}
+          </h2>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Next month"
+            onClick={() => navigateMonth(addMonths(monthStart, 1))}
+          >
+            <ChevronRight aria-hidden="true" />
           </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Show on calendar">
           <button
             type="button"
+            aria-pressed={showHolidays}
             onClick={() => setShowHolidays((v) => !v)}
-            className={cn(
-              "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              showHolidays ? cn("border-transparent", HOLIDAY_CHIP) : "border-border text-muted-foreground opacity-50"
-            )}
+            className={cn(FILTER_CHIP, showHolidays ? cn("border-transparent", HOLIDAY_CHIP) : FILTER_OFF)}
           >
-            <Flag className="size-3" />
+            <Flag className="size-3" aria-hidden="true" />
             Holidays
           </button>
           {(Object.keys(KIND_META) as CalendarBookingKind[]).map((kind) => {
@@ -136,13 +143,11 @@ export function EventCalendar({
               <button
                 key={kind}
                 type="button"
+                aria-pressed={active}
                 onClick={() => toggleKind(kind)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                  active ? cn("border-transparent", meta.chip) : "border-border text-muted-foreground opacity-50"
-                )}
+                className={cn(FILTER_CHIP, active ? cn("border-transparent", meta.chip) : FILTER_OFF)}
               >
-                <span className={cn("size-2 rounded-full", meta.dot)} />
+                <span className={cn("size-2 rounded-full", meta.dot, !active && "opacity-40")} aria-hidden="true" />
                 {meta.label}
               </button>
             );
@@ -173,16 +178,18 @@ export function EventCalendar({
               <button
                 key={day.toISOString()}
                 type="button"
+                tabIndex={hasItems ? 0 : -1}
+                aria-label={`${format(day, "EEEE, d MMMM yyyy")}${hasItems ? `, ${dayHolidays.length + dayBookings.length} items` : ""}`}
                 onClick={() => (hasItems ? setSelectedDay(day) : undefined)}
                 className={cn(
-                  "flex min-h-24 flex-col gap-1 bg-background p-1.5 text-left transition-colors",
+                  "flex min-h-24 flex-col gap-1 bg-background p-1.5 text-left transition-colors outline-none focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring/50",
                   !inMonth && "bg-muted/30 text-muted-foreground/50",
-                  hasItems && "cursor-pointer hover:bg-accent"
+                  hasItems ? "cursor-pointer hover:bg-muted/50" : "cursor-default"
                 )}
               >
                 <span
                   className={cn(
-                    "text-xs font-medium",
+                    "text-xs font-medium tabular-nums",
                     isSameDay(day, new Date()) &&
                       "flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground"
                   )}
@@ -193,6 +200,7 @@ export function EventCalendar({
                   {shownHolidays.map((h) => (
                     <span
                       key={h.date + h.name}
+                      aria-hidden="true"
                       className={cn("truncate rounded px-1 py-0.5 text-[10px] font-semibold", HOLIDAY_CHIP)}
                     >
                       {h.localName}
@@ -209,6 +217,7 @@ export function EventCalendar({
                     return (
                       <span
                         key={`${b.kind}-${b.id}`}
+                        aria-hidden="true"
                         className="flex items-center gap-1 truncate text-[10px] font-medium text-foreground"
                         title={`${meta.label} — ${b.title}${b.customerName ? ` (${b.customerName})` : ""}`}
                       >
@@ -220,7 +229,11 @@ export function EventCalendar({
                       </span>
                     );
                   })}
-                  {overflow > 0 ? <span className="text-[10px] text-muted-foreground">+{overflow} more</span> : null}
+                  {overflow > 0 ? (
+                    <span aria-hidden="true" className="text-[10px] text-muted-foreground tabular-nums">
+                      +{overflow} more
+                    </span>
+                  ) : null}
                 </div>
               </button>
             );
@@ -236,7 +249,7 @@ export function EventCalendar({
           <div className="space-y-3">
             {selectedDayHolidays.map((h) => (
               <div key={h.date + h.name} className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-sm text-primary">
-                <Flag className="size-4 shrink-0" />
+                <Flag className="size-4 shrink-0" aria-hidden="true" />
                 <span className="font-medium">{h.localName}</span>
                 {h.localName !== h.name ? <span className="text-primary/70">({h.name})</span> : null}
               </div>
@@ -248,18 +261,21 @@ export function EventCalendar({
                 <div key={`${b.kind}-${b.id}`} className="rounded-lg border border-border p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", meta.chip)}>
+                      <span
+                        aria-hidden="true"
+                        className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", meta.chip)}
+                      >
                         <Icon className="size-4" />
                       </span>
-                      <div>
-                        <p className="font-medium">{b.title}</p>
-                        <p className="text-xs text-muted-foreground">
+                      <div className="min-w-0">
+                        <p className="font-medium break-words">{b.title}</p>
+                        <p className="text-xs text-muted-foreground tabular-nums">
                           {format(parseISO(b.startDate), "d MMM")}
                           {b.endDate !== b.startDate ? ` – ${format(parseISO(b.endDate), "d MMM yyyy")}` : ""}
                         </p>
                       </div>
                     </div>
-                    <Badge className={cn("border-transparent capitalize", STATUS_STYLES[b.status] ?? "bg-muted text-muted-foreground")}>
+                    <Badge variant={statusBadgeVariant(b.status, STATUS_OVERRIDES)} className="shrink-0 capitalize">
                       {b.status.replace("_", " ")}
                     </Badge>
                   </div>
@@ -267,18 +283,24 @@ export function EventCalendar({
                   <div className="mt-3 space-y-1.5 border-t border-border pt-3 text-sm">
                     <p className="font-medium">{b.customerName ?? "Unknown customer"}</p>
                     {b.customerPhone ? (
-                      <a href={`tel:${b.customerPhone}`} className="flex items-center gap-1.5 text-primary hover:underline">
-                        <Phone className="size-3.5" /> {b.customerPhone}
+                      <a
+                        href={`tel:${b.customerPhone}`}
+                        className="flex w-fit items-center gap-1.5 rounded-sm text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        <Phone className="size-3.5" aria-hidden="true" /> {b.customerPhone}
                       </a>
                     ) : null}
                     {b.customerEmail ? (
-                      <a href={`mailto:${b.customerEmail}`} className="flex items-center gap-1.5 text-primary hover:underline">
-                        <Mail className="size-3.5" /> {b.customerEmail}
+                      <a
+                        href={`mailto:${b.customerEmail}`}
+                        className="flex w-fit items-center gap-1.5 rounded-sm break-all text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        <Mail className="size-3.5 shrink-0" aria-hidden="true" /> {b.customerEmail}
                       </a>
                     ) : null}
                     {b.location ? (
                       <p className="flex items-center gap-1.5 text-muted-foreground">
-                        <MapPin className="size-3.5" /> {b.location}
+                        <MapPin className="size-3.5 shrink-0" aria-hidden="true" /> {b.location}
                       </p>
                     ) : null}
                   </div>
@@ -292,9 +314,7 @@ export function EventCalendar({
                     ))}
                     <div>
                       <dt className="text-muted-foreground">Price</dt>
-                      <dd className="font-medium">
-                        {b.currency} {b.price.toFixed(2)}
-                      </dd>
+                      <dd className="font-medium tabular-nums">{money(b.price, b.currency)}</dd>
                     </div>
                   </dl>
                 </div>

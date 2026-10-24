@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Building2 } from "lucide-react";
 import { requireUserForPortal } from "@/lib/auth/session";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getMyAgency } from "@/modules/agencies/queries";
@@ -11,6 +12,7 @@ import { OnboardingStatusBanner } from "@/components/portal/onboarding-status-ba
 import { AgentNotificationBell } from "@/components/portal/agent-notification-bell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { getServerTrpc } from "@/lib/trpc/server";
 
 /** Portal-scoped title — see the admin portal layout for why this lives on the layout. */
@@ -77,13 +79,17 @@ export default async function AgentLayout({ children }: { children: React.ReactN
   if (!membership) {
     return (
       <div className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
-        <Card>
-          <CardContent className="space-y-3 p-6 text-center">
-            <p className="font-medium">No active agency membership found</p>
-            <p className="text-sm text-muted-foreground">
-              You don&apos;t currently have an active agency membership on this account.
-            </p>
-            <Button render={<Link href="/account/become" />}>Apply to become an agent</Button>
+        <Card className="w-full">
+          <CardContent>
+            <Empty className="p-6 md:p-8">
+              <EmptyMedia variant="icon">
+                <Building2 />
+              </EmptyMedia>
+              <EmptyTitle className="text-base">No active agency membership</EmptyTitle>
+              <EmptyContent>
+                <Button render={<Link href="/account/become" />}>Apply to become an agent</Button>
+              </EmptyContent>
+            </Empty>
           </CardContent>
         </Card>
       </div>

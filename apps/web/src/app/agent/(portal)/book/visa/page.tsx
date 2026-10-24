@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { Stamp } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getMyAgency } from "@/modules/agencies/queries";
@@ -9,7 +8,11 @@ import { getVisaTypes } from "@/modules/visa/queries";
 import { countryFlag, countryName } from "@/lib/countries";
 import { fmtMoney, processingText } from "@/modules/visa/components/visa-shared";
 import { Card, CardContent } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
 import { StartApplicationButton } from "./start-application-button";
+
+export const metadata = { title: "Visa" };
 
 export default async function AgentVisaDeskPage() {
   const profile = await requireUser();
@@ -23,44 +26,49 @@ export default async function AgentVisaDeskPage() {
   const visaTypes = await getVisaTypes();
 
   return (
-    <div className="space-y-4">
-      <Link
-        href="/agent/book"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" /> Services
-      </Link>
-
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Visa</h1>
-        <p className="text-sm text-muted-foreground">For {customer.full_name}</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Visa" back={{ href: "/agent/book", label: "Services" }} />
 
       {visaTypes.length === 0 ? (
         <Card>
-          <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            No visa products published yet.
-          </CardContent>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Stamp />
+            </EmptyMedia>
+            <EmptyTitle>No visa products</EmptyTitle>
+          </Empty>
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visaTypes.map((visa) => (
             <Card key={visa.id}>
-              <CardContent className="space-y-3 pt-6">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl leading-none" aria-hidden>
+              <CardContent className="flex flex-1 flex-col gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="text-2xl leading-none" aria-hidden="true">
                     {countryFlag(visa.destination_country_code)}
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{visa.name}</p>
-                    <p className="text-xs text-muted-foreground">{countryName(visa.destination_country_code)}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {countryName(visa.destination_country_code)}
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{processingText(visa)}</span>
-                  <span className="font-heading font-bold text-primary">{fmtMoney(visa.price, visa.currency)}</span>
+                <dl className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="min-w-0">
+                    <dt className="text-xs text-muted-foreground">Processing</dt>
+                    <dd className="truncate tabular-nums">{processingText(visa)}</dd>
+                  </div>
+                  <div className="text-right">
+                    <dt className="text-xs text-muted-foreground">Price</dt>
+                    <dd className="font-heading font-semibold tabular-nums">
+                      {fmtMoney(visa.price, visa.currency)}
+                    </dd>
+                  </div>
+                </dl>
+                <div className="mt-auto border-t border-border pt-3">
+                  <StartApplicationButton visaTypeId={visa.id} agencyCustomerId={customer.id} />
                 </div>
-                <StartApplicationButton visaTypeId={visa.id} agencyCustomerId={customer.id} />
               </CardContent>
             </Card>
           ))}

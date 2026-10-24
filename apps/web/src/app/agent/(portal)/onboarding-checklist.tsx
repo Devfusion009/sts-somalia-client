@@ -1,63 +1,55 @@
 import Link from "next/link";
-import { ArrowRight, Circle, CheckCircle2 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { ChevronRight, Circle, CheckCircle2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardAction, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { AgencyOnboardingStatus } from "@/modules/agencies/queries";
 
-const ITEMS: Array<{ key: keyof AgencyOnboardingStatus; label: string; description: string; href: string }> = [
-  {
-    key: "hasMarkupConfigured",
-    label: "Set your markup rates",
-    description: "Decide how much you add on top of net fares — this is your own pricing decision.",
-    href: "/agent/markups",
-  },
-  {
-    key: "hasFirstBooking",
-    label: "Make your first booking",
-    description: "Book a flight, hotel, visa, or Umrah package for a client.",
-    href: "/agent/bookings",
-  },
-  {
-    key: "hasInvitedTeamMember",
-    label: "Invite a team member",
-    description: "Give staff their own login and role-based access to the portal.",
-    href: "/agent/team",
-  },
+const ITEMS: Array<{ key: keyof AgencyOnboardingStatus; label: string; href: string }> = [
+  { key: "hasMarkupConfigured", label: "Set your markup rates", href: "/agent/markups" },
+  { key: "hasFirstBooking", label: "Make your first booking", href: "/agent/book" },
+  { key: "hasInvitedTeamMember", label: "Invite a team member", href: "/agent/team" },
 ];
 
 /** Auto-collapses (renders nothing) once all three items are done — the caller doesn't need to gate this itself. */
 export function OnboardingChecklist({ status }: { status: AgencyOnboardingStatus }) {
   if (ITEMS.every((item) => status[item.key])) return null;
+  const done = ITEMS.filter((item) => status[item.key]).length;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Getting started</CardTitle>
+    <Card className="gap-0 pb-0">
+      <CardHeader className="pb-3">
+        <CardTitle>Getting started</CardTitle>
+        <CardAction>
+          <Badge variant="neutral" className="tabular-nums">
+            {done} of {ITEMS.length}
+          </Badge>
+        </CardAction>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <ul className="divide-y divide-border border-t border-border">
         {ITEMS.map((item) => {
-          const done = status[item.key];
+          const complete = status[item.key];
           return (
-            <Link
-              key={item.key}
-              href={item.href}
-              className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent/50"
-            >
-              <div className="flex items-center gap-3">
-                {done ? (
-                  <CheckCircle2 className="size-5 shrink-0 text-primary" />
+            <li key={item.key}>
+              <Link
+                href={item.href}
+                className="flex min-h-11 items-center gap-3 px-4 py-2.5 text-sm transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset"
+              >
+                {complete ? (
+                  <CheckCircle2 className="size-4 shrink-0 text-primary" aria-hidden="true" />
                 ) : (
-                  <Circle className="size-5 shrink-0 text-muted-foreground" />
+                  <Circle className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 )}
-                <div>
-                  <p className={`text-sm font-medium ${done ? "text-muted-foreground line-through" : ""}`}>{item.label}</p>
-                  <p className="text-xs text-muted-foreground">{item.description}</p>
-                </div>
-              </div>
-              {!done ? <ArrowRight className="size-4 shrink-0 text-muted-foreground" /> : null}
-            </Link>
+                <span className={cn("min-w-0 flex-1", complete ? "text-muted-foreground line-through" : "font-medium")}>
+                  {item.label}
+                  <span className="sr-only">{complete ? " (done)" : " (to do)"}</span>
+                </span>
+                {!complete ? <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /> : null}
+              </Link>
+            </li>
           );
         })}
-      </CardContent>
+      </ul>
     </Card>
   );
 }

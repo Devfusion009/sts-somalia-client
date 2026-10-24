@@ -18,8 +18,15 @@ export function WithdrawRequestButton({ requestId }: { requestId: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button type="button" variant="ghost" size="sm" className="gap-1" onClick={() => setOpen(true)}>
-        <Undo2 className="size-3.5" /> Withdraw
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Withdraw request"
+        title="Withdraw request"
+        onClick={() => setOpen(true)}
+      >
+        <Undo2 aria-hidden="true" />
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
@@ -28,7 +35,7 @@ export function WithdrawRequestButton({ requestId }: { requestId: string }) {
             <AlertDialogHeader>
               <AlertDialogTitle>Withdraw this request?</AlertDialogTitle>
             </AlertDialogHeader>
-            <AlertDialogFooter className="mt-4">
+            <AlertDialogFooter className="mt-6">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
@@ -51,11 +58,13 @@ export function RequestRemovalButton({ markupId }: { markupId: string }) {
       <Button
         type="button"
         variant="ghost"
-        size="sm"
-        className="gap-1 text-destructive hover:text-destructive"
+        size="icon-sm"
+        className="text-destructive hover:text-destructive"
+        aria-label="Request removal"
+        title="Request removal"
         onClick={() => setOpen(true)}
       >
-        <Trash2 className="size-3.5" /> Request removal
+        <Trash2 aria-hidden="true" />
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
@@ -64,7 +73,7 @@ export function RequestRemovalButton({ markupId }: { markupId: string }) {
             <AlertDialogHeader>
               <AlertDialogTitle>Request removal of this rule?</AlertDialogTitle>
             </AlertDialogHeader>
-            <AlertDialogFooter className="mt-4">
+            <AlertDialogFooter className="mt-6">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
