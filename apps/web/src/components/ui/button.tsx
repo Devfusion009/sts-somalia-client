@@ -1,6 +1,7 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 
+import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
@@ -47,8 +48,15 @@ function Button({
   size = "default",
   nativeButton,
   render,
+  loading = false,
+  disabled,
+  children,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonPrimitive.Props &
+  VariantProps<typeof buttonVariants> & {
+    /** Disables the button and shows a leading spinner. */
+    loading?: boolean
+  }) {
   // Rendering as a non-<button> element (e.g. `render={<Link />}`) is not a
   // native button, so tell Base UI unless the caller says otherwise.
   const isNativeRenderTarget =
@@ -60,8 +68,13 @@ function Button({
       className={cn(buttonVariants({ variant, size, className }))}
       render={render}
       nativeButton={nativeButton ?? isNativeRenderTarget}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...props}
-    />
+    >
+      {loading ? <Spinner data-icon="inline-start" role={undefined} aria-label={undefined} aria-hidden="true" /> : null}
+      {children}
+    </ButtonPrimitive>
   )
 }
 

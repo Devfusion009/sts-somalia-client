@@ -95,7 +95,7 @@ export function PhoneInput({
                 <ComboboxInputGroup className="mb-1 px-1 pt-1">
                   <ComboboxInput placeholder="Search country or code" />
                 </ComboboxInputGroup>
-                <ComboboxEmpty>No country matches your search.</ComboboxEmpty>
+                <ComboboxEmpty>No country found.</ComboboxEmpty>
                 <ComboboxList>
                   {(code: string) => (
                     <ComboboxItem key={code} value={code}>

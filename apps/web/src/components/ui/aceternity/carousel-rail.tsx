@@ -61,7 +61,7 @@ export function CarouselRail({
         role="region"
         aria-label={ariaLabel}
         tabIndex={0}
-        className="scrollbar-none flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth pb-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="scrollbar-none flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth rounded-2xl pb-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none motion-reduce:scroll-auto"
       >
         {Array.isArray(children)
           ? children.map((child, i) => (
@@ -77,12 +77,14 @@ export function CarouselRail({
           direction="prev"
           disabled={atStart}
           onClick={() => scrollByCard(-1)}
+          label={`Scroll ${ariaLabel} back`}
           className="-translate-x-1/2"
         />
         <RailButton
           direction="next"
           disabled={atEnd}
           onClick={() => scrollByCard(1)}
+          label={`Scroll ${ariaLabel} forward`}
           className="translate-x-1/2"
         />
       </div>
@@ -94,11 +96,13 @@ function RailButton({
   direction,
   disabled,
   onClick,
+  label,
   className,
 }: {
   direction: "prev" | "next";
   disabled: boolean;
   onClick: () => void;
+  label: string;
   className?: string;
 }) {
   const Icon = direction === "prev" ? ChevronLeftIcon : ChevronRightIcon;
@@ -107,7 +111,7 @@ function RailButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      aria-label={direction === "prev" ? "Previous" : "Next"}
+      aria-label={label}
       className={cn(
         "pointer-events-auto grid size-10 place-items-center rounded-full border border-border bg-card text-foreground shadow-lg transition-all duration-200",
         "hover:border-primary/40 hover:bg-primary hover:text-primary-foreground",
@@ -116,7 +120,7 @@ function RailButton({
         className
       )}
     >
-      <Icon sx={{ fontSize: 22 }} />
+      <Icon sx={{ fontSize: 22 }} aria-hidden />
     </button>
   );
 }

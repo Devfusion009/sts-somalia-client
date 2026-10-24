@@ -83,9 +83,10 @@ export function CustomerNotificationBell({ notifications }: { notifications: Not
             variant="ghost"
             size="icon"
             ref={bellRef}
+            aria-label={notifications.length > 0 ? `Notifications (${notifications.length} unread)` : "Notifications"}
             className={cn("relative rounded-full", needsAction && "text-destructive")}
           >
-            <Bell className="size-4" />
+            <Bell className="size-4" aria-hidden="true" />
             {notifications.length > 0 ? (
               <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
                 {notifications.length > 9 ? "9+" : notifications.length}
@@ -98,13 +99,13 @@ export function CustomerNotificationBell({ notifications }: { notifications: Not
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           <p className="text-sm font-semibold">Notifications</p>
           {needsAction ? (
-            <Link href="/account/become" className="text-xs font-medium text-primary hover:underline">
+            <Link href="/account/become" className="rounded-sm text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
               Open applications
             </Link>
           ) : null}
         </div>
         {notifications.length === 0 ? (
-          <p className="px-3 py-6 text-center text-sm text-muted-foreground">You&apos;re all caught up.</p>
+          <p className="px-3 py-6 text-center text-sm text-muted-foreground">No notifications</p>
         ) : (
           <div className="max-h-80 divide-y divide-border overflow-y-auto">
             {notifications.map((n) => (
@@ -114,7 +115,7 @@ export function CustomerNotificationBell({ notifications }: { notifications: Not
                     <Link
                       href={targetHref(n)!}
                       className={cn(
-                        "truncate text-sm font-medium hover:underline",
+                        "block truncate rounded-sm text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50",
                         ACTIONABLE_TYPES.has(n.type) ? "text-destructive" : "text-primary"
                       )}
                     >
@@ -124,7 +125,7 @@ export function CustomerNotificationBell({ notifications }: { notifications: Not
                     <p className="truncate text-sm font-medium">{n.title}</p>
                   )}
                   {n.body ? <p className="mt-0.5 line-clamp-3 text-xs text-muted-foreground">{n.body}</p> : null}
-                  <p className="mt-1 text-[10px] text-muted-foreground">
+                  <p className="mt-1 text-[11px] text-muted-foreground tabular-nums">
                     {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                   </p>
                 </div>
@@ -132,10 +133,12 @@ export function CustomerNotificationBell({ notifications }: { notifications: Not
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="size-6 shrink-0"
+                  className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                  aria-label={`Dismiss ${n.title}`}
+                  disabled={dismiss.isPending && dismiss.variables?.notificationId === n.id}
                   onClick={() => dismiss.mutate({ notificationId: n.id })}
                 >
-                  <X className="size-3.5" />
+                  <X className="size-3.5" aria-hidden="true" />
                 </Button>
               </div>
             ))}

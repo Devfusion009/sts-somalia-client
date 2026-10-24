@@ -30,7 +30,7 @@ export function StatTile({
         <p
           className={cn(
             "truncate font-heading text-2xl leading-none font-semibold tracking-tight tabular-nums",
-            tone === "warn" && "text-brand-gold",
+            tone === "warn" && "text-[color-mix(in_oklch,var(--brand-gold),black_30%)] dark:text-brand-gold",
             tone === "accent" && "text-brand-accent",
             tone === "primary" && "text-primary"
           )}

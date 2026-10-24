@@ -40,14 +40,18 @@ export function DateRangePicker({ currentKey }: { currentKey: DateRangeKey }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex items-center gap-1 rounded-lg border border-border p-1">
+      <div role="group" aria-label="Date range" className="flex items-center gap-0.5 rounded-lg bg-muted p-[3px]">
         {OPTIONS.map((opt) => (
           <Button
             key={opt.key}
             type="button"
             size="sm"
             variant="ghost"
-            className={cn("h-7 px-2.5", currentKey === opt.key && "bg-primary/10 text-primary")}
+            aria-pressed={currentKey === opt.key}
+            className={cn(
+              "h-7 px-2.5 text-muted-foreground tabular-nums hover:bg-background/60",
+              currentKey === opt.key && "bg-background text-foreground shadow-xs hover:bg-background"
+            )}
             onClick={() => setRange(opt.key)}
           >
             {opt.label}
@@ -66,6 +70,9 @@ export function DateRangePicker({ currentKey }: { currentKey: DateRangeKey }) {
           className="h-8 w-36 text-xs"
         />
         <span className="text-xs text-muted-foreground">to</span>
+        <Label htmlFor="dr-to" className="sr-only">
+          To
+        </Label>
         <Input
           id="dr-to"
           type="date"

@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-const CARD = "rounded-xl bg-card shadow-sm ring-1 ring-foreground/10";
+const CARD = "rounded-xl bg-card shadow-xs ring-1 ring-foreground/[0.08]";
 
 export function StatCardSkeleton() {
   return (
