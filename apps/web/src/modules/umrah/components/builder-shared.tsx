@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Check, Lock, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, Lock } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { REQUEST_NOT_EDITABLE_ERROR } from "@/modules/umrah/custom-errors";
@@ -40,22 +40,31 @@ export function BuilderStepper({
   basePath?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-      <p className="text-xs font-bold text-muted-foreground">
-        Private Umrah
-      </p>
-      <ol className="mt-4 space-y-1">
+    <nav
+      aria-label="Private Umrah steps"
+      className="rounded-2xl border border-border bg-card p-2 shadow-xs lg:p-5"
+    >
+      <p className="hidden text-sm font-semibold text-foreground lg:block">Private Umrah</p>
+      {/* Phones/tablets: one compact row of four; lg: the vertical rail. */}
+      <ol className="grid grid-cols-4 gap-1 lg:mt-4 lg:block lg:space-y-1">
         {BUILDER_STEPS.map(({ step, label, hint }) => {
           const isCurrent = step === currentStep;
           const isDone = step < currentStep;
           const isLocked = step > maxStep;
-          const marker = isDone ? <Check className="size-3.5" /> : isLocked ? <Lock className="size-3" /> : step;
+          const marker = isDone ? (
+            <Check className="size-3.5" aria-hidden />
+          ) : isLocked ? (
+            <Lock className="size-3" aria-hidden />
+          ) : (
+            step
+          );
+          const stateText = isCurrent ? "current step" : isDone ? "completed" : isLocked ? "locked" : null;
 
           const content = (
-            <span className="flex items-start gap-3">
+            <span className="flex flex-col items-center gap-1.5 text-center lg:flex-row lg:items-start lg:gap-3 lg:text-left">
               <span
                 className={cn(
-                  "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                  "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums lg:mt-0.5",
                   isCurrent
                     ? "bg-primary text-primary-foreground"
                     : isDone
@@ -68,34 +77,34 @@ export function BuilderStepper({
               <span className="min-w-0">
                 <span
                   className={cn(
-                    "block text-sm font-semibold",
+                    "block text-xs leading-tight font-semibold lg:text-sm",
                     isCurrent ? "text-primary" : isLocked ? "text-muted-foreground" : ""
                   )}
                 >
                   {label}
                 </span>
-                <span className="block text-xs text-muted-foreground">
-                  {isCurrent ? "In progress" : isDone ? "Completed" : hint}
-                </span>
+                <span className="hidden text-xs text-muted-foreground lg:block">{hint}</span>
+                {stateText ? <span className="sr-only">, {stateText}</span> : null}
               </span>
             </span>
           );
 
           return (
-            <li key={step} className="relative">
+            <li key={step} className="relative min-w-0">
               {step < BUILDER_STEPS.length ? (
                 <span
                   aria-hidden
-                  className="absolute top-8 left-3 h-[calc(100%-1.25rem)] w-px bg-border"
+                  className="absolute top-8 left-5 hidden h-[calc(100%-1.25rem)] w-px bg-border lg:block"
                 />
               ) : null}
               {isLocked ? (
-                <span className="block rounded-lg px-2 py-2">{content}</span>
+                <span className="block rounded-lg px-1 py-2 lg:px-2">{content}</span>
               ) : (
                 <Link
                   href={`${basePath}/${requestId}?step=${step}`}
+                  aria-current={isCurrent ? "step" : undefined}
                   className={cn(
-                    "block rounded-lg px-2 py-2 transition-colors hover:bg-accent/60",
+                    "block rounded-lg px-1 py-2 transition-colors outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50 lg:px-2",
                     isCurrent && "bg-secondary"
                   )}
                 >
@@ -106,11 +115,7 @@ export function BuilderStepper({
           );
         })}
       </ol>
-      <p className="mt-4 flex items-start gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
-        <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary" />
-        Nothing is booked and no payment is taken until you review and submit.
-      </p>
-    </div>
+    </nav>
   );
 }
 
@@ -134,7 +139,7 @@ export function PriceSummary({
   currency,
   trip,
   roomSharing,
-  emptyText = "Pick your services and the total will appear here.",
+  emptyText = "No services selected.",
   className,
 }: {
   lines: SummaryLine[];
@@ -149,10 +154,8 @@ export function PriceSummary({
 
   return (
     <div className={cn("rounded-2xl border border-border bg-card p-5 shadow-xs", className)}>
-      <p className="text-xs font-bold text-muted-foreground">
-        Your Umrah price
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <h2 className="font-heading text-base font-bold">Your Umrah price</h2>
+      <p className="mt-1 text-xs text-muted-foreground tabular-nums">
         {trip.numPilgrims} traveller{trip.numPilgrims > 1 ? "s" : ""} · {nights} night
         {nights === 1 ? "" : "s"} ({trip.nightsMakkah} Makkah / {trip.nightsMadinah} Madinah)
         {roomSharing ? ` · ${ROOM_SHARING_LABELS[roomSharing]} room` : null}
@@ -175,7 +178,7 @@ export function PriceSummary({
             return (
               <div key={category.value}>
                 <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                  <category.icon className="size-3.5 text-primary" />
+                  <category.icon className="size-3.5 text-primary" aria-hidden />
                   {category.label}
                 </p>
                 <ul className="mt-1.5 space-y-2 border-l border-border pl-2.5">
@@ -187,11 +190,8 @@ export function PriceSummary({
                           {formatMoney(line.lineTotal, currency)}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        <span className="font-semibold text-foreground">
-                          {formatMoney(line.unitPrice, currency)}
-                        </span>{" "}
-                        × {line.quantity}
+                      <p className="text-xs text-muted-foreground tabular-nums">
+                        {formatMoney(line.unitPrice, currency)} × {line.quantity}
                       </p>
                     </li>
                   ))}
@@ -209,7 +209,7 @@ export function PriceSummary({
         </span>
       </div>
       {trip.numPilgrims > 1 && total > 0 ? (
-        <p className="mt-1 text-right text-xs text-muted-foreground">
+        <p className="mt-1 text-right text-xs text-muted-foreground tabular-nums">
           {formatMoney(total / trip.numPilgrims, currency)} per traveller
         </p>
       ) : null}
@@ -260,7 +260,7 @@ export function TripNotFoundRecovery({
   if (error !== REQUEST_NOT_EDITABLE_ERROR) return null;
   return (
     <Button render={<Link href={basePath} />} variant="outline" size="sm" className="gap-1.5">
-      Start a new private trip <ArrowRight className="size-3.5" />
+      Start a new private trip <ArrowRight className="size-3.5" aria-hidden />
     </Button>
   );
 }

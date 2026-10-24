@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
-import { Sparkles } from "lucide-react";
 import { SubmitButton } from "@/components/submit-button";
+import { FieldError } from "@/components/ui/field";
 import type { ActionState } from "@/lib/auth/actions";
 
 /**
@@ -42,10 +42,10 @@ export function DemoLoginButton({
     <form action={formAction}>
       <input type="hidden" name="email" value={email} />
       <input type="hidden" name="password" value={password} />
-      <SubmitButton className="w-full gap-1.5" pendingText="Signing in…">
-        <Sparkles className="size-4" /> {label}
+      <SubmitButton variant="outline" size="lg" className="w-full" pendingText="Signing in…">
+        {label}
       </SubmitButton>
-      {state?.error ? <p className="mt-2 text-center text-xs text-destructive">{state.error}</p> : null}
+      <FieldError className="mt-2 text-center">{state?.error}</FieldError>
     </form>
   );
 }

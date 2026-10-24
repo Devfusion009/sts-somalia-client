@@ -25,9 +25,15 @@ export function MessageComposer({
       </label>
       <Textarea id={`msg-${applicationId}`} name="body" rows={3} maxLength={4000} required placeholder={placeholder} />
       <div className="flex items-center justify-between gap-3">
-        {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : <span />}
-        <SubmitButton size="sm" pendingText="Sending…" className="gap-1.5">
-          <SendHorizontal className="size-3.5" /> Send
+        {state?.error ? (
+          <p role="alert" className="text-xs text-destructive">
+            {state.error}
+          </p>
+        ) : (
+          <span />
+        )}
+        <SubmitButton pendingText="Sending…">
+          <SendHorizontal data-icon="inline-start" /> Send
         </SubmitButton>
       </div>
     </form>

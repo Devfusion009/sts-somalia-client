@@ -1,13 +1,7 @@
 "use client";
 
-import { CheckCircle2 } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SubmitButton } from "@/components/submit-button";
 import { trpc } from "@/lib/trpc/react";
 import { TravelerFields } from "./traveler-fields";
@@ -27,6 +21,7 @@ export function TravelerProfileCard({ traveler }: { traveler: TravelerProfile | 
     onSuccess: () => {
       utils.travelers.selfTraveler.invalidate();
       utils.travelers.myTravelers.invalidate();
+      toast.success("Passport details saved.");
     },
   });
 
@@ -57,30 +52,25 @@ export function TravelerProfileCard({ traveler }: { traveler: TravelerProfile | 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Traveler &amp; passport details</CardTitle>
+        <CardTitle>Passport details</CardTitle>
       </CardHeader>
       <CardContent>
-        <form action={handleSubmit} className="space-y-4">
-          {save.error ? (
-            <Alert variant="destructive">
-              <AlertDescription>{save.error.message}</AlertDescription>
-            </Alert>
-          ) : null}
-          {save.isSuccess ? (
-            <Alert>
-              <CheckCircle2 />
-              <AlertDescription>Traveler details saved.</AlertDescription>
-            </Alert>
-          ) : null}
-
+        <form action={handleSubmit} className="space-y-5">
           <TravelerFields
             traveler={traveler}
             idPrefix="self"
             showRelationship={false}
-            nameLabel="Full name (as printed in your passport)"
+            nameLabel="Full name (as in passport)"
           />
 
-          <SubmitButton pendingText="Saving…">Save traveler details</SubmitButton>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+            {save.error ? (
+              <p role="alert" className="text-sm text-destructive sm:mr-auto">
+                {save.error.message}
+              </p>
+            ) : null}
+            <SubmitButton pendingText="Saving…">Save passport details</SubmitButton>
+          </div>
         </form>
       </CardContent>
     </Card>

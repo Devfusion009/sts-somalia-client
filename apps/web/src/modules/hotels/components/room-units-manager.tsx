@@ -1,15 +1,16 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { AlertCircle, Ban, DoorOpen, Trash2, TriangleAlert, X } from "lucide-react";
+import { Ban, CircleCheck, DoorOpen, Plus, Trash2, TriangleAlert, X } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { dateSpan } from "@/lib/money";
 import {
   addRoomUnit,
   setRoomUnitStatus,
@@ -19,7 +20,6 @@ import {
 } from "@/modules/hotels/room-unit-actions";
 import type { RoomBlock } from "@/modules/hotels/partner-queries";
 import type { ActionState } from "@/lib/auth/actions";
-import { cn } from "@/lib/utils";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 
 type RoomUnit = {
@@ -30,10 +30,10 @@ type RoomUnit = {
   out_of_order_reason: string | null;
 };
 
-const STATUS_STYLE: Record<RoomUnit["status"], string> = {
-  active: "bg-primary/10 text-primary",
-  out_of_order: "bg-destructive/10 text-destructive",
-  inactive: "bg-muted text-muted-foreground",
+const STATUS_VARIANT: Record<RoomUnit["status"], "success" | "destructive" | "neutral"> = {
+  active: "success",
+  out_of_order: "destructive",
+  inactive: "neutral",
 };
 
 const STATUS_LABEL: Record<RoomUnit["status"], string> = {
@@ -53,10 +53,16 @@ function StatusToggle({ unit }: { unit: RoomUnit }) {
     <form action={action}>
       <input type="hidden" name="unitId" value={unit.id} />
       <input type="hidden" name="status" value={out ? "active" : "out_of_order"} />
-      <Button type="submit" size="sm" variant="ghost" className={cn("h-7 gap-1", !out && "text-destructive")}>
-        <TriangleAlert className="size-3.5" />
-        {out ? "Mark active" : "Out of order"}
-      </Button>
+      <SubmitButton
+        size="icon-sm"
+        variant="ghost"
+        pendingText=""
+        aria-label={out ? `Mark room ${unit.room_number} active` : `Mark room ${unit.room_number} out of order`}
+        title={out ? "Mark active" : "Mark out of order"}
+        className="text-muted-foreground hover:text-foreground"
+      >
+        {out ? <CircleCheck aria-hidden="true" /> : <TriangleAlert aria-hidden="true" />}
+      </SubmitButton>
     </form>
   );
 }
@@ -76,23 +82,31 @@ function BlockDatesButton({ unit }: { unit: RoomUnit }) {
 
   return (
     <>
-      <Button type="button" size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setOpen(true)}>
-        <Ban className="size-3.5" /> Block dates
+      <Button
+        type="button"
+        size="icon-sm"
+        variant="ghost"
+        aria-label={`Block dates for room ${unit.room_number}`}
+        title="Block dates"
+        className="text-muted-foreground hover:text-foreground"
+        onClick={() => setOpen(true)}
+      >
+        <Ban aria-hidden="true" />
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-xs">
           <DialogHeader>
-            <DialogTitle>Block Room {unit.room_number}</DialogTitle>
+            <DialogTitle>Block room {unit.room_number}</DialogTitle>
           </DialogHeader>
           <form action={action} className="space-y-4">
             <input type="hidden" name="unitId" value={unit.id} />
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor={`block-from-${unit.id}`}>From</Label>
+              <Field>
+                <FieldLabel htmlFor={`block-from-${unit.id}`}>From</FieldLabel>
                 <Input id={`block-from-${unit.id}`} name="dateStart" type="date" min={today} required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor={`block-to-${unit.id}`}>Back on</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`block-to-${unit.id}`}>Back on</FieldLabel>
                 <Input
                   id={`block-to-${unit.id}`}
                   name="dateEnd"
@@ -101,18 +115,18 @@ function BlockDatesButton({ unit }: { unit: RoomUnit }) {
                   required
                   aria-invalid={Boolean(state?.error)}
                 />
-              </div>
+              </Field>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={`block-reason-${unit.id}`}>Reason</Label>
+            <Field>
+              <FieldLabel htmlFor={`block-reason-${unit.id}`}>Reason</FieldLabel>
               <Input id={`block-reason-${unit.id}`} name="reason" placeholder="Maintenance" maxLength={300} />
-            </div>
-            <div className="flex justify-end gap-2">
+            </Field>
+            <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Close
+                Cancel
               </Button>
               <SubmitButton pendingText="Blocking…">Block</SubmitButton>
-            </div>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
@@ -143,94 +157,96 @@ export function RoomUnitsManager({
   return (
     <div className="space-y-4">
       {units.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No rooms added yet.</p>
+        <Empty className="p-6">
+          <EmptyMedia variant="icon">
+            <DoorOpen />
+          </EmptyMedia>
+          <EmptyTitle>No rooms added</EmptyTitle>
+        </Empty>
       ) : (
         <ul className="divide-y divide-border">
           {units.map((unit) => (
-            <li key={unit.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-muted-foreground">
-                  <DoorOpen className="size-4" />
-                </span>
-                <div>
-                  <p className="text-sm font-medium">
+            <li key={unit.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium tabular-nums">
                     Room {unit.room_number}
                     {unit.floor ? <span className="font-normal text-muted-foreground"> · Floor {unit.floor}</span> : null}
                   </p>
-                  {unit.out_of_order_reason ? (
-                    <p className="text-xs text-destructive">{unit.out_of_order_reason}</p>
-                  ) : null}
-                  {blocks
-                    .filter((b) => b.roomUnitId === unit.id)
-                    .map((b) => (
-                      <div key={b.id} className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Ban className="size-3 text-destructive" />
-                        {b.dateStart} → {b.dateEnd}
-                        {b.reason ? ` · ${b.reason}` : ""}
-                        {canEdit ? (
-                          <form action={deleteRoomBlock}>
-                            <input type="hidden" name="blockId" value={b.id} />
-                            <button type="submit" aria-label="Remove block" className="text-muted-foreground hover:text-destructive">
-                              <X className="size-3" />
-                            </button>
-                          </form>
-                        ) : null}
-                      </div>
-                    ))}
+                  <Badge variant={STATUS_VARIANT[unit.status]}>{STATUS_LABEL[unit.status]}</Badge>
                 </div>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Badge className={cn("border-transparent", STATUS_STYLE[unit.status])}>
-                  {STATUS_LABEL[unit.status]}
-                </Badge>
-                {canEdit ? (
-                  <>
-                    <StatusToggle unit={unit} />
-                    <BlockDatesButton unit={unit} />
-                    <form action={deleteRoomUnit}>
-                      <input type="hidden" name="unitId" value={unit.id} />
-                      <ConfirmButton
-                        title="Delete this room?"
-                        description={unit.room_number}
-                        aria-label="Delete room"
-                        size="icon"
-                        variant="ghost"
-                        className="size-7 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </ConfirmButton>
-                    </form>
-                  </>
+                {unit.out_of_order_reason ? (
+                  <p className="text-xs text-destructive">{unit.out_of_order_reason}</p>
                 ) : null}
+                {blocks
+                  .filter((b) => b.roomUnitId === unit.id)
+                  .map((b) => (
+                    <div key={b.id} className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
+                      <Ban aria-hidden="true" className="size-3 shrink-0 text-destructive" />
+                      <span className="min-w-0 truncate">
+                        {dateSpan(b.dateStart, b.dateEnd)}
+                        {b.reason ? ` · ${b.reason}` : ""}
+                      </span>
+                      {canEdit ? (
+                        <form action={deleteRoomBlock}>
+                          <input type="hidden" name="blockId" value={b.id} />
+                          <Button
+                            type="submit"
+                            size="icon-xs"
+                            variant="ghost"
+                            aria-label="Remove block"
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <X aria-hidden="true" />
+                          </Button>
+                        </form>
+                      ) : null}
+                    </div>
+                  ))}
               </div>
+              {canEdit ? (
+                <div className="flex shrink-0 items-center">
+                  <StatusToggle unit={unit} />
+                  <BlockDatesButton unit={unit} />
+                  <form action={deleteRoomUnit}>
+                    <input type="hidden" name="unitId" value={unit.id} />
+                    <ConfirmButton
+                      title="Delete this room?"
+                      description={unit.room_number}
+                      aria-label={`Delete room ${unit.room_number}`}
+                      size="icon-sm"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </ConfirmButton>
+                  </form>
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
 
       {canEdit ? (
-        <form action={addAction} className="flex flex-wrap items-end gap-3 border-t border-border pt-4">
+        <form action={addAction} className="space-y-2 border-t border-border pt-4">
           <input type="hidden" name="hotelId" value={hotelId} />
           <input type="hidden" name="roomTypeId" value={roomTypeId} />
-          <div className="space-y-1.5">
-            <Label htmlFor="roomNumber">Room number</Label>
-            <Input id="roomNumber" name="roomNumber" placeholder="e.g. GR-101" required className="w-32" />
+          <div className="flex items-end gap-2">
+            <Field className="min-w-0 flex-1">
+              <FieldLabel htmlFor={`roomNumber-${roomTypeId}`}>Room number</FieldLabel>
+              <Input id={`roomNumber-${roomTypeId}`} name="roomNumber" placeholder="GR-101" required aria-invalid={Boolean(addState?.error)} />
+            </Field>
+            <Field className="w-20 shrink-0">
+              <FieldLabel htmlFor={`floor-${roomTypeId}`}>Floor</FieldLabel>
+              <Input id={`floor-${roomTypeId}`} name="floor" placeholder="3" />
+            </Field>
+            <SubmitButton size="icon" pendingText="" aria-label="Add room" title="Add room" className="shrink-0">
+              <Plus aria-hidden="true" />
+            </SubmitButton>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="floor">Floor</Label>
-            <Input id="floor" name="floor" placeholder="e.g. 3" className="w-24" />
-          </div>
-          <SubmitButton size="sm" pendingText="Adding…">
-            Add room
-          </SubmitButton>
+          <FieldError>{addState?.error}</FieldError>
         </form>
-      ) : null}
-
-      {addState?.error ? (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertDescription>{addState.error}</AlertDescription>
-        </Alert>
       ) : null}
     </div>
   );

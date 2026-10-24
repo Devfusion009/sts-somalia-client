@@ -2,11 +2,10 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -129,172 +128,181 @@ export function HallBookingForm({
     endTime,
   });
 
+  const required = <span className="text-destructive">*</span>;
+
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-5">
       <input type="hidden" name="venueId" value={venueId} />
       {bookedForSlot}
 
-      <div className="space-y-1.5">
-        <Label>Event Type <span className="text-destructive">*</span></Label>
-        <Select name="eventType">
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select event type" />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((type) => (
-              <SelectItem key={type} value={type}>
-                {eventTypeLabel(type)}
-              </SelectItem>
-            ))}
-            {!options.includes("other") ? <SelectItem value="other">Other</SelectItem> : null}
-          </SelectContent>
-        </Select>
-      </div>
+      <FieldGroup className="gap-4">
+        <div className="grid grid-cols-1 gap-4 @md/field-group:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="eventType">Event type {required}</FieldLabel>
+            <Select name="eventType">
+              <SelectTrigger id="eventType" className="w-full">
+                <SelectValue placeholder="Select event type" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {eventTypeLabel(type)}
+                  </SelectItem>
+                ))}
+                {!options.includes("other") ? <SelectItem value="other">Other</SelectItem> : null}
+              </SelectContent>
+            </Select>
+          </Field>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="eventName">Event Name (optional)</Label>
-        <Input id="eventName" name="eventName" placeholder="e.g. Ahmed & Amina's Wedding" />
-      </div>
+          <Field>
+            <FieldLabel htmlFor="eventName">Event name (optional)</FieldLabel>
+            <Input id="eventName" name="eventName" placeholder="e.g. Ahmed & Amina's Wedding" />
+          </Field>
+        </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="startDate">Start Date <span className="text-destructive">*</span></Label>
+        <div className="grid grid-cols-2 gap-4">
+          <Field>
+            <FieldLabel htmlFor="startDate">Start date {required}</FieldLabel>
+            <Input
+              id="startDate"
+              name="startDate"
+              type="date"
+              min={today}
+              required
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="endDate">End date {required}</FieldLabel>
+            <Input
+              id="endDate"
+              name="endDate"
+              type="date"
+              min={startDate || today}
+              required
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field>
+            <FieldLabel htmlFor="startTime">
+              Start time {priceUnit === "per_hour" ? required : null}
+            </FieldLabel>
+            <Input
+              id="startTime"
+              name="startTime"
+              type="time"
+              required={priceUnit === "per_hour"}
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="endTime">
+              End time {priceUnit === "per_hour" ? required : null}
+            </FieldLabel>
+            <Input
+              id="endTime"
+              name="endTime"
+              type="time"
+              required={priceUnit === "per_hour"}
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+          </Field>
+        </div>
+
+        <Field className="@md/field-group:max-w-[calc(50%-0.5rem)]">
+          <FieldLabel htmlFor="expectedGuests">
+            Expected guests{maxGuests ? ` (max ${maxGuests})` : ""} {required}
+          </FieldLabel>
           <Input
-            id="startDate"
-            name="startDate"
-            type="date"
-            min={today}
+            id="expectedGuests"
+            name="expectedGuests"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={maxGuests ?? undefined}
+            value={guests}
+            onChange={(e) => setGuests(Math.max(1, Number(e.target.value) || 1))}
             required
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            className="tabular-nums"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="endDate">End Date <span className="text-destructive">*</span></Label>
-          <Input
-            id="endDate"
-            name="endDate"
-            type="date"
-            min={startDate || today}
-            required
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="setupRequirements">Setup requirements (optional)</FieldLabel>
+          <Textarea
+            id="setupRequirements"
+            name="setupRequirements"
+            rows={3}
+            placeholder="Stage layout, decor, catering preferences, AV needs…"
           />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="startTime">
-            Start Time {priceUnit === "per_hour" ? <span className="text-destructive">*</span> : null}
-          </Label>
-          <Input
-            id="startTime"
-            name="startTime"
-            type="time"
-            required={priceUnit === "per_hour"}
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="endTime">
-            End Time {priceUnit === "per_hour" ? <span className="text-destructive">*</span> : null}
-          </Label>
-          <Input
-            id="endTime"
-            name="endTime"
-            type="time"
-            required={priceUnit === "per_hour"}
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="expectedGuests">
-          Expected Guests{maxGuests ? ` (max ${maxGuests})` : ""} <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          id="expectedGuests"
-          name="expectedGuests"
-          type="number"
-          min={1}
-          max={maxGuests ?? undefined}
-          value={guests}
-          onChange={(e) => setGuests(Math.max(1, Number(e.target.value) || 1))}
-          required
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="setupRequirements">Setup Requirements (optional)</Label>
-        <Textarea
-          id="setupRequirements"
-          name="setupRequirements"
-          rows={3}
-          placeholder="Stage layout, decor, catering preferences, AV needs…"
-        />
-      </div>
-
-      {state?.error ? (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      ) : null}
+        </Field>
+      </FieldGroup>
 
       <Separator />
 
       {/* Per-person and price-on-request venues estimate/confirm before the
           booking completes, so the request goes in WITHOUT payment.
           Fixed-price venues keep the pay-now flow. */}
-      {isRequestFirst ? (
-        <div className="space-y-3">
-          <div className="rounded-lg bg-muted/60 p-3">
-            {!price.onRequest ? (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  {venueMoney(currency, price.unitPrice)} × {formatUnitQuantity(price.quantity, price.unitNoun)}
-                </p>
-                <p className="font-heading text-xl font-bold text-primary">
-                  {venueMoney(currency, price.total)}
-                  <span className="ml-1 text-xs font-normal text-muted-foreground">estimated</span>
-                </p>
-              </div>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <div className="min-w-0">
+            {isRequestFirst ? (
+              price.onRequest ? (
+                <p className="font-heading text-lg font-semibold">Price on request</p>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground tabular-nums">
+                    {venueMoney(currency, price.unitPrice)} ×{" "}
+                    {formatUnitQuantity(price.quantity, price.unitNoun)}
+                  </p>
+                  <p className="font-heading text-xl font-bold tabular-nums text-primary">
+                    {venueMoney(currency, price.total)}
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">estimated</span>
+                  </p>
+                </>
+              )
             ) : (
-              <p className="text-sm font-medium">Price on request</p>
+              <>
+                {!price.needsTimes ? (
+                  <p className="text-sm text-muted-foreground tabular-nums">
+                    {price.unitNoun
+                      ? `${venueMoney(currency, price.unitPrice)} × ${formatUnitQuantity(price.quantity, price.unitNoun)}`
+                      : "Venue fee"}
+                  </p>
+                ) : null}
+                <p className="font-heading text-xl font-bold tabular-nums text-primary">
+                  {venueMoney(currency, price.needsTimes ? price.unitPrice : price.total)}
+                  {price.needsTimes ? (
+                    <span className="text-xs font-normal text-muted-foreground"> per hour</span>
+                  ) : null}
+                </p>
+              </>
             )}
           </div>
-          <SubmitButton pendingText="Sending request…" className="w-full gap-1.5">
-            Request Booking <ArrowRight className="size-4" />
-          </SubmitButton>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div>
-              {!price.needsTimes ? (
-                <p className="text-xs text-muted-foreground">
-                  {price.unitNoun
-                    ? `${venueMoney(currency, price.unitPrice)} × ${formatUnitQuantity(price.quantity, price.unitNoun)}`
-                    : "Venue fee"}
-                </p>
-              ) : null}
-              <p className="font-heading text-xl font-bold text-primary">
-                {venueMoney(currency, price.needsTimes ? price.unitPrice : price.total)}
-                {price.needsTimes ? (
-                  <span className="text-xs font-normal text-muted-foreground"> per hour</span>
-                ) : null}
-              </p>
-            </div>
-            <SubmitButton pendingText="Reserving…" className="gap-1.5" disabled={price.needsTimes}>
-              Reserve &amp; Pay <ArrowRight className="size-4" />
+          {isRequestFirst ? (
+            <SubmitButton pendingText="Sending request…" size="lg" className="max-sm:w-full">
+              Request booking <ArrowRight data-icon="inline-end" aria-hidden="true" />
             </SubmitButton>
-          </div>
+          ) : (
+            <SubmitButton
+              pendingText="Reserving…"
+              size="lg"
+              className="max-sm:w-full"
+              disabled={price.needsTimes}
+            >
+              Reserve &amp; pay <ArrowRight data-icon="inline-end" aria-hidden="true" />
+            </SubmitButton>
+          )}
         </div>
-      )}
+        <FieldError>{state?.error}</FieldError>
+      </div>
     </form>
   );
 }

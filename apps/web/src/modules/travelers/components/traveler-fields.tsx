@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field as FieldRoot, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -43,20 +43,17 @@ const GENDER_ITEMS = [
 function Field({
   label,
   htmlFor,
-  hint,
   children,
 }: {
   label: string;
   htmlFor: string;
-  hint?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor={htmlFor}>{label}</Label>
+    <FieldRoot>
+      <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
       {children}
-      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
-    </div>
+    </FieldRoot>
   );
 }
 
@@ -80,7 +77,7 @@ export function TravelerFields({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
         <Field label={nameLabel} htmlFor={id("fullName")}>
           <Input
             id={id("fullName")}
@@ -159,10 +156,7 @@ export function TravelerFields({
           </Select>
         </Field>
 
-        <Field
-          label="Passport number"
-          htmlFor={id("passportNumber")}
-        >
+        <Field label="Passport number" htmlFor={id("passportNumber")}>
           <Input
             id={id("passportNumber")}
             name="passportNumber"

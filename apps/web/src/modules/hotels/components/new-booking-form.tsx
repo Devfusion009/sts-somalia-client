@@ -5,11 +5,8 @@ import { useRef, useState, useTransition } from "react";
 import { format } from "date-fns";
 import {
   Banknote,
-  CircleAlert,
-  CircleCheck,
   CreditCard,
   Landmark,
-  Loader2,
   Minus,
   Plus,
   Smartphone,
@@ -17,14 +14,15 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Textarea } from "@/components/ui/textarea";
+import { money as formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { createReservation, quoteStay } from "@/modules/hotels/reservation-actions";
 import {
@@ -42,10 +40,7 @@ const METHOD_ICON: Record<OfflinePaymentMethod, LucideIcon> = {
 };
 
 function money(currency: string, amount: number) {
-  return `${currency} ${amount.toLocaleString("en-US", {
-    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return formatMoney(amount, currency);
 }
 
 function day(iso: string) {
@@ -85,13 +80,13 @@ function Stepper({
   label: string;
 }) {
   return (
-    <div className="flex h-9 items-center justify-between rounded-lg border border-input px-1">
+    <div className="flex h-8 items-center justify-between rounded-lg border border-input bg-card px-0.5 shadow-xs focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 max-sm:h-10 dark:bg-input/30">
       <input type="hidden" name={name} value={value} />
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        className="size-7"
+        className="size-7 max-sm:size-9"
         aria-label={`Fewer ${label}`}
         disabled={value <= min}
         onClick={() => onChange(value - 1)}
@@ -105,7 +100,7 @@ function Stepper({
         type="button"
         variant="ghost"
         size="icon"
-        className="size-7"
+        className="size-7 max-sm:size-9"
         aria-label={`More ${label}`}
         disabled={value >= max}
         onClick={() => onChange(value + 1)}
@@ -267,27 +262,20 @@ export function NewBookingForm({
     const waitlisted = confirmation.status === "waitlisted";
     return (
       <Card className="mx-auto max-w-lg">
-        <CardContent className="space-y-6 pt-2">
-          <div className="flex items-start gap-3">
-            <span
-              className={cn(
-                "grid size-10 shrink-0 place-items-center rounded-full",
-                waitlisted ? "bg-brand-gold/15 text-brand-gold" : "bg-primary/10 text-primary"
-              )}
-            >
-              {waitlisted ? <CircleAlert className="size-5" /> : <CircleCheck className="size-5" />}
-            </span>
-            <div>
+        <CardContent className="space-y-6">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-heading text-lg font-semibold">
                 {waitlisted ? "Added to waitlist" : "Booking confirmed"}
               </h2>
-              <p className="font-mono text-sm text-muted-foreground">
-                #{confirmation.bookingId.slice(0, 8).toUpperCase()}
-              </p>
+              <Badge variant={waitlisted ? "warning" : "success"}>{waitlisted ? "Waitlisted" : "Confirmed"}</Badge>
             </div>
+            <p className="font-mono text-sm text-muted-foreground">
+              #{confirmation.bookingId.slice(0, 8).toUpperCase()}
+            </p>
           </div>
 
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 border-t border-border pt-4 text-sm">
             <dt className="text-muted-foreground">Guest</dt>
             <dd className="font-medium">
               {confirmation.guestName}
@@ -296,18 +284,18 @@ export function NewBookingForm({
                 : ""}
             </dd>
             <dt className="text-muted-foreground">Room</dt>
-            <dd>
+            <dd className="tabular-nums">
               {confirmation.numRooms} × {confirmation.room.name}
             </dd>
             <dt className="text-muted-foreground">Stay</dt>
-            <dd>
+            <dd className="tabular-nums">
               {day(confirmation.quote.checkIn)} – {day(confirmation.quote.checkOut)} ·{" "}
               {plural(confirmation.quote.nights, "night")}
             </dd>
             <dt className="text-muted-foreground">Guests</dt>
-            <dd>{confirmation.guests}</dd>
+            <dd className="tabular-nums">{confirmation.guests}</dd>
             <dt className="text-muted-foreground">Total</dt>
-            <dd className="font-semibold">
+            <dd className="font-semibold tabular-nums">
               {money(confirmation.room.currency, confirmation.room.stayPricePerRoom * confirmation.numRooms)}
             </dd>
             <dt className="text-muted-foreground">Payment</dt>
@@ -316,12 +304,12 @@ export function NewBookingForm({
             </dd>
           </dl>
 
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={startOver}>
-              New booking
-            </Button>
+          <div className="flex flex-wrap justify-end gap-2">
             <Button variant="outline" render={<Link href={`/manager/${hotelId}/bookings/${confirmation.bookingId}`} />}>
               View booking
+            </Button>
+            <Button type="button" onClick={startOver}>
+              New booking
             </Button>
           </div>
         </CardContent>
@@ -343,8 +331,8 @@ export function NewBookingForm({
           <section className="space-y-4 p-6">
             <h2 className="font-heading text-base font-semibold">Stay</h2>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="nb-check-in">Check-in</Label>
+              <Field>
+                <FieldLabel htmlFor="nb-check-in">Check-in</FieldLabel>
                 <Input
                   id="nb-check-in"
                   type="date"
@@ -353,9 +341,9 @@ export function NewBookingForm({
                   onChange={(e) => onCheckIn(e.target.value)}
                   required
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="nb-check-out">Check-out</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="nb-check-out">Check-out</FieldLabel>
                 <Input
                   id="nb-check-out"
                   type="date"
@@ -365,12 +353,12 @@ export function NewBookingForm({
                   aria-invalid={Boolean(quoteError)}
                   required
                 />
-              </div>
+              </Field>
             </div>
-            {quoteError ? <p className="text-sm text-destructive">{quoteError}</p> : null}
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="nb-rooms">Rooms</Label>
+            <FieldError>{quoteError}</FieldError>
+            <div className="grid grid-cols-3 gap-3 sm:gap-4">
+              <Field>
+                <FieldLabel htmlFor="nb-rooms">Rooms</FieldLabel>
                 <Stepper
                   id="nb-rooms"
                   name="numRooms"
@@ -380,13 +368,13 @@ export function NewBookingForm({
                   max={Math.max(1, Math.min(20, roomLimit))}
                   onChange={setNumRooms}
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="nb-adults">Adults</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="nb-adults">Adults</FieldLabel>
                 <Stepper id="nb-adults" name="adults" label="adults" value={adults} min={1} max={80} onChange={setAdults} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="nb-children">Children</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="nb-children">Children</FieldLabel>
                 <Stepper
                   id="nb-children"
                   name="children"
@@ -396,22 +384,20 @@ export function NewBookingForm({
                   max={40}
                   onChange={setChildren}
                 />
-              </div>
+              </Field>
             </div>
-            {tooManyGuests && room ? (
-              <p className="text-sm text-destructive">
-                {room.name} holds up to {room.maxOccupancy} guests per room.
-              </p>
-            ) : null}
+            <FieldError>
+              {tooManyGuests && room ? `${room.name} sleeps up to ${room.maxOccupancy} per room.` : null}
+            </FieldError>
           </section>
 
           <section className="space-y-4 p-6">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-heading text-base font-semibold">Room type</h2>
-              {quoting ? <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Updating" /> : null}
+              {quoting ? <Spinner className="text-muted-foreground" aria-label="Updating" /> : null}
             </div>
             {quote.rooms.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No published room types.</p>
+              <p className="text-sm text-muted-foreground">No published room types</p>
             ) : (
               <div role="radiogroup" aria-label="Room type" className={cn("space-y-2", quoting && "opacity-60")}>
                 {quote.rooms.map((r) => {
@@ -421,7 +407,7 @@ export function NewBookingForm({
                     <label
                       key={r.id}
                       className={cn(
-                        "flex items-center gap-4 rounded-lg border p-4 transition-colors",
+                        "flex items-center gap-3 rounded-lg border p-3 transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50 sm:gap-4 sm:p-4",
                         soldOut
                           ? "cursor-not-allowed border-border bg-muted/40 text-muted-foreground"
                           : "cursor-pointer hover:border-primary/40",
@@ -447,12 +433,12 @@ export function NewBookingForm({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium text-foreground">{r.name}</span>
-                        <span className="block text-xs text-muted-foreground">
-                          Up to {r.maxOccupancy} guests · {money(r.currency, r.nightlyRate)} / night
+                        <span className="block text-xs text-muted-foreground tabular-nums">
+                          Sleeps {r.maxOccupancy} · {money(r.currency, r.nightlyRate)} / night
                         </span>
                       </span>
                       <span className="shrink-0 text-right">
-                        <span className="block text-sm font-semibold text-foreground">
+                        <span className="block text-sm font-semibold text-foreground tabular-nums">
                           {money(r.currency, r.stayPricePerRoom)}
                         </span>
                         {soldOut ? (
@@ -462,8 +448,10 @@ export function NewBookingForm({
                         ) : r.available !== null ? (
                           <span
                             className={cn(
-                              "block text-xs",
-                              r.available <= 2 ? "font-medium text-brand-gold" : "text-muted-foreground"
+                              "block text-xs tabular-nums",
+                              r.available <= 2
+                                ? "font-medium text-[color-mix(in_oklch,var(--brand-gold),black_30%)] dark:text-brand-gold"
+                                : "text-muted-foreground"
                             )}
                           >
                             {r.available} left
@@ -479,24 +467,26 @@ export function NewBookingForm({
 
           <section className="space-y-4 p-6">
             <h2 className="font-heading text-base font-semibold">Guest</h2>
-            <div className="space-y-1.5">
-              <Label htmlFor="nb-guest-name">Full name</Label>
+            <Field>
+              <FieldLabel htmlFor="nb-guest-name">Full name</FieldLabel>
               <Input id="nb-guest-name" name="guestName" autoComplete="off" minLength={2} maxLength={120} required />
-            </div>
+            </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="nb-guest-phone">Phone</Label>
+              <Field>
+                <FieldLabel htmlFor="nb-guest-phone">Phone</FieldLabel>
                 <PhoneInput id="nb-guest-phone" name="guestPhone" defaultCountry="SO" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="nb-guest-email">Email</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="nb-guest-email">Email</FieldLabel>
                 <Input id="nb-guest-email" name="guestEmail" type="email" autoComplete="off" maxLength={160} />
-              </div>
+              </Field>
             </div>
 
             {visibleGuests.length > 0 ? (
-              <div className="space-y-2">
-                <Label>Other guests</Label>
+              <div role="group" aria-labelledby="nb-other-guests" className="space-y-2">
+                <p id="nb-other-guests" className="text-sm font-medium">
+                  Other guests
+                </p>
                 {visibleGuests.map((guest, i) => (
                   <div key={guest.id} className="flex items-center gap-2">
                     <Input
@@ -516,8 +506,8 @@ export function NewBookingForm({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-9 shrink-0 text-muted-foreground"
-                      aria-label="Remove guest"
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      aria-label={`Remove guest ${i + 2}`}
                       onClick={() => setAdditionalGuests((list) => list.filter((g) => g.id !== guest.id))}
                     >
                       <X className="size-4" />
@@ -531,19 +521,18 @@ export function NewBookingForm({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="gap-1.5"
                 onClick={() =>
                   setAdditionalGuests((list) => [...list, { id: nextGuestId.current++, name: "" }])
                 }
               >
-                <UserPlus className="size-3.5" /> Add guest
+                <UserPlus aria-hidden="true" /> Add guest
               </Button>
             ) : null}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="nb-notes">Special requests</Label>
+            <Field>
+              <FieldLabel htmlFor="nb-notes">Special requests</FieldLabel>
               <Textarea id="nb-notes" name="notes" rows={2} maxLength={500} />
-            </div>
+            </Field>
           </section>
 
           <section className="space-y-4 p-6">
@@ -556,7 +545,7 @@ export function NewBookingForm({
                   <label
                     key={m}
                     className={cn(
-                      "flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border p-3 text-sm font-medium transition-colors hover:border-primary/40",
+                      "flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-sm font-medium transition-colors hover:border-primary/40 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
                       selected && "border-primary bg-primary/5 text-primary ring-1 ring-primary"
                     )}
                   >
@@ -567,13 +556,13 @@ export function NewBookingForm({
                       checked={selected}
                       onChange={() => setMethod(m)}
                     />
-                    <Icon className="size-5" />
+                    <Icon aria-hidden="true" className="size-5" />
                     {PAYMENT_METHOD_LABEL[m]}
                   </label>
                 );
               })}
             </div>
-            <div role="radiogroup" aria-label="Payment status" className="inline-flex rounded-lg border border-input p-1">
+            <div role="radiogroup" aria-label="Payment status" className="inline-flex gap-0.5 rounded-lg bg-muted p-[3px]">
               {[
                 { value: true, label: "Paid now" },
                 { value: false, label: "Pay at check-in" },
@@ -581,8 +570,10 @@ export function NewBookingForm({
                 <label
                   key={option.label}
                   className={cn(
-                    "cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    paid === option.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                    "flex h-7 cursor-pointer items-center rounded-md px-3 text-sm font-medium transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50 max-sm:h-9",
+                    paid === option.value
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
                   )}
                 >
                   <input
@@ -597,8 +588,8 @@ export function NewBookingForm({
               ))}
             </div>
             {method !== "cash" ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="nb-reference">Reference</Label>
+              <Field>
+                <FieldLabel htmlFor="nb-reference">Reference</FieldLabel>
                 <Input
                   id="nb-reference"
                   name="paymentReference"
@@ -606,7 +597,7 @@ export function NewBookingForm({
                   maxLength={120}
                   autoComplete="off"
                 />
-              </div>
+              </Field>
             ) : null}
           </section>
         </CardContent>
@@ -619,14 +610,14 @@ export function NewBookingForm({
             <>
               <div className="space-y-0.5">
                 <p className="font-medium">{room.name}</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground tabular-nums">
                   {day(checkIn)} – {day(checkOut)}
                 </p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground tabular-nums">
                   {plural(quote.nights, "night")} · {plural(numRooms, "room")} · {plural(adults + children, "guest")}
                 </p>
               </div>
-              <dl className="space-y-1.5 border-t border-border pt-4 text-sm">
+              <dl className="space-y-1.5 border-t border-border pt-4 text-sm tabular-nums">
                 <div className="flex justify-between gap-3">
                   <dt className="text-muted-foreground">
                     {money(room.currency, room.stayPricePerRoom)} × {plural(numRooms, "room")}
@@ -639,24 +630,19 @@ export function NewBookingForm({
                 </div>
                 <div className="flex justify-between gap-3 pt-1">
                   <dt className="text-muted-foreground">{PAYMENT_METHOD_LABEL[method]}</dt>
-                  <dd className={paid ? "font-medium text-primary" : "font-medium text-brand-gold"}>
-                    {paid ? "Paid" : "Due at check-in"}
+                  <dd>
+                    <Badge variant={paid ? "success" : "warning"}>{paid ? "Paid" : "Due at check-in"}</Badge>
                   </dd>
                 </div>
               </dl>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">Choose dates and a room type.</p>
+            <p className="text-sm text-muted-foreground">No room selected</p>
           )}
 
-          {error ? (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          ) : null}
+          <FieldError>{error}</FieldError>
 
-          <Button type="submit" className="w-full" disabled={!canSubmit}>
-            {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+          <Button type="submit" size="lg" className="w-full" disabled={!canSubmit} loading={submitting}>
             {submitting ? "Confirming…" : "Confirm booking"}
           </Button>
         </CardContent>

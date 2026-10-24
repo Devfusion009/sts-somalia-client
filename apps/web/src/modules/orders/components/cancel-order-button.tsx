@@ -2,18 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, AlertCircle } from "lucide-react";
+import { X } from "lucide-react";
 import { trpc } from "@/lib/trpc/react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FieldError } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
 
 /**
@@ -25,10 +26,13 @@ export function CancelOrderButton({
   orderId,
   redirectTo,
   label = "Cancel Order",
+  size = "sm",
 }: {
   orderId: string;
   redirectTo?: string;
   label?: string;
+  /** Trigger size; "default" when it sits among page-header actions. */
+  size?: "sm" | "default";
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -50,30 +54,24 @@ export function CancelOrderButton({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" size="sm" className="gap-1.5 text-destructive hover:text-destructive" />}>
-        <X className="size-3.5" /> {label}
+      <DialogTrigger render={<Button variant="outline" size={size} className="text-destructive hover:text-destructive" />}>
+        <X data-icon="inline-start" aria-hidden="true" /> {label}
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Cancel this order?</DialogTitle>
-          <DialogDescription>
-            This releases any reserved inventory and can&apos;t be undone. The order stays in your
-            history as cancelled.
-          </DialogDescription>
+          <DialogDescription>Reserved inventory is released. This can&apos;t be undone.</DialogDescription>
         </DialogHeader>
-        {cancelOrder.error ? (
-          <Alert variant="destructive">
-            <AlertCircle />
-            <AlertDescription>{cancelOrder.error.message}</AlertDescription>
-          </Alert>
-        ) : null}
-        <form action={handleSubmit} className="flex justify-end gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
-            Keep order
-          </Button>
-          <SubmitButton size="sm" variant="destructive" pendingText="Cancelling…">
-            Yes, cancel it
-          </SubmitButton>
+        <form action={handleSubmit} className="space-y-4">
+          <FieldError>{cancelOrder.error?.message}</FieldError>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Keep order
+            </Button>
+            <SubmitButton variant="destructive" pendingText="Cancelling…">
+              Cancel order
+            </SubmitButton>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

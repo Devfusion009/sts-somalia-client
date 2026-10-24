@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc/react";
 
@@ -14,18 +15,21 @@ import { trpc } from "@/lib/trpc/react";
 export function WithdrawRequestButton({ requestId, orderId }: { requestId: string; orderId: string }) {
   const router = useRouter();
   const withdraw = trpc.bookings.withdrawRequest.useMutation({
-    onSuccess: () => router.refresh(),
+    onSuccess: () => {
+      toast.success("Request withdrawn.");
+      router.refresh();
+    },
+    onError: (error) => toast.error(error.message),
   });
 
   return (
     <Button
       type="button"
-      variant="ghost"
-      size="sm"
-      disabled={withdraw.isPending}
+      variant="outline"
+      loading={withdraw.isPending}
       onClick={() => withdraw.mutate({ requestId, orderId })}
     >
-      {withdraw.isPending ? "Withdrawing…" : "Withdraw"}
+      Withdraw
     </Button>
   );
 }

@@ -63,11 +63,10 @@ export function QuoteRequestForm({
 
   if (!signedIn) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border p-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          Sign in to request a personalised fare quote from our team.
-        </p>
-        <Button render={<Link href="/login" />}>Log in to request a quote</Button>
+      <div className="flex justify-center">
+        <Button size="lg" render={<Link href="/login" />}>
+          Log in to request a quote
+        </Button>
       </div>
     );
   }
@@ -75,16 +74,16 @@ export function QuoteRequestForm({
   if (state && state.error === null && state.success) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl bg-primary/10 p-8 text-center">
-        <CheckCircle2 className="size-8 text-primary" />
-        <p className="font-heading text-lg font-bold">Quote request received!</p>
-        <p className="max-w-md text-sm text-muted-foreground">
-          Our travel team is searching fares for your route and will send you options within a few
-          hours. You can also reach us on{" "}
-          <a href="tel:+252611444420" className="font-medium text-primary">
-            +252 611 444 420
-          </a>
-          .
+        <CheckCircle2 className="size-8 text-primary" aria-hidden />
+        <p role="status" className="font-heading text-lg font-bold">
+          Quote request sent.
         </p>
+        <a
+          href="tel:+252611444420"
+          className="rounded-sm text-sm font-medium text-primary tabular-nums hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          +252 611 444 420
+        </a>
       </div>
     );
   }
@@ -112,12 +111,15 @@ export function QuoteRequestForm({
             id="contactPhone"
             name="contactPhone"
             type="tel"
+            autoComplete="tel"
             placeholder="+252 61 XXXXXXX"
             required
           />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="notes">Anything else we should know? (optional)</Label>
+          <Label htmlFor="notes">
+            Anything else we should know? <span className="font-normal text-muted-foreground">(optional)</span>
+          </Label>
           <Textarea
             id="notes"
             name="notes"
@@ -129,14 +131,16 @@ export function QuoteRequestForm({
 
       {state?.error ? (
         <Alert variant="destructive">
-          <AlertCircle />
+          <AlertCircle aria-hidden />
           <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       ) : null}
 
-      <SubmitButton pendingText="Sending request…" className="gap-2">
-        <PhoneCall className="size-4" /> Request a Quote
-      </SubmitButton>
+      <div className="flex justify-end">
+        <SubmitButton size="lg" pendingText="Sending request…" className="gap-2 max-sm:w-full">
+          <PhoneCall className="size-4" aria-hidden /> Request a quote
+        </SubmitButton>
+      </div>
     </form>
   );
 }

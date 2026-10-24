@@ -2,9 +2,8 @@
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { BedDouble, Plus, Search, Users, DollarSign, Lock, LogIn, LogOut, Pencil, ArrowLeftRight, Ban, X } from "lucide-react";
+import { BedDouble, Plus, Search, Users, DollarSign, Lock, LogIn, LogOut, Pencil, ArrowLeftRight, Ban, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,7 +28,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
+import { Spinner } from "@/components/ui/spinner";
 import { SubmitButton } from "@/components/submit-button";
+import { dateSpan } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import {
   createFrontDeskBooking,
@@ -53,8 +57,11 @@ const STATUS_LABEL: Record<FrontDeskStatus, string> = {
   check_out: "Check-out",
 };
 
+// Filled bars are committed stays; a reserved (unconfirmed) booking is a
+// hollow bar, and arrival/departure states carry an icon, so status never
+// rests on color alone.
 const STATUS_COLOR: Record<FrontDeskStatus, string> = {
-  reserved: "bg-chart-2 text-white",
+  reserved: "bg-chart-2/10 text-foreground ring-1 ring-inset ring-chart-2",
   confirmed_reserved: "bg-primary text-primary-foreground",
   check_in: "bg-brand-gold text-neutral-900",
   occupied: "bg-chart-4 text-white",
@@ -63,13 +70,22 @@ const STATUS_COLOR: Record<FrontDeskStatus, string> = {
 };
 
 const STATUS_DOT: Record<FrontDeskStatus, string> = {
-  reserved: "bg-chart-2",
+  reserved: "bg-chart-2/10 ring-1 ring-inset ring-chart-2",
   confirmed_reserved: "bg-primary",
   check_in: "bg-brand-gold",
   occupied: "bg-chart-4",
   due_out: "bg-chart-5",
   check_out: "bg-muted-foreground",
 };
+
+const STATUS_ICON: Partial<Record<FrontDeskStatus, LucideIcon>> = {
+  check_in: LogIn,
+  due_out: LogOut,
+};
+
+/** Opaque tints for sticky header cells (translucent ones let scrolled rows show through). */
+const TODAY_HEAD = "bg-[color-mix(in_oklch,var(--primary)_10%,var(--card))] shadow-[inset_0_2px_0_var(--primary)]";
+const WEEKEND_HEAD = "bg-[color-mix(in_oklch,var(--secondary)_50%,var(--card))]";
 
 type Cell =
   | { type: "empty"; span: 1; startIdx: number }
@@ -245,7 +261,6 @@ export function FrontDeskGrid({
         })
         .finally(() => setReschedulePending(false));
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [dateList]
   );
 
@@ -306,22 +321,27 @@ export function FrontDeskGrid({
 
   const visibleRoomTypes = roomTypes.filter((rt) => roomTypeFilter.size === 0 || roomTypeFilter.has(rt.id));
 
+  const todayDate = new Date().toISOString().slice(0, 10);
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-card p-2 ring-1 ring-foreground/10">
-        <div className="relative min-w-56 flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+      <div className="flex flex-wrap items-center gap-2">
+        <InputGroup className="min-w-0 flex-1 basis-full sm:max-w-sm sm:basis-auto max-sm:h-10">
+          <InputGroupAddon>
+            <Search aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Booking ID, reference, guest name or email…"
-            className="h-9 rounded-full border-transparent bg-secondary/60 pl-9 text-sm focus-visible:bg-card"
+            placeholder="Booking ID, reference, guest or email"
+            aria-label="Search bookings"
           />
-        </div>
+        </InputGroup>
 
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="h-9 rounded-full px-4" />}>
-            Room type{roomTypeFilter.size > 0 ? ` (${roomTypeFilter.size})` : ""}
+          <DropdownMenuTrigger render={<Button variant="outline" className="tabular-nums" />}>
+            Room type
+            {roomTypeFilter.size > 0 ? <Badge variant="secondary">{roomTypeFilter.size}</Badge> : null}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {roomTypes.map((rt) => (
@@ -344,8 +364,9 @@ export function FrontDeskGrid({
         </DropdownMenu>
 
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="h-9 rounded-full px-4" />}>
-            Status{statusFilter.size > 0 ? ` (${statusFilter.size})` : ""}
+          <DropdownMenuTrigger render={<Button variant="outline" className="tabular-nums" />}>
+            Status
+            {statusFilter.size > 0 ? <Badge variant="secondary">{statusFilter.size}</Badge> : null}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {(Object.keys(STATUS_LABEL) as FrontDeskStatus[]).map((s) => (
@@ -361,30 +382,22 @@ export function FrontDeskGrid({
                   })
                 }
               >
-                <span className={cn("mr-1.5 inline-block size-2 rounded-full", STATUS_DOT[s])} />
+                <span aria-hidden="true" className={cn("mr-1.5 inline-block size-2.5 rounded-sm", STATUS_DOT[s])} />
                 {STATUS_LABEL[s]}
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Users className="size-3" /> Group
-          </span>
-          <span className="flex items-center gap-1">
-            <DollarSign className="size-3" /> Payment pending
-          </span>
-          <span className="flex items-center gap-1">
-            <Lock className="size-3" /> Stop room move
-          </span>
-        </div>
-
         {canEdit ? (
           <div className="ml-auto flex items-center gap-2">
-            {reschedulePending ? <span className="text-xs text-muted-foreground">Moving…</span> : null}
-            <Button size="sm" className="h-9 gap-1.5 rounded-full px-4 shadow-sm" onClick={() => setAddBooking({ open: true, prefill: null })}>
-              <Plus className="size-4" /> Add Booking
+            {reschedulePending ? (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Spinner className="size-3.5" /> Moving
+              </span>
+            ) : null}
+            <Button onClick={() => setAddBooking({ open: true, prefill: null })}>
+              <Plus aria-hidden="true" /> Add booking
             </Button>
           </div>
         ) : null}
@@ -396,29 +409,37 @@ export function FrontDeskGrid({
         </Alert>
       ) : null}
 
-      <div className="overflow-x-auto rounded-2xl bg-card ring-1 ring-foreground/10">
-        <table ref={tableRef} className="w-full border-collapse text-xs">
+      <div className="max-h-[calc(100dvh-14rem)] min-h-64 overflow-auto rounded-xl bg-card ring-1 ring-foreground/10">
+        <table ref={tableRef} className="w-full border-separate border-spacing-0 text-xs">
           <thead>
             <tr>
-              <th ref={firstColRef} className="sticky left-0 z-10 min-w-32 border-b border-border bg-card px-4 py-3 text-left text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+              <th
+                ref={firstColRef}
+                scope="col"
+                className="sticky top-0 left-0 z-30 min-w-32 border-b border-border bg-card px-4 py-3 text-left text-xs font-medium text-muted-foreground"
+              >
                 Room
               </th>
               {dateList.map((date) => {
                 const d = new Date(`${date}T00:00:00Z`);
-                const today = date === new Date().toISOString().slice(0, 10);
+                const today = date === todayDate;
                 const weekend = [0, 5, 6].includes(d.getUTCDay());
                 return (
                   <th
                     key={date}
+                    scope="col"
+                    aria-current={today ? "date" : undefined}
                     className={cn(
-                      "min-w-28 border-b border-l border-border px-2 py-2.5 text-center",
-                      today ? "bg-primary/10" : weekend ? "bg-secondary/50" : "bg-card"
+                      "sticky top-0 z-20 min-w-28 border-b border-l border-border px-2 py-2.5 text-center",
+                      today ? TODAY_HEAD : weekend ? WEEKEND_HEAD : "bg-card"
                     )}
                   >
-                    <div className={cn("text-[11px] font-semibold tracking-wider uppercase", today ? "text-primary" : "text-muted-foreground")}>
-                      {format(d, "EEE")}
+                    <div className={cn("text-xs font-medium", today ? "font-semibold text-primary" : "text-muted-foreground")}>
+                      {today ? "Today" : format(d, "EEE")}
                     </div>
-                    <div className={cn("font-heading text-sm font-bold tabular-nums", today && "text-primary")}>{format(d, "d MMM")}</div>
+                    <div className={cn("font-heading text-sm font-semibold tabular-nums", today && "text-primary")}>
+                      {format(d, "d MMM")}
+                    </div>
                   </th>
                 );
               })}
@@ -431,6 +452,7 @@ export function FrontDeskGrid({
                 hotelId={hotelId}
                 roomType={rt}
                 dateList={dateList}
+                todayDate={todayDate}
                 bars={bars}
                 disabledByUnit={disabledByUnit}
                 unitMatchesFilters={unitMatchesFilters}
@@ -441,15 +463,43 @@ export function FrontDeskGrid({
             ))}
             {visibleRoomTypes.every((rt) => rt.units.length === 0) ? (
               <tr>
-                <td colSpan={dateList.length + 1} className="px-3 py-14 text-center text-muted-foreground">
-                  <BedDouble className="mx-auto mb-2 size-6 opacity-50" />
-                  <span className="text-sm font-medium">No rooms added</span>
+                <td colSpan={dateList.length + 1} className="p-0">
+                  <div className="sticky left-0 max-w-[calc(100vw-2rem)]">
+                    <Empty>
+                      <EmptyMedia variant="icon">
+                        <BedDouble />
+                      </EmptyMedia>
+                      <EmptyTitle>No rooms added</EmptyTitle>
+                    </Empty>
+                  </div>
                 </td>
               </tr>
             ) : null}
           </tbody>
         </table>
       </div>
+
+      <ul aria-label="Legend" className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        {(Object.keys(STATUS_LABEL) as FrontDeskStatus[]).map((s) => {
+          const Icon = STATUS_ICON[s];
+          return (
+            <li key={s} className="flex items-center gap-1.5">
+              <span aria-hidden="true" className={cn("inline-block size-2.5 rounded-sm", STATUS_DOT[s])} />
+              {Icon ? <Icon aria-hidden="true" className="size-3" /> : null}
+              {STATUS_LABEL[s]}
+            </li>
+          );
+        })}
+        <li className="flex items-center gap-1.5">
+          <Users aria-hidden="true" className="size-3" /> Group
+        </li>
+        <li className="flex items-center gap-1.5">
+          <DollarSign aria-hidden="true" className="size-3" /> Payment pending
+        </li>
+        <li className="flex items-center gap-1.5">
+          <Lock aria-hidden="true" className="size-3" /> Stop room move
+        </li>
+      </ul>
 
       {dragPreview ? (
         <div
@@ -473,15 +523,8 @@ export function FrontDeskGrid({
           {active ? (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2">
-                    Room No. {active.roomNumber}
-                    {canEdit ? (
-                      <Button size="sm" variant="outline" className="h-7 gap-1" onClick={() => setEditing(true)}>
-                        <Pencil className="size-3" /> Edit
-                      </Button>
-                    ) : null}
-                  </span>
+                <DialogTitle className="flex flex-wrap items-center gap-2 pr-8">
+                  Room {active.roomNumber}
                   {active.bar.status ? (
                     <Badge className={cn("border-transparent", STATUS_COLOR[active.bar.status])}>
                       {STATUS_LABEL[active.bar.status]}
@@ -491,82 +534,84 @@ export function FrontDeskGrid({
               </DialogHeader>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                 <div>
-                  <dt className="text-xs text-muted-foreground">Booking Duration</dt>
-                  <dd className="font-semibold">
-                    {active.bar.checkIn} → {active.bar.checkOut}
-                  </dd>
+                  <dt className="text-xs text-muted-foreground">Stay</dt>
+                  <dd className="font-medium tabular-nums">{dateSpan(active.bar.checkIn, active.bar.checkOut)}</dd>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <dt className="text-xs text-muted-foreground">Guest</dt>
-                  <dd className="font-semibold">{active.bar.guestName}</dd>
-                  {active.bar.guestEmail ? <dd className="text-xs text-muted-foreground">{active.bar.guestEmail}</dd> : null}
+                  <dd className="truncate font-medium">{active.bar.guestName}</dd>
+                  {active.bar.guestEmail ? (
+                    <dd className="truncate text-xs text-muted-foreground">{active.bar.guestEmail}</dd>
+                  ) : null}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <dt className="text-xs text-muted-foreground">Booking ID</dt>
-                  <dd className="font-mono text-xs font-semibold">{active.bar.bookingId}</dd>
+                  <dd className="truncate font-mono text-xs font-medium">{active.bar.bookingId}</dd>
                 </div>
                 {active.bar.bookingReference ? (
-                  <div>
+                  <div className="min-w-0">
                     <dt className="text-xs text-muted-foreground">Reference</dt>
-                    <dd className="font-mono text-xs font-semibold">{active.bar.bookingReference}</dd>
+                    <dd className="truncate font-mono text-xs font-medium">{active.bar.bookingReference}</dd>
                   </div>
                 ) : null}
                 {active.bar.paymentMethod ? (
                   <div>
-                    <dt className="text-xs text-muted-foreground">Payment Type</dt>
-                    <dd className="font-semibold">{active.bar.paymentMethod}</dd>
+                    <dt className="text-xs text-muted-foreground">Payment</dt>
+                    <dd className="font-medium">{active.bar.paymentMethod}</dd>
                   </div>
                 ) : null}
                 {active.bar.notes ? (
                   <div className="col-span-2">
                     <dt className="text-xs text-muted-foreground">Notes</dt>
-                    <dd className="text-sm">{active.bar.notes}</dd>
+                    <dd>{active.bar.notes}</dd>
                   </div>
                 ) : null}
-                <div className="flex flex-wrap gap-1.5">
-                  {active.bar.isGroupBooking ? (
-                    <Badge variant="outline" className="gap-1">
-                      <Users className="size-3" /> Group
-                    </Badge>
-                  ) : null}
-                  {active.bar.paymentPending ? (
-                    <Badge variant="outline" className="gap-1 text-brand-gold">
-                      <DollarSign className="size-3" /> Payment pending
-                    </Badge>
-                  ) : null}
-                  {active.bar.locked ? (
-                    <Badge variant="outline" className="gap-1">
-                      <Lock className="size-3" /> Stop room move
-                    </Badge>
-                  ) : null}
-                </div>
+                {active.bar.isGroupBooking || active.bar.paymentPending || active.bar.locked ? (
+                  <div className="col-span-2 flex flex-wrap gap-1.5">
+                    {active.bar.isGroupBooking ? (
+                      <Badge variant="outline">
+                        <Users aria-hidden="true" /> Group
+                      </Badge>
+                    ) : null}
+                    {active.bar.paymentPending ? (
+                      <Badge variant="warning">
+                        <DollarSign aria-hidden="true" /> Payment pending
+                      </Badge>
+                    ) : null}
+                    {active.bar.locked ? (
+                      <Badge variant="outline">
+                        <Lock aria-hidden="true" /> Stop room move
+                      </Badge>
+                    ) : null}
+                  </div>
+                ) : null}
               </dl>
 
               {canEdit ? (
-                <div className="space-y-3 border-t border-border pt-3">
+                <div className="space-y-3 border-t border-border pt-4">
                   <div className="flex flex-wrap gap-2">
                     {!active.bar.status || active.bar.status === "confirmed_reserved" || active.bar.status === "check_in" ? (
                       <form action={checkInBooking}>
                         <input type="hidden" name="bookingId" value={active.bar.bookingId} />
-                        <Button size="sm" type="submit" className="gap-1.5">
-                          <LogIn className="size-3.5" /> Check In
-                        </Button>
+                        <SubmitButton pendingText="Checking in…">
+                          <LogIn aria-hidden="true" /> Check in
+                        </SubmitButton>
                       </form>
                     ) : null}
                     {active.bar.status === "occupied" || active.bar.status === "due_out" ? (
                       <form action={checkOutBooking}>
                         <input type="hidden" name="bookingId" value={active.bar.bookingId} />
-                        <Button size="sm" type="submit" variant="outline" className="gap-1.5">
-                          <LogOut className="size-3.5" /> Check Out
-                        </Button>
+                        <SubmitButton variant="outline" pendingText="Checking out…">
+                          <LogOut aria-hidden="true" /> Check out
+                        </SubmitButton>
                       </form>
                     ) : null}
                     <form action={setBookingRoomLock}>
                       <input type="hidden" name="bookingId" value={active.bar.bookingId} />
                       <input type="hidden" name="locked" value={active.bar.locked ? "false" : "true"} />
-                      <Button size="sm" type="submit" variant="ghost" className="gap-1.5">
-                        <Lock className="size-3.5" /> {active.bar.locked ? "Allow room move" : "Stop room move"}
-                      </Button>
+                      <SubmitButton variant="ghost" pendingText="Saving…">
+                        <Lock aria-hidden="true" /> {active.bar.locked ? "Allow room move" : "Stop room move"}
+                      </SubmitButton>
                     </form>
                   </div>
                   <ReallocateForm bookingId={active.bar.bookingId} roomType={active.roomType} currentUnitId={active.bar.roomUnitId} />
@@ -574,8 +619,13 @@ export function FrontDeskGrid({
               ) : null}
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setActive(null)} className="gap-1.5">
-                  <X className="size-3.5" /> Close
+                {canEdit ? (
+                  <Button variant="outline" onClick={() => setEditing(true)}>
+                    <Pencil aria-hidden="true" /> Edit
+                  </Button>
+                ) : null}
+                <Button variant={canEdit ? "ghost" : "outline"} onClick={() => setActive(null)}>
+                  Close
                 </Button>
               </DialogFooter>
             </>
@@ -594,6 +644,7 @@ function RoomTypeSection({
   hotelId,
   roomType,
   dateList,
+  todayDate,
   bars,
   disabledByUnit,
   unitMatchesFilters,
@@ -604,6 +655,7 @@ function RoomTypeSection({
   hotelId: string;
   roomType: FrontDeskRoomType;
   dateList: string[];
+  todayDate: string;
   bars: Record<string, FrontDeskBar[]>;
   disabledByUnit: Map<string, FrontDeskDisabledRange[]>;
   unitMatchesFilters: (unitBars: FrontDeskBar[]) => boolean;
@@ -615,22 +667,47 @@ function RoomTypeSection({
 
   return (
     <>
-      <tr className="bg-secondary/40">
-        <th className="sticky left-0 z-10 border-t border-border bg-secondary px-4 py-2.5 text-left text-sm font-semibold">{roomType.name}</th>
+      <tr>
+        <th
+          scope="rowgroup"
+          className="sticky left-0 z-10 border-t border-border bg-secondary px-4 py-2.5 text-left text-sm font-semibold"
+        >
+          {roomType.name}
+        </th>
         {roomType.dates.map((d) => {
           const sold = d.total > 0 ? Math.min(1, Math.max(0, (d.total - d.available) / d.total)) : 0;
           const bar = d.available === 0 ? "bg-destructive" : sold >= 0.75 ? "bg-brand-gold" : "bg-primary";
           return (
-            <td key={d.date} className="border-t border-l border-border bg-secondary/40 px-3 py-2 text-center">
+            <td
+              key={d.date}
+              className={cn(
+                "border-t border-l border-border px-3 py-2 text-center",
+                d.date === todayDate ? "bg-primary/10" : "bg-secondary/40"
+              )}
+            >
               <div className="flex items-baseline justify-center gap-1">
-                <span className="font-heading text-sm font-bold tabular-nums">{d.available}</span>
+                <span
+                  className={cn(
+                    "font-heading text-sm font-semibold tabular-nums",
+                    d.available === 0 && "text-destructive"
+                  )}
+                >
+                  {d.available}
+                </span>
                 <span className="text-muted-foreground tabular-nums">/ {d.total}</span>
               </div>
-              <div className="mx-auto mt-1 h-1 w-full max-w-16 overflow-hidden rounded-full bg-foreground/10">
+              <div
+                role="meter"
+                aria-label={`${d.date} sold`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(sold * 100)}
+                className="mx-auto mt-1 h-1 w-full max-w-16 overflow-hidden rounded-full bg-foreground/10"
+              >
                 <div className={cn("h-full rounded-full", bar)} style={{ width: `${sold * 100}%` }} />
               </div>
               <div className="mt-1 text-[11px] text-muted-foreground tabular-nums">
-                {roomType.currency} {d.price.toFixed(0)}
+                {roomType.currency} {Math.round(d.price).toLocaleString("en-US")}
               </div>
             </td>
           );
@@ -639,19 +716,28 @@ function RoomTypeSection({
       {visibleUnits.map((unit) => {
         const cells = buildRowCells(dateList, bars[unit.id] ?? [], disabledByUnit.get(unit.id) ?? []);
         return (
-          <tr key={unit.id}>
-            <td className="sticky left-0 z-10 flex items-center justify-between gap-1 border-t border-border bg-card px-4 py-2 font-medium">
-              <span>
-                {unit.roomNumber}
-                {unit.floor ? <span className="text-muted-foreground"> · F{unit.floor}</span> : null}
-              </span>
-              {canEdit ? <DisableRoomButton hotelId={hotelId} roomUnitId={unit.id} roomNumber={unit.roomNumber} /> : null}
-            </td>
+          <tr key={unit.id} className="group/unit">
+            <th
+              scope="row"
+              className="sticky left-0 z-10 border-t border-border bg-card px-4 py-1.5 text-left font-medium group-hover/unit:bg-[color-mix(in_oklch,var(--muted)_50%,var(--card))]"
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="tabular-nums">
+                  {unit.roomNumber}
+                  {unit.floor ? <span className="font-normal text-muted-foreground"> · F{unit.floor}</span> : null}
+                </span>
+                {canEdit ? <DisableRoomButton hotelId={hotelId} roomUnitId={unit.id} roomNumber={unit.roomNumber} /> : null}
+              </div>
+            </th>
             {cells.map((cell, idx) =>
               cell.type === "empty" ? (
                 <td
                   key={idx}
-                  className={cn("border-t border-l border-border", canEdit && "cursor-crosshair")}
+                  className={cn(
+                    "border-t border-l border-border group-hover/unit:bg-muted/30",
+                    dateList[cell.startIdx] === todayDate && "bg-primary/5",
+                    canEdit && "cursor-crosshair"
+                  )}
                   onMouseDown={
                     canEdit
                       ? (e) => onBeginDrag("create", unit.id, roomType.id, cell.startIdx, 1, e.clientX)
@@ -659,36 +745,53 @@ function RoomTypeSection({
                   }
                 />
               ) : cell.type === "disabled" ? (
-                <td key={idx} colSpan={cell.span} className="border-t border-l border-border bg-muted px-2 py-1.5 text-center text-muted-foreground">
-                  Out of order
+                <td
+                  key={idx}
+                  colSpan={cell.span}
+                  title={cell.reason ?? undefined}
+                  className="border-t border-l border-border bg-[repeating-linear-gradient(135deg,var(--muted)_0_6px,transparent_6px_12px)] px-2 py-1.5 text-center text-muted-foreground"
+                >
+                  <span className="inline-flex items-center gap-1 rounded bg-card/80 px-1.5">
+                    <Ban aria-hidden="true" className="size-3" /> Out of order
+                  </span>
                 </td>
               ) : (
                 <td key={idx} colSpan={cell.span} className="relative border-t border-l border-border p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => onSelectBar(unit.roomNumber, cell.bar)}
-                    onMouseDown={
-                      canEdit && !cell.bar.locked
-                        ? (e) => {
-                            e.preventDefault();
-                            onBeginDrag("move", unit.id, roomType.id, cell.startIdx, cell.span, e.clientX, cell.bar.bookingId);
-                          }
-                        : undefined
-                    }
-                    className={cn(
-                      "flex w-full items-center gap-1 rounded px-1.5 py-1 text-left font-medium",
-                      canEdit && !cell.bar.locked && "cursor-grab active:cursor-grabbing",
-                      cell.bar.status ? STATUS_COLOR[cell.bar.status] : "bg-muted text-muted-foreground"
-                    )}
-                  >
-                    <span className="truncate">{cell.bar.guestName}</span>
-                    {cell.bar.isGroupBooking ? <Users className="size-3 shrink-0" /> : null}
-                    {cell.bar.paymentPending ? <DollarSign className="size-3 shrink-0" /> : null}
-                    {cell.bar.locked ? <Lock className="size-3 shrink-0" /> : null}
-                  </button>
+                  {(() => {
+                    const StatusIcon = cell.bar.status ? STATUS_ICON[cell.bar.status] : undefined;
+                    const label = `${cell.bar.guestName}, ${cell.bar.status ? STATUS_LABEL[cell.bar.status] : "Booking"}, ${dateSpan(cell.bar.checkIn, cell.bar.checkOut)}`;
+                    return (
+                      <button
+                        type="button"
+                        title={label}
+                        aria-label={label}
+                        onClick={() => onSelectBar(unit.roomNumber, cell.bar)}
+                        onMouseDown={
+                          canEdit && !cell.bar.locked
+                            ? (e) => {
+                                e.preventDefault();
+                                onBeginDrag("move", unit.id, roomType.id, cell.startIdx, cell.span, e.clientX, cell.bar.bookingId);
+                              }
+                            : undefined
+                        }
+                        className={cn(
+                          "flex min-h-7 w-full items-center gap-1 rounded-md px-1.5 py-1 text-left font-medium outline-none transition-[filter] hover:brightness-95 focus-visible:ring-3 focus-visible:ring-ring/50",
+                          canEdit && !cell.bar.locked && "cursor-grab active:cursor-grabbing",
+                          cell.bar.status ? STATUS_COLOR[cell.bar.status] : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {StatusIcon ? <StatusIcon aria-hidden="true" className="size-3 shrink-0" /> : null}
+                        <span className="truncate">{cell.bar.guestName}</span>
+                        {cell.bar.isGroupBooking ? <Users aria-hidden="true" className="size-3 shrink-0" /> : null}
+                        {cell.bar.paymentPending ? <DollarSign aria-hidden="true" className="size-3 shrink-0" /> : null}
+                        {cell.bar.locked ? <Lock aria-hidden="true" className="size-3 shrink-0" /> : null}
+                      </button>
+                    );
+                  })()}
                   {canEdit && !cell.bar.locked ? (
                     <>
                       <div
+                        aria-hidden="true"
                         className="absolute top-0 left-0.5 h-full w-2 cursor-ew-resize"
                         onMouseDown={(e) => {
                           e.preventDefault();
@@ -697,6 +800,7 @@ function RoomTypeSection({
                         }}
                       />
                       <div
+                        aria-hidden="true"
                         className="absolute top-0 right-0.5 h-full w-2 cursor-ew-resize"
                         onMouseDown={(e) => {
                           e.preventDefault();
@@ -743,9 +847,9 @@ function AddBookingDialog({
 
   // Re-seed the form fields whenever a new prefill arrives (a fresh drag,
   // or the toolbar button clearing it) — not on every render.
-  const lastPrefill = useRef(prefill);
-  if (prefill !== lastPrefill.current) {
-    lastPrefill.current = prefill;
+  const [lastPrefill, setLastPrefill] = useState(prefill);
+  if (prefill !== lastPrefill) {
+    setLastPrefill(prefill);
     setRoomTypeId(prefill?.roomTypeId ?? roomTypes[0]?.id ?? "");
     setCheckIn(prefill?.checkIn ?? "");
     setCheckOut(prefill?.checkOut ?? "");
@@ -764,30 +868,32 @@ function AddBookingDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Book Rooms</DialogTitle>
+          <DialogTitle>Book rooms</DialogTitle>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="hotelId" value={hotelId} />
-          {state?.error ? (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          ) : null}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="checkIn">Check In Date</Label>
-              <Input id="checkIn" name="checkIn" type="date" min={today} required value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="checkOut">Check Out Date</Label>
-              <Input id="checkOut" name="checkOut" type="date" min={checkIn || today} required value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
-            </div>
+            <Field>
+              <FieldLabel htmlFor="fd-add-checkIn">Check-in</FieldLabel>
+              <Input id="fd-add-checkIn" name="checkIn" type="date" min={today} required value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="fd-add-checkOut">Check-out</FieldLabel>
+              <Input id="fd-add-checkOut" name="checkOut" type="date" min={checkIn || today} required value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
+            </Field>
           </div>
-          <div className="space-y-1.5">
-            <Label>Room Type</Label>
+          <Field>
+            <div className="flex items-baseline justify-between gap-2">
+              <FieldLabel htmlFor="fd-add-roomType">Room type</FieldLabel>
+              {checkIn && availableForCheckIn !== undefined ? (
+                <span className={cn("text-xs tabular-nums", availableForCheckIn === 0 ? "text-destructive" : "text-muted-foreground")}>
+                  {availableForCheckIn} available
+                </span>
+              ) : null}
+            </div>
             <input type="hidden" name="roomTypeId" value={roomTypeId} />
             <Select value={roomTypeId} onValueChange={(v) => setRoomTypeId(String(v ?? ""))}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger id="fd-add-roomType" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -798,19 +904,17 @@ function AddBookingDialog({
                 ))}
               </SelectContent>
             </Select>
-            {checkIn && availableForCheckIn !== undefined ? (
-              <p className="text-xs text-muted-foreground">Rooms Available: {availableForCheckIn}</p>
-            ) : null}
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="numRooms">Number of Rooms</Label>
-            <Input id="numRooms" name="numRooms" type="number" min={1} max={20} defaultValue={1} required />
-          </div>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="fd-add-numRooms">Rooms</FieldLabel>
+            <Input id="fd-add-numRooms" name="numRooms" type="number" min={1} max={20} defaultValue={1} required className="tabular-nums" />
+          </Field>
+          <FieldError>{state?.error}</FieldError>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Close
+              Cancel
             </Button>
-            <SubmitButton pendingText="Booking…">Book Rooms</SubmitButton>
+            <SubmitButton pendingText="Booking…">Book</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -831,36 +935,48 @@ function DisableRoomButton({ hotelId, roomUnitId, roomNumber }: { hotelId: strin
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="icon" variant="ghost" className="size-6 shrink-0 text-muted-foreground" />}>
-        <Ban className="size-3.5" />
+      <DialogTrigger
+        render={
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            aria-label={`Disable room ${roomNumber}`}
+            title="Disable room"
+            className="text-muted-foreground hover:text-destructive"
+          />
+        }
+      >
+        <Ban aria-hidden="true" />
       </DialogTrigger>
       <DialogContent className="sm:max-w-xs">
         <DialogHeader>
-          <DialogTitle>Disable Room {roomNumber}</DialogTitle>
+          <DialogTitle>Disable room {roomNumber}</DialogTitle>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="hotelId" value={hotelId} />
           <input type="hidden" name="roomUnitId" value={roomUnitId} />
-          {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="dateStart">From</Label>
-              <Input id="dateStart" name="dateStart" type="date" min={today} required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="dateEnd">Back on</Label>
-              <Input id="dateEnd" name="dateEnd" type="date" min={today} required />
-            </div>
+            <Field>
+              <FieldLabel htmlFor={`fd-dis-start-${roomUnitId}`}>From</FieldLabel>
+              <Input id={`fd-dis-start-${roomUnitId}`} name="dateStart" type="date" min={today} required />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`fd-dis-end-${roomUnitId}`}>Back on</FieldLabel>
+              <Input id={`fd-dis-end-${roomUnitId}`} name="dateEnd" type="date" min={today} required aria-invalid={Boolean(state?.error)} />
+            </Field>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="reason">Reason</Label>
-            <Input id="reason" name="reason" placeholder="Maintenance…" />
-          </div>
+          <Field>
+            <FieldLabel htmlFor={`fd-dis-reason-${roomUnitId}`}>Reason</FieldLabel>
+            <Input id={`fd-dis-reason-${roomUnitId}`} name="reason" placeholder="Maintenance" />
+          </Field>
+          <FieldError>{state?.error}</FieldError>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Close
+              Cancel
             </Button>
-            <SubmitButton pendingText="Disabling…">Disable Room</SubmitButton>
+            <SubmitButton variant="destructive" pendingText="Disabling…">
+              Disable
+            </SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -888,31 +1004,34 @@ function ReallocateForm({
     <form action={formAction} className="space-y-2">
       <input type="hidden" name="bookingId" value={bookingId} />
       <input type="hidden" name="roomUnitId" value={roomUnitId} />
-      {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
-      <div className="flex items-center gap-2">
-        <Select value={roomUnitId} onValueChange={(v) => setRoomUnitId(String(v ?? currentUnitId))}>
-          <SelectTrigger className="h-8 flex-1 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={currentUnitId}>Current room</SelectItem>
-            {otherUnits.map((u) => (
-              <SelectItem key={u.id} value={u.id}>
-                {u.roomNumber}
-                {u.floor ? ` · F${u.floor}` : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <SubmitButton size="sm" variant="outline" className="h-8 shrink-0 gap-1.5" pendingText="Moving…">
-          <ArrowLeftRight className="size-3.5" /> Reallocate/Swap
-        </SubmitButton>
-      </div>
+      <Field>
+        <FieldLabel htmlFor={`fd-realloc-${bookingId}`}>Room</FieldLabel>
+        <div className="flex items-center gap-2">
+          <Select value={roomUnitId} onValueChange={(v) => setRoomUnitId(String(v ?? currentUnitId))}>
+            <SelectTrigger id={`fd-realloc-${bookingId}`} className="min-w-0 flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={currentUnitId}>Current room</SelectItem>
+              {otherUnits.map((u) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.roomNumber}
+                  {u.floor ? ` · F${u.floor}` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <SubmitButton variant="outline" className="shrink-0" pendingText="Moving…" disabled={roomUnitId === currentUnitId}>
+            <ArrowLeftRight aria-hidden="true" /> Reallocate
+          </SubmitButton>
+        </div>
+        <FieldError>{state?.error}</FieldError>
+      </Field>
     </form>
   );
 }
 
-/** Edit modal — price and occupancy only. Dates aren't editable here on purpose; see front-desk-actions.ts. */
+/** Edit modal — dates, price and occupancy; see updateBookingDetails in front-desk-actions.ts. */
 function EditBookingDialog({
   open,
   onOpenChange,
@@ -935,43 +1054,59 @@ function EditBookingDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Edit Booking</DialogTitle>
+          <DialogTitle>Edit booking</DialogTitle>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="bookingId" value={bar.bookingId} />
-          {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="checkIn">Check-In</Label>
-              <Input id="checkIn" name="checkIn" type="date" defaultValue={bar.checkIn} required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="checkOut">Check-Out</Label>
-              <Input id="checkOut" name="checkOut" type="date" defaultValue={bar.checkOut} required />
-            </div>
+            <Field>
+              <FieldLabel htmlFor="fd-edit-checkIn">Check-in</FieldLabel>
+              <Input id="fd-edit-checkIn" name="checkIn" type="date" defaultValue={bar.checkIn} required />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="fd-edit-checkOut">Check-out</FieldLabel>
+              <Input id="fd-edit-checkOut" name="checkOut" type="date" defaultValue={bar.checkOut} required />
+            </Field>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-1 space-y-1.5">
-              <Label htmlFor="totalPrice">Price ({currency})</Label>
-              <Input id="totalPrice" name="totalPrice" type="number" min={0} step="0.01" defaultValue={bar.totalPrice} required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="numAdults">Adults</Label>
-              <Input id="numAdults" name="numAdults" type="number" min={1} max={30} defaultValue={bar.numAdults} required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="numChildren">Children</Label>
-              <Input id="numChildren" name="numChildren" type="number" min={0} max={30} defaultValue={bar.numChildren} required />
-            </div>
+          <Field>
+            <FieldLabel htmlFor="fd-edit-totalPrice">Price</FieldLabel>
+            <InputGroup>
+              <InputGroupAddon>
+                <InputGroupText>{currency}</InputGroupText>
+              </InputGroupAddon>
+              <InputGroupInput
+                id="fd-edit-totalPrice"
+                name="totalPrice"
+                type="number"
+                min={0}
+                step="0.01"
+                defaultValue={bar.totalPrice}
+                required
+                className="tabular-nums"
+              />
+            </InputGroup>
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field>
+              <FieldLabel htmlFor="fd-edit-numAdults">Adults</FieldLabel>
+              <Input id="fd-edit-numAdults" name="numAdults" type="number" min={1} max={30} defaultValue={bar.numAdults} required className="tabular-nums" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="fd-edit-numChildren">Children</FieldLabel>
+              <Input id="fd-edit-numChildren" name="numChildren" type="number" min={0} max={30} defaultValue={bar.numChildren} required className="tabular-nums" />
+            </Field>
           </div>
+
+          <FieldError>{state?.error}</FieldError>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Close
+              Cancel
             </Button>
-            <SubmitButton pendingText="Saving…">Update</SubmitButton>
+            <SubmitButton pendingText="Saving…">Save</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

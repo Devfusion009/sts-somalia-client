@@ -15,3 +15,12 @@ export const PIPELINE_STATUS_STYLES: Record<PipelineStatus, string> = {
   Completed: "bg-primary/10 text-primary",
   Cancelled: "bg-destructive/10 text-destructive",
 };
+
+/** Badge variant per stage, for the shared `Badge` status tints. */
+export const PIPELINE_BADGE_VARIANT = {
+  Pending: "warning",
+  "Payment Received": "info",
+  Confirmed: "success",
+  Completed: "success",
+  Cancelled: "destructive",
+} as const satisfies Record<PipelineStatus, string>;

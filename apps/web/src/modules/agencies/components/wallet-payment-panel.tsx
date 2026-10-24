@@ -1,12 +1,8 @@
-import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { money } from "@/lib/money";
 import { getTopupOptions } from "@/modules/payments/topup";
 import { FundWalletDialog } from "./fund-wallet-dialog";
-
-function money(amount: number, currency: string) {
-  return `${currency} ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-}
 
 /**
  * The agency-balance step of a desk payment.
@@ -47,66 +43,63 @@ export async function WalletPaymentPanel({
   const options = await getTopupOptions();
 
   return (
-    <Card className="overflow-hidden py-0">
-      <CardContent className="divide-y divide-border px-0 py-0">
-        <div className="space-y-2 px-4 py-4 text-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Agency balance</span>
-            <span className="font-medium tabular-nums">{money(available, currency)}</span>
+    <Card>
+      <CardHeader>
+        <CardTitle>Pay from agency balance</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <dl className="space-y-2 text-sm">
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-muted-foreground">Agency balance</dt>
+            <dd className="tabular-nums">{money(available, currency)}</dd>
           </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Amount due</span>
-            <span className="font-medium tabular-nums">{money(due, currency)}</span>
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-muted-foreground">Amount due</dt>
+            <dd className="tabular-nums">{money(due, currency)}</dd>
           </div>
-          <div className="flex items-center justify-between gap-3 border-t border-border pt-2.5">
+          <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2">
             {shortfall > 0 ? (
               <>
-                <span className="font-medium text-destructive">Short by</span>
-                <span className="font-heading text-lg font-bold tabular-nums text-destructive">
+                <dt className="font-medium text-destructive">Short by</dt>
+                <dd className="font-heading text-base font-semibold tabular-nums text-destructive">
                   {money(shortfall, currency)}
-                </span>
+                </dd>
               </>
             ) : (
               <>
-                <span className="font-medium">Balance after payment</span>
-                <span className="font-heading text-lg font-bold tabular-nums text-primary">
+                <dt className="font-medium">Balance after payment</dt>
+                <dd className="font-heading text-base font-semibold tabular-nums">
                   {money(remaining, currency)}
-                </span>
+                </dd>
               </>
             )}
           </div>
-        </div>
+          {pendingTopupTotal > 0 ? (
+            <div className="flex items-center justify-between gap-3">
+              <dt className="flex items-center gap-2 text-muted-foreground">
+                Top-up <Badge variant="warning">Pending</Badge>
+              </dt>
+              <dd className="tabular-nums">{money(pendingTopupTotal, currency)}</dd>
+            </div>
+          ) : null}
+        </dl>
 
-        {pendingTopupTotal > 0 ? (
-          <div className="flex items-center justify-between gap-3 bg-brand-gold/5 px-4 py-2.5 text-sm">
-            <span className="flex items-center gap-1.5 text-muted-foreground">
-              <AlertTriangle className="size-3.5 text-brand-gold" /> Top-up filed, awaiting STS
-            </span>
-            <span className="flex items-center gap-2 font-medium tabular-nums">
-              {money(pendingTopupTotal, currency)}
-              <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Pending</Badge>
-            </span>
-          </div>
-        ) : null}
-
-        <div className="px-4 py-4">
-          {shortfall === 0 ? (
-            children
-          ) : canTopUp ? (
-            <FundWalletDialog
-              amount={shortfall}
-              currency={currency}
-              returnTo={returnTo}
-              offline={options.offline}
-              online={options.online}
-              bankTransfer={options.bankTransfer}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Only the agency owner or an admin can add money.
-            </p>
-          )}
-        </div>
+        {shortfall === 0 ? (
+          children
+        ) : canTopUp ? (
+          <FundWalletDialog
+            amount={shortfall}
+            currency={currency}
+            returnTo={returnTo}
+            offline={options.offline}
+            online={options.online}
+            bankTransfer={options.bankTransfer}
+          />
+        ) : (
+          <p className="rounded-lg bg-muted px-3 py-2.5 text-sm text-muted-foreground">
+            Top-ups need the agency owner or an admin.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

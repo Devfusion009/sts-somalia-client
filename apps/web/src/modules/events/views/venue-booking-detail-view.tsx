@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format, parseISO } from "date-fns";
-import { CircleDot, Mail, Phone, StickyNote } from "lucide-react";
+import { ArrowRight, CircleDot, Mail, Phone, StickyNote } from "lucide-react";
 import { eventTypeLabel } from "@sts/shared-types";
 import { todayIso } from "@/modules/hotels/availability";
 import { getHallBookingDetail, type HallEvent } from "@/modules/events/hall-detail-queries";
@@ -14,8 +14,10 @@ import { BookingNotesForm, RescheduleForm } from "@/modules/events/components/ha
 import { HallStatusBadge } from "@/modules/events/components/hall-badges";
 import { venueMoney } from "@/modules/events/components/amenities";
 import { SubmitButton } from "@/components/submit-button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 
 const REQUEST_KIND = { cancellation: "Cancellation", refund: "Refund", modification: "Change" } as const;
 
@@ -72,14 +74,8 @@ function actor(e: HallEvent, viewerId: string, customerId: string | null) {
   return e.actorId === customerId ? "Client" : "Staff";
 }
 
-function Fact({ label, value, tone }: { label: string; value: React.ReactNode; tone?: string }) {
-  return (
-    <div className="bg-secondary/40 px-4 py-3">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className={cn("font-heading text-base font-semibold tabular-nums", tone)}>{value}</dd>
-    </div>
-  );
-}
+const PAYMENT_OVERRIDES = { requires_action: "warning", partially_refunded: "neutral" } as const;
+const REQUEST_OVERRIDES = { withdrawn: "neutral" } as const;
 
 /** One hall booking — shared by the admin console and the venue manager portal. */
 export async function VenueBookingDetailView({
@@ -87,11 +83,14 @@ export async function VenueBookingDetailView({
   bookingId,
   base,
   access,
+  titleAs: Title = "h1",
 }: {
   venueId: string;
   bookingId: string;
   base: string;
   access: VenueAccess;
+  /** "h2" when a surrounding layout already renders the page's h1 (admin venue layout). */
+  titleAs?: "h1" | "h2";
 }) {
   const detail = await getHallBookingDetail(venueId, bookingId);
   if (!detail) notFound();
@@ -116,24 +115,26 @@ export async function VenueBookingDetailView({
   const canMove = canManage && live && b.end_date >= today;
 
   const paymentFact = refunded
-    ? { label: "Payment", value: "Refunded", tone: "text-destructive" }
+    ? { label: "Payment", value: "Refunded", tone: undefined }
     : !priced
       ? { label: "Payment", value: "—", tone: undefined }
       : balance <= 0
-        ? { label: "Payment", value: "Paid", tone: "text-primary" }
+        ? { label: "Payment", value: "Paid", tone: "primary" as const }
         : paidAmount > 0
-          ? { label: "Balance due", value: money(b.currency, balance), tone: "text-brand-gold" }
-          : { label: "Payment", value: "Unpaid", tone: "text-brand-gold" };
+          ? { label: "Balance due", value: money(b.currency, balance), tone: "warn" as const }
+          : { label: "Payment", value: "Unpaid", tone: "warn" as const };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="font-heading text-2xl font-semibold">{b.event_name || eventTypeLabel(b.event_type)}</h1>
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <Title className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">
+              {b.event_name || eventTypeLabel(b.event_type)}
+            </Title>
             <HallStatusBadge status={b.status} />
           </div>
-          <p className="mt-0.5 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground tabular-nums">
             <span className="font-mono">{b.booking_ref}</span> · {channel} · Booked {format(new Date(b.created_at), "d MMM yyyy, HH:mm")}
             {order ? (
               <>
@@ -155,13 +156,13 @@ export async function VenueBookingDetailView({
         ) : null}
       </div>
 
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border sm:grid-cols-5">
-        <Fact label="Date" value={dates} />
-        <Fact label="Time" value={from && to ? `${from}–${to}` : from ? `From ${from}` : "All day"} />
-        <Fact label="Guests" value={b.expected_guests ?? "—"} />
-        <Fact label="Price" value={priced ? money(b.currency, total) : "Not set"} />
-        <Fact label={paymentFact.label} value={paymentFact.value} tone={paymentFact.tone} />
-      </dl>
+      <StatRail className="sm:grid-cols-5">
+        <StatRailItem label="Date" value={dates} />
+        <StatRailItem label="Time" value={from && to ? `${from}–${to}` : from ? `From ${from}` : "All day"} />
+        <StatRailItem label="Guests" value={b.expected_guests ?? "—"} />
+        <StatRailItem label="Price" value={priced ? money(b.currency, total) : "Not set"} />
+        <StatRailItem label={paymentFact.label} value={paymentFact.value} tone={paymentFact.tone} />
+      </StatRail>
 
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -179,13 +180,13 @@ export async function VenueBookingDetailView({
                 </dl>
                 {b.setup_requirements ? (
                   <p className="flex gap-2 rounded-lg bg-secondary/40 px-3 py-2.5">
-                    <StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" role="img" aria-label="Setup" />
                     <span className="whitespace-pre-wrap">{b.setup_requirements}</span>
                   </p>
                 ) : null}
                 {b.customer_notes ? (
                   <p className="flex gap-2 rounded-lg bg-secondary/40 px-3 py-2.5">
-                    <StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" role="img" aria-label="Client notes" />
                     <span className="whitespace-pre-wrap">{b.customer_notes}</span>
                   </p>
                 ) : null}
@@ -202,14 +203,14 @@ export async function VenueBookingDetailView({
                 {b.contact_phone ? (
                   <a
                     href={`tel:${b.contact_phone.replace(/\s+/g, "")}`}
-                    className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                    className="flex w-fit items-center gap-1.5 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
-                    <Phone className="size-3.5" /> {b.contact_phone}
+                    <Phone className="size-3.5" aria-hidden="true" /> {b.contact_phone}
                   </a>
                 ) : null}
                 {b.contact_email ? (
-                  <a href={`mailto:${b.contact_email}`} className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
-                    <Mail className="size-3.5" /> {b.contact_email}
+                  <a href={`mailto:${b.contact_email}`} className="flex w-fit items-center gap-1.5 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
+                    <Mail className="size-3.5" aria-hidden="true" /> {b.contact_email}
                   </a>
                 ) : null}
               </CardContent>
@@ -235,7 +236,9 @@ export async function VenueBookingDetailView({
                     {b.payment_reference ? <span className="text-muted-foreground"> · {b.payment_reference}</span> : null}
                   </span>
                   {b.paid_at ? (
-                    <span className="font-medium text-primary">Paid {format(new Date(b.paid_at), "d MMM yyyy")}</span>
+                    <Badge variant="success" className="tabular-nums">
+                      Paid {format(new Date(b.paid_at), "d MMM yyyy")}
+                    </Badge>
                   ) : canManage && live ? (
                     <form action={markHallBookingPaid}>
                       <input type="hidden" name="bookingId" value={b.id} />
@@ -245,7 +248,7 @@ export async function VenueBookingDetailView({
                       </SubmitButton>
                     </form>
                   ) : (
-                    <span className="font-medium text-brand-gold">Unpaid</span>
+                    <Badge variant="warning">Unpaid</Badge>
                   )}
                 </div>
               ) : order && order.payments.length > 0 ? (
@@ -254,25 +257,23 @@ export async function VenueBookingDetailView({
                     <li key={p.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
                       <div>
                         <p className="font-medium">{p.method_label ?? methodLabel(p.provider)}</p>
-                        <p className="text-xs text-muted-foreground">{format(new Date(p.created_at), "d MMM yyyy, HH:mm")}</p>
+                        <p className="text-xs text-muted-foreground tabular-nums">{format(new Date(p.created_at), "d MMM yyyy, HH:mm")}</p>
                       </div>
-                      <div className="text-right">
+                      <div className="flex flex-col items-end gap-1">
                         <p className="tabular-nums">{money(b.currency, p.amount)}</p>
-                        <p className={cn("text-xs", p.status === "succeeded" ? "text-primary" : "text-muted-foreground")}>
-                          {PAYMENT_STATUS[p.status] ?? p.status}
-                        </p>
+                        <Badge variant={statusBadgeVariant(p.status, PAYMENT_OVERRIDES)}>{PAYMENT_STATUS[p.status] ?? p.status}</Badge>
                       </div>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-muted-foreground">No payments.</p>
+                <p className="text-sm text-muted-foreground">No payments</p>
               )}
 
               {quote && quote.paidAmount > 0 && live ? (
-                <p className="border-t border-border pt-3 text-sm">
-                  <span className="text-muted-foreground">Refund if cancelled today </span>
-                  <span className="font-medium">
+                <p className="flex flex-wrap justify-between gap-x-3 border-t border-border pt-3 text-sm">
+                  <span className="text-muted-foreground">Refund if cancelled today</span>
+                  <span className="font-medium tabular-nums">
                     {quote.refundAmount !== null
                       ? `${money(b.currency, quote.refundAmount)} (${quote.deductionPercent}% deducted)`
                       : "No refund rules set"}
@@ -300,11 +301,19 @@ export async function VenueBookingDetailView({
 
           {requests.length > 0 ? (
             <Card>
-              <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardHeader>
                 <CardTitle className="text-base">Client requests</CardTitle>
-                <Link href={`${base}/refunds`} className="text-sm font-medium text-primary hover:underline">
-                  Refunds
-                </Link>
+                <CardAction>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Open refunds"
+                    title="Refunds"
+                    render={<Link href={`${base}/refunds`} />}
+                  >
+                    <ArrowRight />
+                  </Button>
+                </CardAction>
               </CardHeader>
               <CardContent>
                 <ul className="divide-y divide-border">
@@ -314,10 +323,12 @@ export async function VenueBookingDetailView({
                         <p className="text-sm font-medium">{REQUEST_KIND[r.kind]}</p>
                         <p className="truncate text-xs text-muted-foreground">{r.reason}</p>
                       </div>
-                      <span className="shrink-0 text-right text-sm">
-                        <span className="capitalize">{r.status.replace(/_/g, " ")}</span>
+                      <span className="flex shrink-0 flex-col items-end gap-1 text-sm">
+                        <Badge variant={statusBadgeVariant(r.status, REQUEST_OVERRIDES)} className="capitalize">
+                          {r.status.replace(/_/g, " ")}
+                        </Badge>
                         {r.approved_amount !== null ? (
-                          <span className="block text-xs text-muted-foreground">{money(b.currency, r.approved_amount)}</span>
+                          <span className="text-xs text-muted-foreground tabular-nums">{money(b.currency, r.approved_amount)}</span>
                         ) : null}
                       </span>
                     </li>
@@ -346,14 +357,14 @@ export async function VenueBookingDetailView({
             </CardHeader>
             <CardContent>
               {events.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No activity yet.</p>
+                <p className="text-sm text-muted-foreground">No activity</p>
               ) : (
                 <ol className="relative space-y-4 border-l border-border pl-5">
                   {[...events].reverse().map((e) => (
                     <li key={e.id} className="relative">
-                      <CircleDot className="absolute top-0.5 -left-[1.6rem] size-3.5 bg-card text-primary" />
+                      <CircleDot className="absolute top-0.5 -left-[1.6rem] size-3.5 bg-card text-primary" aria-hidden="true" />
                       <p className="text-sm font-medium">{eventTitle(e, b.currency)}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground tabular-nums">
                         {format(new Date(e.createdAt), "d MMM, HH:mm")} · {actor(e, access.profileId, b.customer_id)}
                       </p>
                     </li>

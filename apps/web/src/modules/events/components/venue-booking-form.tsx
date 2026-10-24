@@ -9,17 +9,18 @@ import {
   CircleCheck,
   CreditCard,
   Landmark,
-  Loader2,
   Smartphone,
   type LucideIcon,
 } from "lucide-react";
 import { computeHallPrice, eventTypeLabel } from "@sts/shared-types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { checkVenueSlot, createVenueBooking } from "@/modules/events/venue-manager-actions";
@@ -209,20 +210,22 @@ export function VenueBookingForm({
             <span
               className={cn(
                 "grid size-10 shrink-0 place-items-center rounded-full",
-                waitlisted ? "bg-brand-gold/15 text-brand-gold" : "bg-primary/10 text-primary"
+                waitlisted
+                  ? "bg-brand-gold/15 text-[color-mix(in_oklch,var(--brand-gold),black_40%)] dark:text-brand-gold"
+                  : "bg-primary/10 text-primary"
               )}
             >
-              {waitlisted ? <CircleAlert className="size-5" /> : <CircleCheck className="size-5" />}
+              {waitlisted ? <CircleAlert className="size-5" aria-hidden="true" /> : <CircleCheck className="size-5" aria-hidden="true" />}
             </span>
             <div>
-              <h2 className="font-heading text-lg font-semibold">
+              <h2 className="font-heading text-lg font-semibold tracking-tight">
                 {waitlisted ? "Added to waitlist" : "Booking confirmed"}
               </h2>
               <p className="font-mono text-sm text-muted-foreground">{confirmation.bookingRef}</p>
             </div>
           </div>
 
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 border-t border-border pt-5 text-sm tabular-nums">
             <dt className="text-muted-foreground">Client</dt>
             <dd className="font-medium">{confirmation.clientName}</dd>
             <dt className="text-muted-foreground">Event</dt>
@@ -236,19 +239,20 @@ export function VenueBookingForm({
               {confirmation.times ? ` · ${confirmation.times}` : ""}
             </dd>
             <dt className="text-muted-foreground">Total</dt>
-            <dd className="font-semibold">{money(venue.currency, confirmation.price)}</dd>
+            <dd className="font-semibold tabular-nums">{money(venue.currency, confirmation.price)}</dd>
             <dt className="text-muted-foreground">Payment</dt>
-            <dd>
-              {PAYMENT_METHOD_LABEL[confirmation.method]} · {confirmation.paid ? "Paid" : "Due"}
+            <dd className="flex flex-wrap items-center gap-2">
+              {PAYMENT_METHOD_LABEL[confirmation.method]}
+              <Badge variant={confirmation.paid ? "success" : "warning"}>{confirmation.paid ? "Paid" : "Due"}</Badge>
             </dd>
           </dl>
 
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={startOver}>
-              Record another booking
-            </Button>
+          <div className="flex flex-wrap justify-end gap-2">
             <Button variant="outline" render={<Link href={`${base}/bookings`} />}>
               View bookings
+            </Button>
+            <Button type="button" onClick={startOver}>
+              Record another booking
             </Button>
           </div>
         </CardContent>
@@ -272,8 +276,8 @@ export function VenueBookingForm({
           <section className="space-y-4 p-6">
             <h2 className="font-heading text-base font-semibold">Event</h2>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="vb-type">Event type</Label>
+              <Field>
+                <FieldLabel htmlFor="vb-type">Event type</FieldLabel>
                 <Input
                   id="vb-type"
                   name="eventType"
@@ -290,14 +294,14 @@ export function VenueBookingForm({
                     <option key={t} value={eventTypeLabel(t)} />
                   ))}
                 </datalist>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="vb-name">Event name</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="vb-name">Event name</FieldLabel>
                 <Input id="vb-name" name="eventName" autoComplete="off" maxLength={120} />
-              </div>
+              </Field>
             </div>
-            <div className="space-y-1.5 sm:max-w-[12rem]">
-              <Label htmlFor="vb-guests">Guests</Label>
+            <Field className="sm:max-w-[12rem]">
+              <FieldLabel htmlFor="vb-guests">Guests</FieldLabel>
               <Input
                 id="vb-guests"
                 name="expectedGuests"
@@ -307,28 +311,27 @@ export function VenueBookingForm({
                 value={guests}
                 onChange={(e) => setGuests(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
                 aria-invalid={overCapacity}
+                className="tabular-nums"
                 required
               />
-            </div>
-            {overCapacity ? (
-              <p className="text-sm text-destructive">This venue holds up to {venue.capacity} guests.</p>
-            ) : null}
+              {overCapacity ? <FieldError>Maximum {venue.capacity} guests.</FieldError> : null}
+            </Field>
           </section>
 
           <section className="space-y-4 p-6">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-heading text-base font-semibold">Date &amp; time</h2>
               {slot.status === "checking" ? (
-                <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Checking" />
+                <Spinner className="text-muted-foreground" aria-label="Checking availability" />
               ) : slot.status === "free" && datesValid ? (
-                <span className="flex items-center gap-1 text-xs font-medium text-primary">
-                  <CircleCheck className="size-3.5" /> Available
-                </span>
+                <Badge variant="success">
+                  <CircleCheck aria-hidden="true" /> Available
+                </Badge>
               ) : null}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="vb-start">Start date</Label>
+              <Field>
+                <FieldLabel htmlFor="vb-start">Start date</FieldLabel>
                 <Input
                   id="vb-start"
                   type="date"
@@ -337,9 +340,9 @@ export function VenueBookingForm({
                   onChange={(e) => onStartDate(e.target.value)}
                   required
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="vb-end">End date</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="vb-end">End date</FieldLabel>
                 <Input
                   id="vb-end"
                   type="date"
@@ -348,13 +351,13 @@ export function VenueBookingForm({
                   onChange={(e) => setEndDate(e.target.value)}
                   required
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="vb-from">Start time</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="vb-from">Start time</FieldLabel>
                 <Input id="vb-from" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="vb-to">End time</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="vb-to">End time</FieldLabel>
                 <Input
                   id="vb-to"
                   type="time"
@@ -362,44 +365,43 @@ export function VenueBookingForm({
                   onChange={(e) => setEndTime(e.target.value)}
                   aria-invalid={!timesValid}
                 />
-              </div>
+              </Field>
             </div>
-            {!timesValid ? <p className="text-sm text-destructive">The end time must be after the start time.</p> : null}
-            {slot.status === "taken" ? (
-              <p className="text-sm text-destructive">The venue is already booked or blocked for this slot.</p>
-            ) : null}
-            {slot.status === "error" ? <p className="text-sm text-destructive">{slot.message}</p> : null}
+            {!timesValid ? <FieldError>End time must be after start time.</FieldError> : null}
+            {slot.status === "taken" ? <FieldError>Slot already booked or blocked.</FieldError> : null}
+            {slot.status === "error" ? <FieldError>{slot.message}</FieldError> : null}
           </section>
 
           <section className="space-y-4 p-6">
             <h2 className="font-heading text-base font-semibold">Client</h2>
-            <div className="space-y-1.5">
-              <Label htmlFor="vb-client">Full name</Label>
+            <Field>
+              <FieldLabel htmlFor="vb-client">Full name</FieldLabel>
               <Input id="vb-client" name="contactName" autoComplete="off" minLength={2} maxLength={120} required />
-            </div>
+            </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="vb-phone">Phone</Label>
+              <Field>
+                <FieldLabel htmlFor="vb-phone">Phone</FieldLabel>
                 <PhoneInput id="vb-phone" name="contactPhone" defaultCountry="SO" required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="vb-email">Email</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="vb-email">Email</FieldLabel>
                 <Input id="vb-email" name="contactEmail" type="email" autoComplete="off" maxLength={160} />
-              </div>
+              </Field>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="vb-notes">Setup &amp; requirements</Label>
+            <Field>
+              <FieldLabel htmlFor="vb-notes">Setup &amp; requirements</FieldLabel>
               <Textarea id="vb-notes" name="notes" rows={3} maxLength={1000} />
-            </div>
+            </Field>
           </section>
 
           <section className="space-y-4 p-6">
             <h2 className="font-heading text-base font-semibold">Price &amp; payment</h2>
-            <div className="space-y-1.5 sm:max-w-[16rem]">
-              <Label htmlFor="vb-price">Agreed price ({venue.currency})</Label>
+            <Field className="sm:max-w-[16rem]">
+              <FieldLabel htmlFor="vb-price">Agreed price ({venue.currency})</FieldLabel>
               <Input
                 id="vb-price"
                 type="number"
+                className="tabular-nums"
                 min={0}
                 step="0.01"
                 value={priceTouched ? price : String(estimate.onRequest ? "" : estimate.total)}
@@ -410,7 +412,7 @@ export function VenueBookingForm({
                 }}
                 required
               />
-            </div>
+            </Field>
 
             <div role="radiogroup" aria-label="Payment method" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {OFFLINE_PAYMENT_METHODS.map((m) => {
@@ -420,7 +422,7 @@ export function VenueBookingForm({
                   <label
                     key={m}
                     className={cn(
-                      "flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border p-3 text-xs font-medium transition-colors hover:border-primary/40",
+                      "flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-sm font-medium transition-colors hover:border-primary/40 has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
                       selected && "border-primary bg-primary/5 text-primary ring-1 ring-primary"
                     )}
                   >
@@ -431,14 +433,14 @@ export function VenueBookingForm({
                       checked={selected}
                       onChange={() => setMethod(m)}
                     />
-                    <Icon className="size-5" />
+                    <Icon className="size-5" aria-hidden="true" />
                     {PAYMENT_METHOD_LABEL[m]}
                   </label>
                 );
               })}
             </div>
 
-            <div role="radiogroup" aria-label="Payment status" className="inline-flex rounded-lg border border-input p-1">
+            <div role="radiogroup" aria-label="Payment status" className="inline-flex gap-0.5 rounded-lg bg-muted p-[3px]">
               {[
                 { value: true, label: "Paid now" },
                 { value: false, label: "Pay later" },
@@ -446,8 +448,10 @@ export function VenueBookingForm({
                 <label
                   key={option.label}
                   className={cn(
-                    "cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    paid === option.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                    "flex h-7 cursor-pointer items-center rounded-md px-3 text-sm font-medium transition-colors has-focus-visible:ring-3 has-focus-visible:ring-ring/50 max-sm:h-9",
+                    paid === option.value
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
                   )}
                 >
                   <input
@@ -463,8 +467,8 @@ export function VenueBookingForm({
             </div>
 
             {method !== "cash" ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="vb-reference">Reference</Label>
+              <Field>
+                <FieldLabel htmlFor="vb-reference">Reference</FieldLabel>
                 <Input
                   id="vb-reference"
                   name="paymentReference"
@@ -472,7 +476,7 @@ export function VenueBookingForm({
                   maxLength={120}
                   autoComplete="off"
                 />
-              </div>
+              </Field>
             ) : null}
           </section>
         </CardContent>
@@ -484,11 +488,11 @@ export function VenueBookingForm({
           {datesValid ? (
             <div className="space-y-0.5">
               <p className="font-medium">{eventType ? eventTypeLabel(eventType) : "Event"}</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground tabular-nums">
                 {day(startDate)}
                 {endDate !== startDate ? ` – ${day(endDate)}` : ""}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground tabular-nums">
                 {startTime && endTime ? `${startTime}–${endTime} · ` : ""}
                 {guests} guests
               </p>
@@ -504,16 +508,18 @@ export function VenueBookingForm({
                   {money(venue.currency, venue.basePrice)} {UNIT_LABEL[venue.priceUnit] ?? ""}
                   {estimate.quantity > 1 ? ` × ${estimate.quantity}` : ""}
                 </dt>
-                <dd>{money(venue.currency, estimate.total)}</dd>
+                <dd className="tabular-nums">{money(venue.currency, estimate.total)}</dd>
               </div>
             ) : null}
             <div className="flex justify-between gap-3 border-t border-border pt-3 text-base font-semibold">
               <dt>Total</dt>
-              <dd>{money(venue.currency, Number.isFinite(finalPrice) ? finalPrice : 0)}</dd>
+              <dd className="tabular-nums">{money(venue.currency, Number.isFinite(finalPrice) ? finalPrice : 0)}</dd>
             </div>
-            <div className="flex justify-between gap-3 pt-1">
+            <div className="flex items-center justify-between gap-3 pt-1">
               <dt className="text-muted-foreground">{PAYMENT_METHOD_LABEL[method]}</dt>
-              <dd className={paid ? "font-medium text-primary" : "font-medium text-brand-gold"}>{paid ? "Paid" : "Due"}</dd>
+              <dd>
+                <Badge variant={paid ? "success" : "warning"}>{paid ? "Paid" : "Due"}</Badge>
+              </dd>
             </div>
           </dl>
 
@@ -523,8 +529,7 @@ export function VenueBookingForm({
             </Alert>
           ) : null}
 
-          <Button type="submit" className="w-full" disabled={!canSubmit}>
-            {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+          <Button type="submit" size="lg" className="w-full" disabled={!canSubmit} loading={submitting}>
             {submitting ? "Confirming…" : "Confirm booking"}
           </Button>
         </CardContent>

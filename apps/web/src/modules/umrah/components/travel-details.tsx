@@ -30,12 +30,12 @@ export function ItineraryList({ itinerary }: { itinerary: DatedItinerary }) {
             {entry.description ? <p className="text-sm text-muted-foreground">{entry.description}</p> : null}
             {entry.travel.map((line) => (
               <p key={line} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Plane className="size-3.5 shrink-0" /> {line}
+                <Plane className="size-3.5 shrink-0" aria-hidden="true" /> {line}
               </p>
             ))}
             {entry.stay ? (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <BedDouble className="size-3.5 shrink-0" /> {entry.stay.name} · {CITY_LABEL[entry.stay.city] ?? entry.stay.city}
+                <BedDouble className="size-3.5 shrink-0" aria-hidden="true" /> {entry.stay.name} · {CITY_LABEL[entry.stay.city] ?? entry.stay.city}
               </p>
             ) : null}
           </div>

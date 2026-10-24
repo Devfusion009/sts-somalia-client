@@ -1,4 +1,6 @@
 import { format } from "date-fns";
+import { MessagesSquare } from "lucide-react";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
 
 type Message = {
@@ -14,7 +16,16 @@ type Message = {
  * applicant's side on the left; the applicant sees STS on the left.
  */
 export function MessageThread({ messages, viewer }: { messages: Message[]; viewer: "staff" | "customer" }) {
-  if (messages.length === 0) return <p className="text-sm text-muted-foreground">No messages.</p>;
+  if (messages.length === 0) {
+    return (
+      <Empty className="p-6 md:p-8">
+        <EmptyMedia variant="icon">
+          <MessagesSquare />
+        </EmptyMedia>
+        <EmptyTitle>No messages</EmptyTitle>
+      </Empty>
+    );
+  }
 
   return (
     <ol className="space-y-3">
@@ -30,8 +41,13 @@ export function MessageThread({ messages, viewer }: { messages: Message[]; viewe
               )}
             >
               <p className="whitespace-pre-wrap break-words">{m.body}</p>
-              <p className={cn("mt-1 text-[11px]", mine ? "text-primary-foreground/75" : "text-muted-foreground")}>
-                {who} · {format(new Date(m.created_at), "dd MMM, HH:mm")}
+              <p
+                className={cn(
+                  "mt-1 text-xs tabular-nums",
+                  mine ? "text-primary-foreground/80" : "text-muted-foreground"
+                )}
+              >
+                {who} · {format(new Date(m.created_at), "d MMM, HH:mm")}
               </p>
             </div>
           </li>

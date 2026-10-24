@@ -18,10 +18,8 @@ export type DemoAccountEntry = {
  */
 export function DemoAccountsList({ accounts }: { accounts: DemoAccountEntry[] }) {
   return (
-    <div className="space-y-2">
-      <p className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Demo accounts
-      </p>
+    <div className="space-y-3">
+      <p className="text-center text-sm font-medium text-muted-foreground">Demo accounts</p>
       <div className="space-y-2">
         {accounts.map((account) => (
           <DemoLoginButton

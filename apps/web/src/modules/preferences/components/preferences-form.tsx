@@ -1,15 +1,11 @@
 "use client";
 
-import { CheckCircle2, Mail, MessageCircle, Smartphone } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Mail, MessageCircle, Smartphone } from "lucide-react";
+import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -43,32 +39,32 @@ const CHANNELS = [
     key: "email_enabled" as const,
     icon: Mail,
     label: "Email",
-    description: "Booking confirmations, invoices and visa decisions.",
   },
   {
     name: "whatsappEnabled",
     key: "whatsapp_enabled" as const,
     icon: MessageCircle,
     label: "WhatsApp",
-    description: "Quick updates and reminders on the number in your profile.",
   },
   {
     name: "smsEnabled",
     key: "sms_enabled" as const,
     icon: Smartphone,
     label: "SMS",
-    description: "Text messages for time-critical changes.",
   },
 ];
 
 export function PreferencesForm({
   preferences,
   smsAvailable,
+  whatsappAvailable = true,
   convertibleCurrencies,
 }: {
   preferences: Preferences;
   /** False until an SMS provider is configured — the toggle stays honest about it. */
   smsAvailable: boolean;
+  /** False while the WhatsApp provider is awaiting verification. */
+  whatsappAvailable?: boolean;
   /** Currencies that actually have an FX rate on file. */
   convertibleCurrencies: string[];
 }) {
@@ -76,6 +72,7 @@ export function PreferencesForm({
   const save = trpc.preferences.save.useMutation({
     onSuccess: () => {
       utils.preferences.me.invalidate();
+      toast.success("Preferences saved.");
     },
   });
 
@@ -98,56 +95,37 @@ export function PreferencesForm({
 
   return (
     <form action={handleSubmit} className="space-y-6">
-      {save.error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{save.error.message}</AlertDescription>
-        </Alert>
-      ) : null}
-      {save.isSuccess ? (
-        <Alert>
-          <CheckCircle2 />
-          <AlertDescription>Preferences saved.</AlertDescription>
-        </Alert>
-      ) : null}
-
       <Card>
         <CardHeader>
-          <CardTitle>How we contact you</CardTitle>
-          <CardDescription>
-            These control booking updates — confirmations, visa decisions and schedule changes.
-          </CardDescription>
+          <CardTitle>Notifications</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {CHANNELS.map((channel) => {
-            const unavailable = channel.name === "smsEnabled" && !smsAvailable;
-            return (
-              <div
-                key={channel.name}
-                className="flex items-start justify-between gap-4 rounded-lg border border-border p-4"
-              >
-                <div className="flex min-w-0 gap-3">
-                  <channel.icon className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0">
+        <CardContent>
+          <ul className="divide-y divide-border">
+            {CHANNELS.map((channel) => {
+              const unavailable =
+                (channel.name === "smsEnabled" && !smsAvailable) ||
+                (channel.name === "whatsappEnabled" && !whatsappAvailable);
+              return (
+                <li
+                  key={channel.name}
+                  className="flex min-h-14 items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <channel.icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                     <Label htmlFor={channel.name} className="font-medium">
                       {channel.label}
                     </Label>
-                    <p className="mt-0.5 text-sm text-muted-foreground">{channel.description}</p>
-                    {unavailable ? (
-                      <p className="mt-1 text-xs text-amber-600">
-                        SMS delivery isn&apos;t switched on yet. You can set this now and it will
-                        take effect once it is.
-                      </p>
-                    ) : null}
+                    {unavailable ? <Badge variant="neutral">Not live yet</Badge> : null}
                   </div>
-                </div>
-                <Switch
-                  id={channel.name}
-                  name={channel.name}
-                  defaultChecked={preferences[channel.key]}
-                />
-              </div>
-            );
-          })}
+                  <Switch
+                    id={channel.name}
+                    name={channel.name}
+                    defaultChecked={preferences[channel.key]}
+                  />
+                </li>
+              );
+            })}
+          </ul>
         </CardContent>
       </Card>
 
@@ -155,59 +133,56 @@ export function PreferencesForm({
         <CardHeader>
           <CardTitle>Language &amp; currency</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="language">Message language</Label>
-            <Select
-              name="language"
-              defaultValue={preferences.language}
-              items={LANGUAGE_ITEMS}
-            >
-              <SelectTrigger id="language" className="w-full sm:max-w-sm">
-                <SelectValue placeholder="Select a language" />
-              </SelectTrigger>
-              <SelectContent>
-                {LANGUAGE_ITEMS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Applies to emails and WhatsApp messages we send you. The website itself is currently
-              English only.
-            </p>
-          </div>
+        <CardContent>
+          <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="language">Message language</FieldLabel>
+              <Select name="language" defaultValue={preferences.language} items={LANGUAGE_ITEMS}>
+                <SelectTrigger id="language" className="w-full">
+                  <SelectValue placeholder="Select a language" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LANGUAGE_ITEMS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="displayCurrency">Display currency</Label>
-            <Select
-              name="displayCurrency"
-              defaultValue={preferences.display_currency}
-              items={CURRENCY_ITEMS}
-            >
-              <SelectTrigger id="displayCurrency" className="w-full sm:max-w-sm">
-                <SelectValue placeholder="Select a currency" />
-              </SelectTrigger>
-              <SelectContent>
-                {CURRENCY_ITEMS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                    {convertibleCurrencies.includes(item.value) ? "" : " — no rate yet"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Prices are shown converted as a guide. You are always charged in the currency the
-              booking is priced in — conversion here never changes what you pay.
-            </p>
+            <Field>
+              <FieldLabel htmlFor="displayCurrency">Display currency</FieldLabel>
+              <Select
+                name="displayCurrency"
+                defaultValue={preferences.display_currency}
+                items={CURRENCY_ITEMS}
+              >
+                <SelectTrigger id="displayCurrency" className="w-full">
+                  <SelectValue placeholder="Select a currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCY_ITEMS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                      {convertibleCurrencies.includes(item.value) ? "" : " — no rate yet"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
         </CardContent>
       </Card>
 
-      <SubmitButton pendingText="Saving…">Save preferences</SubmitButton>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+        {save.error ? (
+          <p role="alert" className="text-sm text-destructive sm:mr-auto">
+            {save.error.message}
+          </p>
+        ) : null}
+        <SubmitButton pendingText="Saving…">Save preferences</SubmitButton>
+      </div>
     </form>
   );
 }

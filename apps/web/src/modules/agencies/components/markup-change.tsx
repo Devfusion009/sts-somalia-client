@@ -18,12 +18,12 @@ export function ScopeBadge({ itemType, className }: { itemType: string | null; c
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium",
+        "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-sm font-medium",
         itemType === null ? "bg-secondary text-foreground" : "bg-primary/10 text-primary",
         className
       )}
     >
-      <Icon className="size-3.5" />
+      <Icon className="size-3.5" aria-hidden="true" />
       {scopeLabel(itemType)}
     </span>
   );
@@ -53,23 +53,21 @@ export function MarkupChange({
   const currentLabel = current ? "Current" : fallback ? "Current · default" : "Current";
   return (
     <div className={cn("flex items-center gap-3", className)}>
-      <div className="min-w-28 rounded-lg border border-border bg-muted/40 px-4 py-2 text-center">
-        <p className="text-xs font-medium text-muted-foreground">{currentLabel}</p>
-        <p className="text-xl font-semibold text-muted-foreground">
+      <div className="min-w-24 rounded-lg bg-muted/60 px-3 py-1.5">
+        <p className="text-xs text-muted-foreground">{currentLabel}</p>
+        <p className="font-heading text-base font-semibold text-muted-foreground tabular-nums">
           {effective ? markupLabel(effective.markup_type, effective.value) : "No rule"}
         </p>
       </div>
-      <ArrowRight className="size-5 shrink-0 text-muted-foreground" strokeWidth={2.5} />
-      <div
-        className={cn(
-          "min-w-28 rounded-lg border px-4 py-2 text-center",
-          isRemove ? "border-destructive/30 bg-destructive/5" : "border-primary/30 bg-primary/5"
-        )}
-      >
-        <p className={cn("text-xs font-medium", isRemove ? "text-destructive" : "text-primary")}>
-          Requested
-        </p>
-        <p className={cn("text-2xl font-bold", isRemove ? "text-destructive" : "text-primary")}>
+      <ArrowRight className="size-4 shrink-0 text-muted-foreground" strokeWidth={2.5} aria-hidden="true" />
+      <div className={cn("min-w-24 rounded-lg px-3 py-1.5", isRemove ? "bg-destructive/10" : "bg-primary/10")}>
+        <p className={cn("text-xs", isRemove ? "text-destructive" : "text-primary")}>Requested</p>
+        <p
+          className={cn(
+            "font-heading text-base font-semibold tabular-nums",
+            isRemove ? "text-destructive" : "text-primary"
+          )}
+        >
           {isRemove ? "Remove" : markupLabel(request.markup_type, request.value)}
         </p>
       </div>

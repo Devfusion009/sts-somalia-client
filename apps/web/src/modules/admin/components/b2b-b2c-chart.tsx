@@ -1,6 +1,8 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { BarChart3 } from "lucide-react";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import {
   ChartContainer,
   ChartTooltip,
@@ -21,9 +23,12 @@ export function B2BvsB2CChart({
   const hasData = data.some((d) => d.orders > 0);
   if (!hasData) {
     return (
-      <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
-        No paid orders in this range yet.
-      </div>
+      <Empty className="h-56 p-0 md:p-0">
+        <EmptyMedia variant="icon">
+          <BarChart3 />
+        </EmptyMedia>
+        <EmptyTitle>No paid orders in this range</EmptyTitle>
+      </Empty>
     );
   }
 

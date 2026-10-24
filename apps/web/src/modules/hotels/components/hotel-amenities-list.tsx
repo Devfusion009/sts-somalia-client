@@ -18,7 +18,7 @@ export function HotelAmenitiesList({ amenities, limit = 4 }: { amenities: string
         const Icon = amenityIcon(amenity);
         return (
           <li key={amenity} className="flex items-center gap-1 text-xs font-medium text-foreground">
-            <Icon sx={{ fontSize: 14 }} className="text-primary" />
+            <Icon sx={{ fontSize: 14 }} className="text-primary" aria-hidden />
             {amenityDisplayLabel(amenity)}
           </li>
         );
@@ -28,7 +28,7 @@ export function HotelAmenitiesList({ amenities, limit = 4 }: { amenities: string
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="text-xs font-medium text-primary hover:underline focus-visible:underline focus-visible:outline-none"
+            className="rounded-sm text-xs font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
             +{hidden} more
           </button>

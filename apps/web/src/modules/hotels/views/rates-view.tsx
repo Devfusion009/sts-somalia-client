@@ -3,6 +3,7 @@ import { getRatePreview, getRateRules } from "@/modules/hotels/rate-queries";
 import { todayIso } from "@/modules/hotels/availability";
 import { RateRulesEditor } from "@/modules/hotels/components/rate-rules-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
 
 const PREVIEW_DAYS = 14;
@@ -15,20 +16,20 @@ export async function RatesView({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <h1 className="font-heading text-2xl font-semibold">Rates</h1>
+      <PageHeader title="Rates" />
 
       {preview.length > 0 ? (
         <Card className="overflow-hidden py-0">
-          <CardHeader className="border-b border-border !py-4">
+          <CardHeader className="border-b border-border pt-4 pb-3">
             <CardTitle className="text-base">Next {PREVIEW_DAYS} nights</CardTitle>
           </CardHeader>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-xs text-muted-foreground">
-                  <th className="sticky left-0 bg-card px-3 py-2 text-left font-medium">Room type</th>
+                <tr className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
+                  <th className="sticky left-0 bg-muted px-3 py-2 text-left font-medium">Room type</th>
                   {nights.map((night) => (
-                    <th key={night} className="px-2 py-2 text-center font-medium whitespace-nowrap">
+                    <th key={night} className="px-2 py-2 text-center font-medium whitespace-nowrap tabular-nums">
                       {format(new Date(`${night}T00:00:00`), "EEE d")}
                     </th>
                   ))}
@@ -36,7 +37,7 @@ export async function RatesView({ hotelId }: { hotelId: string }) {
               </thead>
               <tbody>
                 {preview.map((room) => (
-                  <tr key={room.roomId} className="border-b border-border last:border-0">
+                  <tr key={room.roomId} className="border-b border-border transition-colors last:border-0 hover:bg-muted/40">
                     <td className="sticky left-0 bg-card px-3 py-2 font-medium whitespace-nowrap">{room.roomName}</td>
                     {room.nights.map((n) => (
                       <td
@@ -44,11 +45,11 @@ export async function RatesView({ hotelId }: { hotelId: string }) {
                         title={n.ruleName ?? (n.source === "override" ? "Set for this date" : undefined)}
                         className={cn(
                           "px-2 py-2 text-center tabular-nums",
-                          n.source === "rule" && "bg-brand-gold/15 font-medium",
+                          n.source === "rule" && "bg-brand-gold/15 font-medium text-[color-mix(in_oklch,var(--brand-gold),black_50%)] dark:text-brand-gold",
                           n.source === "override" && "bg-primary/10 font-medium text-primary"
                         )}
                       >
-                        {n.rate.toFixed(0)}
+                        {Math.round(n.rate).toLocaleString("en-US")}
                       </td>
                     ))}
                   </tr>

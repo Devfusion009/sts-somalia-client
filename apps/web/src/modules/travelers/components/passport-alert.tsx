@@ -43,10 +43,7 @@ export function PassportExpiryAlert({
       <Alert variant="destructive">
         <CalendarX2 />
         <AlertTitle>{who} has expired</AlertTitle>
-        <AlertDescription>
-          It expired on {formatDate(status.expiry)}. You&apos;ll need to renew it before we can
-          submit a visa application or issue a ticket in this name.
-        </AlertDescription>
+        <AlertDescription>Expired on {formatDate(status.expiry)}.</AlertDescription>
       </Alert>
     );
   }
@@ -55,14 +52,11 @@ export function PassportExpiryAlert({
     // Not variant="destructive": nothing is broken yet and the passport is
     // still usable for some trips. Amber reads as "act soon", which is the
     // accurate instruction — red here would cry wolf on every booking.
-    <Alert className="border-amber-500/50 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100 [&>svg]:text-amber-600">
+    <Alert variant="warning">
       <AlertTriangle />
       <AlertTitle>{who} expires in under {PASSPORT_VALIDITY_MONTHS} months</AlertTitle>
-      <AlertDescription className="text-amber-900/90 dark:text-amber-100/90">
-        Valid until {formatDate(status.expiry)} ({status.daysRemaining} days). Most destinations —
-        including the UAE, Saudi Arabia, Türkiye and Kenya — require at least{" "}
-        {PASSPORT_VALIDITY_MONTHS} months of validity from your date of entry, and applications are
-        commonly refused on this alone. Renew before you book.
+      <AlertDescription className="tabular-nums">
+        Valid until {formatDate(status.expiry)} · {status.daysRemaining} days left
       </AlertDescription>
     </Alert>
   );
@@ -74,7 +68,7 @@ export function PassportExpiryBadge({ expiry }: { expiry: string | null | undefi
 
   if (status.level === "none") {
     return (
-      <Badge variant="outline" className="gap-1 text-muted-foreground">
+      <Badge variant="neutral">
         No passport saved
       </Badge>
     );
@@ -82,23 +76,23 @@ export function PassportExpiryBadge({ expiry }: { expiry: string | null | undefi
 
   if (status.level === "expired") {
     return (
-      <Badge variant="destructive" className="gap-1">
-        <CalendarX2 className="size-3" /> Expired
+      <Badge variant="destructive">
+        <CalendarX2 aria-hidden="true" /> Expired
       </Badge>
     );
   }
 
   if (status.level === "expiring") {
     return (
-      <Badge className="gap-1 border-amber-500/40 bg-amber-100 text-amber-900 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-100">
-        <AlertTriangle className="size-3" /> Expires in {status.monthsRemaining < 1 ? "under a month" : `${status.monthsRemaining} mo`}
+      <Badge variant="warning">
+        <AlertTriangle aria-hidden="true" /> Expires in {status.monthsRemaining < 1 ? "under a month" : `${status.monthsRemaining} mo`}
       </Badge>
     );
   }
 
   return (
-    <Badge variant="secondary" className="gap-1">
-      <BadgeCheck className="size-3" /> Valid to {formatDate(status.expiry)}
+    <Badge variant="success">
+      <BadgeCheck aria-hidden="true" /> Valid to {formatDate(status.expiry)}
     </Badge>
   );
 }

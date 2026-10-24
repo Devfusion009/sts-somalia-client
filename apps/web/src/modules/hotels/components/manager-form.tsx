@@ -1,13 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { UserPlus, Trash2, ChevronRight, ChevronDown, KeyRound, Copy, Check } from "lucide-react";
+import { UserPlus, Trash2, ChevronRight, Eye, EyeOff, KeyRound, Copy, Check } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import {
   Dialog,
   DialogContent,
@@ -74,25 +74,24 @@ type Manager = {
 function CredentialsOnce({ password }: { password: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div className="space-y-1.5 rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
-      <Badge variant="outline" className="border-primary/25 bg-primary/10 text-primary">
-        One-time password
-      </Badge>
+    <div className="space-y-1.5 rounded-lg bg-primary/5 px-3 py-2 ring-1 ring-primary/20">
+      <Badge variant="success">One-time password</Badge>
       <div className="flex items-center justify-between gap-2">
         <span className="truncate font-mono text-sm select-all">{password}</span>
         <Button
           type="button"
           variant="outline"
-          size="sm"
-          className="shrink-0 gap-1.5"
+          size="icon-sm"
+          className="shrink-0"
+          aria-label={copied ? "Copied" : "Copy password"}
+          title={copied ? "Copied" : "Copy"}
           onClick={async () => {
             await navigator.clipboard.writeText(password);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
           }}
         >
-          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-          {copied ? "Copied" : "Copy"}
+          {copied ? <Check /> : <Copy />}
         </Button>
       </div>
     </div>
@@ -105,21 +104,31 @@ function AddManagerForm({ kind, propertyId }: { kind: ManagerKind; propertyId: s
   return (
     <form action={formAction} className="space-y-3 border-t border-border pt-4">
       <input type="hidden" name={config.idField} value={propertyId} />
-      <Label htmlFor="manager-email">Add a manager by email</Label>
-      <div className="flex flex-wrap items-end gap-2">
-        <Input id="manager-email" name="email" type="email" placeholder="Manager's email" className="min-w-56 flex-1" required />
-        <SubmitButton pendingText="Adding…" className="gap-1.5">
-          <UserPlus className="size-3.5" /> Add manager
-        </SubmitButton>
-      </div>
+      <Field>
+        <FieldLabel htmlFor={`${kind}-manager-email`}>Manager email</FieldLabel>
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            id={`${kind}-manager-email`}
+            name="email"
+            type="email"
+            placeholder="name@example.com"
+            className="min-w-0 flex-1 basis-56 max-sm:h-10"
+            required
+          />
+          <SubmitButton pendingText="Adding…">
+            <UserPlus aria-hidden="true" /> Add
+          </SubmitButton>
+        </div>
+      </Field>
 
-      <div className="flex flex-wrap gap-x-5 gap-y-2">
+      <fieldset className="flex flex-wrap gap-x-5 gap-y-2">
+        <legend className="sr-only">Permissions</legend>
         {config.permissions.map((perm) => (
-          <label key={perm.key} className="flex items-center gap-2 text-sm text-muted-foreground">
+          <label key={perm.key} className="flex min-h-8 items-center gap-2 text-sm">
             <Checkbox name="permissions" value={perm.key} /> {perm.label}
           </label>
         ))}
-      </div>
+      </fieldset>
 
       {state?.error ? (
         <Alert variant="destructive">
@@ -127,7 +136,13 @@ function AddManagerForm({ kind, propertyId }: { kind: ManagerKind; propertyId: s
         </Alert>
       ) : null}
       {state && !state.error ? (
-        state.newPassword ? <CredentialsOnce password={state.newPassword} /> : <p className="text-xs text-primary">Manager added.</p>
+        state.newPassword ? (
+          <CredentialsOnce password={state.newPassword} />
+        ) : (
+          <p role="status" className="text-xs text-primary">
+            Manager added.
+          </p>
+        )
       ) : null}
     </form>
   );
@@ -159,11 +174,12 @@ function PermissionToggle({
       ))}
       <button
         type="submit"
+        aria-pressed={granted}
         className={cn(
-          "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+          "inline-flex h-7 items-center rounded-full border px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:h-9",
           granted
-            ? "border-transparent bg-primary/10 text-primary hover:bg-primary/15"
-            : "border-border text-muted-foreground hover:bg-muted"
+            ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+            : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
         )}
       >
         {label}
@@ -179,11 +195,15 @@ function ResetPasswordControl({ kind, propertyId, managerId }: { kind: ManagerKi
       <form action={formAction}>
         <input type="hidden" name={KINDS[kind].idField} value={propertyId} />
         <input type="hidden" name="managerId" value={managerId} />
-        <SubmitButton variant="outline" size="sm" pendingText="Resetting…" className="gap-1.5">
-          <KeyRound className="size-3.5" /> Reset password
+        <SubmitButton variant="outline" size="sm" pendingText="Resetting…">
+          <KeyRound aria-hidden="true" /> Reset password
         </SubmitButton>
       </form>
-      {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
+      {state?.error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {state.error}
+        </p>
+      ) : null}
       {state?.newPassword ? <CredentialsOnce password={state.newPassword} /> : null}
     </div>
   );
@@ -218,7 +238,7 @@ function ManagerRow({ kind, propertyId, manager }: { kind: ManagerKind; property
       <button
         type="button"
         onClick={() => setDetailOpen(true)}
-        className="flex w-full items-center justify-between gap-3 py-2.5 text-left first:pt-0 last:pb-0 hover:bg-muted/50"
+        className="-mx-2 flex w-[calc(100%+1rem)] items-center justify-between gap-3 rounded-md px-2 py-2.5 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{manager.profile?.full_name ?? "—"}</p>
@@ -228,7 +248,7 @@ function ManagerRow({ kind, propertyId, manager }: { kind: ManagerKind; property
           <span className="text-xs text-muted-foreground">
             {grantedCount === 0 ? "No permissions" : `${grantedCount} permission${grantedCount > 1 ? "s" : ""}`}
           </span>
-          <ChevronRight className="size-4 text-muted-foreground" />
+          <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
         </div>
       </button>
 
@@ -238,9 +258,11 @@ function ManagerRow({ kind, propertyId, manager }: { kind: ManagerKind; property
             <DialogTitle>{manager.profile?.full_name ?? manager.profile?.email}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">{manager.profile?.email}</p>
+            {manager.profile?.full_name ? (
+              <p className="truncate text-sm text-muted-foreground">{manager.profile.email}</p>
+            ) : null}
             <div className="space-y-2">
-              <Label>Permissions</Label>
+              <p className="text-sm font-medium">Permissions</p>
               <div className="flex flex-wrap gap-2">
                 {config.permissions.map((perm) => (
                   <PermissionToggle
@@ -262,7 +284,7 @@ function ManagerRow({ kind, propertyId, manager }: { kind: ManagerKind; property
               className="text-destructive hover:text-destructive"
               onClick={() => setConfirmOpen(true)}
             >
-              <Trash2 className="size-3.5" /> Remove manager
+              <Trash2 aria-hidden="true" /> Remove manager
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -276,7 +298,11 @@ function ManagerRow({ kind, propertyId, manager }: { kind: ManagerKind; property
             <AlertDialogHeader>
               <AlertDialogTitle>Remove {manager.profile?.full_name ?? manager.profile?.email}?</AlertDialogTitle>
             </AlertDialogHeader>
-            {state?.error ? <p className="my-2 text-xs text-destructive">{state.error}</p> : null}
+            {state?.error ? (
+              <p role="alert" className="my-2 text-xs text-destructive">
+                {state.error}
+              </p>
+            ) : null}
             <AlertDialogFooter>
               <Button type="button" variant="outline" onClick={() => setConfirmOpen(false)}>
                 Cancel
@@ -315,38 +341,44 @@ function ManagersSection({ kind, propertyId, managers }: { kind: ManagerKind; pr
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2">
           <h2 className="font-heading text-sm font-semibold">Managers</h2>
-          <Badge variant="secondary">{managers.length}</Badge>
+          <Badge variant="neutral" className="tabular-nums">
+            {managers.length}
+          </Badge>
         </span>
         <div className="flex items-center gap-1">
+          {hasManagers ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={expanded ? "Hide managers" : "Show managers"}
+              aria-expanded={expanded}
+              title={expanded ? "Hide" : "Show"}
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? <EyeOff /> : <Eye />}
+            </Button>
+          ) : null}
           <Button
             type="button"
-            variant="ghost"
-            size="icon"
-            className="size-7"
+            variant={adding ? "secondary" : "ghost"}
+            size="icon-sm"
             aria-label="Add manager"
+            aria-expanded={adding}
+            title="Add manager"
             onClick={() => setAdding((v) => !v)}
           >
-            <UserPlus className="size-3.5" />
+            <UserPlus />
           </Button>
-          {hasManagers ? (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-            >
-              {expanded ? "Hide" : "View"}
-              {expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-            </button>
-          ) : null}
         </div>
       </div>
 
       {!hasManagers ? (
-        <p className="text-sm text-muted-foreground">No managers assigned yet.</p>
+        <p className="text-sm text-muted-foreground">No managers</p>
       ) : expanded ? (
         <ul className="divide-y divide-border">
           {managers.map((manager) => (
-            <li key={manager.id} className="py-2.5 first:pt-0 last:pb-0">
+            <li key={manager.id} className="py-0.5">
               <ManagerRow kind={kind} propertyId={propertyId} manager={manager} />
             </li>
           ))}

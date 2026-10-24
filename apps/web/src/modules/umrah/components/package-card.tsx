@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { Landmark, CalendarDays, Users, Clock3, ArrowRight, Plane, Building2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MediaPlaceholder } from "@/components/media-placeholder";
 import { INCLUDE_LABELS } from "@/modules/umrah/includes";
-import { cn } from "@/lib/utils";
 
 export { INCLUDE_LABELS };
 
@@ -93,6 +92,11 @@ export function discountPercent(base: number, original: number | null): number |
   return Math.round(((original - base) / original) * 100);
 }
 
+/** Card "from" prices: thousands separator, no decimals (matches the hotel cards). */
+function wholeAmount(n: number) {
+  return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
+
 function hotelFor(hotels: PackageCardHotel[], city: string) {
   return hotels.find((h) => h.city === city) ?? null;
 }
@@ -101,7 +105,7 @@ function HotelLine({ label, hotel }: { label: string; hotel: PackageCardHotel })
   return (
     <div className="min-w-0 flex-1">
       <p className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-        <Building2 className="size-3" /> {label}
+        <Building2 className="size-3" aria-hidden /> {label}
       </p>
       {/* Wraps to two lines rather than truncating. In a four-up grid the
           column is ~110px wide, and "The Oberoi Madinah" truncated to
@@ -139,28 +143,36 @@ export function PackageCard({ pkg }: { pkg: PackageCardData }) {
   const madinah = hotelFor(pkg.hotels, "madinah");
 
   return (
-    <Link href={`/umrah/${pkg.slug}`} className="group block h-full">
-      <Card className="flex h-full flex-col overflow-hidden py-0 transition-all hover:-translate-y-0.5 hover:shadow-lg">
-        <div className="relative">
+    <Link
+      href={`/umrah/${pkg.slug}`}
+      className="group block h-full rounded-xl focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+    >
+      <Card className="flex h-full flex-col overflow-hidden py-0 transition-shadow hover:shadow-lg">
+        <div className="relative overflow-hidden">
           {cover ? (
             // Supabase Storage URL, not a local asset — next/image would need the
             // remote host allow-listed in next.config.ts.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={cover} alt="" className="h-40 w-full object-cover" />
+            <img
+              src={cover}
+              alt=""
+              loading="lazy"
+              className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none"
+            />
           ) : (
             <MediaPlaceholder seed={pkg.id} icon={Landmark} className="h-40 w-full" />
           )}
           <div className="absolute top-3 left-3 flex gap-1.5">
             {pkg.isFeatured ? (
               <Badge className="border-transparent bg-brand-accent font-semibold text-brand-accent-foreground">
-                Most Popular
+                Featured
               </Badge>
             ) : null}
-            <Badge className={cn("border-transparent font-semibold", tier.className, "bg-card")}>{tier.label}</Badge>
+            <Badge className="border-transparent bg-card font-semibold text-foreground">{tier.label}</Badge>
           </div>
           {seatsLeft !== null && seatsLeft <= 10 ? (
-            <Badge className="absolute top-3 right-3 gap-1 border-transparent bg-card text-brand-accent">
-              <Users className="size-3" />
+            <Badge className="absolute top-3 right-3 gap-1 border-transparent bg-card font-semibold text-foreground">
+              <Users aria-hidden />
               {seatsLeft} seats left
             </Badge>
           ) : null}
@@ -176,7 +188,7 @@ export function PackageCard({ pkg }: { pkg: PackageCardData }) {
               <span>{pkg.originIata}</span>
               <span className="flex flex-1 items-center gap-1 text-muted-foreground">
                 <span className="h-px flex-1 border-t border-dashed border-border" />
-                <Plane className="size-3" />
+                <Plane className="size-3" aria-hidden />
                 <span className="h-px flex-1 border-t border-dashed border-border" />
               </span>
               <span>{pkg.destinationIata}</span>
@@ -185,12 +197,12 @@ export function PackageCard({ pkg }: { pkg: PackageCardData }) {
 
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
-              <Clock3 className="size-3.5" /> {pkg.duration_days}D / {Math.max(0, pkg.duration_days - 1)}N
+              <Clock3 className="size-3.5" aria-hidden /> {pkg.duration_days}D / {Math.max(0, pkg.duration_days - 1)}N
             </span>
             {pkg.nextDeparture ? (
               <span className="flex items-center gap-1">
-                <CalendarDays className="size-3.5" />
-                Departs {format(new Date(pkg.nextDeparture.departure_date), "d MMM yyyy")}
+                <CalendarDays className="size-3.5" aria-hidden />
+                Departs {format(parseISO(pkg.nextDeparture.departure_date), "d MMM yyyy")}
               </span>
             ) : null}
           </div>
@@ -208,13 +220,13 @@ export function PackageCard({ pkg }: { pkg: PackageCardData }) {
               {pkg.includes.slice(0, 4).map((item) => (
                 <span
                   key={item}
-                  className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-secondary-foreground"
+                  className="rounded-md bg-secondary px-1.5 py-0.5 text-xs font-medium text-secondary-foreground"
                 >
                   {INCLUDE_LABELS[item] ?? item}
                 </span>
               ))}
               {pkg.includes.length > 4 ? (
-                <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                   +{pkg.includes.length - 4} more
                 </span>
               ) : null}
@@ -224,21 +236,21 @@ export function PackageCard({ pkg }: { pkg: PackageCardData }) {
           <div className="mt-auto flex items-end justify-between pt-2">
             <p className="text-sm">
               <span className="block text-xs text-muted-foreground">Starting from</span>
-              <span className="font-heading text-lg font-bold text-primary">
-                {pkg.currency} {pkg.base_price.toFixed(0)}
+              <span className="font-heading text-lg font-bold text-primary tabular-nums">
+                {pkg.currency} {wholeAmount(pkg.base_price)}
               </span>{" "}
               <span className="text-xs text-muted-foreground">/ pilgrim</span>
               {discount ? (
-                <span className="mt-0.5 block text-xs">
+                <span className="mt-0.5 block text-xs tabular-nums">
                   <span className="text-muted-foreground line-through">
-                    {pkg.currency} {pkg.originalPrice?.toFixed(0)}
+                    {pkg.currency} {wholeAmount(pkg.originalPrice ?? 0)}
                   </span>{" "}
-                  <span className="font-semibold text-primary">{discount}% OFF</span>
+                  <span className="font-semibold text-primary">{discount}% off</span>
                 </span>
               ) : null}
             </p>
             <span className="flex items-center gap-1 text-xs font-semibold text-primary">
-              View package <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+              View package <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </span>
           </div>
         </CardContent>

@@ -42,7 +42,7 @@ export function RoomNightsTable({
           onChange={(e) => setFrom(e.target.value)}
           className="w-auto"
         />
-        <span className="text-sm text-muted-foreground">to</span>
+        <span className="text-sm text-muted-foreground" aria-hidden="true">–</span>
         <Input
           type="date"
           aria-label="To"
@@ -57,13 +57,13 @@ export function RoomNightsTable({
             type="button"
             variant="ghost"
             size="icon"
-            className="size-8"
+            aria-label="Clear dates"
             onClick={() => {
               setFrom("");
               setTo("");
             }}
           >
-            <X className="size-4" />
+            <X />
           </Button>
         ) : null}
       </div>
@@ -71,16 +71,16 @@ export function RoomNightsTable({
         <TableHeader>
           <TableRow>
             <TableHead>Night</TableHead>
-            <TableHead className="text-right">Confirmed</TableHead>
-            <TableHead className="text-right">On request</TableHead>
-            <TableHead className="text-right">Left</TableHead>
-            <TableHead className="text-right">Rate</TableHead>
+            <TableHead numeric>Confirmed</TableHead>
+            <TableHead numeric>On request</TableHead>
+            <TableHead numeric>Left</TableHead>
+            <TableHead numeric>Rate</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filtered.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+              <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
                 No nights in range.
               </TableCell>
             </TableRow>
@@ -93,26 +93,26 @@ export function RoomNightsTable({
                 : undefined;
             return (
               <TableRow key={n.night}>
-                <TableCell className="font-medium">{format(new Date(`${n.night}T00:00:00`), "EEE d MMM")}</TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell className="font-medium whitespace-nowrap tabular-nums">{format(new Date(`${n.night}T00:00:00`), "EEE d MMM")}</TableCell>
+                <TableCell numeric className="tabular-nums">
                   {n.confirmed > 0 ? <span className="font-semibold text-primary">{n.confirmed}</span> : <span className="text-muted-foreground">0</span>}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {n.pending > 0 ? <span className="font-semibold text-brand-gold">{n.pending}</span> : <span className="text-muted-foreground">0</span>}
+                <TableCell numeric className="tabular-nums">
+                  {n.pending > 0 ? <span className="font-semibold text-[color-mix(in_oklch,var(--brand-gold),black_30%)] dark:text-brand-gold">{n.pending}</span> : <span className="text-muted-foreground">0</span>}
                 </TableCell>
-                <TableCell className="text-right tabular-nums" title={detail}>
+                <TableCell numeric className="tabular-nums" title={detail}>
                   {n.capacity === null ? (
                     <span className="text-muted-foreground">—</span>
                   ) : n.available !== null && n.available <= 0 ? (
                     <Badge variant="destructive">0/{n.capacity}</Badge>
                   ) : (
-                    <span className={cn(low && "font-semibold text-brand-gold")}>
+                    <span className={cn(low && "font-semibold text-[color-mix(in_oklch,var(--brand-gold),black_30%)] dark:text-brand-gold")}>
                       {n.available}
                       <span className="text-muted-foreground">/{n.capacity}</span>
                     </span>
                   )}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell numeric className="tabular-nums">
                   <RateCell rate={rates[n.night]} override={n.priceOverride} currency={currency} />
                 </TableCell>
               </TableRow>

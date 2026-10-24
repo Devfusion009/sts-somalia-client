@@ -37,15 +37,13 @@ export function ReplaceUpload({
       <Button
         type="button"
         variant="outline"
-        size="sm"
-        disabled={pending}
+        loading={pending}
         onClick={() => inputRef.current?.click()}
-        className="gap-1.5"
       >
-        <Upload className="size-3.5" />
+        {pending ? null : <Upload data-icon="inline-start" aria-hidden="true" />}
         {pending ? "Uploading…" : "Replace"}
       </Button>
-      {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
+      {state?.error ? <p role="alert" className="text-sm text-destructive">{state.error}</p> : null}
       <UploadStatus file={chosen} pending={pending} error={state?.error} className="w-full min-w-60" />
     </form>
   );

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { UploadCloud } from "lucide-react";
 import { SubmitButton } from "@/components/submit-button";
 import { FileField } from "@/components/ui/upload";
+import { FieldError } from "@/components/ui/field";
 import { resubmitRejectedDocument } from "@/modules/partner-applications/actions";
 import { checkUploadFile } from "@/modules/partner-applications/schemas";
 import type { ApplicationKind } from "@/modules/partner-applications/config";
@@ -28,13 +29,13 @@ export function ResubmitDocumentForm({
 
   useEffect(() => {
     if (wasPending.current && !isPending && !state?.error) {
-      toast.success("Document submitted for review.");
+      toast.success("Document submitted.");
     }
     wasPending.current = isPending;
   }, [isPending, state]);
 
   return (
-    <form action={formAction} className="mt-2 space-y-2">
+    <form action={formAction} className="space-y-2">
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="applicationId" value={applicationId} />
       <input type="hidden" name="docKey" value={docKey} />
@@ -46,11 +47,12 @@ export function ResubmitDocumentForm({
         onFilesChange={(files) => setHasFile(files.length > 0)}
       />
 
-      {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
-
-      <SubmitButton size="sm" pendingText="Uploading…" className="gap-1.5" disabled={!hasFile}>
-        <UploadCloud className="size-3.5" /> Upload replacement
-      </SubmitButton>
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <FieldError className="mr-auto">{state?.error}</FieldError>
+        <SubmitButton size="sm" pendingText="Uploading…" disabled={!hasFile}>
+          <UploadCloud aria-hidden="true" /> Upload replacement
+        </SubmitButton>
+      </div>
     </form>
   );
 }

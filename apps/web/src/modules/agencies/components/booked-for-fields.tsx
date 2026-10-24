@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { UserRound } from "lucide-react";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 export type BookedForCustomer = { id: string; full_name: string; phone: string | null };
 
@@ -19,43 +19,45 @@ export function BookedForFields({ customers }: { customers: BookedForCustomer[] 
   const [selection, setSelection] = useState("self");
 
   return (
-    <div className="space-y-3 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3">
-      <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-        <UserRound className="size-3.5" /> Agency booking
+    <div role="group" aria-labelledby="agency-booking-heading" className="space-y-3 rounded-xl bg-secondary/40 p-4">
+      <p id="agency-booking-heading" className="text-sm font-semibold">
+        Agency booking
       </p>
-      <div className="space-y-1.5">
-        <Label htmlFor="agencyCustomerId">Booking for</Label>
-        <select
-          id="agencyCustomerId"
-          name="agencyCustomerId"
-          value={selection}
-          onChange={(e) => setSelection(e.target.value)}
-          className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        >
-          <option value="self">Myself / walk-in</option>
-          {customers.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.full_name}
-              {c.phone ? ` — ${c.phone}` : ""}
-            </option>
-          ))}
-          <option value="new">+ New customer…</option>
-        </select>
-      </div>
-      {selection === "new" ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="newCustomerName">
-              Customer name <span className="text-destructive">*</span>
-            </Label>
-            <Input id="newCustomerName" name="newCustomerName" placeholder="Full name" required />
+      <FieldGroup className="gap-4">
+        <Field>
+          <FieldLabel htmlFor="agencyCustomerId">Booking for</FieldLabel>
+          <select
+            id="agencyCustomerId"
+            name="agencyCustomerId"
+            value={selection}
+            onChange={(e) => setSelection(e.target.value)}
+            className={NATIVE_SELECT_CLASS}
+          >
+            <option value="self">Myself / walk-in</option>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.full_name}
+                {c.phone ? ` — ${c.phone}` : ""}
+              </option>
+            ))}
+            <option value="new">+ New customer…</option>
+          </select>
+        </Field>
+        {selection === "new" ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="newCustomerName">
+                Customer name <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input id="newCustomerName" name="newCustomerName" placeholder="Full name" required />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="newCustomerPhone">Phone</FieldLabel>
+              <Input id="newCustomerPhone" name="newCustomerPhone" type="tel" placeholder="+252…" />
+            </Field>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="newCustomerPhone">Phone</Label>
-            <Input id="newCustomerPhone" name="newCustomerPhone" placeholder="+252…" />
-          </div>
-        </div>
-      ) : null}
+        ) : null}
+      </FieldGroup>
     </div>
   );
 }

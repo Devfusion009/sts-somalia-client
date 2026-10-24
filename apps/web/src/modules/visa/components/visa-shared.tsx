@@ -1,9 +1,7 @@
 import Link from "next/link";
-import { Clock3, CalendarCheck2, CalendarRange, Printer } from "lucide-react";
 import { countryFlag, countryName } from "@/lib/countries";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { VISA_STATUS_LABELS } from "@/modules/visa/schemas";
 import type { Database } from "@/lib/types/database.types";
 
@@ -15,52 +13,47 @@ export function processingText(visa: Pick<VisaTypeRow, "processing_days_min" | "
     visa.processing_days_max && visa.processing_days_max !== visa.processing_days_min
       ? ` – ${visa.processing_days_max}`
       : "";
-  return `${visa.processing_days_min}${max} Working Days`;
+  return `${visa.processing_days_min}${max} working days`;
 }
 
 export function fmtMoney(amount: number | string, currency: string) {
   const value = Number(amount);
-  return `${currency} ${Number.isInteger(value) ? value : value.toFixed(2)}`;
+  return `${currency} ${value.toLocaleString("en-US", {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
-const STATUS_BADGE_STYLES: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  submitted: "bg-chart-3/10 text-chart-3",
-  in_review: "bg-brand-gold/15 text-brand-gold",
-  additional_info_required: "bg-brand-accent/10 text-brand-accent",
-  ready_for_processing: "bg-chart-2/10 text-chart-2",
-  processing: "bg-chart-4/10 text-chart-4",
-  approved: "bg-primary/10 text-primary",
-  issued: "bg-primary/10 text-primary",
-  rejected: "bg-destructive/10 text-destructive",
-  cancelled: "bg-muted text-muted-foreground",
+const STATUS_BADGE_VARIANTS: Partial<Record<string, BadgeVariant>> = {
+  additional_info_required: "warning",
+  ready_for_processing: "info",
+  processing: "info",
+  cancelled: "neutral",
 };
 
 export function VisaStatusBadge({ status, className }: { status: string; className?: string }) {
   return (
-    <Badge
-      className={cn(
-        "border-transparent font-semibold hover:bg-current/10",
-        STATUS_BADGE_STYLES[status] ?? "bg-muted text-muted-foreground",
-        className
-      )}
-    >
+    <Badge variant={statusBadgeVariant(status, STATUS_BADGE_VARIANTS)} className={className}>
       {VISA_STATUS_LABELS[status] ?? status}
     </Badge>
   );
 }
 
-const DOCUMENT_BADGES: Record<string, { label: string; className: string }> = {
-  pending: { label: "Awaiting review", className: "bg-brand-gold/15 text-brand-gold" },
-  accepted: { label: "Verified", className: "bg-primary/10 text-primary" },
-  rejected: { label: "Rejected", className: "bg-destructive/10 text-destructive" },
-  missing: { label: "Missing", className: "bg-muted text-muted-foreground" },
-  replaced: { label: "Replaced", className: "bg-muted text-muted-foreground" },
+const DOCUMENT_BADGES: Record<string, { label: string; variant: BadgeVariant }> = {
+  pending: { label: "Awaiting review", variant: "warning" },
+  accepted: { label: "Verified", variant: "success" },
+  rejected: { label: "Rejected", variant: "destructive" },
+  missing: { label: "Missing", variant: "neutral" },
+  replaced: { label: "Replaced", variant: "neutral" },
 };
 
 export function DocumentStatusBadge({ status, className }: { status: string; className?: string }) {
   const badge = DOCUMENT_BADGES[status] ?? DOCUMENT_BADGES.pending;
-  return <Badge className={cn("border-transparent font-medium", badge.className, className)}>{badge.label}</Badge>;
+  return (
+    <Badge variant={badge.variant} className={className}>
+      {badge.label}
+    </Badge>
+  );
 }
 
 /**
@@ -76,61 +69,49 @@ export function VisaTypeBanner({
   right?: React.ReactNode;
   facts?: Array<{ label: string; value: string; icon?: "clock" | "calendar" | "range" | "print" }>;
 }) {
-  const factIcons = {
-    clock: Clock3,
-    calendar: CalendarCheck2,
-    range: CalendarRange,
-    print: Printer,
-  } as const;
-
   const defaultFacts = [
-    { label: "Processing Time", value: processingText(visaType), icon: "clock" as const },
+    { label: "Processing time", value: processingText(visaType), icon: "clock" as const },
     ...(visaType.validity_days
-      ? [{ label: "Validity", value: `${visaType.validity_days} Days`, icon: "calendar" as const }]
+      ? [{ label: "Validity", value: `${visaType.validity_days} days`, icon: "calendar" as const }]
       : []),
     ...(visaType.stay_days
-      ? [{ label: "Stay Period", value: `${visaType.stay_days} Days`, icon: "range" as const }]
+      ? [{ label: "Stay period", value: `${visaType.stay_days} days`, icon: "range" as const }]
       : []),
   ];
 
+  // `icon` stays on the facts type for callers; the banner renders label/value only.
   const shownFacts = facts ?? defaultFacts;
 
   return (
     <div className="rounded-2xl border border-border bg-card px-5 py-4 shadow-xs">
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-8">
         <div className="flex min-w-0 items-center gap-3">
           <span className="text-4xl leading-none" aria-hidden>
             {countryFlag(visaType.destination_country_code)}
           </span>
           <div className="min-w-0">
-            <h1 className="truncate font-heading text-lg font-bold sm:text-xl">
+            <h1 className="truncate font-heading text-lg font-bold tracking-tight sm:text-xl">
               {countryName(visaType.destination_country_code)}
             </h1>
             <p className="truncate text-sm text-muted-foreground">{visaType.name}</p>
           </div>
         </div>
 
-        <div className="flex flex-1 flex-wrap items-center gap-x-8 gap-y-3">
-          {shownFacts.map((fact) => {
-            const Icon = fact.icon ? factIcons[fact.icon] : Clock3;
-            return (
-              <div key={fact.label} className="flex items-center gap-2.5">
-                <span className="flex size-9 items-center justify-center rounded-full bg-secondary text-primary">
-                  <Icon className="size-4" />
-                </span>
-                <div>
-                  <p className="text-xs text-muted-foreground">{fact.label}</p>
-                  <p className="text-sm font-semibold">{fact.value}</p>
-                </div>
+        <div className="flex flex-1 flex-wrap items-end gap-x-8 gap-y-3 border-t border-border pt-4 lg:border-0 lg:pt-0">
+          <dl className="flex flex-wrap gap-x-8 gap-y-3">
+            {shownFacts.map((fact) => (
+              <div key={fact.label}>
+                <dt className="text-xs text-muted-foreground">{fact.label}</dt>
+                <dd className="text-sm font-semibold tabular-nums">{fact.value}</dd>
               </div>
-            );
-          })}
+            ))}
+          </dl>
           <div className="ml-auto flex items-center gap-4">
             {right ?? (
               <>
                 <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Price From</p>
-                  <p className="font-heading text-xl font-bold text-primary">
+                  <p className="text-xs text-muted-foreground">Price from</p>
+                  <p className="font-heading text-xl font-bold text-primary tabular-nums">
                     {fmtMoney(visaType.price, visaType.currency)}
                   </p>
                 </div>
@@ -139,7 +120,7 @@ export function VisaTypeBanner({
                   render={<Link href={`/visa/${visaType.id}`} />}
                   className="hidden sm:inline-flex"
                 >
-                  View Details
+                  View details
                 </Button>
               </>
             )}

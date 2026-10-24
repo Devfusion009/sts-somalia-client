@@ -58,12 +58,12 @@ export function HallMoveActions({
             <input key={name} type="hidden" name={name} value={value} />
           ))}
           {move === "confirmed" ? (
-            <SubmitButton size="sm" pendingText="Confirming…" className="gap-1" disabled={Number(booking.price) <= 0}>
-              <Check className="size-3.5" /> Confirm
+            <SubmitButton size="sm" pendingText="Confirming…" disabled={Number(booking.price) <= 0}>
+              <Check aria-hidden="true" /> Confirm
             </SubmitButton>
           ) : move === "completed" ? (
-            <SubmitButton size="sm" variant="outline" pendingText="Saving…" className="gap-1">
-              <Check className="size-3.5" /> Complete
+            <SubmitButton size="sm" variant="outline" pendingText="Saving…">
+              <Check aria-hidden="true" /> Complete
             </SubmitButton>
           ) : move === "cancelled" ? (
             <ConfirmButton
@@ -72,9 +72,9 @@ export function HallMoveActions({
               icon="x"
               size="sm"
               variant="outline"
-              className="gap-1 text-destructive hover:text-destructive"
+              className="text-destructive hover:text-destructive"
             >
-              <X className="size-3.5" /> {isRequest ? "Decline" : "Cancel"}
+              <X aria-hidden="true" /> {isRequest ? "Decline" : "Cancel"}
             </ConfirmButton>
           ) : (
             <ConfirmButton

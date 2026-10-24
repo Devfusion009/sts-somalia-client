@@ -33,7 +33,7 @@ export function BookingRoomAssign({
       <input type="hidden" name="bookingId" value={bookingId} />
       <input type="hidden" name="roomUnitId" value={roomUnitId} />
       <Select value={roomUnitId} onValueChange={(v) => setRoomUnitId(String(v ?? ""))}>
-        <SelectTrigger className="h-9 w-48" aria-invalid={Boolean(state?.error)}>
+        <SelectTrigger className="w-48" aria-label="Room" aria-invalid={Boolean(state?.error)}>
           <SelectValue placeholder="Select room" />
         </SelectTrigger>
         <SelectContent>
@@ -53,11 +53,10 @@ export function BookingRoomAssign({
       <SubmitButton
         size="sm"
         variant="outline"
-        className="gap-1.5"
         pendingText="Saving…"
         disabled={!roomUnitId || roomUnitId === currentUnitId}
       >
-        <ArrowLeftRight className="size-3.5" /> {currentUnitId ? "Reallocate" : "Assign room"}
+        <ArrowLeftRight aria-hidden="true" /> {currentUnitId ? "Reallocate" : "Assign room"}
       </SubmitButton>
     </form>
   );

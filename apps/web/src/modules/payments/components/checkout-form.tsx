@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, Smartphone, Wallet, Landmark, Building2, Lock, ArrowRight } from "lucide-react";
+import { AlertCircle, CreditCard, Smartphone, Wallet, Landmark, Building2, Lock } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import { money } from "@/lib/money";
 import { trpc } from "@/lib/trpc/react";
 
 /** Serializable subset of PaymentMethodDef safe to pass into a client component. */
@@ -28,6 +29,9 @@ const GROUPS = [
   { id: "international", title: "International cards" },
   { id: "other", title: "Other ways to pay" },
 ] as const;
+
+const TILE =
+  "rounded-xl border bg-card text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
 const KIND_ICONS = {
   card: CreditCard,
@@ -84,7 +88,30 @@ export function CheckoutForm({
   const [payChoice, setPayChoice] = useState<"full" | "amount">("full");
   const [amount, setAmount] = useState(canDeposit ? minDeposit : remaining);
   const amountFloor = isFirstPayment ? minDeposit : 0.01;
-  const payLabel = payChoice === "full" ? amountLabel : `${currency} ${amount.toFixed(2)}`;
+  const payLabel = payChoice === "full" ? amountLabel : money(amount, currency);
+
+  // Radio-group keyboard model for the method tiles: one tab stop, arrows move
+  // the selection (WAI-ARIA radio pattern). Order matches the rendered groups.
+  const orderedMethods = GROUPS.flatMap((g) => methods.filter((m) => m.group === g.id));
+  const tileRefs = useRef(new Map<string, HTMLButtonElement>());
+  function onMethodKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const keys = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"];
+    if (!keys.includes(e.key) || orderedMethods.length === 0) return;
+    e.preventDefault();
+    const index = Math.max(0, orderedMethods.findIndex((m) => m.id === selectedId));
+    const last = orderedMethods.length - 1;
+    const next =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? last
+          : e.key === "ArrowDown" || e.key === "ArrowRight"
+            ? (index + 1) % orderedMethods.length
+            : (index - 1 + orderedMethods.length) % orderedMethods.length;
+    const id = orderedMethods[next].id;
+    setSelectedId(id);
+    tileRefs.current.get(id)?.focus();
+  }
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -99,89 +126,115 @@ export function CheckoutForm({
   return (
     <form action={handleSubmit} className="space-y-6">
       {remaining < 1 - 0.005 ? null : (
-        <div>
-          <h2 className="font-heading text-base font-semibold">How much would you like to pay?</h2>
-          <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+        <fieldset>
+          <legend id="pay-amount-heading" className="font-heading text-base font-semibold">
+            Amount
+          </legend>
+          <div role="radiogroup" aria-labelledby="pay-amount-heading" className="mt-3 grid gap-2.5 sm:grid-cols-2">
             <button
               type="button"
+              role="radio"
+              aria-checked={payChoice === "full"}
               onClick={() => setPayChoice("full")}
               className={cn(
-                "rounded-xl border px-4 py-3 text-left transition-colors",
+                TILE,
+                "px-4 py-3",
                 payChoice === "full" ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/40"
               )}
             >
               <span className="block text-sm font-semibold">
                 {isFirstPayment ? "Pay in full" : "Pay remaining balance"}
               </span>
-              <span className="block text-xs text-muted-foreground">
-                {currency} {remaining.toFixed(2)}
+              <span className="block text-sm text-muted-foreground tabular-nums">
+                {money(remaining, currency)}
               </span>
             </button>
             <button
               type="button"
+              role="radio"
+              aria-checked={payChoice === "amount"}
               onClick={() => setPayChoice("amount")}
               className={cn(
-                "rounded-xl border px-4 py-3 text-left transition-colors",
+                TILE,
+                "px-4 py-3",
                 payChoice === "amount" ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/40"
               )}
             >
               <span className="block text-sm font-semibold">
-                {canDeposit ? "Pay a deposit now" : "Pay a different amount"}
+                {canDeposit ? "Pay a deposit" : "Pay a different amount"}
               </span>
-              <span className="block text-xs text-muted-foreground">
-                {canDeposit ? `From ${currency} ${minDeposit.toFixed(2)} — pay the rest later` : "Up to the remaining balance"}
+              <span className="block text-sm text-muted-foreground tabular-nums">
+                {canDeposit ? `From ${money(minDeposit, currency)}` : `Up to ${money(remaining, currency)}`}
               </span>
             </button>
           </div>
           {payChoice === "amount" ? (
-            <div className="mt-3 max-w-xs space-y-1.5">
+            <div className="mt-4 max-w-xs space-y-1.5">
               <Label htmlFor="amountInput">Amount to pay now ({currency})</Label>
               <Input
                 id="amountInput"
                 type="number"
+                inputMode="decimal"
                 min={amountFloor}
                 max={remaining}
                 step="0.01"
                 value={amount}
+                aria-invalid={!Number.isFinite(amount) || amount < amountFloor || amount > remaining || undefined}
+                aria-describedby="amountLimits"
+                className="tabular-nums"
                 onChange={(e) => setAmount(Number(e.target.value))}
               />
-              <p className="text-xs text-muted-foreground">
+              <p id="amountLimits" className="text-xs text-muted-foreground tabular-nums">
                 {isFirstPayment
-                  ? `Minimum ${currency} ${minDeposit.toFixed(2)} (${Math.round((minDeposit / (remaining || 1)) * 100)}% deposit) — the rest is due before your booking is finalized.`
-                  : `Up to the remaining balance of ${currency} ${remaining.toFixed(2)}.`}
+                  ? `Minimum ${money(minDeposit, currency)} · maximum ${money(remaining, currency)}`
+                  : `Maximum ${money(remaining, currency)}`}
               </p>
             </div>
           ) : null}
-        </div>
+        </fieldset>
       )}
 
       <div>
-        <h2 className="font-heading text-base font-semibold">Select Payment Method</h2>
-        <div className="mt-3 space-y-5" role="radiogroup" aria-label="Payment method">
+        <h2 id="payment-method-heading" className="font-heading text-base font-semibold">
+          Payment method
+        </h2>
+        <div
+          className="mt-3 space-y-5"
+          role="radiogroup"
+          aria-labelledby="payment-method-heading"
+          onKeyDown={onMethodKeyDown}
+        >
           {GROUPS.map((group) => {
             const groupMethods = methods.filter((m) => m.group === group.id);
             if (groupMethods.length === 0) return null;
             return (
               <div key={group.id} className="space-y-2.5">
-                <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{group.title}</h3>
+                <h3 className="text-sm font-medium text-muted-foreground">{group.title}</h3>
                 {groupMethods.map((method) => {
             const Icon = KIND_ICONS[method.kind];
             const active = method.id === selectedId;
             return (
               <button
                 key={method.id}
+                ref={(el) => {
+                  if (el) tileRefs.current.set(method.id, el);
+                  else tileRefs.current.delete(method.id);
+                }}
                 type="button"
                 role="radio"
                 aria-checked={active}
+                tabIndex={active || (!selected && method.id === orderedMethods[0]?.id) ? 0 : -1}
                 onClick={() => setSelectedId(method.id)}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-xl border bg-card px-4 py-3.5 text-left transition-colors",
+                  TILE,
+                  "flex min-h-14 w-full items-center gap-3 px-4 py-3",
                   active
-                    ? "border-primary ring-2 ring-primary/20"
+                    ? "border-primary bg-primary/[0.03] ring-2 ring-primary/20"
                     : "border-border hover:border-primary/40"
                 )}
               >
                 <span
+                  aria-hidden
                   className={cn(
                     "flex size-4 shrink-0 items-center justify-center rounded-full border-2",
                     active ? "border-primary" : "border-muted-foreground/40"
@@ -190,6 +243,7 @@ export function CheckoutForm({
                   {active ? <span className="size-2 rounded-full bg-primary" /> : null}
                 </span>
                 <span
+                  aria-hidden
                   className={cn(
                     "flex size-9 shrink-0 items-center justify-center rounded-lg",
                     active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
@@ -199,16 +253,16 @@ export function CheckoutForm({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold">{method.label}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
+                  <span className="block text-xs text-muted-foreground sm:truncate">
                     {method.description}
                     {method.simulated ? " · test mode" : ""}
                   </span>
                 </span>
-                <span className="flex shrink-0 items-center gap-1.5">
+                <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
                   {method.badges.map((badge) => (
                     <span
                       key={badge}
-                      className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-muted-foreground"
+                      className="rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground"
                     >
                       {badge}
                     </span>
@@ -232,41 +286,42 @@ export function CheckoutForm({
             type="tel"
             inputMode="tel"
             placeholder="+252 61 XXXXXXX"
+            autoComplete="tel"
             required
           />
-          <p className="text-xs text-muted-foreground">
-            You&apos;ll receive a prompt on this number to approve the payment.
-          </p>
         </div>
       ) : null}
 
       {error ? (
         <Alert variant="destructive">
+          <AlertCircle />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-muted-foreground">
-          By clicking &ldquo;Pay Now&rdquo;, you agree to our{" "}
-          <Link href="/terms" className="underline underline-offset-2">
-            Terms &amp; Conditions
+          By paying you agree to our{" "}
+          <Link
+            href="/terms"
+            className="rounded-sm underline underline-offset-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            terms and conditions
           </Link>
           .
         </p>
         <Button
           type="submit"
           size="lg"
+          loading={initiate.isPending}
           disabled={
-            initiate.isPending ||
             !selected ||
             (payChoice === "amount" && (!Number.isFinite(amount) || amount < amountFloor || amount > remaining))
           }
-          className="gap-2"
+          className="w-full gap-2 tabular-nums sm:w-auto"
         >
-          <Lock className="size-4" />
-          {initiate.isPending ? "Processing…" : `Pay Now ${payLabel}`}
-          <ArrowRight className="size-4" />
+          {initiate.isPending ? null : <Lock className="size-4" aria-hidden />}
+          {initiate.isPending ? "Processing…" : `Pay ${payLabel}`}
         </Button>
       </div>
     </form>

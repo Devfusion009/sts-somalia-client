@@ -28,26 +28,28 @@ export function HotelCard({ hotel }: { hotel: HotelCardData }) {
 
   const body = (
     <Card className={`flex h-full flex-col overflow-hidden py-0 transition-all ${isExternal ? "" : "group-hover:-translate-y-0.5 group-hover:shadow-lg"}`}>
-      <div className="relative">
+      <div className="relative overflow-hidden bg-muted">
         {hotel.image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={hotel.image}
             alt={hotel.name}
-            className="h-44 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            loading="lazy"
+            decoding="async"
+            className="h-44 w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
           <MediaPlaceholder seed={hotel.id} icon={Building2} className="h-44 w-full" />
         )}
         {hotel.star_rating ? (
           <Badge className="absolute top-3 right-3 gap-1 border-transparent bg-background/95 text-foreground shadow-sm">
-            <Star className="size-3 fill-brand-gold text-brand-gold" />
+            <Star className="size-3 fill-brand-gold text-brand-gold" aria-hidden />
             {hotel.star_rating}-star
           </Badge>
         ) : null}
         {isExternal ? (
           <Badge variant="outline" className="absolute top-3 left-3 gap-1 border-transparent bg-background/95 text-muted-foreground shadow-sm">
-            <Globe className="size-3" />
+            <Globe className="size-3" aria-hidden />
             via {hotel.externalSource}
           </Badge>
         ) : hotel.bookingMode === "manual" ? (
@@ -63,7 +65,7 @@ export function HotelCard({ hotel }: { hotel: HotelCardData }) {
           {hotel.name}
         </h3>
         <p className="flex items-center gap-1 text-xs text-muted-foreground">
-          <MapPin className="size-3.5" />
+          <MapPin className="size-3.5" aria-hidden />
           {hotel.city}, {hotel.country_code}
         </p>
         {hotel.amenities.length > 0 ? (
@@ -71,13 +73,13 @@ export function HotelCard({ hotel }: { hotel: HotelCardData }) {
             {hotel.amenities.slice(0, 3).map((amenity) => (
               <span
                 key={amenity}
-                className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground"
+                className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
               >
                 {amenityLabel(amenity)}
               </span>
             ))}
             {hotel.amenities.length > 3 ? (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                 +{hotel.amenities.length - 3} more
               </span>
             ) : null}
@@ -86,9 +88,9 @@ export function HotelCard({ hotel }: { hotel: HotelCardData }) {
         <div className="mt-auto flex items-end justify-between pt-2">
           {hotel.minPrice !== null && hotel.minPrice > 0 ? (
             <p className="text-sm">
-              <span className="block text-[10px] text-muted-foreground uppercase">From</span>
-              <span className="font-heading text-lg font-bold text-primary">
-                {hotel.currency} {hotel.minPrice.toFixed(0)}
+              <span className="block text-xs text-muted-foreground">From</span>
+              <span className="font-heading text-lg font-bold text-primary tabular-nums">
+                {hotel.currency} {Math.round(hotel.minPrice).toLocaleString("en-US")}
               </span>{" "}
               <span className="text-xs text-muted-foreground">/ night</span>
             </p>
@@ -101,7 +103,7 @@ export function HotelCard({ hotel }: { hotel: HotelCardData }) {
             <span className="text-xs text-muted-foreground">Contact us to book</span>
           ) : (
             <span className="flex items-center gap-1 text-xs font-semibold text-primary">
-              View rooms <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+              View rooms <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </span>
           )}
         </div>
@@ -112,7 +114,10 @@ export function HotelCard({ hotel }: { hotel: HotelCardData }) {
   if (isExternal) return <div className="h-full">{body}</div>;
 
   return (
-    <Link href={`/hotels/${hotel.slug}`} className="group block h-full">
+    <Link
+      href={`/hotels/${hotel.slug}`}
+      className="group block h-full rounded-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+    >
       {body}
     </Link>
   );

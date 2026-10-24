@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { addDays, format, parseISO } from "date-fns";
-import { ArrowRight, CalendarPlus, Phone } from "lucide-react";
+import { ArrowRight, CalendarDays, CalendarPlus, Phone } from "lucide-react";
 import { eventTypeLabel } from "@sts/shared-types";
 import { todayIso } from "@/modules/hotels/availability";
 import {
@@ -15,8 +15,13 @@ import type { VenueAccess } from "@/modules/events/venue-access";
 import { hallSlotLabel, shortTime } from "@/modules/events/venue-desk-types";
 import { venueMoney } from "@/modules/events/components/amenities";
 import { HallPaymentLabel, HallStatusBadge } from "@/modules/events/components/hall-badges";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
+
+const rowLink =
+  "block truncate rounded-sm text-sm font-medium outline-none after:absolute after:inset-0 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50";
 
 function iso(d: Date) {
   return format(d, "yyyy-MM-dd");
@@ -45,9 +50,9 @@ function BookingRow({ booking, href, showDate }: { booking: DeskBooking; href: s
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <Link href={href} className="block truncate text-sm font-medium after:absolute after:inset-0 hover:text-primary">
+        <Link href={href} className={rowLink}>
           {booking.event_name || eventTypeLabel(booking.event_type)}
-          <span className="ml-1.5 font-normal text-muted-foreground">· {booking.expected_guests ?? "—"} guests</span>
+          <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">· {booking.expected_guests ?? "—"} guests</span>
         </Link>
         <p className="truncate text-xs text-muted-foreground">
           {booking.agency?.name ?? booking.contact_name ?? "Client"}
@@ -97,38 +102,33 @@ export async function VenueDashboardView({
 
   return (
     <div className="space-y-6">
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border sm:grid-cols-5">
-        {[
-          { label: "Events today", value: String(todays.length) },
-          { label: "Next 7 days", value: String(thisWeek.length) },
-          { label: "Open requests", value: String(requests.length) },
-          { label: "Awaiting payment", value: String(unpaidUpcoming) },
-          { label: `Booked in ${format(todayDate, "MMMM")}`, value: venueMoney(venue.currency, bookedThisMonth) },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-secondary/40 px-4 py-3">
-            <dt className="text-xs text-muted-foreground">{stat.label}</dt>
-            <dd className="font-heading text-xl font-semibold tabular-nums">{stat.value}</dd>
-          </div>
-        ))}
-      </dl>
+      <StatRail className="sm:grid-cols-5">
+        <StatRailItem label="Events today" value={todays.length} />
+        <StatRailItem label="Next 7 days" value={thisWeek.length} />
+        <StatRailItem label="Open requests" value={requests.length} tone={requests.length > 0 ? "warn" : undefined} />
+        <StatRailItem label="Awaiting payment" value={unpaidUpcoming} />
+        <StatRailItem label={`Booked in ${format(todayDate, "MMMM")}`} value={venueMoney(venue.currency, bookedThisMonth)} />
+      </StatRail>
 
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardHeader>
               <CardTitle className="flex items-baseline gap-2 text-base">
                 Today
-                <span className="text-sm font-normal text-muted-foreground">{format(todayDate, "EEE d MMM")}</span>
+                <span className="text-sm font-normal text-muted-foreground tabular-nums">{format(todayDate, "EEE d MMM")}</span>
               </CardTitle>
               {canBook ? (
-                <Button size="sm" className="gap-1.5" render={<Link href={`${base}/bookings/new?date=${today}`} />}>
-                  <CalendarPlus className="size-3.5" /> New booking
-                </Button>
+                <CardAction>
+                  <Button size="sm" render={<Link href={`${base}/bookings/new?date=${today}`} />}>
+                    <CalendarPlus aria-hidden="true" /> New booking
+                  </Button>
+                </CardAction>
               ) : null}
             </CardHeader>
             <CardContent>
               {todays.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No events today.</p>
+                <p className="text-sm text-muted-foreground">No events today</p>
               ) : (
                 <ul className="divide-y divide-border">
                   {todays.map((b) => (
@@ -140,15 +140,23 @@ export async function VenueDashboardView({
           </Card>
 
           <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardHeader>
               <CardTitle className="text-base">Next 30 days</CardTitle>
-              <Button variant="ghost" size="sm" className="gap-1 text-primary" render={<Link href={`${base}/calendar`} />}>
-                Calendar <ArrowRight className="size-3.5" />
-              </Button>
+              <CardAction>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Open calendar"
+                  title="Calendar"
+                  render={<Link href={`${base}/calendar`} />}
+                >
+                  <CalendarDays />
+                </Button>
+              </CardAction>
             </CardHeader>
             <CardContent>
               {upcoming.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nothing confirmed.</p>
+                <p className="text-sm text-muted-foreground">No confirmed events</p>
               ) : (
                 <ul className="divide-y divide-border">
                   {upcoming.map((b) => (
@@ -162,26 +170,30 @@ export async function VenueDashboardView({
 
         <div className="space-y-6">
           <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 Requests
-                <span className="rounded-full bg-brand-gold/15 px-1.5 text-xs font-semibold text-brand-gold tabular-nums">
-                  {requests.length}
-                </span>
+                {requests.length > 0 ? (
+                  <Badge variant="warning" className="tabular-nums">
+                    {requests.length}
+                  </Badge>
+                ) : null}
               </CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7 text-primary"
-                aria-label="All requests"
-                render={<Link href={`${base}/bookings?view=requests`} />}
-              >
-                <ArrowRight className="size-3.5" />
-              </Button>
+              <CardAction>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="All requests"
+                  title="All requests"
+                  render={<Link href={`${base}/bookings?view=requests`} />}
+                >
+                  <ArrowRight />
+                </Button>
+              </CardAction>
             </CardHeader>
             <CardContent>
               {requests.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No open requests.</p>
+                <p className="text-sm text-muted-foreground">No open requests</p>
               ) : (
                 <ul className="divide-y divide-border">
                   {requests.slice(0, 6).map((b) => (
@@ -189,12 +201,12 @@ export async function VenueDashboardView({
                       <div className="min-w-0">
                         <Link
                           href={`${base}/bookings/${b.id}`}
-                          className="block truncate text-sm font-medium after:absolute after:inset-0 hover:text-primary"
+                          className={rowLink}
                         >
                           {b.event_name || eventTypeLabel(b.event_type)}
                         </Link>
-                        <p className="truncate text-xs text-muted-foreground">{hallSlotLabel(b)}</p>
-                        <p className="truncate text-xs text-muted-foreground">
+                        <p className="truncate text-xs text-muted-foreground tabular-nums">{hallSlotLabel(b)}</p>
+                        <p className="truncate text-xs text-muted-foreground tabular-nums">
                           {b.agency?.name ?? b.contact_name ?? "Client"} · {b.expected_guests ?? "—"} guests ·{" "}
                           {Number(b.price) > 0 ? venueMoney(b.currency, b.price) : "No price"}
                         </p>
@@ -204,12 +216,11 @@ export async function VenueDashboardView({
                         {b.contact_phone ? (
                           <Button
                             variant="ghost"
-                            size="icon"
-                            className="size-7"
+                            size="icon-sm"
                             aria-label={`Call ${b.contact_name ?? "client"}`}
                             render={<a href={`tel:${b.contact_phone.replace(/\s+/g, "")}`} />}
                           >
-                            <Phone className="size-3.5" />
+                            <Phone />
                           </Button>
                         ) : null}
                       </div>
@@ -221,20 +232,28 @@ export async function VenueDashboardView({
           </Card>
 
           <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardHeader>
               <CardTitle className="text-base">Blocked dates</CardTitle>
-              <Button variant="ghost" size="icon" className="size-7 text-primary" aria-label="Calendar" render={<Link href={`${base}/calendar`} />}>
-                <ArrowRight className="size-3.5" />
-              </Button>
+              <CardAction>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Open calendar"
+                  title="Calendar"
+                  render={<Link href={`${base}/calendar`} />}
+                >
+                  <CalendarDays />
+                </Button>
+              </CardAction>
             </CardHeader>
             <CardContent>
               {blocks.length === 0 ? (
-                <p className="text-sm text-muted-foreground">None.</p>
+                <p className="text-sm text-muted-foreground">No blocked dates</p>
               ) : (
                 <ul className="divide-y divide-border">
                   {blocks.slice(0, 5).map((block) => (
                     <li key={block.id} className="py-2 text-sm first:pt-0 last:pb-0">
-                      <p className="font-medium">{blockLabel(block.date_start, block.date_end)}</p>
+                      <p className="font-medium tabular-nums">{blockLabel(block.date_start, block.date_end)}</p>
                       {block.reason ? <p className="text-xs text-muted-foreground">{block.reason}</p> : null}
                     </li>
                   ))}
