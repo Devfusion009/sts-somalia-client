@@ -4,9 +4,10 @@ import type { HotelAccess } from "@/modules/hotels/hotel-access";
 import { getHotelRequests, getRefundRules, type HotelRequest } from "@/modules/hotels/refund-queries";
 import { RefundRulesEditor } from "@/modules/hotels/components/refund-rules-editor";
 import { RequestDecision } from "@/modules/hotels/components/request-decision";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { dateSpan, money as formatMoney } from "@/lib/money";
 
 const KIND_LABEL: Record<HotelRequest["kind"], string> = {
   cancellation: "Cancellation",
@@ -14,17 +15,19 @@ const KIND_LABEL: Record<HotelRequest["kind"], string> = {
   modification: "Change",
 };
 
-const STATUS_BADGE: Record<string, string> = {
-  requested: "bg-brand-gold/15 text-brand-gold",
-  in_review: "bg-brand-gold/15 text-brand-gold",
-  approved: "bg-primary/10 text-primary",
-  completed: "bg-primary/10 text-primary",
-  rejected: "bg-destructive/10 text-destructive",
-  withdrawn: "bg-muted text-muted-foreground",
-};
+const STATUS_OVERRIDES = { withdrawn: "neutral" } as const;
 
 function money(currency: string, amount: number) {
-  return `${currency} ${amount.toFixed(2)}`;
+  return formatMoney(amount, currency);
+}
+
+function Detail({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 font-medium tabular-nums">{children}</dd>
+    </div>
+  );
 }
 
 function RequestCard({
@@ -49,17 +52,17 @@ function RequestCard({
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`${base}/bookings/${request.bookingId}`}
-              className="font-medium hover:text-primary hover:underline"
+              className="rounded-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               {request.guestName}
             </Link>
             <Badge variant="outline">{KIND_LABEL[request.kind]}</Badge>
-            <Badge className={cn("border-transparent capitalize", STATUS_BADGE[request.status] ?? "bg-muted text-muted-foreground")}>
+            <Badge variant={statusBadgeVariant(request.status, STATUS_OVERRIDES)} className="capitalize">
               {request.status.replace(/_/g, " ")}
             </Badge>
           </div>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {request.roomName ?? "Room"} · {request.checkIn} → {request.checkOut} · {money(request.currency, request.totalPrice)}
+          <p className="mt-0.5 text-sm text-muted-foreground tabular-nums">
+            {request.roomName ?? "Room"} · {dateSpan(request.checkIn, request.checkOut)} · {money(request.currency, request.totalPrice)}
             {request.orderNumber ? ` · ${request.orderNumber}` : ""}
           </p>
         </div>
@@ -78,28 +81,21 @@ function RequestCard({
       <p className="rounded-lg bg-secondary/40 px-3 py-2 text-sm">{request.reason}</p>
 
       {open && request.kind !== "modification" ? (
-        <dl className="grid gap-px overflow-hidden rounded-lg bg-border text-sm sm:grid-cols-3">
-          <div className="bg-card px-3 py-2">
-            <dt className="text-xs text-muted-foreground">Guest asked</dt>
-            <dd className="font-medium">{request.requestedAmount !== null ? money(request.currency, request.requestedAmount) : "Policy amount"}</dd>
-          </div>
-          <div className="bg-card px-3 py-2">
-            <dt className="text-xs text-muted-foreground">Policy refund today</dt>
-            <dd className="font-medium">
-              {quote?.refundAmount != null
-                ? `${money(request.currency, quote.refundAmount)} (${quote.deductionPercent}% deducted)`
-                : "No rules set"}
-            </dd>
-          </div>
-          <div className="bg-card px-3 py-2">
-            <dt className="text-xs text-muted-foreground">Paid</dt>
-            <dd className="font-medium">{quote ? money(request.currency, quote.paidAmount) : "—"}</dd>
-          </div>
+        <dl className="grid gap-3 text-sm sm:grid-cols-3">
+          <Detail label="Guest asked">
+            {request.requestedAmount !== null ? money(request.currency, request.requestedAmount) : "Policy amount"}
+          </Detail>
+          <Detail label="Policy refund today">
+            {quote?.refundAmount != null
+              ? `${money(request.currency, quote.refundAmount)} (${quote.deductionPercent}% deducted)`
+              : "No rules set"}
+          </Detail>
+          <Detail label="Paid">{quote ? money(request.currency, quote.paidAmount) : "—"}</Detail>
         </dl>
       ) : null}
 
       {!open ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground tabular-nums">
           {request.approvedAmount !== null ? `Refund ${money(request.currency, request.approvedAmount)} · ` : ""}
           {request.resolvedAt ? format(new Date(request.resolvedAt), "d MMM yyyy") : ""}
           {request.staffNote ? ` · ${request.staffNote}` : ""}
@@ -117,18 +113,22 @@ export async function RefundsView({ hotelId, base, access }: { hotelId: string; 
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <h1 className="font-heading text-2xl font-semibold">Refunds</h1>
+      <PageHeader title="Refunds" />
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            Requests
-            {open.length > 0 ? <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">{open.length}</Badge> : null}
-          </CardTitle>
+          <CardTitle className="text-base">Requests</CardTitle>
+          {open.length > 0 ? (
+            <CardAction>
+              <Badge variant="warning" className="tabular-nums">
+                {open.length}
+              </Badge>
+            </CardAction>
+          ) : null}
         </CardHeader>
         <CardContent>
           {open.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No open requests.</p>
+            <p className="text-sm text-muted-foreground">No open requests</p>
           ) : (
             <ul className="divide-y divide-border">
               {open.map((r) => (

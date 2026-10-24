@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import type { ActionState } from "@/lib/auth/actions";
@@ -36,12 +36,12 @@ export function RescheduleForm({
   const [to, setTo] = useState(current.endTime ?? "");
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form action={formAction} className="space-y-4">
       <input type="hidden" name="venueId" value={venueId} />
       <input type="hidden" name="bookingId" value={bookingId} />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="rs-start">Start date</Label>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Field>
+          <FieldLabel htmlFor="rs-start">Start date</FieldLabel>
           <Input
             id="rs-start"
             name="startDate"
@@ -54,24 +54,30 @@ export function RescheduleForm({
             }}
             required
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="rs-end">End date</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="rs-end">End date</FieldLabel>
           <Input id="rs-end" name="endDate" type="date" min={start || today} value={end} onChange={(e) => setEnd(e.target.value)} required />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="rs-from">Start time</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="rs-from">Start time</FieldLabel>
           <Input id="rs-from" name="startTime" type="time" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="rs-to">End time</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="rs-to">End time</FieldLabel>
           <Input id="rs-to" name="endTime" type="time" value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
+        </Field>
       </div>
-      {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      <SubmitButton size="sm" variant="outline" pendingText="Moving…">
-        Move booking
-      </SubmitButton>
+      {state?.error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {state.error}
+        </p>
+      ) : null}
+      <div className="flex justify-end">
+        <SubmitButton variant="outline" pendingText="Moving…">
+          Move booking
+        </SubmitButton>
+      </div>
     </form>
   );
 }
@@ -94,10 +100,16 @@ export function BookingNotesForm({ venueId, bookingId, notes }: { venueId: strin
         placeholder="Setup, catering, supplier contacts"
         aria-label="Internal notes"
       />
-      {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      <SubmitButton size="sm" variant="outline" pendingText="Saving…" disabled={value === (notes ?? "")}>
-        Save notes
-      </SubmitButton>
+      {state?.error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {state.error}
+        </p>
+      ) : null}
+      <div className="flex justify-end">
+        <SubmitButton variant="outline" pendingText="Saving…" disabled={value === (notes ?? "")}>
+          Save notes
+        </SubmitButton>
+      </div>
     </form>
   );
 }

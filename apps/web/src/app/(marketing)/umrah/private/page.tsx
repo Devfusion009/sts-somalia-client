@@ -1,19 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  AlertCircle,
-  ArrowRight,
-  CalendarDays,
-  ChevronRight,
-  Calculator,
-  Home,
-  ListChecks,
-  RotateCcw,
-  Settings2,
-  UsersRound,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { AlertCircle, ArrowRight, CalendarDays, Calculator, Hash, UsersRound } from "lucide-react";
+import { MarketingBreadcrumb } from "@/components/marketing/marketing-breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
@@ -78,24 +67,15 @@ export default async function PrivateUmrahPage({
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <nav className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Link href="/" className="flex items-center gap-1 hover:text-foreground">
-          <Home className="size-3.5" /> Home
-        </Link>
-        <ChevronRight className="size-3" />
-        <Link href="/umrah" className="hover:text-foreground">
-          Umrah
-        </Link>
-        <ChevronRight className="size-3" />
-        <span className="font-medium text-foreground">Private Umrah</span>
-      </nav>
+      <MarketingBreadcrumb
+        className="mb-4"
+        items={[{ label: "Umrah", href: "/umrah" }, { label: "Private Umrah" }]}
+      />
 
       {error ? (
         <Alert variant="destructive" className="mb-6">
           <AlertCircle />
-          <AlertDescription>
-            We couldn&apos;t start your trip just now. Please try again.
-          </AlertDescription>
+          <AlertDescription>Couldn&apos;t start your trip. Try again.</AlertDescription>
         </Alert>
       ) : null}
 
@@ -122,7 +102,7 @@ export default async function PrivateUmrahPage({
           className="absolute inset-0 bg-gradient-to-r from-sidebar via-sidebar/90 to-sidebar/70 lg:via-sidebar/85 lg:to-sidebar/35"
           aria-hidden
         />
-        <div className="relative z-10 px-6 py-12 sm:px-10 lg:py-16">
+        <div className="relative z-10 px-5 py-12 sm:px-10 lg:py-16">
           <div className="max-w-2xl">
             {draft ? (
               // The whole reason a draft is looked up on this page: someone
@@ -131,153 +111,168 @@ export default async function PrivateUmrahPage({
               // not the exact same first-time pitch, which reads as "start
               // over" even though nothing was lost.
               <>
-                <Badge className="border-transparent bg-brand-accent/20 text-sidebar-foreground">
-                  <RotateCcw className="size-3.5" /> Trip in progress
-                </Badge>
-                <h1 className="mt-4 font-heading text-3xl font-bold tracking-tight sm:text-4xl">
+                <h1 className="font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl">
                   Welcome back — pick up where you left off
                 </h1>
-                <p className="mt-4 text-base leading-relaxed text-sidebar-foreground/80">
-                  Your {UMRAH_TIER_LABELS[draft.tier]} trip for {draft.num_pilgrims} traveller
-                  {draft.num_pilgrims > 1 ? "s" : ""} is saved — nothing has been lost.
-                </p>
-                <dl className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-sidebar-foreground/80">
+                <dl className="mt-5 flex flex-col gap-2 text-sm text-sidebar-foreground/80 sm:flex-row sm:flex-wrap sm:gap-x-6">
                   <div className="flex items-center gap-1.5">
-                    <UsersRound className="size-4 text-brand-accent" />
-                    {draft.num_pilgrims} traveller{draft.num_pilgrims > 1 ? "s" : ""}
+                    <dt className="sr-only">Travellers</dt>
+                    <UsersRound className="size-4 text-brand-accent" aria-hidden />
+                    <dd>
+                      {UMRAH_TIER_LABELS[draft.tier]} · {draft.num_pilgrims} traveller
+                      {draft.num_pilgrims > 1 ? "s" : ""}
+                    </dd>
                   </div>
                   {draft.nights_makkah + draft.nights_madinah > 0 ? (
                     <div className="flex items-center gap-1.5">
-                      <CalendarDays className="size-4 text-brand-accent" />
-                      {tripDurationDays({
-                        numPilgrims: draft.num_pilgrims,
-                        nightsMakkah: draft.nights_makkah,
-                        nightsMadinah: draft.nights_madinah,
-                      })}{" "}
-                      days
+                      <dt className="sr-only">Duration</dt>
+                      <CalendarDays className="size-4 text-brand-accent" aria-hidden />
+                      <dd className="tabular-nums">
+                        {tripDurationDays({
+                          numPilgrims: draft.num_pilgrims,
+                          nightsMakkah: draft.nights_makkah,
+                          nightsMadinah: draft.nights_madinah,
+                        })}{" "}
+                        days
+                      </dd>
                     </div>
                   ) : null}
                   {draft.subtotal > 0 ? (
                     <div className="flex items-center gap-1.5">
-                      <Calculator className="size-4 text-brand-accent" />
-                      {formatMoney(draft.subtotal, draft.currency)} so far
+                      <dt className="sr-only">Total so far</dt>
+                      <Calculator className="size-4 text-brand-accent" aria-hidden />
+                      <dd className="tabular-nums">{formatMoney(draft.subtotal, draft.currency)} so far</dd>
                     </div>
                   ) : null}
+                  <div className="flex items-center gap-1.5">
+                    <dt className="sr-only">Reference</dt>
+                    <Hash className="size-4 text-brand-accent" aria-hidden />
+                    <dd className="font-mono text-xs">{draft.reference}</dd>
+                  </div>
                 </dl>
                 <Button
                   render={<Link href={`/umrah/private/${draft.id}?step=${draft.current_step}`} />}
                   size="lg"
-                  className="mt-7 gap-2"
+                  className="mt-7 w-full gap-2 sm:w-auto"
                 >
-                  Resume your trip <ArrowRight className="size-4" />
+                  Resume your trip <ArrowRight className="size-4" aria-hidden />
                 </Button>
-                <p className="mt-3 text-xs text-sidebar-foreground/60">
-                  Reference {draft.reference} · still nothing is booked until you review and submit.
-                </p>
               </>
             ) : (
               <>
-                <Badge className="border-transparent bg-brand-accent/20 text-sidebar-foreground">
-                  <Settings2 className="size-3.5" /> Individual / Private Umrah
-                </Badge>
-                <h1 className="mt-4 font-heading text-3xl font-bold tracking-tight sm:text-4xl">
-                  Build your Umrah, exactly the way you want it
+                <h1 className="font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl">
+                  Build your own Umrah
                 </h1>
-                <p className="mt-4 text-base leading-relaxed text-sidebar-foreground/80">
-                  For one traveller, a couple, a family or a small party. Choose your hotels in
-                  Makkah and Madinah, your flights, your visa, your transport and anything else you
-                  need — the price adds up as you go, with no surprises at the end.
+                <p className="mt-4 text-lg leading-relaxed text-sidebar-foreground/80">
+                  For one traveller, a couple, a family or a small party. Choose your Makkah and
+                  Madinah hotels, flights, visa, transport and extras, and see the total as you go.
                 </p>
                 <form action={startUmrahCustomRequest} className="mt-7">
-                  <SubmitButton size="lg" pendingText="Setting up your trip…" className="gap-2">
-                    Start building <ArrowRight className="size-4" />
+                  <SubmitButton size="lg" pendingText="Setting up your trip…" className="w-full gap-2 sm:w-auto">
+                    Start building <ArrowRight className="size-4" aria-hidden />
                   </SubmitButton>
                 </form>
-                <p className="mt-3 text-xs text-sidebar-foreground/60">
-                  You can save and come back — nothing is booked until you review and submit.
-                </p>
               </>
             )}
           </div>
         </div>
       </section>
 
-      <div className="mt-10 grid gap-8 lg:grid-cols-[1.4fr_1fr]">
-        <div>
-          <h2 className="font-heading text-lg font-bold">How it works</h2>
-          <ol className="mt-4 space-y-4">
-            {STEPS.map((step) => (
-              <li key={step.n} className="flex gap-4">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 font-heading text-sm font-bold text-primary">
-                  {step.n}
-                </span>
-                <div>
-                  <p className="font-semibold">{step.title}</p>
-                  <p className="text-sm text-muted-foreground">{step.text}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
+      <div className="mt-12 grid gap-10 lg:grid-cols-[1.4fr_1fr]">
+        <div className="min-w-0 space-y-10">
+          <section aria-labelledby="private-steps">
+            <h2 id="private-steps" className="font-heading text-xl font-bold tracking-tight sm:text-2xl">
+              How it works
+            </h2>
+            <ol className="mt-5 space-y-5">
+              {STEPS.map((step) => (
+                <li key={step.n} className="flex gap-4">
+                  <span
+                    className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-sm font-bold text-primary-foreground tabular-nums"
+                    aria-hidden
+                  >
+                    {step.n}
+                  </span>
+                  <div>
+                    <h3 className="font-semibold">
+                      <span className="sr-only">Step {step.n}: </span>
+                      {step.title}
+                    </h3>
+                    <p className="mt-0.5 text-sm text-muted-foreground">{step.text}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
 
-          <div className="mt-8 rounded-xl border border-border bg-secondary/40 p-5">
-            <p className="flex items-center gap-2 font-semibold">
-              <Calculator className="size-4 text-primary" /> How the price is worked out
-            </p>
+          <section aria-labelledby="private-pricing" className="rounded-xl bg-secondary/40 p-5 sm:p-6">
+            <h2 id="private-pricing" className="font-heading text-base font-bold">
+              How the price is worked out
+            </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               Every service has its own rate and its own unit — hotels are per person per night,
               flights and visas are per person, and a private car is one price for your whole party.
-              Add them up and that is your Umrah price:
             </p>
             <p className="mt-3 rounded-lg bg-card px-4 py-3 font-mono text-xs leading-relaxed">
               Flight + Visa + Makkah hotel + Madinah hotel + Transport + Train + VIP service ={" "}
               <span className="font-bold text-primary">Total Umrah price</span>
             </p>
-          </div>
+          </section>
 
-          <div className="mt-6 rounded-xl border border-border p-5">
-            <p className="flex items-center gap-2 font-semibold">
-              <UsersRound className="size-4 text-primary" /> Would a group package suit you better?
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              If you would rather not choose each service, our group packages come ready-made at a
-              fixed price per person — {UMRAH_TIERS.map((t) => t.label).join(", ")}.
-            </p>
-            <Button render={<Link href="/umrah/group" />} variant="outline" size="sm" className="mt-3 gap-1.5">
-              See group packages <ArrowRight className="size-3.5" />
+          <section
+            aria-labelledby="private-group"
+            className="flex flex-col gap-4 rounded-xl border border-border p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+          >
+            <div>
+              <h2 id="private-group" className="font-heading text-base font-bold">
+                Prefer a ready-made package?
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Group packages at a fixed price per person — {UMRAH_TIERS.map((t) => t.label).join(", ")}.
+              </p>
+            </div>
+            <Button
+              render={<Link href="/umrah/group" />}
+              variant="outline"
+              size="lg"
+              className="w-full shrink-0 gap-1.5 sm:w-auto"
+            >
+              See group packages <ArrowRight className="size-4" aria-hidden />
             </Button>
-          </div>
+          </section>
         </div>
 
-        <aside>
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-            <p className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
-              <ListChecks className="size-3.5" /> What you can choose
-            </p>
-            <ul className="mt-4 space-y-3">
+        <aside aria-labelledby="private-choices">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-xs lg:sticky lg:top-24">
+            <h2 id="private-choices" className="font-heading text-base font-bold">
+              What you can choose
+            </h2>
+            <ul className="mt-4 divide-y divide-border">
               {UMRAH_CATEGORIES.map((category) => {
                 const from = cheapestByCategory.get(category.value);
                 return (
-                  <li key={category.value} className="flex items-start gap-3">
-                    <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
-                      <category.icon className="size-4" />
-                    </span>
+                  <li key={category.value} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                    <category.icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold">{category.label}</p>
                       <p className="text-xs text-muted-foreground">{category.hint}</p>
-                      {from ? (
-                        <p className="mt-0.5 text-xs font-medium text-primary">
-                          from {formatMoney(from.price, from.currency)} {from.unit}
-                        </p>
-                      ) : null}
                     </div>
+                    {from ? (
+                      <p className="shrink-0 text-right text-xs tabular-nums">
+                        <span className="block text-muted-foreground">from</span>
+                        <span className="font-semibold text-foreground">
+                          {formatMoney(from.price, from.currency)}
+                        </span>
+                        <span className="block text-muted-foreground">{from.unit}</span>
+                      </p>
+                    ) : null}
                   </li>
                 );
               })}
             </ul>
             {services.length === 0 ? (
               <p className="mt-4 rounded-lg bg-muted p-3 text-xs text-muted-foreground">
-                Our team is finalising this season&apos;s rates. Start a trip anyway and we will get
-                in touch with prices.
+                This season&apos;s rates are being finalised. Start a trip and our team will send prices.
               </p>
             ) : null}
           </div>

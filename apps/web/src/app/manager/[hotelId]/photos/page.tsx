@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
 import { getHotelForEdit } from "@/modules/hotels/partner-queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { GalleryManager } from "@/components/admin/gallery-manager";
 import {
   uploadHotelImagesPartner,
@@ -27,11 +28,11 @@ export default async function ManagerPhotosPage({ params }: { params: Promise<{ 
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="font-heading text-2xl font-semibold">Photos &amp; Media</h1>
+      <PageHeader title="Photos & Media" />
 
       <Card>
         <CardHeader>
-          <CardTitle>Logo</CardTitle>
+          <CardTitle className="text-base">Logo</CardTitle>
         </CardHeader>
         <CardContent>
           <HotelLogoUploader
@@ -45,7 +46,7 @@ export default async function ManagerPhotosPage({ params }: { params: Promise<{ 
 
       <Card>
         <CardHeader>
-          <CardTitle>Photos</CardTitle>
+          <CardTitle className="text-base">Photos</CardTitle>
         </CardHeader>
         <CardContent>
           <GalleryManager

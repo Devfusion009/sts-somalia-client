@@ -105,17 +105,14 @@ export default async function AdminVisaCasePage({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <BackLink href="/admin/visa" label="All applications" className="mt-0.5" />
+      <div className="space-y-5">
+        <BackLink href="/admin/visa" label="All applications" />
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
           <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="font-heading text-2xl font-semibold tracking-tight">{applicantName}</h1>
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{applicantName}</h1>
               <StageBadge stage={stage} />
-              {data.ops?.priority === "urgent" ? (
-                <Badge className="border-transparent bg-destructive/10 text-destructive">Urgent</Badge>
-              ) : null}
+              {data.ops?.priority === "urgent" ? <Badge variant="destructive">Urgent</Badge> : null}
             </div>
             <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
               <span className="font-mono text-foreground">{app.application_ref}</span>
@@ -131,27 +128,26 @@ export default async function AdminVisaCasePage({
               {app.submitted_at ? (
                 <>
                   <Dot />
-                  <span>Submitted {format(new Date(app.submitted_at), "dd MMM yyyy")}</span>
+                  <span className="tabular-nums">Submitted {format(new Date(app.submitted_at), "d MMM yyyy")}</span>
                 </>
               ) : null}
               <Dot />
               <span>{owner ?? "Unassigned"}</span>
             </p>
           </div>
-        </div>
-        {!closed ? (
-          <CaseAssign
-            applicationId={app.id}
-            assignedTo={data.ops?.assigned_to ?? null}
-            meId={profile.id}
-            priority={data.ops?.priority ?? "normal"}
-            staff={staff}
-            canAssign={can("visa.assign")}
-          />
-        ) : null}
-        </div>
+          {!closed ? (
+            <CaseAssign
+              applicationId={app.id}
+              assignedTo={data.ops?.assigned_to ?? null}
+              meId={profile.id}
+              priority={data.ops?.priority ?? "normal"}
+              staff={staff}
+              canAssign={can("visa.assign")}
+            />
+          ) : null}
+        </header>
 
-        <dl className="flex flex-wrap gap-x-8 gap-y-2 rounded-lg bg-secondary/40 px-4 py-3 text-sm">
+        <dl className="flex flex-wrap gap-x-8 gap-y-3 rounded-xl bg-secondary/40 px-4 py-3">
           <Stat label="In stage" value={inStage === null ? "—" : `${inStage}d`} tone={!closed && (inStage ?? 0) > 3 ? "warn" : undefined} />
           <Stat label="Documents" value={`${verified}/${docSlots.length} verified`} />
           <Stat
@@ -185,35 +181,39 @@ export default async function AdminVisaCasePage({
             <Stat label="Passports back" value={`${passportsBack}/${data.passports.length}`} />
           ) : null}
           {sla && !closed ? (
-            <Stat label={overdue ? "Overdue since" : "Due"} value={format(sla, "dd MMM")} tone={overdue ? "danger" : undefined} />
+            <Stat label={overdue ? "Overdue since" : "Due"} value={format(sla, "d MMM")} tone={overdue ? "danger" : undefined} />
           ) : null}
         </dl>
       </div>
 
       <Tabs key={initialTab} defaultValue={initialTab}>
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="applicant">Applicant</TabsTrigger>
-          <TabsTrigger value="documents">
-            Documents
-            {pendingReview > 0 ? (
-              <span className="ml-1 rounded-full bg-brand-gold/15 px-1.5 text-[11px] font-semibold text-brand-gold tabular-nums">
-                {pendingReview}
-              </span>
-            ) : null}
-          </TabsTrigger>
-          {showAppointments ? <TabsTrigger value="appointments">Appointments</TabsTrigger> : null}
-          <TabsTrigger value="submission">Submission</TabsTrigger>
-          <TabsTrigger value="decision">Decision</TabsTrigger>
-          {showPassport ? <TabsTrigger value="passport">Passport</TabsTrigger> : null}
-          <TabsTrigger value="payment">Payment</TabsTrigger>
-          <TabsTrigger value="messages">
-            Messages
-            {awaitingReply ? <span className="ml-1 size-1.5 rounded-full bg-brand-gold" aria-label="Awaiting reply" /> : null}
-          </TabsTrigger>
-          {can("visa.notes.read") ? <TabsTrigger value="notes">Notes</TabsTrigger> : null}
-          <TabsTrigger value="activity">Activity</TabsTrigger>
-        </TabsList>
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="applicant">Applicant</TabsTrigger>
+            <TabsTrigger value="documents">
+              Documents
+              {pendingReview > 0 ? (
+                <Badge variant="warning" className="tabular-nums">
+                  {pendingReview}
+                </Badge>
+              ) : null}
+            </TabsTrigger>
+            {showAppointments ? <TabsTrigger value="appointments">Appointments</TabsTrigger> : null}
+            <TabsTrigger value="submission">Submission</TabsTrigger>
+            <TabsTrigger value="decision">Decision</TabsTrigger>
+            {showPassport ? <TabsTrigger value="passport">Passport</TabsTrigger> : null}
+            <TabsTrigger value="payment">Payment</TabsTrigger>
+            <TabsTrigger value="messages">
+              Messages
+              {awaitingReply ? (
+                <span className="size-1.5 rounded-full bg-brand-gold" role="img" aria-label="Awaiting reply" />
+              ) : null}
+            </TabsTrigger>
+            {can("visa.notes.read") ? <TabsTrigger value="notes">Notes</TabsTrigger> : null}
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview" className="mt-4">
           <OverviewTab data={data} actions={actions} />

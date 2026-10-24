@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { Check, X, DollarSign } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Check, X } from "lucide-react";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { SubmitButton } from "@/components/submit-button";
 import {
   updateHotelBookingStatus,
@@ -17,6 +17,7 @@ import {
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { toast } from "sonner";
 import type { ActionState } from "@/lib/auth/actions";
+import { money } from "@/lib/money";
 
 /**
  * Wraps a server action so success raises a toast from the call itself — the
@@ -68,13 +69,13 @@ export function QueueEntryActions({ kind, bookingId }: { kind: QueueKind; bookin
   const error = confirmState?.error ?? declineState?.error;
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
+    <div className="flex flex-col items-start gap-1.5 sm:items-end">
       <div className="flex items-center gap-2">
         <form action={confirmAction}>
           <input type="hidden" name="bookingId" value={bookingId} />
           <input type="hidden" name="status" value="confirmed" />
-          <SubmitButton size="sm" pendingText="Confirming…" className="gap-1">
-            <Check className="size-3.5" /> Confirm
+          <SubmitButton pendingText="Confirming…">
+            <Check aria-hidden="true" /> Confirm
           </SubmitButton>
         </form>
         <form action={declineAction}>
@@ -84,15 +85,18 @@ export function QueueEntryActions({ kind, bookingId }: { kind: QueueKind; bookin
             title="Decline this request?"
             confirmLabel="Decline"
             icon="x"
-            size="sm"
             variant="outline"
-            className="gap-1 text-destructive hover:text-destructive"
+            className="text-destructive hover:text-destructive"
           >
-            <X className="size-3.5" /> Decline
+            <X aria-hidden="true" /> Decline
           </ConfirmButton>
         </form>
       </div>
-      {error ? <p className="max-w-64 text-right text-xs text-destructive">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="max-w-64 text-xs text-destructive sm:text-right">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -116,29 +120,39 @@ export function PriceQuoteForm({
 }) {
   const action = PRICE_ACTIONS[kind];
   const [state, formAction] = useActionState(
-    withToast(action, (fd) => `Price set to ${currency} ${Number(fd.get("price")).toFixed(2)}.`),
+    withToast(action, (fd) => `Price set to ${money(Number(fd.get("price")), currency)}.`),
     null
   );
 
   return (
-    <form action={formAction} className="flex flex-col items-end gap-1">
+    <form action={formAction} className="flex flex-col items-start gap-1 sm:items-end">
       <input type="hidden" name="bookingId" value={bookingId} />
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-muted-foreground">{currency}</span>
-        <Input
-          name="price"
-          type="number"
-          min={0}
-          step="0.01"
-          defaultValue={currentPrice > 0 ? currentPrice.toFixed(2) : ""}
-          placeholder="Final price"
-          className="h-8 w-28 text-right"
-        />
-        <SubmitButton size="sm" variant="outline" pendingText="Saving…" className="gap-1">
-          <DollarSign className="size-3.5" /> Quote
+      <div className="flex items-center gap-2">
+        <InputGroup className="w-36 max-sm:h-10">
+          <InputGroupAddon>
+            <InputGroupText>{currency}</InputGroupText>
+          </InputGroupAddon>
+          <InputGroupInput
+            name="price"
+            type="number"
+            min={0}
+            step="0.01"
+            defaultValue={currentPrice > 0 ? currentPrice.toFixed(2) : ""}
+            placeholder="Final price"
+            aria-label={`Final price (${currency})`}
+            aria-invalid={state?.error ? true : undefined}
+            className="text-right tabular-nums"
+          />
+        </InputGroup>
+        <SubmitButton variant="outline" pendingText="Saving…">
+          Quote
         </SubmitButton>
       </div>
-      {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
+      {state?.error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {state.error}
+        </p>
+      ) : null}
     </form>
   );
 }

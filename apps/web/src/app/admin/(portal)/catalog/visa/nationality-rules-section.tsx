@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { SubmitButton } from "@/components/submit-button";
 import { countryName, COUNTRY_OPTIONS } from "@/lib/countries";
+import { money } from "@/lib/money";
 import { documentSlotsToRows } from "@/modules/admin/visa-type-utils";
 import { DocumentSlotsField } from "./document-slots-field";
 import {
@@ -25,6 +26,7 @@ import {
 } from "@/modules/admin/visa-nationality-rule-actions";
 import type { Database } from "@/lib/types/database.types";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 type Rule = Database["public"]["Tables"]["visa_nationality_rules"]["Row"];
 
@@ -51,19 +53,17 @@ function RuleDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          rule ? (
-            <Button size="sm" variant="ghost" className="gap-1">
-              <Pencil className="size-3.5" /> Edit
-            </Button>
-          ) : (
-            <Button size="sm" variant="outline" className="gap-1.5">
-              <Plus className="size-3.5" /> Add nationality rule
-            </Button>
-          )
-        }
-      />
+      {rule ? (
+        <DialogTrigger
+          render={<Button size="icon" variant="ghost" aria-label={`Edit ${countryName(rule.nationality_code)} rule`} title="Edit" />}
+        >
+          <Pencil />
+        </DialogTrigger>
+      ) : (
+        <DialogTrigger render={<Button variant="outline" />}>
+          <Plus aria-hidden="true" /> Add nationality rule
+        </DialogTrigger>
+      )}
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{rule ? `Rule for ${countryName(rule.nationality_code)}` : "Add nationality rule"}</DialogTitle>
@@ -75,13 +75,13 @@ function RuleDialog({
           {rule ? (
             <input type="hidden" name="nationalityCode" value={rule.nationality_code} />
           ) : (
-            <div className="space-y-1.5">
-              <Label htmlFor="nationalityCode">Nationality</Label>
+            <Field>
+              <FieldLabel htmlFor="nationalityCode">Nationality</FieldLabel>
               <select
                 id="nationalityCode"
                 name="nationalityCode"
                 required
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className={NATIVE_SELECT_CLASS}
                 defaultValue=""
               >
                 <option value="" disabled>
@@ -93,12 +93,12 @@ function RuleDialog({
                   </option>
                 ))}
               </select>
-            </div>
+            </Field>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="price">Price override ({visaCurrency})</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <Field>
+              <FieldLabel htmlFor="price">Price override ({visaCurrency})</FieldLabel>
               <Input
                 id="price"
                 name="price"
@@ -108,9 +108,9 @@ function RuleDialog({
                 placeholder="Inherit default"
                 defaultValue={rule?.price ?? ""}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="processingFee">Processing fee override</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="processingFee">Processing fee override</FieldLabel>
               <Input
                 id="processingFee"
                 name="processingFee"
@@ -120,9 +120,9 @@ function RuleDialog({
                 placeholder="Inherit default"
                 defaultValue={rule?.processing_fee ?? ""}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="processingDaysMin">Processing days — min</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="processingDaysMin">Min processing days</FieldLabel>
               <Input
                 id="processingDaysMin"
                 name="processingDaysMin"
@@ -131,9 +131,9 @@ function RuleDialog({
                 placeholder="Inherit default"
                 defaultValue={rule?.processing_days_min ?? ""}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="processingDaysMax">Processing days — max</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="processingDaysMax">Max processing days</FieldLabel>
               <Input
                 id="processingDaysMax"
                 name="processingDaysMax"
@@ -142,11 +142,11 @@ function RuleDialog({
                 placeholder="Inherit default"
                 defaultValue={rule?.processing_days_max ?? ""}
               />
-            </div>
+            </Field>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="eligibilityRequirements">Eligibility override</Label>
+          <Field>
+            <FieldLabel htmlFor="eligibilityRequirements">Eligibility override</FieldLabel>
             <Textarea
               id="eligibilityRequirements"
               name="eligibilityRequirements"
@@ -154,15 +154,15 @@ function RuleDialog({
               placeholder="Inherit default"
               defaultValue={rule?.eligibility_requirements ?? ""}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-1.5">
-            <Label>Document override</Label>
+          <Field>
+            <p className="text-sm font-medium">Document override</p>
             <DocumentSlotsField
               name="requiredDocuments"
               initialRows={rule?.required_documents ? documentSlotsToRows(rule.required_documents) : []}
             />
-          </div>
+          </Field>
 
           {state?.error ? (
             <Alert variant="destructive">
@@ -170,7 +170,7 @@ function RuleDialog({
             </Alert>
           ) : null}
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
@@ -194,19 +194,19 @@ export function NationalityRulesSection({
   const existingCodes = rules.map((r) => r.nationality_code);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {rules.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No nationality overrides.</p>
+        <p className="text-sm text-muted-foreground">No nationality overrides</p>
       ) : (
-        <div className="divide-y divide-border rounded-lg border border-border">
+        <ul className="divide-y divide-border">
           {rules.map((rule) => (
-            <div key={rule.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+            <li key={rule.id} className="flex items-center justify-between gap-3 py-2.5 text-sm first:pt-0">
               <div className="min-w-0">
                 <p className="font-medium">{countryName(rule.nationality_code)}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground tabular-nums">
                   {[
-                    rule.price !== null ? `${visaCurrency} ${Number(rule.price).toFixed(0)}` : null,
-                    rule.processing_fee !== null ? `fee ${visaCurrency} ${Number(rule.processing_fee).toFixed(0)}` : null,
+                    rule.price !== null ? money(rule.price, visaCurrency) : null,
+                    rule.processing_fee !== null ? `Fee ${money(rule.processing_fee, visaCurrency)}` : null,
                     rule.processing_days_min !== null ? `${rule.processing_days_min}–${rule.processing_days_max ?? rule.processing_days_min}d` : null,
                     Array.isArray(rule.required_documents) && rule.required_documents.length > 0
                       ? `${rule.required_documents.length} custom doc(s)`
@@ -221,14 +221,20 @@ export function NationalityRulesSection({
                 <form action={deleteVisaNationalityRule}>
                   <input type="hidden" name="ruleId" value={rule.id} />
                   <input type="hidden" name="visaTypeId" value={visaTypeId} />
-                  <ConfirmButton title="Delete this nationality rule?" size="sm" variant="ghost" className="gap-1 text-destructive">
-                    <Trash2 className="size-3.5" /> Delete
+                  <ConfirmButton
+                    title="Delete this nationality rule?"
+                    aria-label={`Delete ${countryName(rule.nationality_code)} rule`}
+                    size="icon"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 />
                   </ConfirmButton>
                 </form>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
       <RuleDialog visaTypeId={visaTypeId} visaCurrency={visaCurrency} existingCodes={existingCodes} />
     </div>

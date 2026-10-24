@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { format } from "date-fns";
-import { Monitor, ShieldCheck } from "lucide-react";
+import { Monitor } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { listVerifiedFactors } from "@/lib/auth/mfa";
@@ -10,7 +10,9 @@ import {
   DeleteAccountCard,
   SignOutEverywhereButton,
 } from "@/modules/auth/components/security-panels";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Badge } from "@/components/ui/badge";
 
 export const metadata: Metadata = { title: "Security" };
@@ -71,44 +73,46 @@ export default async function AccountSecurityPage() {
   const logins = loginsRes.data ?? [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Security</h1>
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <PageHeader title="Security" />
+
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <ChangePasswordCard />
+        <MfaSettings
+          factors={factors.map((f) => ({ id: f.id, friendly_name: f.friendly_name ?? null }))}
+        />
       </div>
-
-      <ChangePasswordCard />
-
-      <MfaSettings
-        factors={factors.map((f) => ({ id: f.id, friendly_name: f.friendly_name ?? null }))}
-      />
 
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <CardTitle className="flex items-center gap-2">
-              <Monitor className="size-5 text-muted-foreground" /> Recent sign-ins
-            </CardTitle>
+          <CardTitle>Recent sign-ins</CardTitle>
+          <CardAction>
             <SignOutEverywhereButton />
-          </div>
+          </CardAction>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="px-0">
           {logins.length === 0 ? (
-            <p className="px-6 pb-6 text-sm text-muted-foreground">
-              No sign-ins recorded yet. This list starts filling from your next sign-in.
-            </p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Monitor />
+                </EmptyMedia>
+                <EmptyTitle>No sign-ins recorded</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <ul className="divide-y divide-border border-t border-border">
               {logins.map((login, index) => (
                 <li
                   key={login.id}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3"
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{describeDevice(login.user_agent)}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-muted-foreground tabular-nums">
                       {format(new Date(login.created_at), "d MMM yyyy, HH:mm")}
                       {login.ip_address ? ` · ${login.ip_address}` : ""}
-                      {login.portal ? ` · ${login.portal}` : ""}
+                      {login.portal ? <span className="capitalize">{` · ${login.portal}`}</span> : null}
                     </p>
                   </div>
                   {index === 0 ? <Badge variant="secondary">Most recent</Badge> : null}
@@ -116,24 +120,6 @@ export default async function AccountSecurityPage() {
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShieldCheck className="size-5 text-muted-foreground" /> Keeping your account safe
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>
-            STS will never ask for your password, your mobile-money PIN, or a two-factor code by
-            phone, WhatsApp or email. Anyone who does is not us.
-          </p>
-          <p>
-            Your passport scans and travel documents stay private to your account — staff only see a
-            document once you attach it to a specific application.
-          </p>
         </CardContent>
       </Card>
 

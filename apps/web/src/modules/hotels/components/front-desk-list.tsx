@@ -3,9 +3,16 @@
 import { useMemo, useState } from "react";
 import { LogIn, LogOut, Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { SubmitButton } from "@/components/submit-button";
+import { shortDate } from "@/lib/money";
 import {
   Table,
   TableBody,
@@ -62,119 +69,92 @@ export function FrontDeskList({
 
   return (
     <Card className="overflow-hidden py-0">
-      <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-border !py-4">
+      <CardHeader className="border-b border-border pt-4 pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           {title}
-          <Badge variant="secondary">{bookings.length}</Badge>
+          <Badge variant="secondary" className="tabular-nums">
+            {bookings.length}
+          </Badge>
         </CardTitle>
         {bookings.length > 0 ? (
-          <div className="relative w-48">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search guest"
-              className="h-8 pl-8 pr-7 text-sm"
-            />
-            {query ? (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                aria-label="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-3.5" />
-              </button>
-            ) : null}
-          </div>
+          <CardAction className="w-40 sm:w-48">
+            <InputGroup className="h-8 max-sm:h-10">
+              <InputGroupAddon>
+                <Search aria-hidden="true" />
+              </InputGroupAddon>
+              <InputGroupInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search guest"
+                aria-label={`Search ${title.toLowerCase()}`}
+              />
+              {query ? (
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton size="icon-xs" aria-label="Clear search" onClick={() => setQuery("")}>
+                    <X aria-hidden="true" />
+                  </InputGroupButton>
+                </InputGroupAddon>
+              ) : null}
+            </InputGroup>
+          </CardAction>
         ) : null}
       </CardHeader>
       <CardContent className="p-0">
         {bookings.length === 0 ? (
-          <p className="px-6 py-6 text-sm text-muted-foreground">
-            {emptyLabel}
-          </p>
+          <Empty>
+            <EmptyMedia variant="icon">{mode === "arriving" ? <LogIn /> : <LogOut />}</EmptyMedia>
+            <EmptyTitle>{emptyLabel}</EmptyTitle>
+          </Empty>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Guest</TableHead>
-                  <TableHead>Adults</TableHead>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="pl-4">Guest</TableHead>
+                  <TableHead className="text-right">Adults</TableHead>
                   <TableHead>Room</TableHead>
-                  <TableHead>
-                    {mode === "arriving" ? "Check-out" : "Check-in"}
-                  </TableHead>
-                  <TableHead className="text-right">
-                    {mode === "arriving" ? "Registration" : "Departure"}
+                  <TableHead>{mode === "arriving" ? "Check-out" : "Check-in"}</TableHead>
+                  <TableHead className="pr-4 text-right">
+                    <span className="sr-only">Actions</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center text-sm text-muted-foreground"
-                    >
-                      No guests match “{query}”.
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                      No match for “{query}”
                     </TableCell>
                   </TableRow>
                 ) : (
                   filtered.map((b) => {
-                    const registered =
-                      mode === "arriving"
-                        ? b.checked_in_at !== null
-                        : b.checked_out_at !== null;
+                    const registered = mode === "arriving" ? b.checked_in_at !== null : b.checked_out_at !== null;
                     return (
                       <TableRow key={b.id}>
-                        <TableCell className="font-medium">
-                          {hotelGuestNames(b.guest_details)[0] ?? "Guest"}
+                        <TableCell className="pl-4 font-medium">{hotelGuestNames(b.guest_details)[0] ?? "Guest"}</TableCell>
+                        <TableCell className="text-right tabular-nums">{b.num_adults}</TableCell>
+                        <TableCell className="text-muted-foreground">{b.hotel_rooms?.name ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground tabular-nums">
+                          {shortDate(mode === "arriving" ? b.check_out : b.check_in)}
                         </TableCell>
-                        <TableCell>{b.num_adults}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {b.hotel_rooms?.name ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {mode === "arriving" ? b.check_out : b.check_in}
-                        </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="pr-4 text-right">
                           {!canEdit ? null : registered ? (
-                            <span className="text-xs text-muted-foreground">
-                              {mode === "arriving"
-                                ? "Checked in"
-                                : "Checked out"}
-                            </span>
+                            <Badge variant={mode === "arriving" ? "success" : "neutral"}>
+                              {mode === "arriving" ? "Checked in" : "Checked out"}
+                            </Badge>
                           ) : mode === "arriving" ? (
                             <form action={checkInBooking}>
-                              <input
-                                type="hidden"
-                                name="bookingId"
-                                value={b.id}
-                              />
-                              <Button
-                                type="submit"
-                                size="sm"
-                                className="gap-1.5"
-                              >
-                                <LogIn className="size-3.5" /> Check in
-                              </Button>
+                              <input type="hidden" name="bookingId" value={b.id} />
+                              <SubmitButton size="sm" pendingText="Checking in…">
+                                <LogIn aria-hidden="true" /> Check in
+                              </SubmitButton>
                             </form>
                           ) : (
                             <form action={checkOutBooking}>
-                              <input
-                                type="hidden"
-                                name="bookingId"
-                                value={b.id}
-                              />
-                              <Button
-                                type="submit"
-                                size="sm"
-                                variant="outline"
-                                className="gap-1.5"
-                              >
-                                <LogOut className="size-3.5" /> Check out
-                              </Button>
+                              <input type="hidden" name="bookingId" value={b.id} />
+                              <SubmitButton size="sm" variant="outline" pendingText="Checking out…">
+                                <LogOut aria-hidden="true" /> Check out
+                              </SubmitButton>
                             </form>
                           )}
                         </TableCell>

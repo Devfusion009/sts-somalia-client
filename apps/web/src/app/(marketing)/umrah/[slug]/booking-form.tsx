@@ -2,12 +2,13 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, BedDouble, CalendarDays, User, Users } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { ArrowRight, BedDouble, CalendarDays, CalendarX2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Field as UiField, FieldError, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -36,12 +37,13 @@ function seatsLeftOn(d: Departure) {
   return d.total_seats - d.booked_seats - d.offline_seats;
 }
 
+// parseISO keeps a yyyy-MM-dd departure on its calendar day in every timezone.
 function formatDate(date: string) {
-  return new Date(date).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return format(parseISO(date), "d MMM yyyy");
+}
+
+function money(amount: number, currency: string) {
+  return `${currency} ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 }
 
 function SectionHeading({ index, title }: { index: number; title: string }) {
@@ -66,13 +68,13 @@ function Field({
   className?: string;
 }) {
   return (
-    <div className={cn("space-y-1.5", className)}>
-      <Label htmlFor={htmlFor}>
+    <UiField className={className}>
+      <FieldLabel htmlFor={htmlFor}>
         {label}
         {required ? <span className="text-destructive"> *</span> : null}
-      </Label>
+      </FieldLabel>
       {children}
-    </div>
+    </UiField>
   );
 }
 
@@ -132,9 +134,14 @@ export function BookingForm({
 
   if (departures.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-        No upcoming departures.
-      </p>
+      <Empty className="border border-dashed border-border">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <CalendarX2 />
+          </EmptyMedia>
+          <EmptyTitle className="text-base">No upcoming departures</EmptyTitle>
+        </EmptyHeader>
+      </Empty>
     );
   }
 
@@ -153,32 +160,26 @@ export function BookingForm({
                 key={d.id}
                 type="button"
                 disabled={full}
+                aria-pressed={active}
                 onClick={() => setSelectedId(d.id)}
                 className={cn(
-                  "rounded-xl border bg-card p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-50",
+                  "rounded-xl border bg-card p-4 text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
                   active
                     ? "border-primary shadow-sm ring-2 ring-primary/20"
                     : "border-border hover:border-primary/40"
                 )}
               >
-                <p className="flex items-center gap-1.5 text-sm font-semibold">
-                  <CalendarDays className="size-4 text-primary" />
+                <p className="flex items-center gap-1.5 text-sm font-semibold tabular-nums">
+                  <CalendarDays className="size-4 text-primary" aria-hidden="true" />
                   {formatDate(d.departure_date)} – {formatDate(d.return_date)}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {currency} {priceFor(d).toFixed(0)} / pilgrim
+                <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                  {money(priceFor(d), currency)} / pilgrim
                 </p>
                 <Badge
-                  className={cn(
-                    "mt-2 gap-1 border-transparent",
-                    full
-                      ? "bg-destructive/10 text-destructive"
-                      : left <= 10
-                        ? "bg-brand-accent/10 text-brand-accent"
-                        : "bg-primary/10 text-primary"
-                  )}
+                  variant={full ? "destructive" : left <= 10 ? "warning" : "success"}
+                  className="mt-2 tabular-nums"
                 >
-                  <Users className="size-3" />
                   {full ? "Fully booked" : `${left} seats left`}
                 </Badge>
               </button>
@@ -201,18 +202,18 @@ export function BookingForm({
                   aria-pressed={active}
                   onClick={() => setSharing(rate.sharing)}
                   className={cn(
-                    "rounded-xl border bg-card p-4 text-left transition-all",
+                    "rounded-xl border bg-card p-4 text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                     active
                       ? "border-primary shadow-sm ring-2 ring-primary/20"
                       : "border-border hover:border-primary/40"
                   )}
                 >
                   <p className="flex items-center gap-1.5 text-sm font-semibold">
-                    <BedDouble className="size-4 text-primary" />
+                    <BedDouble className="size-4 text-primary" aria-hidden="true" />
                     {sharingLabel(rate.sharing)}
                   </p>
-                  <p className="mt-1 font-heading text-base font-bold text-primary">
-                    {currency} {rate.price.toFixed(0)}
+                  <p className="mt-1 font-heading text-base font-bold tabular-nums text-primary">
+                    {money(rate.price, currency)}
                     <span className="text-xs font-normal text-muted-foreground"> / pilgrim</span>
                   </p>
                 </button>
@@ -230,32 +231,32 @@ export function BookingForm({
             id="num_pilgrims"
             name="num_pilgrims"
             type="number"
+            inputMode="numeric"
             min={1}
             max={Math.max(seatsLeft, 1)}
+            className="tabular-nums"
             value={numPilgrims}
             onChange={(e) => setNumPilgrims(Math.max(1, Number(e.target.value) || 1))}
           />
         </Field>
 
-        <div className="space-y-4">
+        <div className="divide-y divide-border">
           {Array.from({ length: numPilgrims }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-border">
-              <p className="flex items-center gap-2 border-b border-border px-4 py-2.5 text-sm font-bold">
-                <span className="flex size-6 items-center justify-center rounded-full bg-secondary text-primary">
-                  <User className="size-3.5" />
+            <fieldset key={i} className="min-w-0 space-y-4 py-5 first:pt-2 last:pb-0">
+              <legend className="contents">
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-muted text-xs tabular-nums text-foreground">
+                    {i + 1}
+                  </span>
+                  Pilgrim {i + 1}
+                  {i === 0 ? <Badge variant="info">Lead pilgrim</Badge> : null}
                 </span>
-                Pilgrim {i + 1}
-                {i === 0 ? (
-                  <Badge className="border-transparent bg-chart-3/10 text-[10px] text-chart-3">
-                    Lead pilgrim
-                  </Badge>
-                ) : null}
-              </p>
-              <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
+              </legend>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Full name (as in passport)" htmlFor={`pilgrim_${i}_full_name`} required className="sm:col-span-2">
                   <Input id={`pilgrim_${i}_full_name`} name={`pilgrim_${i}_full_name`} placeholder="Enter full name" required />
                 </Field>
-                <Field label="Gender" required>
+                <Field label="Gender" htmlFor={`pilgrim_${i}_gender`} required>
                   <Select name={`pilgrim_${i}_gender`} defaultValue="male">
                     <SelectTrigger id={`pilgrim_${i}_gender`} className="w-full">
                       <SelectValue />
@@ -285,7 +286,7 @@ export function BookingForm({
                   <Input id={`pilgrim_${i}_mahram_relation`} name={`pilgrim_${i}_mahram_relation`} />
                 </Field>
               </div>
-            </div>
+            </fieldset>
           ))}
         </div>
       </section>
@@ -296,31 +297,27 @@ export function BookingForm({
           id="special_requests"
           name="special_requests"
           rows={3}
+          aria-label="Special requests"
           placeholder="Wheelchair access, dietary needs, room preferences"
         />
       </section>
 
-      {state?.error ? (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      ) : null}
+      <FieldError>{state?.error}</FieldError>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-secondary/40 p-4">
-        <div>
+      <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-card p-4 shadow-md ring-1 ring-foreground/10">
+        <div className="min-w-0">
           <p className="text-sm text-muted-foreground">
             Total for {numPilgrims} pilgrim{numPilgrims > 1 ? "s" : ""}
           </p>
-          <p className="font-heading text-2xl font-bold text-primary">
-            {currency} {totalPrice.toFixed(0)}
+          <p className="font-heading text-2xl font-bold tabular-nums text-primary">
+            {money(totalPrice, currency)}
           </p>
-          <p className="text-xs text-muted-foreground">
-            {currency} {unitPrice.toFixed(0)} × {numPilgrims}
+          <p className="text-xs text-muted-foreground tabular-nums">
+            {money(unitPrice, currency)} × {numPilgrims}
             {selectedRate ? ` · ${sharingLabel(selectedRate.sharing)}` : ""}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center">
           {bookedForSlot ? (
             <SubmitButton
               name="intent"
@@ -333,8 +330,8 @@ export function BookingForm({
               Hold 24h
             </SubmitButton>
           ) : null}
-          <SubmitButton size="lg" disabled={!selectedId || needsSharing} pendingText="Creating booking…" className="gap-2">
-            Continue to Payment <ArrowRight className="size-4" />
+          <SubmitButton size="lg" disabled={!selectedId || needsSharing} pendingText="Creating booking…">
+            Continue to payment <ArrowRight data-icon="inline-end" aria-hidden="true" />
           </SubmitButton>
         </div>
       </div>

@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Pencil, Plus, Trash2, UserRound } from "lucide-react";
+import { Pencil, Plus, Trash2, UsersRound } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -26,7 +28,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { countryFlag, countryName } from "@/lib/countries";
 import { trpc } from "@/lib/trpc/react";
 import { TravelerFields } from "./traveler-fields";
-import { PassportExpiryBadge } from "./passport-alert";
+import { PassportExpiryAlert, PassportExpiryBadge } from "./passport-alert";
 import type { TravelerProfile } from "../queries";
 
 /**
@@ -44,6 +46,7 @@ export function TravelerManager({ travelers }: { travelers: TravelerProfile[] })
     onSuccess: () => {
       utils.travelers.myTravelers.invalidate();
       setEditing(null);
+      toast.success("Traveler saved.");
     },
   });
 
@@ -51,7 +54,9 @@ export function TravelerManager({ travelers }: { travelers: TravelerProfile[] })
     onSuccess: () => {
       utils.travelers.myTravelers.invalidate();
       setConfirmDelete(null);
+      toast.success("Traveler removed.");
     },
+    onError: (error) => toast.error(error.message),
   });
 
   // async + awaited mutateAsync so SubmitButton's useFormStatus()-based
@@ -79,49 +84,68 @@ export function TravelerManager({ travelers }: { travelers: TravelerProfile[] })
   const companions = travelers.filter((t) => !t.is_self);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {companions.length === 0
-            ? "No saved travelers yet."
-            : `${companions.length} saved traveler${companions.length === 1 ? "" : "s"}.`}
-        </p>
-        <Button onClick={() => setEditing("new")} className="gap-1.5">
-          <Plus className="size-4" /> Add traveler
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Saved travelers"
+        status={companions.length > 0 ? <Badge variant="secondary">{companions.length}</Badge> : null}
+        actions={
+          <Button onClick={() => setEditing("new")}>
+            <Plus data-icon="inline-start" /> Add traveler
+          </Button>
+        }
+      />
+
+      {/* One alert per companion whose passport needs attention, above the
+          list so the warnings are impossible to miss on a long page. */}
+      {companions.map((traveler) => (
+        <PassportExpiryAlert
+          key={traveler.id}
+          expiry={traveler.passport_expiry}
+          subject={`${traveler.full_name}'s passport`}
+        />
+      ))}
 
       {companions.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center gap-3 p-12 text-center">
-            <span className="flex size-12 items-center justify-center rounded-full bg-secondary text-primary">
-              <UserRound className="size-5" />
-            </span>
-            <p className="font-medium">Save the people you travel with</p>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Add a spouse, child or parent once and their passport details will prefill every visa
-              application, Umrah booking and group ticket you make for them.
-            </p>
-            <Button onClick={() => setEditing("new")} className="mt-1 gap-1.5">
-              <Plus className="size-4" /> Add your first traveler
-            </Button>
-          </CardContent>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <UsersRound />
+              </EmptyMedia>
+              <EmptyTitle>No saved travelers</EmptyTitle>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={() => setEditing("new")}>
+                <Plus data-icon="inline-start" /> Add traveler
+              </Button>
+            </EmptyContent>
+          </Empty>
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {companions.map((traveler) => (
-            <Card key={traveler.id}>
-              <CardContent className="flex flex-col gap-3 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-heading font-bold">{traveler.full_name}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground capitalize">
-                      {traveler.relationship}
-                      {traveler.nationality
-                        ? ` · ${countryFlag(traveler.nationality)} ${countryName(traveler.nationality)}`
-                        : ""}
-                    </p>
-                  </div>
+        <Card className="py-0">
+          <ul className="divide-y divide-border">
+            {companions.map((traveler) => (
+              <li
+                key={traveler.id}
+                className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:gap-4 sm:px-5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-heading font-semibold">{traveler.full_name}</p>
+                  <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                    <span className="capitalize">{traveler.relationship}</span>
+                    {traveler.nationality
+                      ? ` · ${countryFlag(traveler.nationality)} ${countryName(traveler.nationality)}`
+                      : ""}
+                    {traveler.passport_number ? (
+                      <>
+                        {" · "}
+                        <span className="font-mono uppercase">{traveler.passport_number}</span>
+                      </>
+                    ) : null}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <PassportExpiryBadge expiry={traveler.passport_expiry} />
                   <div className="flex shrink-0 gap-1">
                     <Button
                       size="icon"
@@ -129,41 +153,31 @@ export function TravelerManager({ travelers }: { travelers: TravelerProfile[] })
                       aria-label={`Edit ${traveler.full_name}`}
                       onClick={() => setEditing(traveler)}
                     >
-                      <Pencil className="size-4" />
+                      <Pencil />
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
+                      className="text-destructive hover:text-destructive"
                       aria-label={`Remove ${traveler.full_name}`}
                       onClick={() => setConfirmDelete(traveler)}
                     >
-                      <Trash2 className="size-4 text-destructive" />
+                      <Trash2 />
                     </Button>
                   </div>
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  {traveler.passport_number ? (
-                    <span className="font-mono uppercase">{traveler.passport_number}</span>
-                  ) : null}
-                  <PassportExpiryBadge expiry={traveler.passport_expiry} />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
       <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {editing === "new" ? "Add a traveler" : `Edit ${editing?.full_name ?? "traveler"}`}
+              {editing === "new" ? "Add traveler" : `Edit ${editing?.full_name ?? "traveler"}`}
             </DialogTitle>
-            <DialogDescription>
-              Enter the details exactly as they appear in this person&apos;s passport — they are
-              copied straight onto visa applications.
-            </DialogDescription>
           </DialogHeader>
 
           {/* Remounted per traveler so the uncontrolled defaultValue inputs
@@ -175,19 +189,18 @@ export function TravelerManager({ travelers }: { travelers: TravelerProfile[] })
             action={handleSubmit}
             className="space-y-4"
           >
-            {save.error ? (
-              <Alert variant="destructive">
-                <AlertDescription>{save.error.message}</AlertDescription>
-              </Alert>
-            ) : null}
-
             <TravelerFields
               traveler={editing === "new" ? null : editing}
               idPrefix={editing === "new" ? "new-traveler" : `traveler-${editing?.id}`}
               showRelationship
             />
 
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-end">
+              {save.error ? (
+                <p role="alert" className="text-sm text-destructive sm:mr-auto">
+                  {save.error.message}
+                </p>
+              ) : null}
               <Button type="button" variant="outline" onClick={() => setEditing(null)}>
                 Cancel
               </Button>
@@ -207,14 +220,14 @@ export function TravelerManager({ travelers }: { travelers: TravelerProfile[] })
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {confirmDelete?.full_name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Their saved passport details will be deleted. Bookings and visa applications already
-              made for them are unaffected — those keep their own copy of the details.
+              Their saved passport details are deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
+              loading={remove.isPending}
               onClick={() => confirmDelete && remove.mutate({ travelerId: confirmDelete.id })}
             >
               Remove traveler
@@ -222,13 +235,6 @@ export function TravelerManager({ travelers }: { travelers: TravelerProfile[] })
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {save.isSuccess ? (
-        <Alert>
-          <CheckCircle2 />
-          <AlertDescription>Traveler saved.</AlertDescription>
-        </Alert>
-      ) : null}
     </div>
   );
 }

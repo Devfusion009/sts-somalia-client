@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { getBookingCustomers } from "@/modules/agencies/booking-context";
 import { BookingContextBar } from "@/modules/agencies/components/booking-context-bar";
+import { DeskSteps } from "./desk-steps";
 
 export default async function BookingDeskLayout({
   children,
@@ -20,9 +21,12 @@ export default async function BookingDeskLayout({
 
   return (
     <div className="space-y-6">
-      {customers.length > 0 ? (
-        <BookingContextBar customers={customers} available={available} />
-      ) : null}
+      <div className="space-y-3">
+        <DeskSteps hasCustomer={customers.length > 0} />
+        {customers.length > 0 ? (
+          <BookingContextBar customers={customers} available={available} />
+        ) : null}
+      </div>
       {children}
     </div>
   );

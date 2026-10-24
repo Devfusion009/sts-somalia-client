@@ -2,8 +2,9 @@
 
 import { useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
-import { Ban, Loader2, Trash2, X } from "lucide-react";
+import { Ban, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -72,7 +73,7 @@ export function ConfirmButton({
         disabled={disabled || busy}
         onClick={() => setOpen(true)}
       >
-        {busy ? <Loader2 className="size-3.5 animate-spin" /> : children}
+        {busy ? <Spinner className="size-3.5" /> : children}
       </Button>
       <ConfirmDialog
         open={open}

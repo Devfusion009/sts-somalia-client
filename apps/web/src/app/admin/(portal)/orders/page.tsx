@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import {
-  BadgeCheck,
   Building2,
   CalendarRange,
   Download,
@@ -13,12 +11,14 @@ import {
   Plane,
   Receipt,
   Users,
-  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { StatTile } from "@/components/dashboard/stat-tile";
+import { FilterChips } from "@/components/dashboard/filter-chips";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { getOrderQueue, getOrdersByIds } from "@/modules/admin/queries";
 import { describeOrderItem, travelWindow, travelLength, orderTravelStart } from "@/modules/admin/order-items";
@@ -28,6 +28,7 @@ import { OrderStatusSelect } from "./order-status-select";
 import { RecordPaymentDialog } from "./record-payment-dialog";
 import { ConfirmPaymentButton } from "./confirm-payment-button";
 import { cn } from "@/lib/utils";
+import { money } from "@/lib/money";
 
 export const metadata = { title: "Orders & Payments" };
 
@@ -39,25 +40,8 @@ const ITEM_ICON: Record<string, LucideIcon> = {
   hall: PartyPopper,
 };
 
-const PAYMENT_STATUS_STYLES: Record<string, string> = {
-  succeeded: "bg-primary/10 text-primary",
-  requires_action: "bg-brand-gold/15 text-brand-gold",
-  processing: "bg-chart-3/10 text-chart-3",
-  failed: "bg-destructive/10 text-destructive",
-  refunded: "bg-muted text-muted-foreground",
-  partially_refunded: "bg-muted text-muted-foreground",
-};
-
-const ORDER_STATUS_STYLES: Record<string, string> = {
-  paid: "bg-primary/10 text-primary",
-  completed: "bg-primary/10 text-primary",
-  processing: "bg-chart-3/10 text-chart-3",
-  pending_payment: "bg-brand-gold/15 text-brand-gold",
-  partially_paid: "bg-brand-gold/15 text-brand-gold",
-  held: "bg-brand-gold/15 text-brand-gold",
-  cancelled: "bg-destructive/10 text-destructive",
-  refunded: "bg-muted text-muted-foreground",
-};
+/** Payment rows: a manual payment waiting on staff is the one to act on. */
+const PAYMENT_STATUS_VARIANT = { requires_action: "warning", partially_refunded: "neutral" } as const;
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -68,10 +52,6 @@ const FILTERS = [
   { key: "paid", label: "Paid" },
   { key: "cancelled", label: "Cancelled" },
 ] as const;
-
-function money(amount: number | string, currency: string) {
-  return `${currency} ${Number(amount).toFixed(2)}`;
-}
 
 export default async function AdminOrdersPage({
   searchParams,
@@ -90,74 +70,56 @@ export default async function AdminOrdersPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold">Orders &amp; Payments</h1>
-      </div>
+      <PageHeader title="Orders & Payments" />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile icon={Receipt} label="Orders" value={String(queue.total)} />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatTile label="Orders" value={queue.total.toLocaleString("en-US")} />
         <StatTile
-          icon={Wallet}
           label="Settled revenue"
-          value={`USD ${queue.settledRevenue.toFixed(0)}`}
+          value={`USD ${Math.round(queue.settledRevenue).toLocaleString("en-US")}`}
           hint={`${queue.settledCount} paid`}
         />
         <StatTile
-          icon={BadgeCheck}
           label="Awaiting confirmation"
           value={String(queue.action)}
           hint="bank transfer / cash"
           tone={queue.action > 0 ? "warn" : undefined}
         />
         <StatTile
-          icon={CalendarRange}
           label="Travelling within 30 days"
           value={String(queue.upcoming)}
-          tone={queue.upcoming > 0 ? "accent" : undefined}
+          tone={queue.upcoming > 0 ? "primary" : undefined}
         />
       </div>
 
-      <nav className="flex flex-wrap gap-2" aria-label="Filter orders">
-        {FILTERS.map((f) => {
-          const active = f.key === filter;
-          const count =
+      <FilterChips
+        label="Filter orders"
+        active={filter}
+        showZero
+        items={FILTERS.map((f) => ({
+          key: f.key,
+          label: f.label,
+          href: `/orders?filter=${f.key}`,
+          count:
             f.key === "all"
               ? queue.total
               : f.key === "action"
                 ? queue.action
                 : f.key === "upcoming"
                   ? queue.upcoming
-                  : (queue.byStatus[f.key] ?? 0);
-          return (
-            <Link
-              key={f.key}
-              href={`/orders?filter=${f.key}`}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
-                active
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-              )}
-            >
-              {f.label}
-              <span
-                className={cn(
-                  "rounded-full px-1.5 text-xs tabular-nums",
-                  active ? "bg-primary-foreground/20" : "bg-secondary"
-                )}
-              >
-                {count}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
+                  : (queue.byStatus[f.key] ?? 0),
+        }))}
+      />
 
       {visible.length === 0 ? (
         <Card>
-          <CardContent className="py-16 text-center">
-            <p className="text-sm font-medium">{queue.total === 0 ? "No orders yet." : "No orders match this filter."}</p>
+          <CardContent>
+            <Empty>
+              <EmptyMedia variant="icon">
+                <Receipt />
+              </EmptyMedia>
+              <EmptyTitle>{queue.total === 0 ? "No orders" : "No orders match this filter"}</EmptyTitle>
+            </Empty>
           </CardContent>
         </Card>
       ) : (
@@ -190,24 +152,19 @@ export default async function AdminOrdersPage({
               >
                 <CardContent className="p-0">
                   {/* Header: who, how much, what state */}
-                  <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border bg-muted/30 px-5 py-4">
+                  <div className="flex flex-col gap-4 border-b border-border bg-muted/30 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-heading font-bold">{order.order_number}</span>
-                        <Badge
-                          className={cn(
-                            "border-transparent capitalize",
-                            ORDER_STATUS_STYLES[order.status] ?? "bg-muted text-muted-foreground"
-                          )}
-                        >
+                        <span className="font-heading font-semibold tabular-nums">{order.order_number}</span>
+                        <Badge variant={statusBadgeVariant(order.status)} className="capitalize">
                           {order.status.replace(/_/g, " ")}
                         </Badge>
                         {order.agency?.name ? (
-                          <Badge className="gap-1 border-transparent bg-primary font-semibold text-primary-foreground">
-                            <Users className="size-3" /> {order.agency.name}
+                          <Badge variant="info">
+                            <Users aria-hidden="true" /> {order.agency.name}
                           </Badge>
                         ) : (
-                          <Badge variant="outline">Direct (B2C)</Badge>
+                          <Badge variant="neutral">Direct (B2C)</Badge>
                         )}
                       </div>
                       {/* On an agency order customer_id holds the agent who placed
@@ -225,9 +182,9 @@ export default async function AdminOrdersPage({
                         {order.customer?.email ? (
                           <a
                             href={`mailto:${order.customer.email}`}
-                            className="flex items-center gap-1 hover:text-foreground"
+                            className="flex min-w-0 items-center gap-1 break-all hover:text-foreground"
                           >
-                            <Mail className="size-3" /> {order.customer.email}
+                            <Mail className="size-3 shrink-0" aria-hidden="true" /> {order.customer.email}
                           </a>
                         ) : null}
                         {order.customer?.phone ? (
@@ -235,27 +192,27 @@ export default async function AdminOrdersPage({
                             href={`tel:${order.customer.phone.replace(/\s/g, "")}`}
                             className="flex items-center gap-1 hover:text-foreground"
                           >
-                            <Phone className="size-3" /> {order.customer.phone}
+                            <Phone className="size-3 shrink-0" aria-hidden="true" /> {order.customer.phone}
                           </a>
                         ) : null}
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-2">
-                      <p className="font-heading text-xl font-bold">
+                    <div className="flex flex-col items-start gap-2 sm:items-end">
+                      <p className="font-heading text-xl font-semibold tabular-nums">
                         {money(order.total, order.currency)}
                       </p>
                       {order.status === "partially_paid" ? (
-                        <p className="text-xs">
+                        <p className="text-xs tabular-nums">
                           <span className="text-muted-foreground">
                             {money(paidTotal, order.currency)} paid ·{" "}
                           </span>
-                          <span className="font-semibold text-brand-gold">
+                          <span className="font-semibold text-foreground">
                             {money(balanceDue, order.currency)} due
                           </span>
                         </p>
                       ) : null}
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground tabular-nums">
                         Placed {format(new Date(order.created_at), "d MMM yyyy")}
                         {order.paid_at
                           ? ` · paid ${format(new Date(order.paid_at), "d MMM")}`
@@ -275,16 +232,14 @@ export default async function AdminOrdersPage({
                       const length = travelLength(d.from, d.to);
 
                       return (
-                        <li key={item.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
+                        <li key={item.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground" aria-hidden="true">
                             <Icon className="size-4" />
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
                               {d.title}
-                              <Badge variant="secondary" className="text-[10px]">
-                                {d.typeLabel}
-                              </Badge>
+                              <Badge variant="neutral">{d.typeLabel}</Badge>
                               {d.status ? (
                                 <span className="text-xs text-muted-foreground capitalize">
                                   {d.status.replace(/_/g, " ")}
@@ -298,21 +253,21 @@ export default async function AdminOrdersPage({
                             </p>
                           </div>
 
-                          <div className="text-right">
+                          <div className="ml-13 sm:ml-0 sm:text-right">
                             {window ? (
-                              <p className="flex items-center justify-end gap-1.5 text-sm font-medium">
-                                <CalendarRange className="size-3.5 text-muted-foreground" />
+                              <p className="flex items-center gap-1.5 text-sm font-medium tabular-nums sm:justify-end">
+                                <CalendarRange className="size-3.5 text-muted-foreground" aria-hidden="true" />
                                 {window}
                               </p>
                             ) : (
-                              <p className="text-xs text-muted-foreground">No travel dates yet</p>
+                              <p className="text-xs text-muted-foreground">No travel dates</p>
                             )}
                             {length ? (
                               <p className="text-xs text-muted-foreground">{length}</p>
                             ) : null}
                           </div>
 
-                          <span className="w-24 text-right text-sm tabular-nums">
+                          <span className="ml-auto min-w-24 text-right text-sm font-medium tabular-nums">
                             {money(item.total_price, order.currency)}
                           </span>
                         </li>
@@ -321,10 +276,10 @@ export default async function AdminOrdersPage({
                   </ul>
 
                   {/* Payments + documents */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-5 py-3">
+                  <div className="flex flex-col gap-3 border-t border-border bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                     <div className="flex min-w-0 flex-col gap-1.5">
                       {order.payments.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">No payment recorded yet.</span>
+                        <span className="text-xs text-muted-foreground">No payments</span>
                       ) : (
                         order.payments.map((payment) => (
                           <div
@@ -342,15 +297,12 @@ export default async function AdminOrdersPage({
                               {money(payment.amount, payment.currency)}
                             </span>
                             <Badge
-                              className={cn(
-                                "border-transparent capitalize",
-                                PAYMENT_STATUS_STYLES[payment.status] ??
-                                  "bg-muted text-muted-foreground"
-                              )}
+                              variant={statusBadgeVariant(payment.status, PAYMENT_STATUS_VARIANT)}
+                              className="capitalize"
                             >
                               {payment.status.replace(/_/g, " ")}
                             </Badge>
-                            <span className="text-muted-foreground">
+                            <span className="text-muted-foreground tabular-nums">
                               {formatDistanceToNowStrict(new Date(payment.created_at))} ago
                             </span>
                             {payment.status === "requires_action" ? (
@@ -361,12 +313,12 @@ export default async function AdminOrdersPage({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {balanceDue > 0.01 && !["cancelled", "refunded"].includes(order.status) ? (
                         <RecordPaymentDialog orderId={order.id} remaining={balanceDue} currency={order.currency} />
                       ) : null}
                       {daysToTravel !== null && daysToTravel >= 0 && daysToTravel <= 30 ? (
-                        <Badge className="border-transparent bg-brand-accent text-brand-accent-foreground">
+                        <Badge variant="warning" className="tabular-nums">
                           {daysToTravel === 0 ? "Departs today" : `Departs in ${daysToTravel}d`}
                         </Badge>
                       ) : null}
@@ -374,7 +326,7 @@ export default async function AdminOrdersPage({
                         <Button
                           size="sm"
                           variant="outline"
-                          className="gap-1.5"
+                          className="tabular-nums"
                           render={
                             <a
                               href={`/api/invoices/${order.id}`}
@@ -383,10 +335,10 @@ export default async function AdminOrdersPage({
                             />
                           }
                         >
-                          <Download className="size-3.5" /> {invoice.invoice_number}
+                          <Download aria-hidden="true" /> {invoice.invoice_number}
                         </Button>
                       ) : (
-                        <span className="text-xs text-muted-foreground">No invoice yet</span>
+                        <span className="text-xs text-muted-foreground">No invoice</span>
                       )}
                     </div>
                   </div>

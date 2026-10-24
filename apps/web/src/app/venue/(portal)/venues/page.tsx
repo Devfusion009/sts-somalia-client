@@ -1,21 +1,17 @@
+import { PartyPopper } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyVenuePartnerId, getMyVenues } from "@/modules/events/venue-partner-queries";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getManagersForVenues } from "@/modules/events/venue-manager-queries";
 import { VenuePartnerForm, type EditableVenue } from "./venue-partner-form";
 import { VenueManagersDialog } from "./venue-managers-dialog";
-import { venueMoney } from "@/modules/events/components/amenities";
+import { priceUnitLabel, venueMoney } from "@/modules/events/components/amenities";
 
 export const metadata = { title: "My Venues" };
-
-const STATUS_BADGE: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  pending_review: "bg-brand-gold/15 text-brand-gold",
-  published: "bg-primary/10 text-primary",
-  suspended: "bg-destructive/10 text-destructive",
-};
 
 export default async function MyVenuesPage() {
   const profile = await requireUser();
@@ -25,18 +21,26 @@ export default async function MyVenuesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold">My Venues</h1>
-        </div>
-        <VenuePartnerForm />
-      </div>
+      <PageHeader
+        title="My Venues"
+        status={
+          venues.length > 0 ? (
+            <Badge variant="secondary" className="tabular-nums">
+              {venues.length}
+            </Badge>
+          ) : null
+        }
+        actions={<VenuePartnerForm />}
+      />
 
       {venues.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No venues yet.
-          </CardContent>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <PartyPopper />
+            </EmptyMedia>
+            <EmptyTitle>No venues</EmptyTitle>
+          </Empty>
         </Card>
       ) : (
         <Card className="overflow-hidden py-0">
@@ -45,35 +49,35 @@ export default async function MyVenuesPage() {
               <TableRow>
                 <TableHead>Venue</TableHead>
                 <TableHead>City</TableHead>
-                <TableHead>Capacity</TableHead>
-                <TableHead>Price</TableHead>
+                <TableHead numeric>Seated</TableHead>
+                <TableHead numeric>Standing</TableHead>
+                <TableHead numeric>Price</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="w-24">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {venues.map((venue) => (
                 <TableRow key={venue.id}>
-                  <TableCell>
-                    <p className="font-medium">{venue.name}</p>
-                    {venue.tagline ? <p className="text-xs text-muted-foreground">{venue.tagline}</p> : null}
+                  <TableCell className="max-w-64">
+                    <p className="truncate font-medium">{venue.name}</p>
+                    {venue.tagline ? <p className="truncate text-xs text-muted-foreground">{venue.tagline}</p> : null}
                   </TableCell>
                   <TableCell>{venue.city}</TableCell>
-                  <TableCell className="text-sm">
-                    {venue.capacity_seated ? `${venue.capacity_seated} seated` : ""}
-                    {venue.capacity_seated && venue.capacity_standing ? " · " : ""}
-                    {venue.capacity_standing ? `${venue.capacity_standing} standing` : ""}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {venueMoney(venue.currency, venue.base_price)}{" "}
-                    <span className="text-xs text-muted-foreground">/ {venue.price_unit.replace("per_", "")}</span>
+                  <TableCell numeric>{venue.capacity_seated ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                  <TableCell numeric>{venue.capacity_standing ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                  <TableCell numeric className="whitespace-nowrap">
+                    {venueMoney(venue.currency, venue.base_price)}
+                    <p className="text-xs text-muted-foreground">{priceUnitLabel(venue.price_unit)}</p>
                   </TableCell>
                   <TableCell>
-                    <Badge className={`border-transparent capitalize ${STATUS_BADGE[venue.status] ?? ""}`}>
+                    <Badge variant={statusBadgeVariant(venue.status)} className="capitalize">
                       {venue.status.replace(/_/g, " ")}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <VenueManagersDialog venueId={venue.id} venueName={venue.name} managers={managers.get(venue.id) ?? []} />
                       <VenuePartnerForm venue={venue as unknown as EditableVenue} />

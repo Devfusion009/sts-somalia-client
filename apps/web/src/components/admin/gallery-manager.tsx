@@ -268,7 +268,7 @@ function UploadRow({
             type="button"
             onClick={() => onRetry(item.key)}
             aria-label={`Retry ${item.name}`}
-            className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <RotateCw className="size-4" />
           </button>
@@ -279,7 +279,7 @@ function UploadRow({
             type="button"
             onClick={() => onCancel(item.key)}
             aria-label={`Cancel ${item.name}`}
-            className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <X className="size-4" />
           </button>
@@ -671,7 +671,7 @@ export function GalleryManager({
                     onClick={() => setCollapsed((c) => !c)}
                     aria-label={collapsed ? "Show files" : "Hide files"}
                     aria-expanded={!collapsed}
-                    className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
                     <ChevronDown className={cn("size-4 transition-transform duration-300", collapsed && "-rotate-90")} />
                   </button>
@@ -679,7 +679,7 @@ export function GalleryManager({
                     type="button"
                     onClick={clearAll}
                     aria-label={inFlight > 0 ? "Cancel uploads" : "Dismiss"}
-                    className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
                     <X className="size-4" />
                   </button>
@@ -711,8 +711,8 @@ export function GalleryManager({
 
         {paths.length === 0 && items.length === 0 ? (
           <div className="flex flex-col items-center gap-1.5 rounded-xl border border-border py-10 text-center">
-            <ImageIcon className="size-7 text-muted-foreground" />
-            <p className="text-sm font-medium">No photos yet</p>
+            <ImageIcon className="size-7 text-muted-foreground" aria-hidden="true" />
+            <p className="text-sm font-medium">No photos</p>
           </div>
         ) : (
           <motion.div layout className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

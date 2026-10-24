@@ -7,7 +7,7 @@ import {
 export default function UmrahRequestsLoading() {
   return (
     <LoadingShell label="Umrah requests">
-      <Title title="Private Umrah requests" badge className="text-xl" />
+      <Title title="Private Umrah requests" badge actions={["w-36"]} />
       <RequestCards rows={4} />
     </LoadingShell>
   );

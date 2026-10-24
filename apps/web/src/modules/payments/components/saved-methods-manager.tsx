@@ -3,17 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Smartphone, Star, Trash2, Pencil } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -53,17 +54,20 @@ export function SavedMethodsManager({ methods }: { methods: SavedPaymentMethod[]
     onSuccess: (result) => {
       if (result.error) return;
       setEditing(null);
+      toast.success("Wallet saved.");
       router.refresh();
     },
   });
   const deleteMethod = trpc.payments.account.deleteWalletMethod.useMutation({
     onSuccess: () => {
       setConfirmDelete(null);
+      toast.success("Wallet removed.");
       router.refresh();
     },
   });
   const setDefaultMethod = trpc.payments.account.setDefaultWalletMethod.useMutation({
     onSuccess: () => router.refresh(),
+    onError: (error) => toast.error(error.message),
   });
 
   async function handleSave(formData: FormData) {
@@ -84,196 +88,172 @@ export function SavedMethodsManager({ methods }: { methods: SavedPaymentMethod[]
     if (!confirmDelete) return;
     try {
       await deleteMethod.mutateAsync({ methodId: confirmDelete.id });
-    } catch {
-      // deletion failing silently matches the prior server-action behavior
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not remove the wallet.");
     }
   }
 
   const saveError = saveMethod.error?.message ?? saveMethod.data?.error ?? null;
 
+  const addButton = (
+    <Button onClick={() => setEditing("new")}>
+      <Plus data-icon="inline-start" /> Add wallet
+    </Button>
+  );
+
   return (
-    <div className="space-y-4">
-      <Alert>
-        <Smartphone />
-        <AlertDescription>
-          We save wallet numbers so checkout can prefill them — never a PIN, and never a card. Every
-          payment is still approved by you on your own handset.
-        </AlertDescription>
-      </Alert>
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {methods.length === 0
-            ? "No saved payment details."
-            : `${methods.length} saved payment method${methods.length === 1 ? "" : "s"}.`}
-        </p>
-        <Button onClick={() => setEditing("new")} className="gap-1.5">
-          <Plus className="size-4" /> Add wallet
-        </Button>
-      </div>
-
-      {methods.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
-            <span className="flex size-12 items-center justify-center rounded-full bg-secondary text-primary">
-              <Smartphone className="size-5" />
-            </span>
-            <p className="font-medium">Save your mobile money number</p>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Add your EVC Plus, ZAAD, Sahal or eDahab number once and it will be filled in for you
-              every time you pay.
-            </p>
-            <Button onClick={() => setEditing("new")} className="mt-1 gap-1.5">
-              <Plus className="size-4" /> Add your first wallet
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {methods.map((method) => (
-            <Card key={method.id}>
-              <CardContent className="flex items-center gap-3 p-5">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
-                  <Smartphone className="size-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 font-medium">
-                    {WALLET_LABELS.get(method.provider) ?? method.provider}
-                    {method.is_default ? (
-                      <Badge variant="secondary" className="gap-1">
-                        <Star className="size-3" /> Default
-                      </Badge>
+    <Card>
+      <CardHeader>
+        <CardTitle>Saved wallets</CardTitle>
+        {methods.length > 0 ? <CardAction>{addButton}</CardAction> : null}
+      </CardHeader>
+      <CardContent className="px-0">
+        {methods.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Smartphone />
+              </EmptyMedia>
+              <EmptyTitle>No saved wallets</EmptyTitle>
+            </EmptyHeader>
+            <EmptyContent>{addButton}</EmptyContent>
+          </Empty>
+        ) : (
+          <ul className="divide-y divide-border border-t border-border">
+            {methods.map((method) => {
+              const name = WALLET_LABELS.get(method.provider) ?? method.provider;
+              return (
+                <li key={method.id} className="flex items-center gap-3 px-4 py-3.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 font-medium">
+                      {name}
+                      {method.is_default ? <Badge variant="secondary">Default</Badge> : null}
+                    </p>
+                    <p className="truncate text-sm text-muted-foreground tabular-nums">
+                      {maskMsisdn(method.msisdn)}
+                      {method.label ? ` · ${method.label}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {!method.is_default ? (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Make ${name} default`}
+                        title="Make default"
+                        disabled={setDefaultMethod.isPending}
+                        onClick={() => setDefaultMethod.mutate({ methodId: method.id })}
+                      >
+                        <Star />
+                      </Button>
                     ) : null}
-                  </p>
-                  <p className="text-sm text-muted-foreground tabular-nums">
-                    {maskMsisdn(method.msisdn)}
-                  </p>
-                  {method.label ? (
-                    <p className="truncate text-xs text-muted-foreground">{method.label}</p>
-                  ) : null}
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {!method.is_default ? (
                     <Button
-                      type="button"
                       size="icon"
                       variant="ghost"
-                      aria-label="Make default"
-                      title="Make default"
-                      disabled={setDefaultMethod.isPending}
-                      onClick={() => setDefaultMethod.mutate({ methodId: method.id })}
+                      aria-label={`Edit ${name}`}
+                      title="Edit"
+                      onClick={() => setEditing(method)}
                     >
-                      <Star className="size-4" />
+                      <Pencil />
                     </Button>
-                  ) : null}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="Edit"
-                    onClick={() => setEditing(method)}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="Remove"
-                    onClick={() => setConfirmDelete(method)}
-                  >
-                    <Trash2 className="size-4 text-destructive" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      aria-label={`Remove ${name}`}
+                      title="Remove"
+                      onClick={() => setConfirmDelete(method)}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardContent>
 
       <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editing === "new" ? "Add a wallet" : "Edit saved wallet"}
+              {editing === "new" ? "Add wallet" : "Edit wallet"}
             </DialogTitle>
-            <DialogDescription>
-              Enter the number you use to approve payments on your phone.
-            </DialogDescription>
           </DialogHeader>
 
-          <form
-            key={editing === "new" ? "new" : (editing?.id ?? "none")}
-            action={handleSave}
-            className="space-y-4"
-          >
-            {saveError ? (
-              <Alert variant="destructive">
-                <AlertDescription>{saveError}</AlertDescription>
-              </Alert>
-            ) : null}
+          <form key={editing === "new" ? "new" : (editing?.id ?? "none")} action={handleSave}>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="wallet-provider">Wallet</FieldLabel>
+                <Select
+                  name="provider"
+                  defaultValue={
+                    editing !== "new" && editing?.provider ? editing.provider : "evc_plus"
+                  }
+                  items={WALLET_ITEMS}
+                >
+                  <SelectTrigger id="wallet-provider" className="w-full">
+                    <SelectValue placeholder="Select a wallet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WALLET_ITEMS.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="wallet-provider">Wallet</Label>
-              <Select
-                name="provider"
-                defaultValue={
-                  editing !== "new" && editing?.provider ? editing.provider : "evc_plus"
-                }
-                items={WALLET_ITEMS}
-              >
-                <SelectTrigger id="wallet-provider" className="w-full">
-                  <SelectValue placeholder="Select a wallet" />
-                </SelectTrigger>
-                <SelectContent>
-                  {WALLET_ITEMS.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <Field>
+                <FieldLabel htmlFor="wallet-msisdn">Wallet number</FieldLabel>
+                <Input
+                  id="wallet-msisdn"
+                  name="msisdn"
+                  type="tel"
+                  inputMode="tel"
+                  required
+                  defaultValue={editing !== "new" ? (editing?.msisdn ?? "") : ""}
+                  placeholder="61 1234567"
+                  autoComplete="tel"
+                />
+              </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="wallet-msisdn">Wallet number</Label>
-              <Input
-                id="wallet-msisdn"
-                name="msisdn"
-                type="tel"
-                inputMode="tel"
-                required
-                defaultValue={editing !== "new" ? (editing?.msisdn ?? "") : ""}
-                placeholder="61 1234567"
-                autoComplete="tel"
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="wallet-label">Nickname</FieldLabel>
+                <Input
+                  id="wallet-label"
+                  name="label"
+                  defaultValue={editing !== "new" ? (editing?.label ?? "") : ""}
+                  placeholder="Optional, e.g. Personal"
+                />
+              </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="wallet-label">Nickname (optional)</Label>
-              <Input
-                id="wallet-label"
-                name="label"
-                defaultValue={editing !== "new" ? (editing?.label ?? "") : ""}
-                placeholder="e.g. My personal number"
-              />
-            </div>
+              <Field orientation="horizontal" className="justify-start">
+                <Checkbox
+                  id="wallet-default"
+                  name="makeDefault"
+                  defaultChecked={editing !== "new" ? (editing?.is_default ?? false) : true}
+                />
+                <Label htmlFor="wallet-default" className="font-normal">
+                  Default payment method
+                </Label>
+              </Field>
 
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="wallet-default"
-                name="makeDefault"
-                defaultChecked={editing !== "new" ? (editing?.is_default ?? false) : true}
-              />
-              <Label htmlFor="wallet-default" className="font-normal">
-                Use this as my default payment method
-              </Label>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setEditing(null)}>
-                Cancel
-              </Button>
-              <SubmitButton pendingText="Saving…">Save</SubmitButton>
-            </div>
+              <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-end">
+                {saveError ? (
+                  <p role="alert" className="text-sm text-destructive sm:mr-auto">
+                    {saveError}
+                  </p>
+                ) : null}
+                <Button type="button" variant="outline" onClick={() => setEditing(null)}>
+                  Cancel
+                </Button>
+                <SubmitButton pendingText="Saving…">Save</SubmitButton>
+              </div>
+            </FieldGroup>
           </form>
         </DialogContent>
       </Dialog>
@@ -287,15 +267,14 @@ export function SavedMethodsManager({ methods }: { methods: SavedPaymentMethod[]
             <AlertDialogTitle>Remove this wallet?</AlertDialogTitle>
             <AlertDialogDescription>
               {WALLET_LABELS.get(confirmDelete?.provider ?? "") ?? "This wallet"}{" "}
-              {maskMsisdn(confirmDelete?.msisdn ?? null)} will no longer prefill at checkout. Past
-              payments are unaffected.
+              {maskMsisdn(confirmDelete?.msisdn ?? null)} is removed from your saved wallets.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deleteMethod.isPending}
+              variant="destructive"
+              loading={deleteMethod.isPending}
               onClick={handleDelete}
             >
               Remove
@@ -303,6 +282,6 @@ export function SavedMethodsManager({ methods }: { methods: SavedPaymentMethod[]
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </Card>
   );
 }

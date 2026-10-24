@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowRight,
   Check,
   Copy,
   LayoutDashboard,
@@ -27,7 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { signOutAction, signOutEverywhereAction } from "@/lib/auth/actions";
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from "@/lib/marketing-nav";
 import { whatsappLink } from "@/lib/whatsapp";
@@ -135,7 +134,7 @@ export function PortalAccountMenu({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{name || "Account"}</p>
               <p className="truncate text-xs text-muted-foreground">{email}</p>
-              <Badge variant="outline" className="mt-1 h-5 px-1.5 text-[10px] font-semibold tracking-wide uppercase">
+              <Badge variant="outline" className="mt-1">
                 {roleLabel}
                 {accountCode ? ` · ${accountCode}` : ""}
               </Badge>
@@ -146,11 +145,11 @@ export function PortalAccountMenu({
             {showPersonalAccount || isPlatformAdmin || contexts.length > 0 ? (
               <>
                 <DropdownMenuGroup>
-                  <DropdownMenuLabel className="px-2 text-[11px] tracking-wider uppercase">Switch account</DropdownMenuLabel>
+                  <DropdownMenuLabel className="px-2">Switch account</DropdownMenuLabel>
                 </DropdownMenuGroup>
                 {showPersonalAccount ? (
                   <DropdownMenuItem render={<Link href={rootOrigin() ? `${rootOrigin()}/account` : "/account"} />} className="gap-2.5 rounded-lg py-2">
-                    <User /> Personal Account
+                    <User /> Personal account
                   </DropdownMenuItem>
                 ) : null}
                 {isPlatformAdmin ? (
@@ -166,8 +165,8 @@ export function PortalAccountMenu({
                         {c.name} <span className="text-muted-foreground">· {c.label}</span>
                       </span>
                       {c.status && c.status !== "live" ? (
-                        <Badge variant="outline" className="shrink-0 text-[10px] capitalize">
-                          {c.status}
+                        <Badge variant={statusBadgeVariant(c.status)} className="shrink-0 capitalize">
+                          {c.status.replace(/_/g, " ")}
                         </Badge>
                       ) : null}
                     </span>
@@ -269,7 +268,7 @@ export function PortalAccountMenu({
               </div>
               {info.workspace ? (
                 <div className="flex items-center justify-between gap-3 px-3 py-2">
-                  <dt className="text-muted-foreground">Hotel</dt>
+                  <dt className="text-muted-foreground">Workspace</dt>
                   <dd className="truncate font-medium">{info.workspace}</dd>
                 </div>
               ) : null}
@@ -290,7 +289,7 @@ export function PortalAccountMenu({
                 setHelpOpen(false);
               }}
             >
-              <LifeBuoy className="size-4" /> Report a problem <ArrowRight className="size-3.5" />
+              <LifeBuoy data-icon="inline-start" aria-hidden="true" /> Report a problem
             </Button>
             <Button variant="outline" className={cn("gap-1.5", copied && "text-primary")} onClick={copyDetails}>
               {copied ? <Check className="size-4" /> : <Copy className="size-4" />}

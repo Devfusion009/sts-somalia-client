@@ -1,5 +1,7 @@
-import { PauseCircle } from "lucide-react";
+import { PauseCircle, PhoneIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from "@/lib/marketing-nav";
 
 /**
  * Full-screen notice shown in place of a partner-facing portal when the
@@ -11,16 +13,19 @@ import { Card, CardContent } from "@/components/ui/card";
 export function PortalSuspendedNotice({ portalLabel }: { portalLabel: string }) {
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
-      <Card>
-        <CardContent className="space-y-3 p-6 text-center">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-            <PauseCircle className="size-6" />
-          </div>
-          <p className="font-medium">Your {portalLabel} access is suspended</p>
-          <p className="text-sm text-muted-foreground">
-            This partner account has been suspended by STS Somalia. If you believe this is a mistake, or to resolve
-            it, please contact the STS partnerships team.
-          </p>
+      <Card className="w-full">
+        <CardContent className="flex flex-col items-center gap-3 p-6 text-center md:p-8">
+          <span
+            aria-hidden="true"
+            className="flex size-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive"
+          >
+            <PauseCircle className="size-5" />
+          </span>
+          <h1 className="font-heading text-base font-semibold">{portalLabel} access suspended</h1>
+          <Button variant="outline" className="mt-1 max-sm:h-11" render={<a href={SUPPORT_PHONE_TEL} />}>
+            <PhoneIcon aria-hidden="true" />
+            <span className="tabular-nums">{SUPPORT_PHONE_DISPLAY}</span>
+          </Button>
         </CardContent>
       </Card>
     </div>

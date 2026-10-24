@@ -8,11 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
 import { useRestoreOnError } from "@/lib/use-restore-on-error";
 import { updateUmrahPilgrim, type PilgrimActionState } from "@/modules/umrah/pilgrim-actions";
 import { readinessLabel, type PilgrimReadiness } from "@/modules/umrah/readiness";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 export type EditablePilgrim = {
   id: string;
@@ -28,9 +29,6 @@ export type EditablePilgrim = {
   phone?: string | null;
 };
 
-const selectClass =
-  "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
-
 function formatDay(value: string | null) {
   if (!value) return null;
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
@@ -39,17 +37,17 @@ function formatDay(value: string | null) {
 export function ReadinessBadges({ readiness }: { readiness?: PilgrimReadiness }) {
   if (!readiness) return null;
   if (readiness.missing.length === 0 && readiness.warnings.length === 0) {
-    return <Badge className="border-transparent bg-primary/10 text-primary">Ready</Badge>;
+    return <Badge variant="success">Ready</Badge>;
   }
   return (
     <>
       {readiness.missing.map((code) => (
-        <Badge key={code} className="border-transparent bg-destructive/10 text-destructive">
+        <Badge key={code} variant="destructive">
           {readinessLabel(code)}
         </Badge>
       ))}
       {readiness.warnings.map((code) => (
-        <Badge key={code} className="border-transparent bg-brand-gold/15 text-brand-gold">
+        <Badge key={code} variant="warning">
           {readinessLabel(code)}
         </Badge>
       ))}
@@ -87,32 +85,32 @@ function PilgrimDialog({ pilgrim, open, onOpenChange }: { pilgrim: EditablePilgr
               <AlertDescription>{state.error}</AlertDescription>
             </Alert>
           ) : null}
-          <div className="space-y-1.5">
-            <Label htmlFor={id("full_name")}>Full name (as in passport)</Label>
+          <Field>
+            <FieldLabel htmlFor={id("full_name")}>Full name (as in passport)</FieldLabel>
             <Input id={id("full_name")} name="full_name" defaultValue={pilgrim.full_name} maxLength={120} required />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor={id("gender")}>Gender</Label>
-              <select id={id("gender")} name="gender" className={selectClass} defaultValue={pilgrim.gender}>
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field>
+              <FieldLabel htmlFor={id("gender")}>Gender</FieldLabel>
+              <select id={id("gender")} name="gender" className={NATIVE_SELECT_CLASS} defaultValue={pilgrim.gender}>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
               </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={id("date_of_birth")}>Date of birth</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={id("date_of_birth")}>Date of birth</FieldLabel>
               <Input id={id("date_of_birth")} name="date_of_birth" type="date" defaultValue={pilgrim.date_of_birth ?? ""} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={id("nationality")}>Nationality</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={id("nationality")}>Nationality</FieldLabel>
               <Input id={id("nationality")} name="nationality" maxLength={60} defaultValue={pilgrim.nationality ?? ""} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={id("phone")}>Phone</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={id("phone")}>Phone</FieldLabel>
               <Input id={id("phone")} name="phone" type="tel" maxLength={30} defaultValue={pilgrim.phone ?? ""} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={id("passport_number")}>Passport number</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={id("passport_number")}>Passport number</FieldLabel>
               <Input
                 id={id("passport_number")}
                 name="passport_number"
@@ -120,35 +118,40 @@ function PilgrimDialog({ pilgrim, open, onOpenChange }: { pilgrim: EditablePilgr
                 className="font-mono uppercase"
                 defaultValue={pilgrim.passport_number ?? ""}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={id("passport_expiry")}>Passport expiry</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={id("passport_expiry")}>Passport expiry</FieldLabel>
               <Input id={id("passport_expiry")} name="passport_expiry" type="date" defaultValue={pilgrim.passport_expiry ?? ""} />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor={id("passport_issue_country")}>Passport issued by</Label>
+            </Field>
+            <Field className="col-span-2">
+              <FieldLabel htmlFor={id("passport_issue_country")}>Passport issued by</FieldLabel>
               <Input
                 id={id("passport_issue_country")}
                 name="passport_issue_country"
                 maxLength={60}
                 defaultValue={pilgrim.passport_issue_country ?? ""}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={id("mahram_name")}>Mahram name</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={id("mahram_name")}>Mahram name</FieldLabel>
               <Input id={id("mahram_name")} name="mahram_name" maxLength={120} defaultValue={pilgrim.mahram_name ?? ""} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={id("mahram_relation")}>Relation to mahram</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={id("mahram_relation")}>Relation to mahram</FieldLabel>
               <Input
                 id={id("mahram_relation")}
                 name="mahram_relation"
                 maxLength={60}
                 defaultValue={pilgrim.mahram_relation ?? ""}
               />
-            </div>
+            </Field>
           </div>
-          <SubmitButton pendingText="Saving…">Save</SubmitButton>
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
@@ -181,7 +184,7 @@ export function PilgrimEditor({
           <li key={pilgrim.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-3">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">{pilgrim.full_name}</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground tabular-nums">
                 {[
                   pilgrim.gender.charAt(0).toUpperCase() + pilgrim.gender.slice(1),
                   formatDay(pilgrim.date_of_birth),
@@ -203,12 +206,12 @@ export function PilgrimEditor({
             {editable ? (
               <Button
                 size="icon"
-                variant="outline"
-                className="size-8"
+                variant="ghost"
                 aria-label={`Edit ${pilgrim.full_name}`}
+                title="Edit"
                 onClick={() => setEditing(pilgrim.id)}
               >
-                <Pencil className="size-3.5" />
+                <Pencil />
               </Button>
             ) : null}
           </li>

@@ -59,7 +59,7 @@ export function HotelGallery({
           className={cn(tile, "col-span-4 row-span-2 sm:col-span-2")}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL, host not allow-listed for next/image */}
-          <img src={images[0]} alt={hotelName} className={photo} />
+          <img src={images[0]} alt={hotelName} fetchPriority="high" className={photo} />
         </button>
 
         {thumbs.map((src, i) => {
@@ -73,7 +73,7 @@ export function HotelGallery({
               className={cn(tile, "hidden sm:block")}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL, host not allow-listed for next/image */}
-              <img src={src} alt={`${hotelName} photo ${i + 2}`} className={photo} />
+              <img src={src} alt={`${hotelName} photo ${i + 2}`} loading="lazy" decoding="async" className={photo} />
               {last ? (
                 <span className="absolute inset-0 grid place-items-center bg-black/55 font-heading text-lg font-bold text-white backdrop-blur-[1px]">
                   +{hidden}
@@ -99,7 +99,7 @@ export function HotelGallery({
           onClick={() => setOpenAt(0)}
           className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-full bg-black/65 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-black/80 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
         >
-          <Images className="size-4" />
+          <Images className="size-4" aria-hidden />
           {total} photo{total === 1 ? "" : "s"}
         </button>
       </div>
@@ -111,7 +111,7 @@ export function HotelGallery({
         >
           <DialogTitle className="sr-only">{hotelName} photos</DialogTitle>
 
-          <div className="relative flex h-[60vh] items-center justify-center overflow-hidden rounded-lg bg-black">
+          <div className="relative flex h-[50vh] items-center justify-center overflow-hidden rounded-lg bg-black sm:h-[60vh]">
             {openAt !== null ? (
               // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL, host not allow-listed for next/image
               <img
@@ -129,7 +129,7 @@ export function HotelGallery({
                   aria-label="Previous photo"
                   className="absolute left-3 grid size-10 place-items-center rounded-full bg-white/90 text-foreground shadow-md transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
                 >
-                  <ChevronLeft className="size-5" />
+                  <ChevronLeft className="size-5" aria-hidden />
                 </button>
                 <button
                   type="button"
@@ -137,7 +137,7 @@ export function HotelGallery({
                   aria-label="Next photo"
                   className="absolute right-3 grid size-10 place-items-center rounded-full bg-white/90 text-foreground shadow-md transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
                 >
-                  <ChevronRight className="size-5" />
+                  <ChevronRight className="size-5" aria-hidden />
                 </button>
                 <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white tabular-nums">
                   {(openAt ?? 0) + 1} / {total}
@@ -154,9 +154,9 @@ export function HotelGallery({
                   type="button"
                   onClick={() => setOpenAt(i)}
                   aria-label={`Photo ${i + 1}`}
-                  aria-current={i === openAt}
+                  aria-current={i === openAt ? "true" : undefined}
                   className={cn(
-                    "h-14 w-20 shrink-0 overflow-hidden rounded-md ring-2 transition-opacity focus-visible:outline-none",
+                    "h-14 w-20 shrink-0 overflow-hidden rounded-md ring-2 transition-opacity focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                     i === openAt ? "ring-primary" : "ring-transparent opacity-60 hover:opacity-100"
                   )}
                 >

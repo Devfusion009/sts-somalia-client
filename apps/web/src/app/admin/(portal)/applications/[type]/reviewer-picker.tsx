@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { assignReviewer } from "@/modules/admin/application-actions";
 import type { ApplicationType } from "@/modules/admin/queries";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 export function ReviewerPicker({
   applicationId,
@@ -22,9 +23,10 @@ export function ReviewerPicker({
       <input type="hidden" name="applicationId" value={applicationId} />
       <select
         name="reviewerId"
+        aria-label="Assigned reviewer"
         defaultValue={currentReviewerId ?? "unassigned"}
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className="border-input h-10 w-full rounded-md border bg-transparent px-3.5 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className={NATIVE_SELECT_CLASS}
       >
         <option value="unassigned">Unassigned</option>
         {admins.map((admin) => (

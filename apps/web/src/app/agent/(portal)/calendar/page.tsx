@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { getAgencyCalendarBookings } from "@/modules/admin/calendar-queries";
 import { getPublicHolidaysInRange } from "@/lib/provider-runtime/holidays";
+import { PageHeader } from "@/components/ui/page-header";
 import { EventCalendar } from "./event-calendar";
 
 export const metadata: Metadata = { title: "Event Calendar" };
@@ -28,9 +29,7 @@ export default async function AgentCalendarPage({ searchParams }: { searchParams
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Event Calendar</h1>
-      </div>
+      <PageHeader title="Event calendar" />
       <EventCalendar month={month} bookings={bookings} holidays={holidays} />
     </div>
   );

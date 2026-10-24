@@ -456,7 +456,7 @@ export function PortalShell({
       </Sidebar>
       <SidebarInset>
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur-md sm:px-5">
-          <SidebarTrigger className="text-muted-foreground" />
+          <SidebarTrigger className="text-muted-foreground max-sm:size-10" />
           <Separator orientation="vertical" className="h-4" />
           <span className="truncate text-sm font-medium">{portalName}</span>
           <div className="ml-auto flex shrink-0 items-center gap-2">{headerExtra}</div>

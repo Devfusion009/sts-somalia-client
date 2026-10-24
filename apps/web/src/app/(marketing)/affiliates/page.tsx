@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import { HandCoins, Link2, LineChart, Wallet } from "lucide-react";
 import { ProgramLanding } from "@/components/marketing/program-landing";
 
-export const metadata: Metadata = { title: "Join the Affiliate Program" };
+export const metadata: Metadata = { title: "Join the affiliate programme" };
 
 export default function AffiliatesLandingPage() {
   return (
     <ProgramLanding
       image={{ src: "/marketing/partner-affiliate.webp", alt: "A content creator working on a laptop in a café" }}
-      eyebrow="Affiliate Program"
+      eyebrow="Affiliate programme"
       icon={HandCoins}
-      title="Join the Affiliate Program"
+      title="Join the affiliate programme"
       subtitle="Share your link and earn commission every time someone books a hotel, flight, visa, or Umrah package through STS Somalia."
       ctaLabel="Apply to become an affiliate"
       ctaHref="/account/become?program=affiliate"
@@ -39,7 +39,7 @@ export default function AffiliatesLandingPage() {
       steps={[
         {
           title: "Create an account",
-          description: "Sign up with your email — takes less than a minute.",
+          description: "Sign up with your email.",
         },
         {
           title: "Apply to the program",
@@ -47,14 +47,14 @@ export default function AffiliatesLandingPage() {
         },
         {
           title: "Get your referral code",
-          description: "Once approved, you'll get a unique referral code and can create tracked links instantly.",
+          description: "Approved affiliates get a unique referral code and tracked links.",
         },
         {
           title: "Share and earn",
           description: "Promote your links and track clicks, conversions, and commission from your dashboard.",
         },
       ]}
-      faqNote="Perfect for content creators, bloggers, and community leaders with an audience interested in travel."
+      faqNote="For content creators, bloggers and community leaders with an audience interested in travel."
     />
   );
 }

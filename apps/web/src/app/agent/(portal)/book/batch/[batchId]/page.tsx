@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertCircle, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyBatchOrders, getAgencyTopupRequests } from "@/modules/agencies/queries";
 import { describeOrderItem } from "@/modules/orders/format";
 import { WalletPaymentPanel } from "@/modules/agencies/components/wallet-payment-panel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { money } from "@/lib/money";
 import {
   Table,
   TableBody,
@@ -20,16 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { PayBatchForm } from "./pay-batch-form";
 
-const ORDER_STATUS_STYLES: Record<string, string> = {
-  held: "bg-brand-gold/15 text-brand-gold",
-  pending_payment: "bg-brand-gold/15 text-brand-gold",
-  partially_paid: "bg-brand-gold/15 text-brand-gold",
-  paid: "bg-primary/10 text-primary",
-  processing: "bg-chart-3/10 text-chart-3",
-  completed: "bg-primary/10 text-primary",
-  cancelled: "bg-muted text-muted-foreground",
-  refunded: "bg-destructive/10 text-destructive",
-};
+export const metadata = { title: "Review & pay" };
 
 const PAYABLE = ["pending_payment", "held", "partially_paid"];
 
@@ -77,112 +70,35 @@ export default async function BatchBookingPage({
   const available =
     Number(membership.agency.credit_balance ?? 0) + Number(membership.agency.credit_limit ?? 0);
 
-  return (
-    <div className="space-y-4">
-      <Link
-        href="/agent/book"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" /> New booking
-      </Link>
+  const customersLabel = orders
+    .map((order) => order.agency_customer?.full_name)
+    .filter(Boolean)
+    .join(" · ");
 
-      <h1 className="font-heading text-2xl font-bold">
-        {orders.length} booking{orders.length === 1 ? "" : "s"}
-      </h1>
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        back={{ href: "/agent/book", label: "New booking" }}
+        title={`${orders.length} booking${orders.length === 1 ? "" : "s"}`}
+        meta={customersLabel || undefined}
+        actions={
+          <>
+            <Button variant="outline" render={<Link href="/agent/bookings" />}>
+              All bookings
+            </Button>
+            <Button variant="outline" render={<Link href="/agent/book" />}>
+              Book another service
+            </Button>
+          </>
+        }
+      />
 
       {failed ? (
         <Alert variant="destructive">
+          <AlertCircle />
           <AlertDescription>Could not book for {failed}.</AlertDescription>
         </Alert>
       ) : null}
-
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg bg-secondary/40 px-4 py-3 sm:grid-cols-4">
-        <div>
-          <dt className="text-xs text-muted-foreground">Net</dt>
-          <dd className="font-medium tabular-nums">
-            {currency} {(total - margin).toFixed(0)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Your margin</dt>
-          <dd className="font-medium tabular-nums">
-            {currency} {margin.toFixed(0)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">
-            Customers pay
-          </dt>
-          <dd className="font-semibold tabular-nums">
-            {awaitingPrice ? "On request" : `${currency} ${total.toFixed(0)}`}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Balance</dt>
-          <dd className="font-semibold tabular-nums">
-            {awaitingPrice ? "On request" : `${currency} ${balance.toFixed(0)}`}
-          </dd>
-        </div>
-      </dl>
-
-      <Card className="overflow-hidden py-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Customer</TableHead>
-                <TableHead>Booking</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell>
-                    <p className="font-medium">{order.agency_customer?.full_name ?? "—"}</p>
-                    <p className="font-mono text-xs text-muted-foreground">{order.order_number}</p>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {order.order_items.map((item) => (
-                      <p key={item.id} className="truncate">
-                        {describeOrderItem(item).title}
-                      </p>
-                    ))}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      className={cn(
-                        "border-transparent capitalize",
-                        ORDER_STATUS_STYLES[order.status] ?? "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {Number(order.total) === 0 && PAYABLE.includes(order.status)
-                        ? "Awaiting price"
-                        : order.status.replace(/_/g, " ")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right text-sm font-semibold tabular-nums">
-                    {Number(order.total) === 0 && PAYABLE.includes(order.status)
-                      ? "On request"
-                      : `${order.currency} ${Number(order.total).toFixed(0)}`}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      render={<Link href={`/agent/book/order/${order.id}`} />}
-                    >
-                      Open
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
 
       {topup === "success" ? (
         <Alert>
@@ -190,36 +106,148 @@ export default async function BatchBookingPage({
           <AlertDescription>Wallet topped up.</AlertDescription>
         </Alert>
       ) : topup === "pending" ? (
-        <Alert>
+        <Alert variant="warning">
           <AlertCircle />
           <AlertDescription>Approve the payment on your phone to finish this top-up.</AlertDescription>
         </Alert>
       ) : null}
 
-      {payableOrders.length > 0 ? (
-        <WalletPaymentPanel
-          due={balance}
-          available={available}
-          currency={currency}
-          canTopUp={canTopUp}
-          pendingTopupTotal={pendingTopupTotal}
-          returnTo={`/agent/book/batch/${batchId}`}
-        >
-          <PayBatchForm
-            batchId={batchId}
-            count={payableOrders.length}
-            amountLabel={`${currency} ${balance.toFixed(0)}`}
-          />
-        </WalletPaymentPanel>
-      ) : null}
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="min-w-0 space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-base font-semibold">Orders</h2>
+            <Badge variant="neutral" className="tabular-nums">
+              {orders.length}
+            </Badge>
+          </div>
+          <Card className="overflow-hidden py-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Booking</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead numeric>Total</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.map((order) => {
+                  const orderAwaitingPrice = Number(order.total) === 0 && PAYABLE.includes(order.status);
+                  return (
+                    <TableRow key={order.id}>
+                      <TableCell>
+                        <p className="font-medium">{order.agency_customer?.full_name ?? "—"}</p>
+                        <p className="text-xs text-muted-foreground tabular-nums">{order.order_number}</p>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {order.order_items.map((item) => (
+                          <p key={item.id} className="max-w-64 truncate">
+                            {describeOrderItem(item).title}
+                          </p>
+                        ))}
+                      </TableCell>
+                      <TableCell>
+                        {orderAwaitingPrice ? (
+                          <Badge variant="warning">Awaiting price</Badge>
+                        ) : (
+                          <Badge variant={statusBadgeVariant(order.status)} className="capitalize">
+                            {order.status.replace(/_/g, " ")}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell numeric className="text-sm font-medium">
+                        {orderAwaitingPrice ? (
+                          <span className="font-normal text-muted-foreground">On request</span>
+                        ) : (
+                          money(Number(order.total), order.currency)
+                        )}
+                      </TableCell>
+                      <TableCell numeric>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          render={<Link href={`/agent/book/order/${order.id}`} />}
+                        >
+                          Open
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+        </section>
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" render={<Link href="/agent/book" />}>
-          Book another service
-        </Button>
-        <Button variant="outline" render={<Link href="/agent/bookings" />}>
-          All bookings
-        </Button>
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-24">
+          <Card>
+            <CardHeader>
+              <CardTitle>Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="space-y-2 text-sm">
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-muted-foreground">Net</dt>
+                  <dd className="tabular-nums">{money(total - margin, currency)}</dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-muted-foreground">Your margin</dt>
+                  <dd className="tabular-nums">{money(margin, currency)}</dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2 font-medium">
+                  <dt>Customers pay</dt>
+                  <dd className="font-heading text-base font-semibold tabular-nums">
+                    {awaitingPrice ? "On request" : money(total, currency)}
+                  </dd>
+                </div>
+                {paidTotal > 0 ? (
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-muted-foreground">Paid</dt>
+                    <dd className="tabular-nums">{money(paidTotal, currency)}</dd>
+                  </div>
+                ) : null}
+                {!awaitingPrice ? (
+                  <div
+                    className={cn(
+                      "flex items-baseline justify-between gap-3 font-medium",
+                      paidTotal > 0 && "border-t border-border pt-2"
+                    )}
+                  >
+                    <dt>Balance due</dt>
+                    <dd
+                      className={cn(
+                        "font-heading text-base font-semibold tabular-nums",
+                        balance > 0 && "text-[color-mix(in_oklch,var(--brand-gold),black_30%)] dark:text-brand-gold"
+                      )}
+                    >
+                      {money(balance, currency)}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </CardContent>
+          </Card>
+
+          {payableOrders.length > 0 ? (
+            <WalletPaymentPanel
+              due={balance}
+              available={available}
+              currency={currency}
+              canTopUp={canTopUp}
+              pendingTopupTotal={pendingTopupTotal}
+              returnTo={`/agent/book/batch/${batchId}`}
+            >
+              <PayBatchForm
+                batchId={batchId}
+                count={payableOrders.length}
+                amountLabel={money(balance, currency)}
+              />
+            </WalletPaymentPanel>
+          ) : null}
+        </aside>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
-import { AlertCircle, FileText, Landmark, Undo2 } from "lucide-react";
+import { AlertCircle, Banknote, FileText, Pencil, Undo2 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -13,21 +13,22 @@ import {
 import { cancelAgencyPayoutRequest } from "@/modules/agencies/payout-actions";
 import { payoutMethodLabel } from "@/modules/payments/payout";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatStrip, StatStripItem } from "@/components/dashboard/filter-chips";
+import { money } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { WithdrawForm } from "./withdraw-form";
 
 export const metadata: Metadata = { title: "Withdraw Earnings" };
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-brand-gold/15 text-brand-gold",
-  approved: "bg-primary/10 text-primary",
-  processing: "bg-chart-4/15 text-chart-4",
-  paid: "bg-chart-3/10 text-chart-3",
-  rejected: "bg-muted text-muted-foreground",
-  failed: "bg-destructive/10 text-destructive",
+const STATUS_VARIANT: Partial<Record<string, BadgeVariant>> = {
+  approved: "info",
+  processing: "info",
+  rejected: "neutral",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -38,10 +39,6 @@ const STATUS_LABEL: Record<string, string> = {
   rejected: "Declined",
   failed: "Failed",
 };
-
-function money(amount: number) {
-  return `USD ${amount.toFixed(2)}`;
-}
 
 type TimelineStep = { label: string; at: string | null; detail?: string | null; state: "done" | "failed" | "idle" };
 
@@ -91,15 +88,16 @@ function RequestTimeline({ request, receiptUrl }: { request: AgencyPayoutRequest
       {stepsFor(request).map((step) => (
         <li key={step.label} className="relative text-sm">
           <span
+            aria-hidden="true"
             className={cn(
-              "absolute -left-[21px] top-1.5 size-2 rounded-full",
+              "absolute top-1.5 -left-[21px] size-2 rounded-full ring-2 ring-card",
               step.state === "done" ? "bg-primary" : step.state === "failed" ? "bg-destructive" : "bg-border"
             )}
           />
           <p className={cn("font-medium", step.state === "idle" && "text-muted-foreground")}>
             {step.label}
             {step.at ? (
-              <span className="ml-2 font-normal text-muted-foreground">
+              <span className="ml-2 font-normal text-muted-foreground tabular-nums">
                 {format(new Date(step.at), "d MMM yyyy")}
               </span>
             ) : null}
@@ -113,14 +111,14 @@ function RequestTimeline({ request, receiptUrl }: { request: AgencyPayoutRequest
       ))}
       {receiptUrl ? (
         <li className="relative text-sm">
-          <span className="absolute -left-[21px] top-1.5 size-2 rounded-full bg-primary" />
+          <span aria-hidden="true" className="absolute top-1.5 -left-[21px] size-2 rounded-full bg-primary ring-2 ring-card" />
           <a
             href={receiptUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 text-primary hover:underline"
+            className="inline-flex items-center gap-1.5 rounded-sm font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            <FileText className="size-3.5" /> Receipt
+            <FileText className="size-3.5" aria-hidden="true" /> Receipt
           </a>
         </li>
       ) : null}
@@ -149,33 +147,39 @@ export default async function AgentWithdrawalsPage() {
     if (data?.signedUrl) receiptUrls.set(request.id, data.signedUrl);
   }
 
+  const agency = membership.agency;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Withdraw Earnings</h1>
-      </div>
+      <PageHeader title="Withdraw earnings" />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Available to withdraw</p>
-            <p className="mt-1 font-heading text-3xl font-bold text-primary">{money(earnings.available)}</p>
-            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-border pt-4 text-xs">
-              <div>
-                <dt className="text-muted-foreground">In review by STS</dt>
-                <dd className="mt-0.5 font-medium">{money(earnings.inReview)}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Already requested</dt>
-                <dd className="mt-0.5 font-medium">{money(earnings.requested)}</dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
+      <StatStrip cols={3}>
+        <StatStripItem label="Available to withdraw" value={money(earnings.available, "USD")} tone="primary" />
+        <StatStripItem
+          label="In review by STS"
+          value={money(earnings.inReview, "USD")}
+          tone={earnings.inReview > 0 ? "warn" : undefined}
+        />
+        <StatStripItem label="Already requested" value={money(earnings.requested, "USD")} />
+      </StatStrip>
 
-        <Card>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <Card className="lg:sticky lg:top-24 lg:order-2">
           <CardHeader>
-            <CardTitle className="text-base">Request a transfer</CardTitle>
+            <CardTitle>Request a transfer</CardTitle>
+            {hasBankDetails ? (
+              <CardAction>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="Edit bank details"
+                  title="Edit bank details"
+                  render={<Link href="/agent/bank-details" />}
+                >
+                  <Pencil aria-hidden="true" />
+                </Button>
+              </CardAction>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-4">
             {!hasBankDetails ? (
@@ -183,8 +187,8 @@ export default async function AgentWithdrawalsPage() {
                 <AlertCircle />
                 <AlertDescription className="flex flex-wrap items-center gap-2">
                   <span>Add your payout account first.</span>
-                  <Button size="sm" variant="outline" className="h-7 gap-1.5" render={<Link href="/agent/bank-details" />}>
-                    <Landmark className="size-3.5" /> Bank Details
+                  <Button size="sm" variant="outline" render={<Link href="/agent/bank-details" />}>
+                    Bank details
                   </Button>
                 </AlertDescription>
               </Alert>
@@ -194,66 +198,82 @@ export default async function AgentWithdrawalsPage() {
                 <AlertDescription>Only the agency owner or an admin can request a payout.</AlertDescription>
               </Alert>
             ) : (
-              <>
-                <WithdrawForm available={earnings.available} />
-                <dl className="grid gap-1 border-t border-border pt-4 text-xs sm:grid-cols-3">
-                  <div>
-                    <dt className="text-muted-foreground">Bank</dt>
-                    <dd className="mt-0.5 font-medium">{membership.agency.bank_name ?? "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Account name</dt>
-                    <dd className="mt-0.5 truncate font-medium">{membership.agency.bank_account_name ?? "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Account number</dt>
-                    <dd className="mt-0.5 truncate font-medium">{membership.agency.bank_account_number}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Branch</dt>
-                    <dd className="mt-0.5 truncate font-medium">{membership.agency.bank_branch ?? "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">SWIFT/BIC</dt>
-                    <dd className="mt-0.5 truncate font-medium">{membership.agency.bank_swift_code ?? "—"}</dd>
-                  </div>
-                </dl>
-              </>
+              <WithdrawForm available={earnings.available} />
             )}
+            {hasBankDetails ? (
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border pt-4 text-sm">
+                <div className="col-span-2 min-w-0">
+                  <dt className="text-xs text-muted-foreground">Bank</dt>
+                  <dd className="truncate font-medium">{agency.bank_name ?? "—"}</dd>
+                </div>
+                <div className="col-span-2 min-w-0">
+                  <dt className="text-xs text-muted-foreground">Account name</dt>
+                  <dd className="truncate font-medium">{agency.bank_account_name ?? "—"}</dd>
+                </div>
+                <div className="col-span-2 min-w-0">
+                  <dt className="text-xs text-muted-foreground">Account number</dt>
+                  <dd className="truncate font-mono font-medium">{agency.bank_account_number}</dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-xs text-muted-foreground">Branch</dt>
+                  <dd className="truncate font-medium">{agency.bank_branch ?? "—"}</dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-xs text-muted-foreground">SWIFT/BIC</dt>
+                  <dd className="truncate font-mono font-medium">{agency.bank_swift_code ?? "—"}</dd>
+                </div>
+              </dl>
+            ) : null}
           </CardContent>
         </Card>
-      </div>
 
-      <Card className="overflow-hidden py-0">
-        <CardHeader className="border-b border-border !py-4">
-          <CardTitle className="text-base">Requests</CardTitle>
-        </CardHeader>
-        {requests.length === 0 ? (
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">No requests yet.</CardContent>
-        ) : (
-          <div className="divide-y divide-border">
-            {requests.map((request) => (
-              <div key={request.id} className="grid gap-4 p-4 sm:grid-cols-[minmax(0,14rem)_1fr] sm:p-5">
-                <div className="space-y-2">
-                  <p className="font-heading text-lg font-semibold">{money(Number(request.amount))}</p>
-                  <Badge className={cn("border-transparent", STATUS_STYLES[request.status] ?? "")}>
-                    {STATUS_LABEL[request.status] ?? request.status}
-                  </Badge>
-                  {request.status === "pending" && canRequest ? (
-                    <form action={cancelAgencyPayoutRequest}>
-                      <input type="hidden" name="requestId" value={request.id} />
-                      <Button type="submit" size="sm" variant="ghost" className="gap-1.5 px-0">
-                        <Undo2 className="size-3.5" /> Cancel
-                      </Button>
-                    </form>
-                  ) : null}
-                </div>
-                <RequestTimeline request={request} receiptUrl={receiptUrls.get(request.id)} />
-              </div>
-            ))}
+        <section className="min-w-0 space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-base font-semibold">Requests</h2>
+            {requests.length > 0 ? (
+              <Badge variant="neutral" className="tabular-nums">
+                {requests.length}
+              </Badge>
+            ) : null}
           </div>
-        )}
-      </Card>
+          <Card className="overflow-hidden py-0">
+            {requests.length === 0 ? (
+              <Empty>
+                <EmptyMedia variant="icon">
+                  <Banknote />
+                </EmptyMedia>
+                <EmptyTitle>No withdrawal requests</EmptyTitle>
+              </Empty>
+            ) : (
+              <ul className="divide-y divide-border">
+                {requests.map((request) => (
+                  <li key={request.id} className="grid gap-4 p-4 sm:grid-cols-[minmax(0,12rem)_1fr] sm:p-5">
+                    <div className="flex items-start justify-between gap-2 sm:flex-col sm:justify-start">
+                      <div className="space-y-1.5">
+                        <p className="font-heading text-lg font-semibold tabular-nums">
+                          {money(Number(request.amount), "USD")}
+                        </p>
+                        <Badge variant={statusBadgeVariant(request.status, STATUS_VARIANT)}>
+                          {STATUS_LABEL[request.status] ?? request.status}
+                        </Badge>
+                      </div>
+                      {request.status === "pending" && canRequest ? (
+                        <form action={cancelAgencyPayoutRequest}>
+                          <input type="hidden" name="requestId" value={request.id} />
+                          <Button type="submit" size="sm" variant="outline">
+                            <Undo2 data-icon="inline-start" aria-hidden="true" /> Cancel request
+                          </Button>
+                        </form>
+                      ) : null}
+                    </div>
+                    <RequestTimeline request={request} receiptUrl={receiptUrls.get(request.id)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </section>
+      </div>
     </div>
   );
 }

@@ -173,17 +173,17 @@ export default function AboutPage() {
           {FACTS.map((fact, i) => (
             <div
               key={fact.value}
-              className={`px-2 py-7 lg:px-8 ${i % 2 === 1 ? "border-l border-border lg:border-l-0" : ""} ${i > 1 ? "border-t border-border lg:border-t-0" : ""}`}
+              className={`flex flex-col px-2 py-7 lg:px-8 ${i % 2 === 1 ? "border-l border-border lg:border-l-0" : ""} ${i > 1 ? "border-t border-border lg:border-t-0" : ""}`}
             >
-              <dd className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">{fact.value}</dd>
-              <dt className="mt-1 text-sm text-muted-foreground">{fact.label}</dt>
+              <dt className="order-2 mt-1 text-sm text-muted-foreground">{fact.label}</dt>
+              <dd className="order-1 font-heading text-2xl font-bold tracking-tight sm:text-3xl">{fact.value}</dd>
             </div>
           ))}
         </dl>
       </section>
 
       {/* ── Company profile ──────────────────────────────────────────────── */}
-      <section className="bg-background py-16 sm:py-24">
+      <section className="bg-background py-16 sm:py-20 lg:py-24">
         <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:px-8">
           <FadeIn>
             <h2 className="font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl">
@@ -235,7 +235,7 @@ export default function AboutPage() {
       </section>
 
       {/* ── What we do ───────────────────────────────────────────────────── */}
-      <section className="bg-muted/40 py-16 sm:py-24">
+      <section className="bg-muted/40 py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <FadeIn>
             <SectionHeading title="What we do" lead="Six ways to travel and trade with STS." />
@@ -247,7 +247,7 @@ export default function AboutPage() {
                 <StaggerItem key={service.key} className="grid">
                   <Link
                     href={service.href}
-                    className="group flex h-full flex-col rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    className="group flex h-full flex-col rounded-2xl border border-border bg-card p-6 transition-shadow duration-300 hover:border-primary/30 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                   >
                     <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
                       <Icon sx={{ fontSize: 24 }} />
@@ -267,7 +267,7 @@ export default function AboutPage() {
       </section>
 
       {/* ── Principles ───────────────────────────────────────────────────── */}
-      <section className="bg-background py-16 sm:py-24">
+      <section className="bg-background py-16 sm:py-20 lg:py-24">
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:gap-16 lg:px-8">
           <FadeIn direction="right">
             <figure>
@@ -306,7 +306,7 @@ export default function AboutPage() {
       </section>
 
       {/* ── Credentials register ─────────────────────────────────────────── */}
-      <section id="credentials" className="scroll-mt-32 bg-muted/40 py-16 sm:py-24">
+      <section id="credentials" className="scroll-mt-32 bg-muted/40 py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <FadeIn>
             <SectionHeading
@@ -335,8 +335,8 @@ export default function AboutPage() {
             <StaggerGroup className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
               <ul className="divide-y divide-border">
                 {CREDENTIALS.map((c) => (
-                  <StaggerItem key={c.key}>
-                    <li className="grid gap-3 px-6 py-5 sm:grid-cols-[1fr_auto] sm:items-start sm:gap-8">
+                  <li key={c.key}>
+                    <StaggerItem className="grid gap-3 px-5 py-5 sm:grid-cols-[1fr_auto] sm:items-start sm:gap-8 sm:px-6">
                       <div className="flex gap-4">
                         <VerifiedIcon sx={{ fontSize: 22 }} className="mt-0.5 shrink-0 text-primary" />
                         <div>
@@ -361,8 +361,8 @@ export default function AboutPage() {
                           ) : null}
                         </dl>
                       ) : null}
-                    </li>
-                  </StaggerItem>
+                    </StaggerItem>
+                  </li>
                 ))}
               </ul>
             </StaggerGroup>
@@ -395,7 +395,7 @@ export default function AboutPage() {
       </section>
 
       {/* ── Pilgrimage ───────────────────────────────────────────────────── */}
-      <section className="bg-background py-16 sm:py-24">
+      <section className="bg-background py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <FadeIn>
             <SectionHeading
@@ -438,7 +438,7 @@ export default function AboutPage() {
       </section>
 
       {/* ── Offices ──────────────────────────────────────────────────────── */}
-      <section id="offices" className="scroll-mt-32 bg-muted/40 py-16 sm:py-24">
+      <section id="offices" className="scroll-mt-32 bg-muted/40 py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <FadeIn>
             <SectionHeading title="Our offices" lead="Head office in Mogadishu, branch office in Nairobi." align="left" />

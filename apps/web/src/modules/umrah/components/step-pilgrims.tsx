@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useRef } from "react";
-import { AlertCircle, ArrowLeft, ArrowRight, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -45,31 +45,22 @@ export function StepPilgrims({
       <input type="hidden" name="requestId" value={requestId} />
       {desk ? <input type="hidden" name="desk" value="1" /> : null}
 
-      <div>
-        <h2 className="font-heading text-xl font-bold">Traveller details</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Enter each traveller&apos;s details exactly as they appear in their passport — this is what
-          goes on the visa application. Only the name and gender are needed now; passport details
-          can follow later if you don&apos;t have them to hand.
-        </p>
-      </div>
+      <h2 className="font-heading text-xl font-bold tracking-tight">Traveller details</h2>
 
       <div className="space-y-4">
         {Array.from({ length: numPilgrims }).map((_, i) => {
           const p = saved[i];
           return (
-            <div key={i} className="rounded-xl border border-border">
-              <p className="flex items-center gap-2 border-b border-border px-4 py-2.5 text-sm font-bold">
-                <span className="flex size-6 items-center justify-center rounded-full bg-secondary text-primary">
-                  <User className="size-3.5" />
+            <fieldset key={i} className="min-w-0 rounded-xl border border-border">
+              <legend className="contents">
+                <span className="flex items-center gap-2 border-b border-border bg-secondary/40 px-4 py-2.5 text-sm font-semibold">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-card text-xs tabular-nums ring-1 ring-border">
+                    {i + 1}
+                  </span>
+                  Traveller {i + 1}
+                  {i === 0 ? <Badge variant="info">Lead traveller</Badge> : null}
                 </span>
-                Traveller {i + 1}
-                {i === 0 ? (
-                  <Badge className="border-transparent bg-chart-3/10 text-[10px] text-chart-3">
-                    Lead traveller
-                  </Badge>
-                ) : null}
-              </p>
+              </legend>
               <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
                 <Field
                   label="Full name (as in passport)"
@@ -85,7 +76,7 @@ export function StepPilgrims({
                     required
                   />
                 </Field>
-                <Field label="Gender" required>
+                <Field label="Gender" htmlFor={`pilgrim_${i}_gender`} required>
                   <Select name={`pilgrim_${i}_gender`} defaultValue={p?.gender ?? "male"}>
                     <SelectTrigger id={`pilgrim_${i}_gender`} className="w-full">
                       <SelectValue />
@@ -131,12 +122,12 @@ export function StepPilgrims({
                 <Field
                   label="Mahram name (if applicable)"
                   htmlFor={`pilgrim_${i}_mahram_name`}
-                  hint={i === 0 ? "Required for female pilgrims under Umrah regulations." : undefined}
                 >
                   <Input
                     id={`pilgrim_${i}_mahram_name`}
                     name={`pilgrim_${i}_mahram_name`}
                     defaultValue={p?.mahram_name ?? ""}
+                    placeholder="Required for female pilgrims"
                   />
                 </Field>
                 <Field label="Relation to mahram" htmlFor={`pilgrim_${i}_mahram_relation`}>
@@ -147,17 +138,19 @@ export function StepPilgrims({
                   />
                 </Field>
               </div>
-            </div>
+            </fieldset>
           );
         })}
       </div>
 
-      <Field
-        label="Anything else we should know?"
-        htmlFor="notes"
-        hint="Wheelchair access, dietary needs, room preferences, or dates that could flex."
-      >
-        <Textarea id="notes" name="notes" rows={3} defaultValue={notes ?? ""} placeholder="Optional" />
+      <Field label="Special requests" htmlFor="notes">
+        <Textarea
+          id="notes"
+          name="notes"
+          rows={3}
+          defaultValue={notes ?? ""}
+          placeholder="Wheelchair access, dietary needs, room preferences, flexible dates"
+        />
       </Field>
 
       {state?.error ? (
@@ -170,12 +163,17 @@ export function StepPilgrims({
         </Alert>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
-        <Button render={<Link href={`${basePath}/${requestId}?step=2`} />} variant="ghost" className="gap-2">
-          <ArrowLeft className="size-4" /> Back
+      <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <Button
+          render={<Link href={`${basePath}/${requestId}?step=2`} />}
+          variant="ghost"
+          size="lg"
+          className="gap-2"
+        >
+          <ArrowLeft className="size-4" aria-hidden /> Back
         </Button>
         <SubmitButton size="lg" pendingText="Saving…" className="gap-2">
-          Continue to review <ArrowRight className="size-4" />
+          Continue to review <ArrowRight className="size-4" aria-hidden />
         </SubmitButton>
       </div>
     </form>

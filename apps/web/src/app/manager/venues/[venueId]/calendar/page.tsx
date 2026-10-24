@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PageHeader } from "@/components/ui/page-header";
 import { getVenueAccess } from "@/modules/events/venue-access";
 import { VenueCalendarView } from "@/modules/events/views/venue-calendar-view";
 
@@ -15,8 +16,8 @@ export default async function VenueCalendarPage({
   const access = await getVenueAccess(venueId);
   if (!access) notFound();
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
-      <h1 className="font-heading text-2xl font-semibold">Calendar</h1>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <PageHeader title="Calendar" />
       <VenueCalendarView venueId={venueId} base={`/manager/venues/${venueId}`} access={access} month={month} />
     </div>
   );

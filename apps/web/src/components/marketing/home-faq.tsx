@@ -34,9 +34,9 @@ export const HOME_FAQS: Array<{ question: string; answer: string }> = [
       "Return flights, visa processing, hotels in Makkah and Madinah, airport and inter-city transport, and a group guide. Each package page lists exactly what's included and the distance from your hotel to the Haram.",
   },
   {
-    question: "Are the hotel photos and prices real?",
+    question: "Are hotel rates confirmed?",
     answer:
-      "Yes. Partner hotels on STS are vetted, their rates are confirmed, and the price you see at search is the price you pay. If a listing doesn't match reality, tell us and we make it right.",
+      "Yes. Partner hotels on STS are vetted and their rates are confirmed, so the price you see at search is the price you pay. If a listing doesn't match what you find on arrival, tell us and we make it right.",
   },
   {
     question: "Can I book for family members or a group?",
@@ -58,8 +58,8 @@ export const HOME_FAQS: Array<{ question: string; answer: string }> = [
  */
 export function HomeFaq({
   faqs = HOME_FAQS,
-  title = "Before you ask — you're not the first",
-  lead = "The answers travellers ask us for most. Anything else, the support desk is one call away.",
+  title = "Frequently asked questions",
+  lead,
 }: {
   faqs?: Array<{ question: string; answer: string }>;
   title?: string;
@@ -76,7 +76,7 @@ export function HomeFaq({
         <Reveal delay={100}>
           <div className="mt-12 divide-y divide-border rounded-2xl border border-border bg-card">
             {faqs.map((faq) => (
-              <details key={faq.question} className="group px-6 py-1">
+              <details key={faq.question} className="group px-5 py-1 sm:px-6">
                 <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-3 font-heading text-base font-semibold marker:hidden focus-visible:rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden">
                   {faq.question}
                   <ChevronDown

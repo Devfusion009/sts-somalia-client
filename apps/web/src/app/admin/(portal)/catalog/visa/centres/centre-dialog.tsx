@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field as FieldRoot, FieldLabel } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { CountrySearchSelect } from "@/components/ui/country-select";
 import { SubmitButton } from "@/components/submit-button";
@@ -32,10 +32,10 @@ const TIMEZONES = [
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1.5">
-      <Label htmlFor={htmlFor}>{label}</Label>
+    <FieldRoot>
+      <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
       {children}
-    </div>
+    </FieldRoot>
   );
 }
 
@@ -52,31 +52,36 @@ export function CentreDialog({ centre }: { centre?: Centre }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {centre ? (
-        <DialogTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Edit ${centre.name}`} title="Edit" />}>
-          <Pencil className="size-3.5" />
+        <DialogTrigger render={<Button variant="ghost" size="icon" aria-label={`Edit ${centre.name}`} title="Edit" />}>
+          <Pencil />
         </DialogTrigger>
       ) : (
         <DialogTrigger render={<Button />}>
-          <Plus /> Add centre
+          <Plus aria-hidden="true" /> Add centre
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{centre ? "Edit centre" : "Add application centre"}</DialogTitle>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
           {centre ? <input type="hidden" name="id" value={centre.id} /> : null}
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Name" htmlFor={`c-name-${id}`}>
               <Input id={`c-name-${id}`} name="name" defaultValue={centre?.name} placeholder="VFS Global Nairobi" required />
             </Field>
             <Field label="Provider" htmlFor={`c-prov-${id}`}>
               <Input id={`c-prov-${id}`} name="provider" defaultValue={centre?.provider ?? ""} placeholder="VFS, TLS, BLS, Embassy" />
             </Field>
-            <div className="space-y-1.5">
-              <Label>Country</Label>
-              <CountrySearchSelect name="countryCode" defaultValue={centre?.country_code} placeholder="Select country" />
-            </div>
+            <FieldRoot>
+              <FieldLabel htmlFor={`c-country-${id}`}>Country</FieldLabel>
+              <CountrySearchSelect
+                id={`c-country-${id}`}
+                name="countryCode"
+                defaultValue={centre?.country_code}
+                placeholder="Select country"
+              />
+            </FieldRoot>
             <Field label="City" htmlFor={`c-city-${id}`}>
               <Input id={`c-city-${id}`} name="city" defaultValue={centre?.city} required />
             </Field>
@@ -96,7 +101,7 @@ export function CentreDialog({ centre }: { centre?: Centre }) {
           <Field label="Address" htmlFor={`c-addr-${id}`}>
             <Input id={`c-addr-${id}`} name="address" defaultValue={centre?.address ?? ""} />
           </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Submission hours" htmlFor={`c-sub-${id}`}>
               <Input id={`c-sub-${id}`} name="submissionHours" defaultValue={centre?.submission_hours ?? ""} placeholder="Sun–Thu 08:00–15:00" />
             </Field>
@@ -118,9 +123,16 @@ export function CentreDialog({ centre }: { centre?: Centre }) {
               <option key={tz} value={tz} />
             ))}
           </datalist>
-          {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+          {state?.error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {state.error}
+            </p>
+          ) : null}
           <DialogFooter>
-            <SubmitButton pendingText="Saving…">{centre ? "Save" : "Add centre"}</SubmitButton>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <SubmitButton pendingText="Saving…">{centre ? "Save changes" : "Add centre"}</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

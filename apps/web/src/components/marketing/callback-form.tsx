@@ -1,11 +1,11 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Loader2, PhoneCall } from "lucide-react";
+import { PhoneCall } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -48,9 +48,7 @@ export function CallbackForm() {
         setError(null);
         setService(null);
         formRef.current?.reset();
-        toast.success("Request received!", {
-          description: "Our team will call you back within business hours.",
-        });
+        toast.success("Request sent.");
       } else {
         setError(result.error);
       }
@@ -65,13 +63,10 @@ export function CallbackForm() {
       className="rounded-2xl border border-border bg-card p-6 shadow-2xl shadow-black/25 lg:p-8"
     >
       <h3 className="font-heading text-xl font-semibold">Request a callback</h3>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Leave your number — a travel expert calls you back, usually within the hour.
-      </p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="callback-name">Your name</Label>
+        <Field>
+          <FieldLabel htmlFor="callback-name">Your name</FieldLabel>
           <Input
             id="callback-name"
             name="name"
@@ -82,9 +77,9 @@ export function CallbackForm() {
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? "callback-error" : undefined}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="callback-phone">Phone / WhatsApp</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="callback-phone">Phone / WhatsApp</FieldLabel>
           <Input
             id="callback-phone"
             name="phone"
@@ -96,9 +91,9 @@ export function CallbackForm() {
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? "callback-error" : undefined}
           />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="callback-service">What do you need?</Label>
+        </Field>
+        <Field className="sm:col-span-2">
+          <FieldLabel htmlFor="callback-service">What do you need?</FieldLabel>
           <Select value={service} onValueChange={(value) => setService(value ? String(value) : null)}>
             <SelectTrigger id="callback-service" className="h-12 w-full">
               <SelectValue placeholder="Choose a service" />
@@ -111,40 +106,33 @@ export function CallbackForm() {
               ))}
             </SelectContent>
           </Select>
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="callback-message">
+        </Field>
+        <Field className="sm:col-span-2">
+          <FieldLabel htmlFor="callback-message">
             Anything we should know? <span className="font-normal text-muted-foreground">(optional)</span>
-          </Label>
+          </FieldLabel>
           <Textarea
             id="callback-message"
             name="message"
             rows={3}
             placeholder="Travel dates, destination, number of travellers…"
           />
-        </div>
+        </Field>
       </div>
 
       {error ? (
-        <p id="callback-error" role="alert" aria-live="polite" className="mt-4 text-sm font-medium text-destructive">
+        <FieldError id="callback-error" className="mt-4">
           {error}
-        </p>
+        </FieldError>
       ) : null}
 
       <Button
         type="submit"
-        disabled={pending}
+        loading={pending}
         className="mt-6 h-12 w-full bg-brand-accent text-base font-semibold text-brand-accent-foreground hover:bg-brand-accent/90"
       >
-        {pending ? (
-          <>
-            <Loader2 className="animate-spin" aria-hidden /> Sending…
-          </>
-        ) : (
-          <>
-            <PhoneCall aria-hidden /> Call me back
-          </>
-        )}
+        {pending ? null : <PhoneCall aria-hidden />}
+        Call me back
       </Button>
     </form>
   );

@@ -22,11 +22,11 @@ function Heading() {
     <SectionHeading
       align="left"
       title="Featured hotels"
-      lead="Hand-checked properties with confirmed rates and real photos."
+      lead="Partner properties with confirmed rates."
       action={
         <Link
           href="/hotels"
-          className="flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+          className="flex h-11 items-center gap-1 rounded-md text-sm font-semibold text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           View all hotels <ArrowRight className="size-4" aria-hidden />
         </Link>

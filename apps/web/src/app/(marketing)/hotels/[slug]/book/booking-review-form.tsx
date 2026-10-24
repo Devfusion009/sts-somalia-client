@@ -246,8 +246,8 @@ export function BookingReviewForm({
                   required
                 />
                 {roomsError ? (
-                  <p id="numRooms-error" className="flex items-center gap-1 text-xs font-medium text-destructive">
-                    <AlertCircle className="size-3.5 shrink-0" /> {roomsError}
+                  <p id="numRooms-error" role="alert" className="flex items-center gap-1 text-xs font-medium text-destructive">
+                    <AlertCircle className="size-3.5 shrink-0" aria-hidden /> {roomsError}
                   </p>
                 ) : null}
               </div>
@@ -269,11 +269,11 @@ export function BookingReviewForm({
               </div>
             </div>
 
-            <p className="text-sm text-muted-foreground">
-              {nights > 0
-                ? `${nights} night${nights > 1 ? "s" : ""} · ${numRooms} room${numRooms > 1 ? "s" : ""}`
-                : "Select your check-in and check-out dates."}
-            </p>
+            {nights > 0 ? (
+              <p className="text-sm text-muted-foreground tabular-nums">
+                {nights} night{nights > 1 ? "s" : ""} · {numRooms} room{numRooms > 1 ? "s" : ""}
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -289,7 +289,7 @@ export function BookingReviewForm({
                   <label
                     key={option}
                     className={cn(
-                      "flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                      "flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2",
                       checked
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-border bg-background text-muted-foreground hover:border-primary/40"
@@ -322,7 +322,9 @@ export function BookingReviewForm({
           <CardContent className="space-y-4">
             {bookedForSlot}
             <div className="space-y-2">
-              <Label>Guest names (optional)</Label>
+              <Label>
+                Guest names <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
               {guestNameRows.map((row, i) => (
                 <div key={row.id} className="flex items-center gap-2">
                   <Input
@@ -341,8 +343,8 @@ export function BookingReviewForm({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-9 shrink-0 text-muted-foreground"
-                    aria-label="Remove guest"
+                    className="size-9 shrink-0 text-muted-foreground max-sm:size-11"
+                    aria-label={`Remove guest ${i + 1}`}
                     onClick={() => setGuestNameRows((rows) => rows.filter((r) => r.id !== row.id))}
                   >
                     <X className="size-4" />
@@ -353,7 +355,6 @@ export function BookingReviewForm({
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   className="gap-1.5"
                   onClick={() =>
                     setGuestNameRows((rows) => [...rows, { id: nextGuestRowId.current++, value: "" }])
@@ -407,10 +408,13 @@ export function BookingReviewForm({
                 {/* Before dates are picked there is no stay length to multiply
                     by — a "× 0 nights" line reads as a broken total. */}
                 {nights === 0 || total === null ? (
-                  <p className="text-muted-foreground">Select dates to calculate the total.</p>
+                  <div className="flex items-center justify-between text-base font-semibold">
+                    <span>Total</span>
+                    <span className="text-muted-foreground">—</span>
+                  </div>
                 ) : (
                   <>
-                    <p className="text-muted-foreground">
+                    <p className="text-muted-foreground tabular-nums">
                       {nights} night{nights > 1 ? "s" : ""} × {numRooms} room{numRooms > 1 ? "s" : ""}
                     </p>
                     <div className="flex items-center justify-between text-base font-semibold">
@@ -427,13 +431,13 @@ export function BookingReviewForm({
             <div className="space-y-2 pt-2">
               {isManual ? (
                 <>
-                  <SubmitButton className="w-full" pendingText="Sending request…" disabled={blocked}>
+                  <SubmitButton size="lg" className="w-full" pendingText="Sending request…" disabled={blocked}>
                     Submit booking request
                   </SubmitButton>
                 </>
               ) : (
                 <>
-                  <SubmitButton className="w-full" pendingText="Reserving…" disabled={blocked}>
+                  <SubmitButton size="lg" className="w-full" pendingText="Reserving…" disabled={blocked}>
                     Continue to payment
                   </SubmitButton>
                   {bookedForSlot ? (
@@ -441,6 +445,7 @@ export function BookingReviewForm({
                       name="intent"
                       value="hold"
                       variant="outline"
+                      size="lg"
                       className="w-full"
                       pendingText="Holding…"
                       disabled={blocked}

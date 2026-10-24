@@ -1,19 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
-  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
 import { trpc } from "@/lib/trpc/react";
 
@@ -55,31 +55,36 @@ export function NewLinkForm() {
       }}
     >
       <DialogTrigger render={<Button />}>
-        <Plus /> New link
+        <Plus aria-hidden="true" /> New link
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create a tracked link</DialogTitle>
-          <DialogDescription>Point it at any page on the site — a package, hotel, or the homepage.</DialogDescription>
+          <DialogTitle>New tracked link</DialogTitle>
         </DialogHeader>
-        <form action={handleSubmit} className="space-y-4">
-          {createLink.error ? (
-            <Alert variant="destructive">
-              <AlertCircle />
-              <AlertDescription>{createLink.error.message}</AlertDescription>
-            </Alert>
-          ) : null}
-          <div className="space-y-2">
-            <Label htmlFor="campaignName">Campaign name (optional)</Label>
-            <Input id="campaignName" name="campaignName" placeholder="Instagram bio, newsletter…" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="targetPath">Destination path</Label>
-            <Input id="targetPath" name="targetPath" placeholder="/umrah/14-day-premium-umrah" defaultValue="/" required />
-          </div>
-          <SubmitButton className="w-full" pendingText="Creating…">
-            Create link
-          </SubmitButton>
+        <form action={handleSubmit}>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="campaignName">Campaign</FieldLabel>
+              <Input id="campaignName" name="campaignName" placeholder="Instagram bio, newsletter…" />
+            </Field>
+            <Field data-invalid={createLink.error ? true : undefined}>
+              <FieldLabel htmlFor="targetPath">Destination path</FieldLabel>
+              <Input
+                id="targetPath"
+                name="targetPath"
+                placeholder="/umrah/14-day-premium-umrah"
+                defaultValue="/"
+                required
+                className="font-mono"
+                aria-invalid={createLink.error ? true : undefined}
+              />
+              <FieldError>{createLink.error?.message}</FieldError>
+            </Field>
+            <DialogFooter>
+              <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+              <SubmitButton pendingText="Creating…">Create link</SubmitButton>
+            </DialogFooter>
+          </FieldGroup>
         </form>
       </DialogContent>
     </Dialog>

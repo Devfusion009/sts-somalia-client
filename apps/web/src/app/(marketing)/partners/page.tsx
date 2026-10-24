@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import { Building2, Globe2, SlidersHorizontal, CalendarCheck, BedDouble } from "lucide-react";
 import { ProgramLanding } from "@/components/marketing/program-landing";
 
-export const metadata: Metadata = { title: "List Your Hotel" };
+export const metadata: Metadata = { title: "List your hotel" };
 
 export default function PartnersLandingPage() {
   return (
     <ProgramLanding
       image={{ src: "/marketing/partner-hotel.webp", alt: "A hotel receptionist handing a key card to an arriving guest" }}
-      eyebrow="Hotel Partners"
+      eyebrow="Hotel partners"
       icon={Building2}
-      title="List Your Hotel"
+      title="List your hotel"
       subtitle="Reach travelers across Somalia and beyond. List your property, manage rooms and availability, and receive bookings directly through STS Somalia."
       ctaLabel="Apply to list your hotel"
       ctaHref="/account/become?program=partner"
@@ -23,7 +23,7 @@ export default function PartnersLandingPage() {
         {
           icon: SlidersHorizontal,
           title: "You control your listing",
-          description: "Manage your hotel details, rooms, pricing, and publish status yourself — no approval needed to update.",
+          description: "Manage your hotel details, rooms, pricing and publish status yourself.",
         },
         {
           icon: BedDouble,
@@ -39,7 +39,7 @@ export default function PartnersLandingPage() {
       steps={[
         {
           title: "Create an account",
-          description: "Sign up with your email — takes less than a minute.",
+          description: "Sign up with your email.",
         },
         {
           title: "Tell us about your property",
@@ -47,11 +47,11 @@ export default function PartnersLandingPage() {
         },
         {
           title: "Get approved",
-          description: "Our team reviews applications and approves most within a couple of business days.",
+          description: "Our team reviews your application.",
         },
         {
           title: "Add your hotel and go live",
-          description: "Once approved, add your hotel, its rooms, and publish — you're in full control of what's visible.",
+          description: "Add your hotel and its rooms, then publish.",
         },
       ]}
       faqNote="After approval, you can list multiple properties under one partner account."

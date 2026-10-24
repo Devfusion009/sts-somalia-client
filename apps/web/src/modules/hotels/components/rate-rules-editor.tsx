@@ -4,12 +4,13 @@ import { useActionState, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
 import { addRateRule, deleteRateRule, type RateActionState } from "@/modules/hotels/rate-actions";
 import type { RateRule } from "@/modules/hotels/rate-queries";
+import { dateSpan } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -54,15 +55,15 @@ export function RateRulesEditor({
   return (
     <div className="space-y-5">
       {rules.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No rules.</p>
+        <p className="text-sm text-muted-foreground">No rules</p>
       ) : (
-        <ul className="divide-y divide-border rounded-lg border border-border">
+        <ul className="divide-y divide-border">
           {rules.map((rule) => (
-            <li key={rule.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
+            <li key={rule.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 first:pt-0">
               <div className="min-w-0">
                 <p className="text-sm font-medium">{rule.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {rule.roomName ?? "All room types"} · {rule.dateStart} → {rule.dateEnd} · {describeDays(rule.weekdays)}
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  {rule.roomName ?? "All room types"} · {dateSpan(rule.dateStart, rule.dateEnd)} · {describeDays(rule.weekdays)}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -70,8 +71,14 @@ export function RateRulesEditor({
                 <form action={deleteRateRule}>
                   <input type="hidden" name="hotelId" value={hotelId} />
                   <input type="hidden" name="ruleId" value={rule.id} />
-                  <Button type="submit" variant="ghost" size="icon" className="size-7 text-muted-foreground" aria-label="Delete rule">
-                    <Trash2 className="size-3.5" />
+                  <Button
+                    type="submit"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground hover:text-destructive"
+                    aria-label={`Delete ${rule.name}`}
+                  >
+                    <Trash2 />
                   </Button>
                 </form>
               </div>
@@ -85,14 +92,14 @@ export function RateRulesEditor({
         {roomId !== "all" ? <input type="hidden" name="roomId" value={roomId} /> : null}
         <input type="hidden" name="adjustment" value={adjustment} />
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="rule-name">Name</Label>
+          <Field>
+            <FieldLabel htmlFor="rule-name">Name</FieldLabel>
             <Input id="rule-name" name="name" placeholder="Ramadan" maxLength={80} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Room type</Label>
+          </Field>
+          <Field>
+            <FieldLabel>Room type</FieldLabel>
             <Select value={roomId} onValueChange={(v) => setRoomId(String(v ?? "all"))}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full" aria-label="Room type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -104,15 +111,15 @@ export function RateRulesEditor({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="rule-start">From</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="rule-start">From</FieldLabel>
             <Input id="rule-start" name="dateStart" type="date" min={today} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="rule-end">To</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="rule-end">To</FieldLabel>
             <Input id="rule-end" name="dateEnd" type="date" min={today} required />
-          </div>
+          </Field>
         </div>
 
         <fieldset className="space-y-1.5">
@@ -124,7 +131,7 @@ export function RateRulesEditor({
                 <label
                   key={label}
                   className={cn(
-                    "cursor-pointer rounded-full border px-3 py-1 text-sm transition-colors",
+                    "inline-flex h-8 cursor-pointer items-center rounded-full border px-3 text-sm transition-colors has-focus-visible:ring-3 has-focus-visible:ring-ring/50 max-sm:h-10",
                     on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -144,10 +151,10 @@ export function RateRulesEditor({
         </fieldset>
 
         <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1.5">
-            <Label>Change</Label>
+          <Field>
+            <FieldLabel>Change</FieldLabel>
             <Select value={adjustment} onValueChange={(v) => setAdjustment(v === "fixed" ? "fixed" : "percent")}>
-              <SelectTrigger className="w-44">
+              <SelectTrigger className="w-44" aria-label="Change">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -155,21 +162,21 @@ export function RateRulesEditor({
                 <SelectItem value="fixed">Fixed nightly price</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="rule-value">{adjustment === "percent" ? "Percent (+/-)" : "Price"}</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="rule-value">{adjustment === "percent" ? "Percent (+/-)" : "Price"}</FieldLabel>
             <Input
               id="rule-value"
               name="value"
               type="number"
               step="0.01"
               required
-              className="w-36"
+              className="w-36 tabular-nums"
               aria-invalid={Boolean(state?.error)}
             />
-          </div>
-          <SubmitButton size="sm" className="gap-1.5" pendingText="Adding…">
-            <Plus className="size-3.5" /> Add rule
+          </Field>
+          <SubmitButton className="sm:ml-auto" pendingText="Adding…">
+            <Plus aria-hidden="true" /> Add rule
           </SubmitButton>
         </div>
       </form>

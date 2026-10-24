@@ -1,10 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { SubmitButton } from "@/components/submit-button";
 import type { ActionState } from "@/lib/auth/actions";
 import { requestAgencyPayout } from "@/modules/agencies/payout-actions";
@@ -13,27 +11,34 @@ export function WithdrawForm({ available }: { available: number }) {
   const [state, formAction] = useActionState<ActionState, FormData>(requestAgencyPayout, null);
 
   return (
-    <form action={formAction} className="space-y-4">
-      {state?.error ? (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      ) : null}
-      <div className="grid gap-2 sm:max-w-xs">
-        <Label htmlFor="amount">Amount (USD)</Label>
-        <Input
-          id="amount"
-          name="amount"
-          type="number"
-          step="0.01"
-          min="0.01"
-          max={available}
-          placeholder={available.toFixed(2)}
-          required
-        />
-      </div>
-      <SubmitButton disabled={available <= 0}>Request transfer</SubmitButton>
+    <form action={formAction}>
+      <FieldGroup className="gap-4">
+        <Field data-invalid={state?.error ? true : undefined}>
+          <FieldLabel htmlFor="amount">Amount (USD)</FieldLabel>
+          <InputGroup>
+            <InputGroupAddon>
+              <InputGroupText>$</InputGroupText>
+            </InputGroupAddon>
+            <InputGroupInput
+              id="amount"
+              name="amount"
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0.01"
+              max={available}
+              placeholder={available.toFixed(2)}
+              aria-invalid={state?.error ? true : undefined}
+              required
+              className="tabular-nums"
+            />
+          </InputGroup>
+          <FieldError>{state?.error}</FieldError>
+        </Field>
+        <SubmitButton disabled={available <= 0} pendingText="Requesting…" className="w-full">
+          Request transfer
+        </SubmitButton>
+      </FieldGroup>
     </form>
   );
 }

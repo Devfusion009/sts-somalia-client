@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { ChevronRight, Plus, Search } from "lucide-react";
+import { CalendarDays, ChevronRight, Plus, Search } from "lucide-react";
 import { eventTypeLabel } from "@sts/shared-types";
 import { todayIso } from "@/modules/hotels/availability";
 import { deskPayment, expirePastHallRequests, getVenueDeskBookings, type DeskBooking } from "@/modules/events/venue-manager-queries";
@@ -9,10 +9,11 @@ import { shortTime } from "@/modules/events/venue-desk-types";
 import { venueMoney } from "@/modules/events/components/amenities";
 import { HallPaymentLabel, HallStatusBadge } from "@/modules/events/components/hall-badges";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { FilterChips } from "@/components/dashboard/filter-chips";
 
 const VIEWS = [
   { key: "upcoming", label: "Upcoming" },
@@ -79,36 +80,37 @@ export async function VenueBookingsView({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav className="flex flex-wrap gap-1.5" aria-label="Filter bookings">
-          {VIEWS.map((v) => (
-            <Link
-              key={v.key}
-              href={`${base}/bookings?view=${v.key}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-              aria-current={view === v.key ? "page" : undefined}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-                view === v.key
-                  ? "border-transparent bg-primary text-primary-foreground"
-                  : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              {v.label}
-              <span className={cn("text-xs tabular-nums", view === v.key ? "opacity-80" : "text-muted-foreground")}>
-                {counts[v.key]}
-              </span>
-            </Link>
-          ))}
-        </nav>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <FilterChips
+          label="Filter bookings"
+          active={view}
+          showZero
+          items={VIEWS.map((v) => ({
+            key: v.key,
+            label: v.label,
+            href: `${base}/bookings?view=${v.key}${q ? `&q=${encodeURIComponent(q)}` : ""}`,
+            count: counts[v.key],
+          }))}
+        />
         <div className="flex items-center gap-2">
-          <form className="relative" role="search">
+          <form role="search" className="min-w-0 flex-1 lg:w-64 lg:flex-none">
             <input type="hidden" name="view" value={view} />
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input name="q" defaultValue={q} placeholder="Reference, client, phone" aria-label="Search bookings" className="h-9 w-56 pl-8" />
+            <InputGroup className="max-sm:h-10">
+              <InputGroupAddon>
+                <Search aria-hidden="true" />
+              </InputGroupAddon>
+              <InputGroupInput
+                name="q"
+                type="search"
+                defaultValue={q}
+                placeholder="Reference, client, phone"
+                aria-label="Search bookings"
+              />
+            </InputGroup>
           </form>
           {canManage ? (
-            <Button className="gap-1.5" render={<Link href={`${base}/bookings/new`} />}>
-              <Plus className="size-4" /> New booking
+            <Button className="shrink-0" render={<Link href={`${base}/bookings/new`} />}>
+              <Plus aria-hidden="true" /> New booking
             </Button>
           ) : null}
         </div>
@@ -116,20 +118,26 @@ export async function VenueBookingsView({
 
       {bookings.length === 0 ? (
         <Card>
-          <CardContent className="py-16 text-center text-sm text-muted-foreground">No bookings.</CardContent>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <CalendarDays />
+            </EmptyMedia>
+            <EmptyTitle>{q ? "No bookings match" : "No bookings"}</EmptyTitle>
+          </Empty>
         </Card>
       ) : (
         <Card className="overflow-hidden py-0">
-          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Event</TableHead>
                   <TableHead>Client</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead numeric>Price</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-8" />
+                  <TableHead className="w-8">
+                    <span className="sr-only">Open</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -140,7 +148,10 @@ export async function VenueBookingsView({
                   return (
                     <TableRow key={b.id} className="group relative">
                       <TableCell className="whitespace-nowrap">
-                        <Link href={href} className="font-medium after:absolute after:inset-0 hover:text-primary">
+                        <Link
+                          href={href}
+                          className="rounded-sm font-medium tabular-nums outline-none after:absolute after:inset-0 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                        >
                           {format(parseISO(b.start_date), "EEE d MMM yyyy")}
                         </Link>
                         <p className="text-xs text-muted-foreground tabular-nums">
@@ -151,7 +162,7 @@ export async function VenueBookingsView({
                       </TableCell>
                       <TableCell className="max-w-64">
                         <p className="truncate font-medium">{b.event_name || eventTypeLabel(b.event_type)}</p>
-                        <p className="truncate text-xs text-muted-foreground">
+                        <p className="truncate text-xs text-muted-foreground tabular-nums">
                           {b.event_name ? `${eventTypeLabel(b.event_type)} · ` : ""}
                           {b.expected_guests ?? "—"} guests · <span className="font-mono">{b.booking_ref}</span>
                         </p>
@@ -163,22 +174,26 @@ export async function VenueBookingsView({
                           {b.contact_phone ? ` · ${b.contact_phone}` : ""}
                         </p>
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <p className="tabular-nums">{Number(b.price) > 0 ? venueMoney(b.currency, b.price) : "Not set"}</p>
+                      <TableCell numeric className="whitespace-nowrap">
+                        <p className="tabular-nums">
+                          {Number(b.price) > 0 ? venueMoney(b.currency, b.price) : <span className="text-muted-foreground">Not set</span>}
+                        </p>
                         <HallPaymentLabel state={deskPayment(b)} />
                       </TableCell>
                       <TableCell>
                         <HallStatusBadge status={b.status} />
                       </TableCell>
                       <TableCell>
-                        <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                        <ChevronRight
+                          className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                          aria-hidden="true"
+                        />
                       </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
-          </div>
         </Card>
       )}
     </div>

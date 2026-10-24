@@ -7,18 +7,10 @@ import { getPendingHallBookingCount } from "@/modules/events/venue-manager-queri
 import { getOpenVenueRequestCount } from "@/modules/events/venue-refund-queries";
 import { priceUnitLabel, venueMoney } from "@/modules/events/components/amenities";
 import { BackLink } from "@/components/back-link";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { VenueForm } from "../venue-form";
 import { VenueTabs } from "./venue-tabs";
-
-const STATUS_STYLE: Record<string, string> = {
-  published: "bg-primary/10 text-primary",
-  draft: "bg-muted text-muted-foreground",
-  pending_review: "bg-brand-gold/15 text-brand-gold",
-  suspended: "bg-destructive/10 text-destructive",
-};
 
 /** Header and section tabs shared by every page of one venue in the admin console. */
 export default async function AdminVenueLayout({
@@ -48,30 +40,32 @@ export default async function AdminVenueLayout({
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="space-y-4">
         <BackLink href="/admin/events" label="All venues" />
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="font-heading text-2xl font-semibold">{venue.name}</h1>
-              <Badge className={cn("border-transparent capitalize", STATUS_STYLE[venue.status] ?? "bg-muted text-muted-foreground")}>
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{venue.name}</h1>
+              <Badge variant={statusBadgeVariant(venue.status)} className="capitalize">
                 {venue.status.replace(/_/g, " ")}
               </Badge>
+              {venue.is_featured ? <Badge variant="info">Featured</Badge> : null}
             </div>
-            <p className="mt-0.5 text-sm text-muted-foreground">{meta.join(" · ")}</p>
+            <p className="text-sm text-muted-foreground tabular-nums">{meta.join(" · ")}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1">
             {venue.status === "published" ? (
               <Button
                 variant="outline"
                 size="icon"
                 aria-label="Open public page"
+                title="Open public page"
                 render={<a href={`/events/${venue.slug}`} target="_blank" rel="noreferrer" />}
               >
-                <ExternalLink className="size-4" />
+                <ExternalLink />
               </Button>
             ) : null}
             <VenueForm venue={venue} />
           </div>
-        </div>
+        </header>
         <VenueTabs id={id} counts={{ requests, refunds }} />
       </div>
       {children}

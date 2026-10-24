@@ -4,7 +4,7 @@ import { useActionState, useRef } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
 import { deleteRefundRule, saveRefundRule, type RefundActionState } from "@/modules/hotels/refund-actions";
@@ -49,11 +49,11 @@ export function RefundRulesEditor({
   return (
     <div className="space-y-4">
       {rules.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No rules.</p>
+        <p className="text-sm text-muted-foreground">No rules</p>
       ) : (
-        <ul className="divide-y divide-border rounded-lg border border-border">
+        <ul className="divide-y divide-border">
           {rules.map((rule) => (
-            <li key={rule.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+            <li key={rule.id} className="flex items-center justify-between gap-3 py-2.5 text-sm first:pt-0">
               <span>
                 {rule.daysBefore === 0 ? "Any time" : `${rule.daysBefore} days or more`} before {anchor}
               </span>
@@ -63,8 +63,14 @@ export function RefundRulesEditor({
                   <form action={deleteAction}>
                     <input type="hidden" name={scopeName} value={scopeId} />
                     <input type="hidden" name="ruleId" value={rule.id} />
-                    <Button type="submit" variant="ghost" size="icon" className="size-7 text-muted-foreground" aria-label="Delete rule">
-                      <Trash2 className="size-3.5" />
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-muted-foreground hover:text-destructive"
+                      aria-label="Delete rule"
+                    >
+                      <Trash2 />
                     </Button>
                   </form>
                 ) : null}
@@ -72,7 +78,7 @@ export function RefundRulesEditor({
             </li>
           ))}
           {lowest !== null && lowest > 0 ? (
-            <li className="flex items-center justify-between gap-3 bg-secondary/40 px-3 py-2.5 text-sm">
+            <li className="flex items-center justify-between gap-3 py-2.5 text-sm text-muted-foreground">
               <span>Less than {lowest} days before {anchor}</span>
               <span className="font-semibold tabular-nums">100% deducted</span>
             </li>
@@ -81,14 +87,14 @@ export function RefundRulesEditor({
       )}
 
       {canEdit ? (
-        <form ref={formRef} action={formAction} className="flex flex-wrap items-end gap-3">
+        <form ref={formRef} action={formAction} className="flex flex-wrap items-end gap-3 border-t border-border pt-4">
           <input type="hidden" name={scopeName} value={scopeId} />
-          <div className="space-y-1.5">
-            <Label htmlFor="daysBefore">Days before {anchor}</Label>
-            <Input id="daysBefore" name="daysBefore" type="number" min={0} max={730} step={1} required className="w-40" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="deductionPercent">Deduction %</Label>
+          <Field>
+            <FieldLabel htmlFor="daysBefore">Days before {anchor}</FieldLabel>
+            <Input id="daysBefore" name="daysBefore" type="number" min={0} max={730} step={1} required className="w-40 tabular-nums" />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="deductionPercent">Deduction %</FieldLabel>
             <Input
               id="deductionPercent"
               name="deductionPercent"
@@ -97,12 +103,12 @@ export function RefundRulesEditor({
               max={100}
               step="0.01"
               required
-              className="w-32"
+              className="w-32 tabular-nums"
               aria-invalid={Boolean(state?.error)}
             />
-          </div>
-          <SubmitButton size="sm" className="gap-1.5" pendingText="Saving…">
-            <Plus className="size-3.5" /> Add rule
+          </Field>
+          <SubmitButton className="sm:ml-auto" pendingText="Saving…">
+            <Plus aria-hidden="true" /> Add rule
           </SubmitButton>
         </form>
       ) : null}

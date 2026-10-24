@@ -32,7 +32,7 @@ export function SelectCustomerButton({
       size="sm"
       variant={variant}
       className={className}
-      disabled={pending}
+      loading={pending}
       onClick={() =>
         startTransition(async () => {
           const result = await selectBookingCustomer(customerId);

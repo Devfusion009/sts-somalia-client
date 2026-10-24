@@ -17,6 +17,7 @@ import {
   type PilgrimActionState,
 } from "@/modules/umrah/pilgrim-actions";
 import { HAND_IN_LABEL, HAND_IN_TYPES, REVIEW_STATUS_LABEL, type HandInType } from "@/modules/umrah/readiness";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 export type HandedInDocument = {
   id: string;
@@ -27,9 +28,6 @@ export type HandedInDocument = {
   review_note: string | null;
   url: string | null;
 };
-
-const selectClass =
-  "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 const REVIEW_STYLES: Record<string, string> = {
   pending: "bg-brand-gold/15 text-brand-gold",
@@ -77,7 +75,7 @@ function UploadDialog({ bookingId, pilgrims }: { bookingId: string; pilgrims: { 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="handin-pilgrim">Pilgrim</Label>
-              <select id="handin-pilgrim" name="pilgrimId" className={selectClass} defaultValue={pilgrims[0]?.id} required>
+              <select id="handin-pilgrim" name="pilgrimId" className={NATIVE_SELECT_CLASS} defaultValue={pilgrims[0]?.id} required>
                 {pilgrims.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.full_name}
@@ -87,7 +85,7 @@ function UploadDialog({ bookingId, pilgrims }: { bookingId: string; pilgrims: { 
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="handin-type">Type</Label>
-              <select id="handin-type" name="docType" className={selectClass} defaultValue="passport_copy" required>
+              <select id="handin-type" name="docType" className={NATIVE_SELECT_CLASS} defaultValue="passport_copy" required>
                 {HAND_IN_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {HAND_IN_LABEL[t]}

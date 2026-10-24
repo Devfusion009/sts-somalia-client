@@ -5,13 +5,11 @@ import { format } from "date-fns";
 import {
   ArrowRight,
   Check,
-  BedDouble,
-  CalendarDays,
+  ChevronRight,
   CreditCard,
   Download,
   FileText,
   Landmark,
-  Plane,
   Send,
   Ticket,
   Users,
@@ -38,8 +36,9 @@ import { Button } from "@/components/ui/button";
 import { BackLink } from "@/components/back-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
+import { cn } from "@/lib/utils";
 import { FlightDetails, hasFlightDetails } from "@/app/(marketing)/umrah/[slug]/flight-details";
 import { umrahTimeline, UMRAH_STAGE_LABEL, UMRAH_DOC_TYPE_LABEL, formatFileSize } from "@/modules/umrah/timeline";
 import type { BookingType } from "@/modules/bookings/types";
@@ -110,7 +109,7 @@ export default async function BookingDetailPage({
   // instead of the same detail view they'd see a week later.
   const justRequested = submitted.requested === "1" || submitted.waitlisted === "1";
   const justWaitlisted = submitted.waitlisted === "1";
-  const profile = await requireUser();
+  await requireUser();
 
   const trpc = await getServerTrpc();
   let order: CheckoutOrderRow | null;
@@ -229,531 +228,478 @@ export default async function BookingDetailPage({
         : "awaiting_confirmation"
       : order.status;
 
+  // The one thing the customer has to do next, surfaced above everything
+  // else: pay a confirmed request-first booking, or settle a balance.
+  const payNow =
+    awaitingPayment &&
+    (hotelStatus === "confirmed" || hallStatus === "confirmed" || umrahBookingStatus === "confirmed");
+  const nextStep = payNow
+    ? { label: "Confirmed price", amount: Number(order.total), action: "Complete payment" }
+    : balanceDue > 0
+      ? { label: "Balance due", amount: balanceDue, action: "Pay balance" }
+      : null;
+
+  const invoiceAvailable = order.status !== "cancelled";
+  const showManage = requests.length > 0 || order.status !== "cancelled";
+
   return (
-    <div className="space-y-6">
-      <div>
-        <BackLink href="/account/bookings" label="All bookings" className="mb-3" />
+    <div className="mx-auto w-full max-w-6xl space-y-6">
+      <BackLink href="/account/bookings" label="All bookings" />
 
-        {justRequested ? (
-          <div className="mb-5 flex flex-wrap items-center gap-4 rounded-xl bg-primary/5 p-5 ring-1 ring-primary/20">
-            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-              <Check className="size-6" />
-            </span>
-            <h2 className="font-heading text-lg font-bold">
-              {justWaitlisted ? "You're on the waitlist" : "Booking request received"}
-            </h2>
-            <Button variant="outline" size="sm" className="ml-auto gap-1.5" render={<Link href="/hotels" />}>
-              Browse hotels <ArrowRight className="size-3.5" />
-            </Button>
-          </div>
+      {justRequested ? (
+        <div role="status" className="flex flex-wrap items-center gap-3 rounded-xl bg-primary/5 p-4 ring-1 ring-primary/20 sm:gap-4">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+            <Check className="size-5" aria-hidden="true" />
+          </span>
+          <h2 className="min-w-0 flex-1 font-heading text-lg font-semibold">
+            {justWaitlisted ? "You're on the waitlist" : "Booking request received"}
+          </h2>
+          <Button variant="outline" render={<Link href="/hotels" />}>
+            Browse hotels <ArrowRight data-icon="inline-end" aria-hidden="true" />
+          </Button>
+        </div>
+      ) : null}
+
+      <PageHeader
+        title={order.order_number}
+        status={<StatusBadge status={headerStatus} />}
+        meta={
+          <span className="tabular-nums">
+            Booked {format(new Date(order.created_at), "d MMM yyyy")}
+            {order.order_items.length > 1 ? ` · ${order.order_items.length} bookings` : ""}
+          </span>
+        }
+      />
+
+      <StatRail className={balanceDue > 0 ? "sm:grid-cols-3" : "sm:grid-cols-2"}>
+        <StatRailItem label="Total" value={formatMoney(Number(order.total), order.currency)} />
+        <StatRailItem label="Paid" value={formatMoney(paidSoFar, order.currency)} />
+        {balanceDue > 0 ? (
+          <StatRailItem label="Balance due" value={formatMoney(balanceDue, order.currency)} tone="warn" />
         ) : null}
+      </StatRail>
 
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      {nextStep ? (
+        <div className="flex flex-col gap-3 rounded-xl bg-primary/5 p-4 ring-1 ring-primary/25 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="font-heading text-2xl font-bold">{order.order_number}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Booked {format(new Date(order.created_at), "d MMMM yyyy")}
-              {order.order_items.length > 1
-                ? ` · ${order.order_items.length} bookings in this itinerary`
-                : ""}
+            <p className="text-sm text-muted-foreground">{nextStep.label}</p>
+            <p className="font-heading text-xl font-semibold tabular-nums">
+              {formatMoney(nextStep.amount, order.currency)}
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <StatusBadge status={headerStatus} />
-            <span className="font-heading text-xl font-bold">
-              {formatMoney(order.total, order.currency)}
-            </span>
-          </div>
+          <Button size="lg" render={<Link href={`/checkout/${orderId}`} />}>
+            <CreditCard data-icon="inline-start" aria-hidden="true" /> {nextStep.action}
+          </Button>
+        </div>
+      ) : null}
+
+      <div className="grid items-start gap-6 lg:grid-cols-3">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
+          {/* Hotel progress (manual booking) */}
+          {hotelStatus ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center gap-2">
+                  Hotel booking
+                  {hotelStatus === "waitlisted" ? (
+                    <Badge variant="warning">Waitlisted</Badge>
+                  ) : hotelStatus === "pending" && awaitingPayment ? (
+                    <Badge variant="warning">Requested</Badge>
+                  ) : null}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StatusTimeline
+                  stages={HOTEL_STAGES}
+                  currentIndex={manualBookingStageIndex(hotelStatus).index}
+                  outcome={manualBookingStageIndex(hotelStatus).outcome}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* Hall progress (manual booking) */}
+          {hallStatus ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center gap-2">
+                  Event booking
+                  {hallStatus === "waitlisted" ? (
+                    <Badge variant="warning">Waitlisted</Badge>
+                  ) : hallStatus === "pending" && awaitingPayment ? (
+                    <Badge variant="warning">Requested</Badge>
+                  ) : null}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StatusTimeline
+                  stages={HALL_STAGES}
+                  currentIndex={manualBookingStageIndex(hallStatus).index}
+                  outcome={manualBookingStageIndex(hallStatus).outcome}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* Umrah progress */}
+          {umrahBookingStatus && umrahTrack ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center gap-2">
+                  {umrahIsPrivate ? "Private Umrah" : "Umrah"}
+                  {umrahIsPrivate && umrahBookingStatus === "pending" && awaitingPayment ? (
+                    <Badge variant="warning">Requested</Badge>
+                  ) : null}
+                  {umrahBooking?.custom_request ? (
+                    <span className="font-mono text-xs font-normal text-muted-foreground">
+                      {umrahBooking.custom_request.reference}
+                    </span>
+                  ) : null}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StatusTimeline
+                  stages={umrahTrack.stages}
+                  currentIndex={umrahTrack.index}
+                  outcome={umrahTrack.outcome}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* Combined itinerary */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Itinerary</CardTitle>
+            </CardHeader>
+            <CardContent className="px-0">
+              <ul className="divide-y divide-border border-t border-border">
+                {order.order_items.map((item) => {
+                  const described = describeOrderItem(item);
+                  const type = item.item_type as BookingType;
+                  const Icon = TYPE_ICON[type] ?? FileText;
+                  const guests =
+                    item.item_type === "hotel" ? hotelGuestNames(item.hotel_booking?.guest_details) : [];
+                  const trackable = described.href !== "/account/bookings";
+
+                  return (
+                    <li key={item.id} className="flex items-start gap-3 px-4 py-3.5 sm:gap-4">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                        <Icon className="size-4" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">{described.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {[TYPE_LABEL[type] ?? item.item_type, described.subtitle].filter(Boolean).join(" · ")}
+                        </p>
+                        {guests.length > 0 ? (
+                          <p className="mt-0.5 text-sm text-muted-foreground">{guests.join(", ")}</p>
+                        ) : null}
+                      </div>
+                      <span className="pt-0.5 text-sm font-medium tabular-nums">
+                        {formatMoney(item.total_price, order.currency)}
+                      </span>
+                      {trackable ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="-my-1"
+                          aria-label={`Track ${described.title}`}
+                          title="Track application"
+                          render={<Link href={described.href} />}
+                        >
+                          <ChevronRight />
+                        </Button>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </CardContent>
+          </Card>
+
+          {umrahDeparture && hasFlightDetails(umrahDeparture) ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Flights</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FlightDetails departure={umrahDeparture} />
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {umrahTravel?.itinerary ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Day by day</CardTitle>
+              </CardHeader>
+              <CardContent className="px-0">
+                <div className="border-t border-border">
+                  <ItineraryList itinerary={umrahTravel.itinerary} />
+                </div>
+                {umrahContact ? (
+                  <p className="border-t border-border px-4 pt-3 text-sm text-muted-foreground">{umrahContact}</p>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {umrahTravel && umrahTravel.hotels.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Hotels</CardTitle>
+              </CardHeader>
+              <CardContent className="px-0">
+                <div className="border-t border-border">
+                  <HotelStayList hotels={umrahTravel.hotels} />
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {umrahPilgrims.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  Pilgrims
+                  <Badge variant="secondary">{umrahPilgrims.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-0">
+                <div className="border-t border-border">
+                  <PilgrimEditor pilgrims={umrahPilgrims} readiness={umrahReadiness} editable={umrahOpenForChanges} />
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {umrahBooking && umrahPilgrims.length > 0 && (umrahOpenForChanges || umrahHandedIn.length > 0) ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Passports &amp; photos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PilgrimDocuments
+                  bookingId={umrahBooking.id}
+                  pilgrims={umrahPilgrims.map((p) => ({ id: p.id, full_name: p.full_name }))}
+                  documents={umrahHandedIn}
+                  canUpload={umrahOpenForChanges}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {umrahHistory.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Umrah updates</CardTitle>
+              </CardHeader>
+              <CardContent className="px-0">
+                <ol className="divide-y divide-border border-t border-border">
+                  {umrahHistory.map((entry) => (
+                    <li key={entry.id} className="flex flex-col gap-0.5 px-4 py-3 sm:flex-row sm:gap-4">
+                      <time
+                        dateTime={entry.created_at}
+                        className="shrink-0 text-sm text-muted-foreground tabular-nums sm:w-36"
+                      >
+                        {format(new Date(entry.created_at), "d MMM yyyy, HH:mm")}
+                      </time>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{UMRAH_STAGE_LABEL[entry.stage]}</p>
+                        {entry.note ? <p className="text-sm text-muted-foreground">{entry.note}</p> : null}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+
+        <div className="min-w-0 space-y-6">
+          {/* Documents: vouchers, invoice, and anything staff have issued. */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Documents</CardTitle>
+            </CardHeader>
+            <CardContent className="px-0">
+              <ul className="divide-y divide-border border-t border-border">
+                <DocumentRow
+                  title="Travel voucher"
+                  href={voucherAvailable ? `/api/vouchers/${orderId}` : null}
+                />
+                {umrahBooking ? (
+                  <DocumentRow
+                    title="Itinerary"
+                    href={voucherAvailable ? `/api/umrah-itinerary/${orderId}` : null}
+                  />
+                ) : null}
+                <DocumentRow
+                  title={invoice ? `Invoice ${invoice.invoice_number}` : "Proforma invoice"}
+                  href={invoiceAvailable ? `/api/invoices/${orderId}` : null}
+                />
+                {umrahDocuments.map((doc) => {
+                  const pilgrimName = doc.pilgrim_id ? pilgrimNames.get(doc.pilgrim_id) : null;
+                  const meta = [
+                    UMRAH_DOC_TYPE_LABEL[doc.doc_type] ?? doc.doc_type,
+                    pilgrimName,
+                    formatFileSize(doc.file_size),
+                    format(new Date(doc.created_at), "d MMM yyyy"),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return (
+                    <DocumentRow
+                      key={doc.id}
+                      title={doc.title}
+                      meta={meta}
+                      href={signedUrls.get(doc.storage_path) ?? null}
+                    />
+                  );
+                })}
+              </ul>
+            </CardContent>
+          </Card>
+
+          {/* Payments */}
+          {order.payments.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Payments</CardTitle>
+              </CardHeader>
+              <CardContent className="px-0">
+                <ul className="divide-y divide-border border-t border-border">
+                  {order.payments.map((payment) => (
+                    <li key={payment.id} className="flex items-center gap-3 px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium capitalize">
+                          {payment.method_label ?? payment.provider}
+                        </p>
+                        <p className="text-sm text-muted-foreground tabular-nums">
+                          {format(new Date(payment.created_at), "d MMM yyyy, HH:mm")}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <StatusBadge status={payment.status} />
+                        <span className="text-sm font-medium tabular-nums">
+                          {formatMoney(payment.amount, payment.currency)}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* Requests */}
+          {showManage ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Manage booking</CardTitle>
+              </CardHeader>
+              {requests.length > 0 ? (
+                <CardContent className="px-0">
+                  <ul className="divide-y divide-border border-y border-border">
+                    {requests.map((request) => (
+                      <li key={request.id} className="space-y-2 px-4 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-medium">
+                            {REQUEST_KIND_LABEL[request.kind] ?? request.kind}
+                          </p>
+                          <StatusBadge status={request.status} />
+                        </div>
+                        {request.reason ? (
+                          <p className="line-clamp-2 text-sm text-muted-foreground">{request.reason}</p>
+                        ) : null}
+                        {request.staff_note ? (
+                          <p className="text-sm">
+                            <span className="font-medium">STS: </span>
+                            {request.staff_note}
+                          </p>
+                        ) : null}
+                        {request.status === "requested" || request.status === "in_review" ? (
+                          <WithdrawRequestButton requestId={request.id} orderId={orderId} />
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              ) : null}
+
+              {isCancellableDirectly ? (
+                <CardContent>
+                  <CancelOrderButton orderId={orderId} redirectTo="/account/bookings" label="Cancel booking" size="default" />
+                </CardContent>
+              ) : order.status !== "cancelled" ? (
+                <CardContent className="space-y-4">
+                  {refundQuote && refundQuote.refundAmount !== null && refundQuote.paidAmount > 0 ? (
+                    <dl className="flex items-baseline justify-between gap-3 text-sm">
+                      <dt className="text-muted-foreground">Refund if cancelled today</dt>
+                      <dd className="text-right font-medium tabular-nums">
+                        {formatMoney(refundQuote.refundAmount, refundQuote.currency)}
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          {refundQuote.deductionPercent}% deducted
+                        </span>
+                      </dd>
+                    </dl>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <BookingRequestDialog
+                      orderId={orderId}
+                      kind="modification"
+                      currency={order.currency}
+                      size="default"
+                      disabled={openRequests.some((r) => r.kind === "modification")}
+                    />
+                    <BookingRequestDialog
+                      orderId={orderId}
+                      kind="cancellation"
+                      currency={order.currency}
+                      size="default"
+                      disabled={openRequests.some((r) => r.kind === "cancellation")}
+                    />
+                    <BookingRequestDialog
+                      orderId={orderId}
+                      kind="refund"
+                      currency={order.currency}
+                      size="default"
+                      disabled={openRequests.some((r) => r.kind === "refund")}
+                    />
+                  </div>
+                </CardContent>
+              ) : null}
+            </Card>
+          ) : null}
         </div>
       </div>
-
-      {/* Documents */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Ticket className="size-4 text-muted-foreground" /> Documents
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            disabled={!voucherAvailable}
-            render={
-              voucherAvailable ? (
-                <a href={`/api/vouchers/${orderId}`} target="_blank" rel="noopener noreferrer" />
-              ) : undefined
-            }
-          >
-            <Download className="size-3.5" /> Travel voucher
-          </Button>
-          {umrahBooking ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              disabled={!voucherAvailable}
-              render={
-                voucherAvailable ? (
-                  <a href={`/api/umrah-itinerary/${orderId}`} target="_blank" rel="noopener noreferrer" />
-                ) : undefined
-              }
-            >
-              <Download className="size-3.5" /> Itinerary
-            </Button>
-          ) : null}
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            disabled={order.status === "cancelled"}
-            render={
-              order.status !== "cancelled" ? (
-                <a href={`/api/invoices/${orderId}`} target="_blank" rel="noopener noreferrer" />
-              ) : undefined
-            }
-          >
-            <Download className="size-3.5" />
-            {invoice ? `Invoice ${invoice.invoice_number}` : "Proforma invoice"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Combined itinerary */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Itinerary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 p-0">
-          <ul className="divide-y divide-border border-t border-border">
-            {order.order_items.map((item) => {
-              const described = describeOrderItem(item);
-              const type = item.item_type as BookingType;
-              const Icon = TYPE_ICON[type] ?? FileText;
-              const guests =
-                item.item_type === "hotel" ? hotelGuestNames(item.hotel_booking?.guest_details) : [];
-
-              return (
-                <li key={item.id} className="flex flex-wrap items-start gap-4 px-5 py-4">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
-                    <Icon className="size-5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <Badge variant="secondary" className="mb-1">
-                      {TYPE_LABEL[type] ?? item.item_type}
-                    </Badge>
-                    <p className="font-medium">{described.title}</p>
-                    {described.subtitle ? (
-                      <p className="mt-0.5 text-sm text-muted-foreground">{described.subtitle}</p>
-                    ) : null}
-                    {guests.length > 0 ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Guests: {guests.join(", ")}
-                      </p>
-                    ) : null}
-                    {described.href !== "/account/bookings" ? (
-                      <Link
-                        href={described.href}
-                        className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                      >
-                        Track this application <ArrowRight className="size-3" />
-                      </Link>
-                    ) : null}
-                  </div>
-                  <span className="font-medium tabular-nums">
-                    {formatMoney(item.total_price, order.currency)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </CardContent>
-      </Card>
-
-      {/* Hotel progress (manual booking) */}
-      {hotelStatus ? (
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-              Hotel booking progress
-              {hotelStatus === "waitlisted" ? (
-                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Waitlisted</Badge>
-              ) : hotelStatus === "pending" && awaitingPayment ? (
-                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Requested</Badge>
-              ) : null}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <StatusTimeline
-              stages={HOTEL_STAGES}
-              currentIndex={manualBookingStageIndex(hotelStatus).index}
-              outcome={manualBookingStageIndex(hotelStatus).outcome}
-            />
-            <PayAfterConfirmation show={hotelStatus === "confirmed" && awaitingPayment} orderId={orderId} total={order.total} currency={order.currency} />
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {/* Hall progress (manual booking) */}
-      {hallStatus ? (
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-              Event booking progress
-              {hallStatus === "waitlisted" ? (
-                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Waitlisted</Badge>
-              ) : hallStatus === "pending" && awaitingPayment ? (
-                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Requested</Badge>
-              ) : null}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <StatusTimeline
-              stages={HALL_STAGES}
-              currentIndex={manualBookingStageIndex(hallStatus).index}
-              outcome={manualBookingStageIndex(hallStatus).outcome}
-            />
-            <PayAfterConfirmation show={hallStatus === "confirmed" && awaitingPayment} orderId={orderId} total={order.total} currency={order.currency} />
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {/* Umrah progress */}
-      {umrahBookingStatus && umrahTrack ? (
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-              {umrahIsPrivate ? "Private Umrah progress" : "Umrah progress"}
-              {umrahIsPrivate && umrahBookingStatus === "pending" && awaitingPayment ? (
-                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">
-                  Requested
-                </Badge>
-              ) : null}
-              {umrahBooking?.custom_request ? (
-                <span className="font-mono text-xs font-normal text-muted-foreground">
-                  {umrahBooking.custom_request.reference}
-                </span>
-              ) : null}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <StatusTimeline
-              stages={umrahTrack.stages}
-              currentIndex={umrahTrack.index}
-              outcome={umrahTrack.outcome}
-            />
-            <PayAfterConfirmation
-              show={umrahBookingStatus === "confirmed" && awaitingPayment}
-              orderId={orderId}
-              total={order.total}
-              currency={order.currency}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {umrahDeparture && hasFlightDetails(umrahDeparture) ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Plane className="size-4 text-muted-foreground" /> Flights
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <FlightDetails departure={umrahDeparture} />
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {umrahTravel?.itinerary ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CalendarDays className="size-4 text-muted-foreground" /> Day by day
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="border-t border-border">
-              <ItineraryList itinerary={umrahTravel.itinerary} />
-            </div>
-            {umrahContact ? (
-              <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">{umrahContact}</p>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {umrahTravel && umrahTravel.hotels.length > 0 ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BedDouble className="size-4 text-muted-foreground" /> Hotels
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="border-t border-border">
-              <HotelStayList hotels={umrahTravel.hotels} />
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {umrahPilgrims.length > 0 ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="size-4 text-muted-foreground" /> Pilgrims
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="border-t border-border">
-              <PilgrimEditor pilgrims={umrahPilgrims} readiness={umrahReadiness} editable={umrahOpenForChanges} />
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {umrahBooking && umrahPilgrims.length > 0 && (umrahOpenForChanges || umrahHandedIn.length > 0) ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileText className="size-4 text-muted-foreground" /> Passports and photos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PilgrimDocuments
-              bookingId={umrahBooking.id}
-              pilgrims={umrahPilgrims.map((p) => ({ id: p.id, full_name: p.full_name }))}
-              documents={umrahHandedIn}
-              canUpload={umrahOpenForChanges}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {umrahDocuments.length > 0 ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileText className="size-4 text-muted-foreground" /> Travel documents
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ul className="divide-y divide-border border-t border-border">
-              {umrahDocuments.map((doc) => {
-                const pilgrimName = doc.pilgrim_id ? pilgrimNames.get(doc.pilgrim_id) : null;
-                const meta = [
-                  UMRAH_DOC_TYPE_LABEL[doc.doc_type] ?? doc.doc_type,
-                  pilgrimName,
-                  formatFileSize(doc.file_size),
-                  format(new Date(doc.created_at), "d MMM yyyy"),
-                ]
-                  .filter(Boolean)
-                  .join(" · ");
-                return (
-                  <li key={doc.id} className="flex items-center gap-3 px-5 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{doc.title}</p>
-                      <p className="text-xs text-muted-foreground">{meta}</p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      aria-label={`Download ${doc.title}`}
-                      render={
-                        <a
-                          href={signedUrls.get(doc.storage_path)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        />
-                      }
-                    >
-                      <Download className="size-4" />
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {umrahHistory.length > 0 ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Umrah updates</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ul className="divide-y divide-border border-t border-border">
-              {umrahHistory.map((entry) => (
-                <li key={entry.id} className="flex flex-wrap items-start gap-x-4 gap-y-1 px-5 py-3">
-                  <span className="w-36 shrink-0 text-xs text-muted-foreground tabular-nums">
-                    {format(new Date(entry.created_at), "d MMM yyyy, HH:mm")}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{UMRAH_STAGE_LABEL[entry.stage]}</p>
-                    {entry.note ? <p className="text-sm text-muted-foreground">{entry.note}</p> : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {/* Payments */}
-      {order.payments.length > 0 ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CreditCard className="size-4 text-muted-foreground" /> Payments
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 p-0">
-            <ul className="divide-y divide-border border-t border-border">
-              {order.payments.map((payment) => (
-                <li key={payment.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium capitalize">{payment.method_label ?? payment.provider}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(payment.created_at), "d MMM yyyy, HH:mm")}
-                    </p>
-                  </div>
-                  <StatusBadge status={payment.status} />
-                  <span className="text-sm font-medium tabular-nums">
-                    {formatMoney(payment.amount, payment.currency)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {balanceDue > 0 ? (
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Balance due</p>
-                  <p className="font-heading text-lg font-bold">{formatMoney(balanceDue, order.currency)}</p>
-                </div>
-                <Button className="gap-1.5" render={<Link href={`/checkout/${orderId}`} />}>
-                  <CreditCard className="size-4" /> Pay balance
-                </Button>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {/* Requests */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Manage this booking</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {requests.length > 0 ? (
-            <ul className="space-y-2">
-              {requests.map((request) => (
-                <li
-                  key={request.id}
-                  className="flex flex-wrap items-center gap-3 rounded-lg border border-border px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">
-                      {REQUEST_KIND_LABEL[request.kind] ?? request.kind}
-                    </p>
-                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                      {request.reason}
-                    </p>
-                    {request.staff_note ? (
-                      <p className="mt-1 text-xs">
-                        <span className="font-medium">STS: </span>
-                        {request.staff_note}
-                      </p>
-                    ) : null}
-                  </div>
-                  <StatusBadge status={request.status} />
-                  {request.status === "requested" || request.status === "in_review" ? (
-                    <WithdrawRequestButton requestId={request.id} orderId={orderId} />
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {requests.length > 0 ? <Separator /> : null}
-
-          {isCancellableDirectly ? (
-            <CancelOrderButton orderId={orderId} redirectTo="/account/bookings" />
-          ) : order.status === "cancelled" ? (
-            <Alert>
-              <AlertDescription>This booking has been cancelled.</AlertDescription>
-            </Alert>
-          ) : (
-            <div className="space-y-3">
-              {refundQuote && refundQuote.refundAmount !== null && refundQuote.paidAmount > 0 ? (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Refund if cancelled today </span>
-                  <span className="font-medium">
-                    {formatMoney(refundQuote.refundAmount, refundQuote.currency)} ({refundQuote.deductionPercent}% deducted)
-                  </span>
-                </p>
-              ) : null}
-              <div className="flex flex-wrap gap-2">
-                <BookingRequestDialog
-                  orderId={orderId}
-                  kind="modification"
-                  currency={order.currency}
-                  disabled={openRequests.some((r) => r.kind === "modification")}
-                />
-                <BookingRequestDialog
-                  orderId={orderId}
-                  kind="cancellation"
-                  currency={order.currency}
-                  disabled={openRequests.some((r) => r.kind === "cancellation")}
-                />
-                <BookingRequestDialog
-                  orderId={orderId}
-                  kind="refund"
-                  currency={order.currency}
-                  disabled={openRequests.some((r) => r.kind === "refund")}
-                />
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <p className="text-xs text-muted-foreground">
-        Booked by {profile.full_name ?? profile.email} · Reference {order.order_number}
-      </p>
     </div>
   );
 }
 
-/**
- * The moment a manual (request-first) booking is confirmed, its confirmed
- * final price becomes payable — this is the customer's path into checkout,
- * which never existed at request time.
- */
-function PayAfterConfirmation({
-  show,
-  orderId,
-  total,
-  currency,
-}: {
-  show: boolean;
-  orderId: string;
-  total: number | string;
-  currency: string;
-}) {
-  if (!show) return null;
+/** One downloadable document; `href` null means it is not available. */
+function DocumentRow({ title, meta, href }: { title: string; meta?: string; href: string | null }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
-      <div>
-        <p className="text-xs text-muted-foreground">Confirmed price</p>
-        <p className="font-heading text-lg font-bold">{formatMoney(Number(total), currency)}</p>
+    <li className="flex items-center gap-3 px-4 py-3">
+      <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <p className={cn("truncate text-sm font-medium", !href && "text-muted-foreground")}>{title}</p>
+        {meta ? <p className="truncate text-sm text-muted-foreground">{meta}</p> : null}
       </div>
-      <Button className="gap-1.5" render={<Link href={`/checkout/${orderId}`} />}>
-        <CreditCard className="size-4" /> Complete payment
-      </Button>
-    </div>
+      {href ? (
+        <Button
+          size="icon"
+          variant="outline"
+          aria-label={`Download ${title}`}
+          title="Download"
+          render={<a href={href} target="_blank" rel="noopener noreferrer" />}
+        >
+          <Download />
+        </Button>
+      ) : (
+        <Badge variant="neutral">Unavailable</Badge>
+      )}
+    </li>
   );
 }

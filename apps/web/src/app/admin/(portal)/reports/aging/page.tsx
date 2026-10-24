@@ -1,25 +1,24 @@
-import Link from "next/link";
-import { Download, TrendingDown } from "lucide-react";
+import type { Metadata } from "next";
+import { format } from "date-fns";
+import { Download, Scale } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { getAgencyAgingReport, type AgencyAgingBucket } from "@/modules/agencies/queries";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { Card } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { StatStrip, StatStripItem } from "@/components/dashboard/filter-chips";
+import { money } from "@/lib/money";
 
-const BUCKET_STYLES: Record<AgencyAgingBucket, string> = {
-  "0-7": "bg-muted text-muted-foreground",
-  "8-30": "bg-chart-3/10 text-chart-3",
-  "31-60": "bg-brand-gold/15 text-brand-gold",
-  "60+": "bg-destructive/10 text-destructive",
+export const metadata: Metadata = { title: "Aging Report" };
+
+const BUCKET_VARIANT: Record<AgencyAgingBucket, BadgeVariant> = {
+  "0-7": "neutral",
+  "8-30": "info",
+  "31-60": "warning",
+  "60+": "destructive",
 };
 
 const BUCKET_LABELS: Record<AgencyAgingBucket, string> = {
@@ -30,10 +29,6 @@ const BUCKET_LABELS: Record<AgencyAgingBucket, string> = {
 };
 
 const BUCKET_ORDER: AgencyAgingBucket[] = ["0-7", "8-30", "31-60", "60+"];
-
-function money(amount: number) {
-  return `USD ${amount.toFixed(2)}`;
-}
 
 export default async function AdminAgingReportPage() {
   await requirePlatformAdmin();
@@ -50,80 +45,65 @@ export default async function AdminAgingReportPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold">Aging Report</h1>
-        </div>
-        <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/admin/reports/aging/export" />}>
-          <Download className="size-3.5" /> Export CSV
-        </Button>
-      </div>
+      <PageHeader
+        title="Aging Report"
+        actions={
+          <Button variant="outline" nativeButton={false} render={<a href="/admin/reports/aging/export" />}>
+            <Download aria-hidden="true" /> Export CSV
+          </Button>
+        }
+      />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <StatStrip>
         {summary.map((s) => (
-          <Card key={s.bucket}>
-            <CardContent className="flex items-start justify-between gap-3 pt-6">
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">{BUCKET_LABELS[s.bucket]}</p>
-                <p className="mt-1 truncate font-heading text-2xl font-bold">{money(s.total)}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {s.count} {s.count === 1 ? "agency" : "agencies"}
-                </p>
-              </div>
-              <span
-                className={cn(
-                  "flex size-10 shrink-0 items-center justify-center rounded-xl",
-                  BUCKET_STYLES[s.bucket]
-                )}
-              >
-                <TrendingDown className="size-4.5" />
-              </span>
-            </CardContent>
-          </Card>
+          <StatStripItem
+            key={s.bucket}
+            label={BUCKET_LABELS[s.bucket]}
+            value={money(s.total, "USD")}
+            sub={`${s.count} ${s.count === 1 ? "agency" : "agencies"}`}
+            tone={s.bucket === "60+" && s.count > 0 ? "warn" : undefined}
+          />
         ))}
-      </div>
+      </StatStrip>
 
       <Card className="overflow-hidden py-0">
         {rows.length === 0 ? (
-          <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            No agencies currently carry a negative balance.
-          </CardContent>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Scale />
+            </EmptyMedia>
+            <EmptyTitle>No agencies with a negative balance</EmptyTitle>
+          </Empty>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Agency</TableHead>
-                  <TableHead className="text-right">Outstanding</TableHead>
-                  <TableHead>Aging Since</TableHead>
-                  <TableHead className="text-right">Days</TableHead>
-                  <TableHead>Bucket</TableHead>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Agency</TableHead>
+                <TableHead numeric>Outstanding</TableHead>
+                <TableHead>Aging since</TableHead>
+                <TableHead numeric>Days</TableHead>
+                <TableHead>Bucket</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.agencyId}>
+                  <TableCell>
+                    <p className="font-medium">{row.agencyName}</p>
+                    <p className="text-xs text-muted-foreground">{row.contactEmail}</p>
+                  </TableCell>
+                  <TableCell numeric className="font-semibold text-destructive">
+                    {money(row.outstandingAmount, "USD")}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{format(new Date(row.agingSince), "d MMM yyyy")}</TableCell>
+                  <TableCell numeric>{row.agingDays}</TableCell>
+                  <TableCell>
+                    <Badge variant={BUCKET_VARIANT[row.bucket]}>{BUCKET_LABELS[row.bucket]}</Badge>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.agencyId}>
-                    <TableCell>
-                      <p className="font-medium">{row.agencyName}</p>
-                      <p className="text-xs text-muted-foreground">{row.contactEmail}</p>
-                    </TableCell>
-                    <TableCell className="text-right font-semibold text-destructive">
-                      {money(row.outstandingAmount)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(row.agingSince).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">{row.agingDays}</TableCell>
-                    <TableCell>
-                      <Badge className={cn("border-transparent", BUCKET_STYLES[row.bucket])}>
-                        {BUCKET_LABELS[row.bucket]}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </Card>
     </div>

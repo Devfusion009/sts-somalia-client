@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PageHeader } from "@/components/ui/page-header";
 import { getVenueAccess } from "@/modules/events/venue-access";
 import { VenueBookingsView } from "@/modules/events/views/venue-bookings-view";
 
@@ -15,8 +16,8 @@ export default async function VenueBookingsPage({
   const access = await getVenueAccess(venueId);
   if (!access) notFound();
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <h1 className="font-heading text-2xl font-semibold">Bookings</h1>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <PageHeader title="Bookings" />
       <VenueBookingsView venueId={venueId} base={`/manager/venues/${venueId}`} access={access} view={view} q={q} />
     </div>
   );

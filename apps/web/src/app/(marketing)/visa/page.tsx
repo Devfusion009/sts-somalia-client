@@ -1,18 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Clock3,
-  Headset,
-  ShieldCheck,
-  Sparkles,
-  Timer,
-  Wallet,
-} from "lucide-react";
+import { ArrowRight, Globe, Headset, ShieldCheck, Timer, Users, Wallet } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { getVisaTypes } from "@/modules/visa/queries";
 import { countryFlag, countryName } from "@/lib/countries";
 import { fmtMoney, processingText } from "@/modules/visa/components/visa-shared";
@@ -24,6 +16,7 @@ import { VisaHeroBanner, VisaProcess } from "@/components/marketing/visa-hero";
 import { VisaExpertCard } from "@/components/marketing/visa-expert-card";
 import { ReviewsRail } from "@/components/marketing/reviews-rail";
 import { HomeFaq } from "@/components/marketing/home-faq";
+import { SectionHeading } from "@/components/marketing/section-heading";
 
 export const metadata: Metadata = { title: "Visa Services" };
 
@@ -36,7 +29,7 @@ const VISA_FAQS: Array<{ question: string; answer: string }> = [
   {
     question: "How long does processing take?",
     answer:
-      "Processing time is set per destination and shown on that visa's page before you apply. Our desk reviews your documents before submission so nothing gets rejected for a fixable reason.",
+      "Processing time is set per destination and shown on that visa's page before you apply. Our desk reviews your documents before they are submitted.",
   },
   {
     question: "Can I apply for my family or a group in one application?",
@@ -59,29 +52,18 @@ const VISA_FAQS: Array<{ question: string; answer: string }> = [
 ];
 
 const TRUST_POINTS = [
-  { icon: ShieldCheck, text: "Expert document review before submission" },
-  { icon: Timer, text: "Real-time application tracking" },
-  { icon: Sparkles, text: "Family & group applications in one flow" },
+  { icon: ShieldCheck, text: "Document review before submission" },
+  { icon: Timer, text: "Application tracking in your account" },
+  { icon: Users, text: "Family and group applications" },
 ];
 
 const WHY_US = [
   { icon: ShieldCheck, text: "Documents checked before they reach the consulate" },
-  { icon: Timer, text: "Real-time tracking on every application" },
-  { icon: Sparkles, text: "Family & group applications handled together" },
+  { icon: Timer, text: "Status tracking on every application" },
+  { icon: Users, text: "Family and group applications handled together" },
   { icon: Wallet, text: "Local payment methods — EVC Plus, bank, card" },
   { icon: Headset, text: "24/7 support from our Mogadishu-based team" },
 ];
-
-/** Panel tint cycled across destination cards that have no photo below. */
-const PANEL_TINTS = [
-  "from-sky-500/20 to-sky-500/5",
-  "from-emerald-500/20 to-emerald-500/5",
-  "from-amber-500/20 to-amber-500/5",
-  "from-violet-500/20 to-violet-500/5",
-  "from-rose-500/20 to-rose-500/5",
-  "from-teal-500/20 to-teal-500/5",
-];
-
 
 export default async function VisaListPage({
   searchParams,
@@ -100,162 +82,191 @@ export default async function VisaListPage({
     <div>
       <VisaHeroBanner>
         <div className="max-w-2xl">
-          <Badge className="border-white/25 bg-white/15 text-white backdrop-blur-sm">Visa services</Badge>
-          <h1 className="mt-4 font-heading text-3xl font-bold tracking-tight text-white drop-shadow-lg sm:text-4xl lg:text-5xl">
-            Visas without the guesswork,{" "}
-            <span className="text-brand-accent">wherever you&apos;re going</span>
+          <h1 className="font-heading text-3xl font-bold tracking-tight text-balance text-white drop-shadow-lg sm:text-4xl lg:text-5xl">
+            Visa applications, <span className="text-brand-accent">checked before they&apos;re submitted</span>
           </h1>
-          <p className="mt-4 max-w-lg text-base leading-relaxed text-white/85 drop-shadow">
-            We check every document against what the consulate actually requires — before it&apos;s submitted.
+          <p className="mt-4 max-w-lg text-lg leading-relaxed text-white/85 drop-shadow">
+            Our desk reviews every document against what the consulate requires, then tracks your
+            case to a decision.
           </p>
 
           <VisaDestinationSearch destinations={destinations} defaultValue={country} />
 
-          <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2 rounded-2xl bg-white/10 px-5 py-4 ring-1 ring-white/15 backdrop-blur-sm">
+          <ul className="mt-7 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-6">
             {TRUST_POINTS.map((point) => (
               <li key={point.text} className="flex items-center gap-2 text-sm font-medium text-white/85 drop-shadow">
-                <point.icon className="size-4 text-teal-300" /> {point.text}
+                <point.icon className="size-4 shrink-0 text-primary" aria-hidden /> {point.text}
               </li>
             ))}
           </ul>
         </div>
       </VisaHeroBanner>
 
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-16 px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
         {featured.length > 0 ? (
-          <section className="mb-10">
-            <div className="flex items-center justify-between">
-              <h2 className="font-heading text-xl font-bold">Popular destinations</h2>
+          <section aria-labelledby="visa-popular">
+            <div id="visa-popular">
+              <SectionHeading align="left" title="Popular destinations" />
             </div>
-            <div className="mt-9 grid grid-cols-2 gap-x-5 gap-y-10 sm:grid-cols-3 lg:grid-cols-4">
-              {featured.map((visa, i) => {
+            <ul className="mt-8 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4">
+              {featured.map((visa) => {
                 const photo = visaCardImage(visa);
                 return (
-                <Link key={visa.id} href={`/visa/${visa.id}`} className="group block">
-                  <div className="relative">
-                    <div
-                      className={`relative flex h-28 items-center justify-center overflow-hidden rounded-2xl border border-border sm:h-32 ${photo ? "" : `bg-gradient-to-br ${PANEL_TINTS[i % PANEL_TINTS.length]}`}`}
+                  <li key={visa.id}>
+                    <Link
+                      href={`/visa/${visa.id}`}
+                      className="group block rounded-2xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
                     >
-                      {photo ? (
-                        <Image
-                          src={photo}
-                          alt=""
-                          fill
-                          sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-                          unoptimized={!photo.startsWith("/")}
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      ) : (
-                        <span className="text-5xl leading-none drop-shadow-sm transition-transform duration-300 group-hover:scale-110 sm:text-6xl">
-                          {countryFlag(visa.destination_country_code)}
-                        </span>
-                      )}
-                      {photo ? <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" aria-hidden /> : null}
-                      <Badge className="absolute top-2 left-2 border-transparent bg-brand-accent text-[10px] text-brand-accent-foreground">
-                        Popular
-                      </Badge>
-                      {photo ? (
-                        <span className="absolute right-2 bottom-2 text-2xl leading-none drop-shadow" aria-hidden>
-                          {countryFlag(visa.destination_country_code)}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="absolute inset-x-0 -bottom-6 flex justify-center">
-                      <div className="flex min-w-[4.5rem] flex-col items-center justify-center rounded-full border-4 border-background bg-primary px-3 py-1.5 text-center whitespace-nowrap text-primary-foreground shadow-lg transition-transform duration-300 group-hover:scale-105">
-                        <span className="text-xs leading-none font-semibold opacity-80">
-                          From
-                        </span>
-                        <span className="font-heading text-sm leading-tight font-bold">
+                      <div className="relative flex aspect-4/3 items-center justify-center overflow-hidden rounded-2xl bg-secondary">
+                        {photo ? (
+                          <Image
+                            src={photo}
+                            alt=""
+                            fill
+                            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+                            unoptimized={!photo.startsWith("/")}
+                            className="object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none"
+                          />
+                        ) : (
+                          <span className="text-5xl leading-none sm:text-6xl" aria-hidden>
+                            {countryFlag(visa.destination_country_code)}
+                          </span>
+                        )}
+                        {photo ? (
+                          <span
+                            className="absolute right-2 bottom-2 grid size-9 place-items-center rounded-full bg-background text-lg leading-none shadow-md"
+                            aria-hidden
+                          >
+                            {countryFlag(visa.destination_country_code)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <h3 className="mt-3 font-heading text-base leading-snug font-bold transition-colors group-hover:text-primary">
+                        {countryName(visa.destination_country_code)}
+                      </h3>
+                      <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-2">
+                        <span className="text-xs text-muted-foreground">{processingText(visa)}</span>
+                        <span className="font-heading text-base font-bold text-foreground tabular-nums sm:text-lg">
                           {fmtMoney(visa.price, visa.currency)}
                         </span>
                       </div>
-                    </div>
-                  </div>
-                  <div className="pt-9 text-center">
-                    <h3 className="font-heading text-sm font-bold group-hover:text-primary sm:text-base">
-                      {countryName(visa.destination_country_code)}
-                    </h3>
-                    <p className="mt-1 flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                      <Clock3 className="size-3" /> {processingText(visa)}
-                    </p>
-                  </div>
-                </Link>
+                    </Link>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           </section>
         ) : null}
 
-        <section id="visa-results" className="scroll-mt-48">
-          <h2 className="font-heading text-xl font-bold">
-            {country ? `Results for "${country}"` : "All visa services"}
-          </h2>
+        <section id="visa-results" aria-labelledby="visa-results-heading" className="scroll-mt-48">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 id="visa-results-heading" className="font-heading text-2xl font-bold tracking-tight">
+              {country ? `Visas for “${country}”` : "All visa services"}
+            </h2>
+            {visaTypes.length > 0 ? (
+              <p className="text-sm text-muted-foreground tabular-nums">
+                {visaTypes.length} visa{visaTypes.length === 1 ? "" : "s"}
+              </p>
+            ) : null}
+          </div>
           {visaTypes.length > 0 ? (
-            <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <ul className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
               {visaTypes.map((visa) => (
-                <Card key={visa.id} className="transition-shadow hover:shadow-md">
-                  <CardContent className="p-5">
-                    <div className="flex items-start gap-4">
-                      <span className="text-3xl leading-none">{countryFlag(visa.destination_country_code)}</span>
+                <li key={visa.id}>
+                  <Card className="h-full py-0 transition-shadow hover:shadow-md">
+                    <CardContent className="flex h-full flex-col gap-4 p-5 sm:flex-row sm:items-start">
+                      <span className="text-3xl leading-none" aria-hidden>
+                        {countryFlag(visa.destination_country_code)}
+                      </span>
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-medium text-muted-foreground">
                           {countryName(visa.destination_country_code)}
                         </p>
-                        <h3 className="font-heading text-base font-bold">{visa.name}</h3>
-                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          <span>Processing: {processingText(visa)}</span>
-                          {visa.validity_days ? <span>Validity: {visa.validity_days} days</span> : null}
-                          {visa.stay_days ? <span>Stay: {visa.stay_days} days</span> : null}
-                          <span className="capitalize">
-                            {visa.entry_type === "multiple" ? "Multiple entry" : "Single entry"}
-                          </span>
-                        </div>
-                        <div className="mt-2">
+                        <h3 className="font-heading text-base font-bold">
+                          <Link
+                            href={`/visa/${visa.id}`}
+                            className="rounded-sm hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                          >
+                            {visa.name}
+                          </Link>
+                        </h3>
+                        <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground tabular-nums">
+                          <div className="flex gap-1">
+                            <dt>Processing</dt>
+                            <dd className="font-medium text-foreground">{processingText(visa)}</dd>
+                          </div>
+                          {visa.validity_days ? (
+                            <div className="flex gap-1">
+                              <dt>Validity</dt>
+                              <dd className="font-medium text-foreground">{visa.validity_days} days</dd>
+                            </div>
+                          ) : null}
+                          {visa.stay_days ? (
+                            <div className="flex gap-1">
+                              <dt>Stay</dt>
+                              <dd className="font-medium text-foreground">{visa.stay_days} days</dd>
+                            </div>
+                          ) : null}
+                          <div>
+                            <dt className="sr-only">Entry</dt>
+                            <dd>{visa.entry_type === "multiple" ? "Multiple entry" : "Single entry"}</dd>
+                          </div>
+                        </dl>
+                        <div className="mt-2.5">
                           <VisaRequirementBadge destinationCountryName={countryName(visa.destination_country_code)} />
                         </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-xs text-muted-foreground">From</p>
-                        <p className="font-heading text-lg font-bold text-primary">
-                          {fmtMoney(visa.price, visa.currency)}
+                      <div className="flex items-end justify-between gap-3 border-t border-border pt-4 sm:block sm:shrink-0 sm:border-0 sm:pt-0 sm:text-right">
+                        <p>
+                          <span className="block text-xs text-muted-foreground">From</span>
+                          <span className="font-heading text-lg font-bold text-primary tabular-nums">
+                            {fmtMoney(visa.price, visa.currency)}
+                          </span>
                         </p>
-                        <Button size="sm" className="mt-2 gap-1" render={<Link href={`/visa/${visa.id}`} />}>
-                          Apply <ArrowRight className="size-3.5" />
+                        <Button className="gap-1 sm:mt-2" render={<Link href={`/visa/${visa.id}`} />}>
+                          Apply <ArrowRight className="size-3.5" aria-hidden />
+                          <span className="sr-only">for {visa.name}</span>
                         </Button>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </li>
               ))}
-            </div>
+            </ul>
           ) : (
-            <Card className="mt-4">
-              <CardContent className="p-10 text-center text-muted-foreground">
-                No visa services found{country ? ` for "${country}"` : ""}.{" "}
-                <Link href="/visa" className="text-primary hover:underline">
-                  View all visa services
-                </Link>
-                .
-              </CardContent>
-            </Card>
+            <Empty className="mt-6 border border-border bg-card">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Globe />
+                </EmptyMedia>
+                <EmptyTitle className="text-base">
+                  No visa services{country ? ` for “${country}”` : ""}
+                </EmptyTitle>
+              </EmptyHeader>
+              {country ? (
+                <EmptyContent>
+                  <Button variant="outline" render={<Link href="/visa" />}>
+                    View all visa services
+                  </Button>
+                </EmptyContent>
+              ) : null}
+            </Empty>
           )}
         </section>
       </div>
 
       <VisaProcess />
-      <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6 sm:py-16 lg:px-8">
+      <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
         <VisaExpertCard wide />
       </div>
 
-      <section className="bg-background py-14 sm:py-16">
+      <section className="border-t border-border bg-background py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-center font-heading text-2xl font-bold tracking-tight sm:text-3xl">
-            Why book your visa with us
-          </h2>
-          <ul className="mx-auto mt-9 grid max-w-5xl grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-5">
+          <SectionHeading title="Why book your visa with STS" />
+          <ul className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-5">
             {WHY_US.map((point) => (
-              <li key={point.text} className="flex flex-col items-center gap-3 text-center lg:items-center">
-                <span className="grid size-12 place-items-center rounded-full bg-primary/10 text-primary">
+              <li key={point.text} className="flex items-center gap-3 sm:flex-col sm:text-center">
+                <span className="grid size-12 shrink-0 place-items-center rounded-full bg-primary/10 text-primary" aria-hidden>
                   <point.icon className="size-5" />
                 </span>
                 <p className="text-sm leading-snug text-muted-foreground">{point.text}</p>
@@ -266,11 +277,7 @@ export default async function VisaListPage({
       </section>
 
       <ReviewsRail />
-      <HomeFaq
-        faqs={VISA_FAQS}
-        title="Before you apply — you're not the first"
-        lead="What travellers ask us most before starting a visa application. Anything else, the support desk is one call away."
-      />
+      <HomeFaq faqs={VISA_FAQS} title="Visa questions" />
     </div>
   );
 }

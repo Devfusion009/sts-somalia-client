@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { money } from "@/lib/money";
 import {
   BankTransferDetails,
   OfflineTopupForm,
@@ -48,8 +49,8 @@ export function FundWalletDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button className="gap-1.5" />}>
-        <Wallet className="size-4" /> Add {currency} {amount.toFixed(0)}
+      <DialogTrigger render={<Button size="lg" className="w-full tabular-nums" />}>
+        <Wallet data-icon="inline-start" aria-hidden="true" /> Add {money(amount, currency)}
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>

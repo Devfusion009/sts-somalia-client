@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -33,13 +34,15 @@ export function VenueTabs({ id, counts }: { id: string; counts: { requests: numb
             href={root + tab.path}
             aria-current={current ? "page" : undefined}
             className={cn(
-              "flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              "flex shrink-0 items-center gap-1.5 rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:py-3",
               current ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
             {tab.label}
             {count ? (
-              <span className="rounded-full bg-brand-gold/15 px-1.5 text-xs font-semibold text-brand-gold tabular-nums">{count}</span>
+              <Badge variant="warning" className="h-4.5 px-1.5 tabular-nums" aria-label={`${count} waiting`}>
+                {count}
+              </Badge>
             ) : null}
           </Link>
         );

@@ -52,7 +52,11 @@ export function StatusTimeline({
         const Icon = failed ? X : isDone || succeeded ? Check : stage.icon;
 
         return (
-          <li key={stage.key} className="relative flex flex-1 gap-3 pb-6 sm:flex-col sm:gap-0 sm:pb-0">
+          <li
+            key={stage.key}
+            aria-current={isCurrent ? "step" : undefined}
+            className="relative flex flex-1 gap-3 pb-5 last:pb-0 sm:flex-col sm:gap-0 sm:pb-0"
+          >
             {/* Connector. Drawn behind the marker and inset by its radius so it
                 meets the circle's edge instead of running under it. */}
             {index < lastIndex ? (
@@ -77,13 +81,14 @@ export function StatusTimeline({
                       : "border-border bg-background text-muted-foreground"
               )}
             >
-              <Icon className="size-4" />
+              <Icon className="size-4" aria-hidden="true" />
             </span>
 
-            <div className="min-w-0 sm:mt-2 sm:pr-4">
+            <div className="min-w-0 pt-1.5 sm:mt-2 sm:pt-0 sm:pr-4">
               <p
                 className={cn(
                   "text-sm font-medium",
+                  isCurrent && "font-semibold",
                   failed
                     ? "text-destructive"
                     : isDone || isCurrent
@@ -92,6 +97,9 @@ export function StatusTimeline({
                 )}
               >
                 {stage.label}
+                <span className="sr-only">
+                  {failed ? " (stopped)" : isDone || succeeded ? " (done)" : isCurrent ? " (current)" : " (upcoming)"}
+                </span>
               </p>
               {stage.description ? (
                 <p className="mt-0.5 text-xs text-muted-foreground">{stage.description}</p>

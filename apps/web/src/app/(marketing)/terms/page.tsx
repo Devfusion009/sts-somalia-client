@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { LegalPage, type LegalSection } from "@/components/marketing/legal-page";
 
-export const metadata: Metadata = { title: "Terms & Conditions" };
+export const metadata: Metadata = { title: "Terms and conditions" };
 
-const SECTIONS: Array<{ title: string; body: string }> = [
+const SECTIONS: LegalSection[] = [
   {
     title: "1. Who we are",
     body: "Scout Travel Solution LTD (STS) is a licensed travel and tourism management company headquartered at Sultan Business Park, Waaberi District, 21 Oct Street, Muqdisho, Somalia. These terms govern the use of our website and booking services, including flights, hotels, visa assistance, Umrah packages, and event hall bookings.",
@@ -34,18 +35,5 @@ const SECTIONS: Array<{ title: string; body: string }> = [
 ];
 
 export default function TermsPage() {
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-      <h1 className="font-heading text-3xl font-bold">Terms &amp; Conditions</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Last updated: August 2026</p>
-      <div className="mt-8 space-y-7">
-        {SECTIONS.map((section) => (
-          <section key={section.title}>
-            <h2 className="font-heading text-lg font-semibold">{section.title}</h2>
-            <p className="mt-2 leading-relaxed text-muted-foreground">{section.body}</p>
-          </section>
-        ))}
-      </div>
-    </div>
-  );
+  return <LegalPage title="Terms and conditions" meta="Last updated: August 2026" sections={SECTIONS} />;
 }

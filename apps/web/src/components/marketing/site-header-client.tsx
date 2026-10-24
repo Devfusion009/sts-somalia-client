@@ -24,7 +24,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { signOutAction } from "@/lib/auth/actions";
 import { portalHref } from "@/lib/subdomain";
 import type { PartnerContext } from "@/modules/identity/queries";
@@ -97,7 +96,17 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
           const isOpen = openKey === section.key;
 
           return (
-            <div key={section.key} className="relative" onMouseEnter={() => open(section.key)}>
+            <div
+              key={section.key}
+              className="relative"
+              onMouseEnter={() => open(section.key)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") closeNow();
+              }}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) scheduleClose();
+              }}
+            >
               <Link
                 href={section.href}
                 aria-expanded={isOpen}
@@ -111,7 +120,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                     : "border-border bg-card text-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
                 )}
               >
-                <Icon sx={{ fontSize: 19 }} />
+                <Icon sx={{ fontSize: 19 }} aria-hidden />
                 {section.label}
                 <ExpandMoreIcon
                   sx={{ fontSize: 16 }}
@@ -157,7 +166,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                                   <Link
                                     href={link.href}
                                     onClick={closeNow}
-                                    className="block rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-primary"
+                                    className="block rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-primary focus-visible:bg-accent focus-visible:text-primary"
                                   >
                                     {link.label}
                                   </Link>
@@ -206,8 +215,8 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                     <p className="truncate text-xs text-white/75">{profile.email}</p>
                   </div>
                 </div>
-                <span className="relative mt-3 inline-flex items-center rounded-full border border-white/25 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase">
-                  {profile.is_platform_admin ? "Administrator" : profile.role.replace(/_/g, " ")}
+                <span className="relative mt-3 inline-flex items-center rounded-full border border-white/25 bg-white/10 px-2.5 py-0.5 text-xs font-medium">
+                  {profile.is_platform_admin ? "Administrator" : "Personal account"}
                 </span>
               </div>
 
@@ -226,7 +235,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuGroup>
-                      <DropdownMenuLabel className="px-2.5 text-[11px] tracking-wider uppercase">Switch account</DropdownMenuLabel>
+                      <DropdownMenuLabel className="px-2.5 text-xs">Switch account</DropdownMenuLabel>
                     </DropdownMenuGroup>
                     {contexts.map((c) => (
                       <DropdownMenuItem key={c.type} render={<Link href={c.href} />} className="gap-3 rounded-xl px-2.5 py-2">
@@ -316,7 +325,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                           render={
                             <Link
                               href={link.href}
-                              className="rounded-md px-2 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                              className="flex min-h-11 items-center rounded-md px-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
                             />
                           }
                         >
@@ -333,12 +342,12 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
               {profile ? (
                 <div className="flex flex-col gap-1">
                   {profile.role !== "agent" ? (
-                    <SheetClose render={<Link href="/account" className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent" />}>
+                    <SheetClose render={<Link href="/account" className="flex min-h-11 items-center rounded-md px-3 text-sm font-medium hover:bg-accent" />}>
                       My Account
                     </SheetClose>
                   ) : null}
                   {profile?.is_platform_admin ? (
-                    <SheetClose render={<Link href={portalHref("admin")} className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent" />}>
+                    <SheetClose render={<Link href={portalHref("admin")} className="flex min-h-11 items-center rounded-md px-3 text-sm font-medium hover:bg-accent" />}>
                       Admin Console
                     </SheetClose>
                   ) : null}
@@ -348,7 +357,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                       {contexts.map((c) => (
                         <SheetClose
                           key={c.type}
-                          render={<Link href={c.href} className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent" />}
+                          render={<Link href={c.href} className="flex min-h-11 items-center rounded-md px-3 text-sm font-medium hover:bg-accent" />}
                         >
                           {c.name} · {c.label}
                           {c.status && c.status !== "live" ? (
@@ -359,7 +368,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                     </>
                   ) : null}
                   <form action={signOutAction}>
-                    <button type="submit" className="w-full rounded-md px-3 py-2.5 text-left text-sm font-medium text-destructive hover:bg-accent">
+                    <button type="submit" className="flex min-h-11 w-full items-center rounded-md px-3 text-left text-sm font-medium text-destructive hover:bg-accent">
                       Sign out
                     </button>
                   </form>
@@ -464,7 +473,7 @@ export function HeaderSearch() {
             }}
             className="mx-auto flex max-w-2xl items-center gap-0 px-4 py-3 transition-[padding] duration-300 ease-out group-data-[condensed]/header:py-1.5"
           >
-            <div className="relative flex-1">
+            <div className="relative min-w-0 flex-1">
               <PlaceIcon
                 sx={{ fontSize: 22 }}
                 className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
@@ -478,14 +487,17 @@ export function HeaderSearch() {
                 aria-label="Search destinations"
                 placeholder="Where do you want to go?"
                 autoComplete="off"
-                className="h-12 w-full rounded-l-xl rounded-r-none border border-r-0 border-input bg-card pr-3 pl-11 text-sm text-foreground outline-none transition-[height] duration-300 ease-out group-data-[condensed]/header:h-9 placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                aria-autocomplete="list"
+                className="h-12 w-full rounded-l-xl rounded-r-none border border-r-0 border-input bg-card pr-3 pl-11 text-base text-foreground sm:text-sm outline-none transition-[height] duration-300 ease-out group-data-[condensed]/header:h-9 placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
               />
               {suggestOpen && predictions.length > 0 ? (
-                <div className="absolute top-full left-0 z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-border bg-popover py-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10">
+                <div role="listbox" aria-label="Destination suggestions" className="absolute top-full left-0 z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-border bg-popover py-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10">
                   {predictions.map((p) => (
                     <button
                       key={p.id}
                       type="button"
+                      role="option"
+                      aria-selected={false}
                       onMouseDown={(e) => {
                         e.preventDefault();
                         setValue(p.text);
@@ -503,6 +515,7 @@ export function HeaderSearch() {
             </div>
             <button
               type="submit"
+              aria-label="Search hotels"
               className="h-12 shrink-0 rounded-r-xl bg-brand-accent px-7 text-sm font-bold text-brand-accent-foreground transition-all duration-300 ease-out group-data-[condensed]/header:h-9 hover:bg-brand-accent/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               <SearchIcon sx={{ fontSize: 18 }} className="mr-1 -ml-1 align-text-bottom sm:hidden" />

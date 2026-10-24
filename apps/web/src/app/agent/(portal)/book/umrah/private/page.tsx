@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertCircle, ArrowRight, Calculator, CalendarDays, RotateCcw, UsersRound } from "lucide-react";
+import { AlertCircle, ArrowRight, Settings2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 import { BackLink } from "@/components/back-link";
 import { SubmitButton } from "@/components/submit-button";
 import { requireUser } from "@/lib/auth/session";
@@ -37,9 +41,10 @@ export default async function AgentPrivateUmrahLauncherPage({
 
   return (
     <div className="space-y-6">
-      <BackLink href="/agent/book/umrah" label="Umrah" />
-
-      <h1 className="font-heading text-2xl font-bold">Build a private Umrah</h1>
+      <div className="space-y-4">
+        <BackLink href="/agent/book/umrah" label="Umrah" />
+        <PageHeader title="Private Umrah" />
+      </div>
 
       {error ? (
         <Alert variant="destructive">
@@ -48,58 +53,72 @@ export default async function AgentPrivateUmrahLauncherPage({
         </Alert>
       ) : null}
 
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
-        {draft ? (
-          <>
-            <Badge className="border-transparent bg-primary/10 text-primary">
-              <RotateCcw className="size-3.5" /> Draft in progress
-            </Badge>
-            <p className="mt-3 font-heading text-lg font-bold">
-              {UMRAH_TIER_LABELS[draft.tier]} · {draft.num_pilgrims} traveller
-              {draft.num_pilgrims > 1 ? "s" : ""}
-            </p>
-            <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-              {draft.nights_makkah + draft.nights_madinah > 0 ? (
-                <div className="flex items-center gap-1.5">
-                  <CalendarDays className="size-4 text-primary" />
-                  {tripDurationDays({
-                    numPilgrims: draft.num_pilgrims,
-                    nightsMakkah: draft.nights_makkah,
-                    nightsMadinah: draft.nights_madinah,
-                  })}{" "}
-                  days
+      {draft ? (
+        <Card>
+          <CardContent className="space-y-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="font-heading text-base font-semibold">Draft in progress</h2>
+                  <Badge variant="neutral" className="font-mono">
+                    {draft.reference}
+                  </Badge>
                 </div>
-              ) : null}
-              {draft.subtotal > 0 ? (
-                <div className="flex items-center gap-1.5">
-                  <Calculator className="size-4 text-primary" />
-                  {formatMoney(draft.subtotal, draft.currency)} so far
-                </div>
-              ) : null}
-            </dl>
-            <Button
-              render={<Link href={`/agent/book/umrah/private/${draft.id}?step=${draft.current_step}`} />}
-              size="lg"
-              className="mt-5 gap-2"
-            >
-              Resume <ArrowRight className="size-4" />
-            </Button>
-            <p className="mt-2 font-mono text-xs text-muted-foreground">{draft.reference}</p>
-          </>
-        ) : (
-          <>
-            <Badge className="border-transparent bg-primary/10 text-primary">
-              <UsersRound className="size-3.5" /> Custom build
-            </Badge>
-            <form action={startUmrahCustomRequest} className="mt-4">
-              <input type="hidden" name="desk" value="1" />
-              <SubmitButton size="lg" pendingText="Setting up…" className="gap-2">
-                Start building <ArrowRight className="size-4" />
-              </SubmitButton>
-            </form>
-          </>
-        )}
-      </div>
+                <p className="text-sm text-muted-foreground">
+                  {UMRAH_TIER_LABELS[draft.tier]} · Step {draft.current_step} of 4
+                </p>
+              </div>
+              <Button
+                size="lg"
+                className="max-sm:w-full"
+                render={<Link href={`/agent/book/umrah/private/${draft.id}?step=${draft.current_step}`} />}
+              >
+                Resume <ArrowRight data-icon="inline-end" aria-hidden="true" />
+              </Button>
+            </div>
+
+            <StatRail className="sm:grid-cols-3">
+              <StatRailItem
+                label="Travellers"
+                value={draft.num_pilgrims}
+              />
+              <StatRailItem
+                label="Days"
+                value={
+                  draft.nights_makkah + draft.nights_madinah > 0
+                    ? tripDurationDays({
+                        numPilgrims: draft.num_pilgrims,
+                        nightsMakkah: draft.nights_makkah,
+                        nightsMadinah: draft.nights_madinah,
+                      })
+                    : "—"
+                }
+              />
+              <StatRailItem
+                label="Subtotal"
+                value={draft.subtotal > 0 ? formatMoney(draft.subtotal, draft.currency) : "—"}
+              />
+            </StatRail>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Settings2 />
+            </EmptyMedia>
+            <EmptyTitle>Build a trip from scratch</EmptyTitle>
+            <EmptyContent>
+              <form action={startUmrahCustomRequest}>
+                <input type="hidden" name="desk" value="1" />
+                <SubmitButton size="lg" pendingText="Setting up…">
+                  Start building <ArrowRight data-icon="inline-end" aria-hidden="true" />
+                </SubmitButton>
+              </form>
+            </EmptyContent>
+          </Empty>
+        </Card>
+      )}
     </div>
   );
 }

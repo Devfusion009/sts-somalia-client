@@ -1,3 +1,4 @@
+import type { BadgeVariant } from "@/components/ui/badge";
 import type { Database } from "@/lib/types/database.types";
 
 export type UmrahStage = Database["public"]["Enums"]["umrah_fulfillment_stage"];
@@ -23,14 +24,15 @@ export const UMRAH_STAGE_LABELS: Record<UmrahStage, string> = {
   completed: "Completed",
 };
 
-export const UMRAH_STAGE_STYLES: Record<UmrahStage, string> = {
-  booked: "bg-muted text-muted-foreground",
-  confirmed: "bg-primary/10 text-primary",
-  visa_processing: "bg-brand-gold/15 text-brand-gold",
-  visa_issued: "bg-primary/10 text-primary",
-  travel_confirmed: "bg-primary/10 text-primary",
-  documents_ready: "bg-primary/10 text-primary",
-  completed: "bg-primary text-primary-foreground",
+/** Badge variant per stage: in-flight stages read as info, the visa wait as warning, the end state as success. */
+export const UMRAH_STAGE_VARIANTS: Record<UmrahStage, BadgeVariant> = {
+  booked: "neutral",
+  confirmed: "info",
+  visa_processing: "warning",
+  visa_issued: "info",
+  travel_confirmed: "info",
+  documents_ready: "info",
+  completed: "success",
 };
 
 export const UMRAH_DOC_TYPES = ["visa", "e_ticket", "hotel_voucher", "itinerary", "insurance", "other"] as const;
@@ -51,6 +53,14 @@ export function isUmrahStage(value: string | undefined): value is UmrahStage {
 
 export function isPaidOrderStatus(status: string | null | undefined) {
   return status === "paid" || status === "partially_paid" || status === "processing" || status === "completed";
+}
+
+/** Payment badge variant for an order status on Umrah screens. */
+export function orderStatusVariant(status: string): BadgeVariant {
+  if (isPaidOrderStatus(status)) return status === "partially_paid" ? "warning" : "success";
+  if (status === "cancelled") return "destructive";
+  if (status === "refunded") return "neutral";
+  return "warning";
 }
 
 export const ORDER_STATUS_LABELS: Record<string, string> = {

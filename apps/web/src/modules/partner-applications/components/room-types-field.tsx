@@ -154,7 +154,7 @@ function RoomTypeCombobox({
       <ComboboxPortal>
         <ComboboxPositioner>
           <ComboboxPopup>
-            <ComboboxEmpty>No matching room type — your typed name will be used as a custom room type.</ComboboxEmpty>
+            <ComboboxEmpty>Custom room type</ComboboxEmpty>
             <ComboboxList>
               {(group: { label: string; items: readonly string[] }) => (
                 <ComboboxGroup key={group.label} items={group.items}>
@@ -452,14 +452,13 @@ export function RoomTypesField({ initial }: { initial: RoomTypeRow[] }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this room type?</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmDeleteRow?.typeName ? `"${confirmDeleteRow.typeName}" has` : "This row has"} details filled in
-              — removing it discards them.
+              {confirmDeleteRow?.typeName ? `"${confirmDeleteRow.typeName}"` : "This row"} and its details are removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
               onClick={() => {
                 if (confirmDeleteId) removeRow(confirmDeleteId);
                 setConfirmDeleteId(null);
@@ -477,9 +476,9 @@ export function RoomTypesField({ initial }: { initial: RoomTypeRow[] }) {
             <AlertDialogTitle>Room count doesn&apos;t match</AlertDialogTitle>
             <AlertDialogDescription>
               {mismatch && mismatch.sum > mismatch.total
-                ? `Your room types add up to ${mismatch.sum} rooms — ${mismatch.sum - mismatch.total} more than the ${mismatch.total} total rooms / units above.`
+                ? `Room types total ${mismatch.sum} rooms, ${mismatch.sum - mismatch.total} over the ${mismatch.total} declared.`
                 : mismatch
-                  ? `Your room types add up to ${mismatch.sum} rooms — ${mismatch.total - mismatch.sum} short of the ${mismatch.total} total rooms / units above.`
+                  ? `Room types total ${mismatch.sum} rooms, ${mismatch.total - mismatch.sum} under the ${mismatch.total} declared.`
                   : null}
             </AlertDialogDescription>
           </AlertDialogHeader>

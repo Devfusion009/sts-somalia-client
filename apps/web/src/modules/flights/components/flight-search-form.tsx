@@ -52,7 +52,7 @@ const CABINS = [
 /** Bare cell inside the white pill — no borders of its own, just padding. */
 const CELL = "relative min-w-0 px-4 py-3.5";
 const RESET_INPUT =
-  "h-8 w-full border-0 bg-transparent p-0 text-sm font-semibold text-foreground shadow-none outline-none placeholder:font-normal placeholder:text-muted-foreground focus-visible:ring-0 cursor-pointer " +
+  "h-8 w-full border-0 bg-transparent p-0 text-base font-semibold text-foreground sm:text-sm shadow-none outline-none placeholder:font-normal placeholder:text-muted-foreground focus-visible:ring-0 cursor-pointer " +
   // The native calendar-picker icon stays clickable but invisible, stretched
   // over the whole field — one visible icon (ours) instead of two competing
   // ones, and the field is clickable anywhere, not just on a tiny glyph.
@@ -142,9 +142,9 @@ function AirportPicker({
                 setQuery("");
               }}
               aria-label={`Clear ${placeholder}`}
-              className="grid size-5 shrink-0 place-items-center rounded text-secondary-foreground/70 transition-colors hover:bg-black/10 hover:text-secondary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className="grid size-6 shrink-0 place-items-center rounded text-secondary-foreground/70 transition-colors hover:bg-black/10 hover:text-secondary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-              <CloseIcon sx={{ fontSize: 14 }} />
+              <CloseIcon sx={{ fontSize: 14 }} aria-hidden />
             </button>
           </span>
         ) : (
@@ -152,7 +152,7 @@ function AirportPicker({
             id={id}
             placeholder={placeholder}
             autoComplete="off"
-            className="h-8 rounded-none border-0 bg-transparent p-0 text-sm font-semibold shadow-none placeholder:font-normal focus-visible:ring-0 dark:bg-transparent"
+            className="h-8 rounded-none border-0 bg-transparent p-0 text-base font-semibold shadow-none placeholder:font-normal focus-visible:ring-0 sm:text-sm dark:bg-transparent"
           />
         )}
         <ComboboxPortal>
@@ -242,11 +242,11 @@ export function FlightSearchForm({
           aria-label="Trip type"
           className="flex w-auto items-center gap-6 border-b border-border px-5 py-3"
         >
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-foreground">
+          <label className="flex min-h-8 cursor-pointer items-center gap-2 text-sm font-semibold text-foreground">
             <RadioGroupItem value="one_way" />
             One way
           </label>
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-foreground">
+          <label className="flex min-h-8 cursor-pointer items-center gap-2 text-sm font-semibold text-foreground">
             <RadioGroupItem value="round_trip" />
             Return
           </label>
@@ -277,9 +277,9 @@ export function FlightSearchForm({
               setDestination(origin);
             }}
             aria-label="Swap departure and destination"
-            className="z-10 grid size-8 place-items-center rounded-full border border-border bg-card text-primary transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none lg:absolute"
+            className="z-10 grid size-9 place-items-center rounded-full border border-border bg-card text-primary transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none lg:absolute"
           >
-            <SwapHorizIcon sx={{ fontSize: 18 }} />
+            <SwapHorizIcon sx={{ fontSize: 18 }} aria-hidden />
           </button>
         </div>
 
@@ -305,7 +305,7 @@ export function FlightSearchForm({
             Departure
           </label>
           <div className="flex items-center gap-1.5">
-            <CalendarMonthIcon sx={{ fontSize: 16 }} className="shrink-0 text-muted-foreground" />
+            <CalendarMonthIcon sx={{ fontSize: 16 }} className="shrink-0 text-muted-foreground" aria-hidden />
             <input
               id="depart_date"
               name="depart_date"
@@ -325,7 +325,7 @@ export function FlightSearchForm({
             Return
           </label>
           <div className="flex items-center gap-1.5">
-            <CalendarMonthIcon sx={{ fontSize: 16 }} className="shrink-0 text-muted-foreground" />
+            <CalendarMonthIcon sx={{ fontSize: 16 }} className="shrink-0 text-muted-foreground" aria-hidden />
             <input
               id="return_date"
               name="return_date"
@@ -347,8 +347,8 @@ export function FlightSearchForm({
             Travellers
           </span>
           <Popover>
-            <PopoverTrigger className="flex h-8 w-full items-center gap-1.5 text-left text-sm font-semibold text-foreground focus-visible:outline-none">
-              <PersonIcon sx={{ fontSize: 16 }} className="shrink-0 text-muted-foreground" />
+            <PopoverTrigger aria-label={`Travellers: ${adults} ${adults === "1" ? "adult" : "adults"}, ${cabinLabel}`} className="flex h-8 w-full items-center gap-1.5 rounded-md text-left text-sm font-semibold text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none">
+              <PersonIcon sx={{ fontSize: 16 }} className="shrink-0 text-muted-foreground" aria-hidden />
               <span className="truncate">
                 {adults} {adults === "1" ? "adult" : "adults"}, {cabinLabel}
               </span>
@@ -362,9 +362,9 @@ export function FlightSearchForm({
                     onClick={() => setAdults((n) => String(Math.max(1, Number(n) - 1)))}
                     disabled={adults === "1"}
                     aria-label="Fewer adults"
-                    className="grid size-7 place-items-center rounded-full border border-border text-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+                    className="grid size-9 place-items-center rounded-full border border-border text-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40"
                   >
-                    <Minus className="size-3.5" />
+                    <Minus className="size-3.5" aria-hidden />
                   </button>
                   <span className="w-4 text-center text-sm font-semibold tabular-nums">{adults}</span>
                   <button
@@ -372,9 +372,9 @@ export function FlightSearchForm({
                     onClick={() => setAdults((n) => String(Math.min(9, Number(n) + 1)))}
                     disabled={adults === "9"}
                     aria-label="More adults"
-                    className="grid size-7 place-items-center rounded-full border border-border text-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+                    className="grid size-9 place-items-center rounded-full border border-border text-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40"
                   >
-                    <Plus className="size-3.5" />
+                    <Plus className="size-3.5" aria-hidden />
                   </button>
                 </div>
               </div>
@@ -403,9 +403,9 @@ export function FlightSearchForm({
         <div className="col-span-2 p-2 lg:col-span-1 lg:flex lg:items-center lg:p-2">
           <button
             type="submit"
-            className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-brand-accent px-8 font-heading text-base font-bold text-brand-accent-foreground shadow-md shadow-brand-accent/30 transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-accent/90 hover:shadow-lg hover:shadow-brand-accent/40 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none lg:h-[3.25rem] lg:min-w-44"
+            className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-brand-accent px-8 font-heading text-base font-bold text-brand-accent-foreground shadow-md shadow-brand-accent/30 transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-accent/90 hover:shadow-lg hover:shadow-brand-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none lg:h-[3.25rem] lg:min-w-44"
           >
-            <SearchIcon sx={{ fontSize: 20 }} />
+            <SearchIcon sx={{ fontSize: 20 }} aria-hidden />
             Search
           </button>
         </div>

@@ -4,9 +4,10 @@ import { useActionState } from "react";
 import { AlertCircle, CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { money } from "@/lib/money";
 import { SubmitButton } from "@/components/submit-button";
 import {
   saveUmrahHotel,
@@ -19,9 +20,7 @@ import {
 } from "@/modules/umrah/admin-actions";
 import { sharingLabel } from "@/modules/umrah/images";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-
-const selectClass =
-  "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 function ErrorAlert({ error }: { error: string | null | undefined }) {
   if (!error) return null;
@@ -55,18 +54,20 @@ export function HotelsManager({ packageId, hotels }: { packageId: string; hotels
   return (
     <div className="space-y-4">
       {hotels.length > 0 ? (
-        <div className="space-y-2">
+        <ul className="divide-y divide-border">
           {hotels.map((h) => (
-            <div key={h.id} className="flex items-start justify-between gap-3 rounded-lg border border-border p-3">
+            <li key={h.id} className="flex items-start justify-between gap-3 py-3 first:pt-0">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary">{CITY_LABELS[h.city] ?? h.city}</Badge>
+                  <Badge variant="neutral">{CITY_LABELS[h.city] ?? h.city}</Badge>
                   <span className="font-medium">{h.name}</span>
                   {h.star_rating ? (
-                    <span className="text-sm text-brand-gold">{"★".repeat(h.star_rating)}</span>
+                    <span className="text-sm text-brand-gold" role="img" aria-label={`${h.star_rating} stars`}>
+                      {"★".repeat(h.star_rating)}
+                    </span>
                   ) : null}
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
                   {h.distance_to_haram_m ? `${h.distance_to_haram_m}m from Haram` : "Distance not set"}
                   {h.nights ? ` · ${h.nights} night${h.nights === 1 ? "" : "s"}` : ""}
                   {h.room_type ? ` · ${h.room_type}` : ""}
@@ -75,55 +76,64 @@ export function HotelsManager({ packageId, hotels }: { packageId: string; hotels
               <form action={deleteUmrahHotel}>
                 <input type="hidden" name="packageId" value={packageId} />
                 <input type="hidden" name="hotelRowId" value={h.id} />
-                <ConfirmButton title="Remove this hotel?" confirmLabel="Remove" aria-label="Remove hotel" size="sm" variant="ghost" className="text-destructive hover:text-destructive">
-                  <Trash2 className="size-3.5" />
+                <ConfirmButton
+                  title="Remove this hotel?"
+                  confirmLabel="Remove"
+                  aria-label={`Remove ${h.name}`}
+                  size="icon-sm"
+                  variant="ghost"
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 />
                 </ConfirmButton>
               </form>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       ) : null}
 
-      <form action={formAction} className="space-y-3 rounded-lg border border-dashed border-border p-4">
+      <form action={formAction} className="space-y-4 border-t border-border pt-4">
         <input type="hidden" name="packageId" value={packageId} />
         <ErrorAlert error={state?.error} />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="city">City</Label>
-            <select id="city" name="city" defaultValue="makkah" className={selectClass}>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+          <Field>
+            <FieldLabel htmlFor="city">City</FieldLabel>
+            <select id="city" name="city" defaultValue="makkah" className={NATIVE_SELECT_CLASS}>
               <option value="makkah">Makkah</option>
               <option value="madinah">Madinah</option>
               <option value="other">Other</option>
             </select>
-          </div>
-          <div className="space-y-1.5 lg:col-span-2">
-            <Label htmlFor="hotelName">Hotel name</Label>
+          </Field>
+          <Field className="col-span-2">
+            <FieldLabel htmlFor="hotelName">Hotel name</FieldLabel>
             <Input id="hotelName" name="name" placeholder="Waha Al Deafah Hotel" required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="starRating">Stars</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="starRating">Stars</FieldLabel>
             <Input id="starRating" name="starRating" type="number" min={1} max={5} placeholder="3" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="distanceToHaramM">Distance to Haram (m)</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="distanceToHaramM">Distance to Haram (m)</FieldLabel>
             <Input id="distanceToHaramM" name="distanceToHaramM" type="number" min={0} placeholder="650" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="nights">Nights</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="nights">Nights</FieldLabel>
             <Input id="nights" name="nights" type="number" min={1} placeholder="7" />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="roomType">Room type</Label>
+          </Field>
+          <Field className="col-span-2">
+            <FieldLabel htmlFor="roomType">Room type</FieldLabel>
             <Input id="roomType" name="roomType" placeholder="Quad sharing, sea view" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sortOrder">Order</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="sortOrder">Order</FieldLabel>
             <Input id="sortOrder" name="sortOrder" type="number" min={0} max={99} defaultValue={hotels.length} />
-          </div>
+          </Field>
         </div>
-        <SubmitButton size="sm" pendingText="Adding…">
-          <Plus className="size-4" /> Add hotel
-        </SubmitButton>
+        <div className="flex justify-end">
+          <SubmitButton variant="outline" pendingText="Adding…">
+            <Plus aria-hidden="true" /> Add hotel
+          </SubmitButton>
+        </div>
       </form>
     </div>
   );
@@ -149,11 +159,11 @@ export function ItineraryManager({
   return (
     <div className="space-y-4">
       {days.length > 0 ? (
-        <ol className="space-y-2">
+        <ol className="divide-y divide-border">
           {days.map((d) => (
-            <li key={d.id} className="flex items-start justify-between gap-3 rounded-lg border border-border p-3">
+            <li key={d.id} className="flex items-start justify-between gap-3 py-3 first:pt-0">
               <div className="flex min-w-0 gap-3">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary tabular-nums">
                   {d.day_number}
                 </span>
                 <div className="min-w-0">
@@ -166,8 +176,14 @@ export function ItineraryManager({
               <form action={deleteUmrahItineraryDay}>
                 <input type="hidden" name="packageId" value={packageId} />
                 <input type="hidden" name="dayId" value={d.id} />
-                <ConfirmButton title="Delete this itinerary day?" aria-label="Delete day" size="sm" variant="ghost" className="text-destructive hover:text-destructive">
-                  <Trash2 className="size-3.5" />
+                <ConfirmButton
+                  title="Delete this itinerary day?"
+                  aria-label={`Delete day ${d.day_number}`}
+                  size="icon-sm"
+                  variant="ghost"
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 />
                 </ConfirmButton>
               </form>
             </li>
@@ -175,31 +191,33 @@ export function ItineraryManager({
         </ol>
       ) : null}
 
-      <form action={formAction} className="space-y-3 rounded-lg border border-dashed border-border p-4">
+      <form action={formAction} className="space-y-4 border-t border-border pt-4">
         <input type="hidden" name="packageId" value={packageId} />
         <ErrorAlert error={state?.error} />
-        <div className="grid gap-3 sm:grid-cols-[100px_1fr]">
-          <div className="space-y-1.5">
-            <Label htmlFor="dayNumber">Day</Label>
+        <div className="grid grid-cols-[5rem_1fr] gap-4">
+          <Field>
+            <FieldLabel htmlFor="dayNumber">Day</FieldLabel>
             <Input id="dayNumber" name="dayNumber" type="number" min={1} max={durationDays} defaultValue={nextDay} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="dayTitle">Title</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="dayTitle">Title</FieldLabel>
             <Input id="dayTitle" name="title" placeholder="Arrival in Jeddah & transfer to Makkah" required />
-          </div>
+          </Field>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="dayDescription">Description</Label>
+        <Field>
+          <FieldLabel htmlFor="dayDescription">Description</FieldLabel>
           <Textarea
             id="dayDescription"
             name="description"
             rows={2}
             placeholder="Meet & greet at Jeddah airport, private coach to the hotel, check-in, first Umrah with our guide."
           />
+        </Field>
+        <div className="flex justify-end">
+          <SubmitButton variant="outline" pendingText="Adding…">
+            <Plus aria-hidden="true" /> Add day
+          </SubmitButton>
         </div>
-        <SubmitButton size="sm" pendingText="Adding…">
-          <Plus className="size-4" /> Add day
-        </SubmitButton>
       </form>
     </div>
   );
@@ -225,52 +243,54 @@ export function PricingManager({
   return (
     <div className="space-y-4">
       {rows.length > 0 ? (
-        <div className="space-y-2">
+        <ul className="divide-y divide-border">
           {rows.map((r) => (
-            <div key={r.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+            <li key={r.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0">
               <div className="flex items-center gap-2">
                 <span className="font-medium">{sharingLabel(r.sharing)}</span>
                 {Number(r.price) === cheapest ? (
-                  <Badge className="border-transparent bg-primary/10 text-primary">Starting price</Badge>
+                  <Badge variant="success">Starting price</Badge>
                 ) : null}
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-semibold">
-                  {currency} {Number(r.price).toFixed(2)}
-                </span>
+                <span className="font-semibold tabular-nums">{money(r.price, currency)}</span>
                 <form action={deleteUmrahPricing}>
                   <input type="hidden" name="packageId" value={packageId} />
                   <input type="hidden" name="pricingId" value={r.id} />
-                  <ConfirmButton title="Delete this price?" aria-label="Delete price" size="sm" variant="ghost" className="text-destructive hover:text-destructive">
-                    <Trash2 className="size-3.5" />
+                  <ConfirmButton
+                    title="Delete this price?"
+                    aria-label={`Delete ${sharingLabel(r.sharing)} price`}
+                    size="icon-sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 />
                   </ConfirmButton>
                 </form>
               </div>
-            </div>
+            </li>
           ))}
-          <p className="text-xs text-muted-foreground">
-            The cheapest rate becomes the package&apos;s charged base price and the &ldquo;starting from&rdquo; figure
-            customers see.
-          </p>
-        </div>
+        </ul>
       ) : null}
 
-      <form action={formAction} className="space-y-3 rounded-lg border border-dashed border-border p-4">
+      <form action={formAction} className="space-y-4 border-t border-border pt-4">
         <input type="hidden" name="packageId" value={packageId} />
         <ErrorAlert error={state?.error} />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="sharing">Pilgrims per room</Label>
+        <div className="grid grid-cols-2 gap-4">
+          <Field>
+            <FieldLabel htmlFor="sharing">Pilgrims per room</FieldLabel>
             <Input id="sharing" name="sharing" type="number" min={1} max={12} placeholder="4" required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="price">Price per pilgrim ({currency})</Label>
-            <Input id="price" name="price" type="number" min={0} step="0.01" placeholder="1250" required />
-          </div>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="price">Price per pilgrim ({currency})</FieldLabel>
+            <Input id="price" name="price" type="number" min={0} step="0.01" placeholder="1250" className="tabular-nums" required />
+          </Field>
         </div>
-        <SubmitButton size="sm" pendingText="Saving…">
-          <Plus className="size-4" /> Add / update rate
-        </SubmitButton>
+        <div className="flex justify-end">
+          <SubmitButton variant="outline" pendingText="Saving…">
+            <Plus aria-hidden="true" /> Save rate
+          </SubmitButton>
+        </div>
       </form>
     </div>
   );
@@ -294,9 +314,7 @@ export function AgenciesPicker({
 
   if (agencies.length === 0) {
     return (
-      <p className="py-6 text-center text-sm text-muted-foreground">
-        No active agencies yet.
-      </p>
+      <p className="text-sm text-muted-foreground">No active agencies</p>
     );
   }
 
@@ -315,14 +333,14 @@ export function AgenciesPicker({
         {agencies.map((a) => (
           <label
             key={a.id}
-            className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border p-3 text-sm has-checked:border-primary has-checked:bg-primary/5"
+            className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border p-3 text-sm transition-colors hover:bg-muted/50 has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
           >
             <input
               type="checkbox"
               name="agencyIds"
               value={a.id}
               defaultChecked={selectedIds.includes(a.id)}
-              className="mt-0.5 size-4"
+              className="mt-0.5 size-4 accent-primary"
             />
             <span className="min-w-0">
               <span className="block font-medium">{a.name}</span>
@@ -331,10 +349,9 @@ export function AgenciesPicker({
           </label>
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">
-        Internal assignment — linked agencies can see they handle this package. Not shown to the public.
-      </p>
-      <SubmitButton pendingText="Saving…">Save agencies</SubmitButton>
+      <div className="flex justify-end">
+        <SubmitButton pendingText="Saving…">Save agencies</SubmitButton>
+      </div>
     </form>
   );
 }

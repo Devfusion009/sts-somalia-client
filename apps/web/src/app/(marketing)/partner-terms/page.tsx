@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
+import { LegalPage, type LegalSection } from "@/components/marketing/legal-page";
 
-export const metadata: Metadata = { title: "Partner Terms & Conditions" };
+export const metadata: Metadata = { title: "Partner terms and conditions" };
 
-type Section = { title: string; body: string; list?: string[] };
-
-const SECTIONS: Section[] = [
+const SECTIONS: LegalSection[] = [
   {
     title: "1. Parties and scope",
     body:
@@ -99,27 +98,10 @@ const SECTIONS: Section[] = [
 
 export default function PartnerTermsPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-      <h1 className="font-heading text-3xl font-bold">Partner Terms &amp; Conditions</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        For Travel Agent, Hotel Partner, and Affiliate accounts on the STS Somalia B2B platform. Last updated: August
-        2026.
-      </p>
-      <div className="mt-8 space-y-7">
-        {SECTIONS.map((section) => (
-          <section key={section.title}>
-            <h2 className="font-heading text-lg font-semibold">{section.title}</h2>
-            <p className="mt-2 leading-relaxed text-muted-foreground">{section.body}</p>
-            {section.list ? (
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-muted-foreground">
-                {section.list.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            ) : null}
-          </section>
-        ))}
-      </div>
-    </div>
+    <LegalPage
+      title="Partner terms and conditions"
+      meta="For travel agent, hotel partner and affiliate accounts on the STS Somalia B2B platform. Last updated: August 2026."
+      sections={SECTIONS}
+    />
   );
 }

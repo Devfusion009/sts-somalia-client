@@ -9,8 +9,6 @@ import {
   ArrowRight,
   CheckCircle2,
   FileText,
-  Info,
-  MapPin,
   Pencil,
   Plus,
   Trash2,
@@ -70,6 +68,7 @@ import { RELATIONSHIPS, parseDocumentSlots, parseApplicationQuestions, todayIso,
 import type { WizardApplication } from "@/modules/visa/queries";
 import { FileField } from "@/components/ui/upload";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 const GENDER_LABELS: Record<string, string> = { male: "Male", female: "Female" };
 
@@ -106,16 +105,14 @@ function wizardBasePath(desk: boolean) {
   return desk ? "/agent/book/visa/apply" : "/visa/apply";
 }
 
-function StepHeading({ index, title }: { index?: number; title: string }) {
-  return (
-    <div>
-      {index ? (
-        <p className="text-xs font-bold text-primary">Step {index} of 5</p>
-      ) : null}
-      <h2 className="mt-1 font-heading text-xl font-bold sm:text-2xl">{title}</h2>
-    </div>
-  );
+/** `index` is kept for callers; the stepper beside the form already shows the step number. */
+function StepHeading({ title }: { index?: number; title: string }) {
+  return <h2 className="font-heading text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>;
 }
+
+/** Back on the left, primary on the right; stacked full-width on phones (primary first). */
+const STEP_FOOTER =
+  "flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between max-sm:[&>*]:w-full";
 
 function ErrorAlert({ state }: { state: ActionState }) {
   if (!state?.error) return null;
@@ -129,8 +126,8 @@ function ErrorAlert({ state }: { state: ActionState }) {
 
 function BackButton({ href }: { href: string }) {
   return (
-    <Button variant="outline" render={<Link href={href} />} className="gap-2">
-      <ArrowLeft className="size-4" /> Back
+    <Button variant="outline" size="lg" render={<Link href={href} />} className="gap-2">
+      <ArrowLeft className="size-4" aria-hidden /> Back
     </Button>
   );
 }
@@ -165,15 +162,17 @@ function LabeledSelect({
   defaultValue,
   placeholder,
   options,
+  id,
 }: {
   name: string;
   defaultValue?: string | null;
   placeholder: string;
   options: Array<{ value: string; label: string }>;
+  id?: string;
 }) {
   return (
     <Select name={name} defaultValue={defaultValue || undefined} items={options}>
-      <SelectTrigger className="w-full">
+      <SelectTrigger id={id} className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -198,7 +197,7 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
   sister: "Sister",
   grandfather: "Grandfather",
   grandmother: "Grandmother",
-  other: "Other Relative",
+  other: "Other relative",
 };
 
 /* ------------------------------------------------------------------------- */
@@ -209,20 +208,20 @@ const APPLICANT_TYPE_CARDS = [
   {
     value: "single",
     icon: User,
-    title: "Single Applicant",
-    description: "I am applying only for myself",
+    title: "Single applicant",
+    description: "Only myself",
   },
   {
     value: "family",
     icon: Users,
-    title: "Family Application",
-    description: "I am applying with my family members",
+    title: "Family",
+    description: "Me and my family members",
   },
   {
     value: "group",
     icon: UsersRound,
-    title: "Group Application",
-    description: "I am applying with a group (not family)",
+    title: "Group",
+    description: "Me and a group (not family)",
   },
 ] as const;
 
@@ -249,12 +248,12 @@ function MemberDialog({
       <DialogTrigger render={<span />}>{trigger}</DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{member ? "Edit Member" : "Add Member"}</DialogTitle>
+          <DialogTitle>{member ? "Edit member" : "Add member"}</DialogTitle>
         </DialogHeader>
         <form action={formAction} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <input type="hidden" name="applicationId" value={applicationId} />
           {member ? <input type="hidden" name="memberId" value={member.id} /> : null}
-          <Field label="Full Name (as in passport)" htmlFor={`member-name-${member?.id ?? "new"}`} required className="sm:col-span-2">
+          <Field label="Full name (as in passport)" htmlFor={`member-name-${member?.id ?? "new"}`} required className="sm:col-span-2">
             <Input
               id={`member-name-${member?.id ?? "new"}`}
               name="fullName"
@@ -263,8 +262,9 @@ function MemberDialog({
               required
             />
           </Field>
-          <Field label="Relationship" required>
+          <Field label="Relationship" htmlFor={`member-rel-${member?.id ?? "new"}`} required>
             <LabeledSelect
+              id={`member-rel-${member?.id ?? "new"}`}
               name="relationship"
               defaultValue={member?.relationship}
               placeholder="Select relationship"
@@ -274,7 +274,7 @@ function MemberDialog({
               }))}
             />
           </Field>
-          <Field label="Date of Birth" htmlFor={`member-dob-${member?.id ?? "new"}`} required>
+          <Field label="Date of birth" htmlFor={`member-dob-${member?.id ?? "new"}`} required>
             <Input
               id={`member-dob-${member?.id ?? "new"}`}
               name="dateOfBirth"
@@ -284,14 +284,15 @@ function MemberDialog({
               required
             />
           </Field>
-          <Field label="Nationality" required>
+          <Field label="Nationality" htmlFor={`member-nat-${member?.id ?? "new"}`} required>
             <CountrySearchSelect
+              id={`member-nat-${member?.id ?? "new"}`}
               name="nationality"
               defaultValue={member?.nationality ?? "SO"}
               placeholder="Select nationality"
             />
           </Field>
-          <Field label="Passport Number" htmlFor={`member-passport-${member?.id ?? "new"}`} required>
+          <Field label="Passport number" htmlFor={`member-passport-${member?.id ?? "new"}`} required>
             <Input
               id={`member-passport-${member?.id ?? "new"}`}
               name="passportNumber"
@@ -300,7 +301,7 @@ function MemberDialog({
               required
             />
           </Field>
-          <Field label="Passport Expiry Date" htmlFor={`member-expiry-${member?.id ?? "new"}`}>
+          <Field label="Passport expiry date" htmlFor={`member-expiry-${member?.id ?? "new"}`}>
             <Input
               id={`member-expiry-${member?.id ?? "new"}`}
               name="passportExpiry"
@@ -312,11 +313,11 @@ function MemberDialog({
           <div className="sm:col-span-2">
             <ErrorAlert state={state} />
           </div>
-          <div className="flex justify-end gap-2 sm:col-span-2">
+          <div className="flex flex-col-reverse gap-2 sm:col-span-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <SubmitButton pendingText="Saving…">{member ? "Save Changes" : "Add Member"}</SubmitButton>
+            <SubmitButton pendingText="Saving…">{member ? "Save changes" : "Add member"}</SubmitButton>
           </div>
         </form>
       </DialogContent>
@@ -338,22 +339,23 @@ export function StepApplicantType({
   useDeskNavigate(state);
   const [applicantType, setApplicantType] = useState(application.applicant_type);
   const members = application.members;
-  const others = members.filter((m) => !m.is_primary);
 
   return (
     <div className="space-y-8">
       <section className="space-y-4">
         <StepHeading index={1} title="Applicant type" />
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div role="radiogroup" aria-label="Applicant type" className="grid gap-3 sm:grid-cols-3 sm:gap-4">
           {APPLICANT_TYPE_CARDS.map((card) => {
             const active = applicantType === card.value;
             return (
               <button
                 key={card.value}
                 type="button"
+                role="radio"
+                aria-checked={active}
                 onClick={() => setApplicantType(card.value)}
                 className={cn(
-                  "flex flex-col items-center gap-2 rounded-2xl border bg-card p-6 text-center transition-all",
+                  "flex items-center gap-3 rounded-2xl border bg-card p-4 text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:flex-col sm:gap-2 sm:p-6 sm:text-center",
                   active
                     ? "border-primary shadow-sm ring-2 ring-primary/20"
                     : "border-border hover:border-primary/40"
@@ -361,17 +363,21 @@ export function StepApplicantType({
               >
                 <span
                   className={cn(
-                    "flex size-12 items-center justify-center rounded-full",
+                    "flex size-10 shrink-0 items-center justify-center rounded-full sm:size-12",
                     active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
                   )}
+                  aria-hidden
                 >
                   <card.icon className="size-5" />
                 </span>
-                <span className="text-sm font-bold">{card.title}</span>
-                <span className="text-xs text-muted-foreground">{card.description}</span>
+                <span className="min-w-0 flex-1 sm:flex-none">
+                  <span className="block text-sm font-bold">{card.title}</span>
+                  <span className="block text-xs text-muted-foreground">{card.description}</span>
+                </span>
                 <span
+                  aria-hidden
                   className={cn(
-                    "mt-1 flex size-4 items-center justify-center rounded-full border-2",
+                    "flex size-4 shrink-0 items-center justify-center rounded-full border-2 sm:mt-1",
                     active ? "border-primary" : "border-muted-foreground/40"
                   )}
                 >
@@ -385,13 +391,13 @@ export function StepApplicantType({
 
       {applicantType !== "single" ? (
         <section className="space-y-4">
-          <StepHeading title={applicantType === "family" ? "Family details" : "Group details"} />
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <StepHeading title={applicantType === "family" ? "Family details" : "Group details"} />
             <MemberDialog
               applicationId={application.id}
               trigger={
-                <Button size="sm" className="gap-1.5">
-                  <Plus className="size-4" /> Add Member
+                <Button className="gap-1.5">
+                  <Plus className="size-4" aria-hidden /> Add member
                 </Button>
               }
             />
@@ -401,38 +407,35 @@ export function StepApplicantType({
             <div className="overflow-x-auto rounded-xl border border-border">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
                     <TableHead className="w-10">#</TableHead>
-                    <TableHead>Full Name</TableHead>
+                    <TableHead>Full name</TableHead>
                     <TableHead>Relationship</TableHead>
-                    <TableHead>Date of Birth</TableHead>
-                    <TableHead>Passport No.</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>Date of birth</TableHead>
+                    <TableHead>Passport no.</TableHead>
+                    <TableHead className="text-right">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {members.map((member, i) => (
                     <TableRow key={member.id}>
-                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="text-muted-foreground tabular-nums">{i + 1}</TableCell>
                       <TableCell>
-                        <span className="flex items-center gap-2">
-                          <span className="flex size-7 items-center justify-center rounded-full bg-muted">
-                            <User className="size-3.5 text-muted-foreground" />
-                          </span>
-                          <span>
-                            <span className="block text-sm font-medium">{member.full_name}</span>
-                            {member.is_primary ? (
-                              <Badge className="mt-0.5 border-transparent bg-chart-3/10 text-[10px] text-chart-3">
-                                Primary Applicant
-                              </Badge>
-                            ) : null}
-                          </span>
-                        </span>
+                        <span className="block text-sm font-medium">{member.full_name}</span>
+                        {member.is_primary ? (
+                          <Badge variant="info" className="mt-0.5">
+                            Primary applicant
+                          </Badge>
+                        ) : null}
                       </TableCell>
                       <TableCell className="capitalize">
                         {RELATIONSHIP_LABELS[member.relationship] ?? member.relationship}
                       </TableCell>
-                      <TableCell>{member.date_of_birth ?? "—"}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {member.date_of_birth ? format(parseISO(member.date_of_birth), "d MMM yyyy") : "—"}
+                      </TableCell>
                       <TableCell className="font-mono text-xs">
                         {member.passport_number ?? "—"}
                       </TableCell>
@@ -442,8 +445,8 @@ export function StepApplicantType({
                             applicationId={application.id}
                             member={member}
                             trigger={
-                              <Button variant="ghost" size="icon-sm" aria-label="Edit member">
-                                <Pencil className="size-3.5 text-primary" />
+                              <Button variant="ghost" size="icon" aria-label={`Edit ${member.full_name}`}>
+                                <Pencil className="size-4" aria-hidden />
                               </Button>
                             }
                           />
@@ -456,10 +459,10 @@ export function StepApplicantType({
                                 description={member.full_name}
                                 confirmLabel="Remove"
                                 variant="ghost"
-                                size="icon-sm"
-                                aria-label="Remove member"
+                                size="icon"
+                                aria-label={`Remove ${member.full_name}`}
                               >
-                                <Trash2 className="size-3.5 text-destructive" />
+                                <Trash2 className="size-4 text-destructive" aria-hidden />
                               </ConfirmButton>
                             </form>
                           ) : null}
@@ -483,10 +486,10 @@ export function StepApplicantType({
         <input type="hidden" name="applicantType" value={applicantType} />
         {desk ? <input type="hidden" name="desk" value="1" /> : null}
         <ErrorAlert state={state} />
-        <div className="flex items-center justify-between">
+        <div className={STEP_FOOTER}>
           <BackButton href={backHref} />
-          <SubmitButton pendingText="Saving…" className="gap-2">
-            Continue <ArrowRight className="size-4" />
+          <SubmitButton size="lg" pendingText="Saving…" className="gap-2">
+            Continue <ArrowRight className="size-4" aria-hidden />
           </SubmitButton>
         </div>
       </form>
@@ -526,8 +529,9 @@ export function StepPersonalInfo({
         <Field label="Date of birth" htmlFor="dateOfBirth" required>
           <Input id="dateOfBirth" name="dateOfBirth" type="date" max={todayIso()} defaultValue={v.dateOfBirth ?? t.date_of_birth ?? ""} required />
         </Field>
-        <Field label="Gender" required>
+        <Field label="Gender" htmlFor="gender" required>
           <LabeledSelect
+            id="gender"
             name="gender"
             defaultValue={v.gender ?? t.gender}
             placeholder="Select gender"
@@ -537,8 +541,8 @@ export function StepPersonalInfo({
             ]}
           />
         </Field>
-        <Field label="Nationality" required>
-          <CountrySearchSelect name="nationality" defaultValue={v.nationality ?? t.nationality ?? "SO"} placeholder="Select nationality" />
+        <Field label="Nationality" htmlFor="nationality" required>
+          <CountrySearchSelect id="nationality" name="nationality" defaultValue={v.nationality ?? t.nationality ?? "SO"} placeholder="Select nationality" />
         </Field>
         <Field label="Passport number" htmlFor="passportNumber" required>
           <Input id="passportNumber" name="passportNumber" defaultValue={v.passportNumber ?? t.passport_number ?? ""} placeholder="Enter passport number" required />
@@ -563,10 +567,10 @@ export function StepPersonalInfo({
 
       <ErrorAlert state={state} />
 
-      <div className="flex items-center justify-between">
+      <div className={STEP_FOOTER}>
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=1`} />
-        <SubmitButton pendingText="Saving…" className="gap-2">
-          Continue <ArrowRight className="size-4" />
+        <SubmitButton size="lg" pendingText="Saving…" className="gap-2">
+          Continue <ArrowRight className="size-4" aria-hidden />
         </SubmitButton>
       </div>
     </form>
@@ -579,19 +583,26 @@ export function StepPersonalInfo({
 
 function YesNo({ name, label, defaultValue }: { name: string; label: string; defaultValue: "yes" | "no" }) {
   const [value, setValue] = useState<"yes" | "no">(defaultValue);
+  const labelId = `${name}-label`;
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
+      <Label id={labelId}>{label}</Label>
       <input type="hidden" name={name} value={value} />
-      <div className="flex gap-4">
+      <div role="radiogroup" aria-labelledby={labelId} className="flex gap-2">
         {(["yes", "no"] as const).map((option) => (
           <button
             key={option}
             type="button"
+            role="radio"
+            aria-checked={value === option}
             onClick={() => setValue(option)}
-            className="flex items-center gap-2 text-sm"
+            className={cn(
+              "flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              value === option ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+            )}
           >
             <span
+              aria-hidden
               className={cn(
                 "flex size-4 items-center justify-center rounded-full border-2",
                 value === option ? "border-primary" : "border-muted-foreground/40"
@@ -638,8 +649,9 @@ export function StepTravelInfo({
         <Field label={`Departure from ${destination}`} htmlFor="departureDate" required>
           <Input id="departureDate" name="departureDate" type="date" min={todayIso()} defaultValue={v.departureDate ?? str("departure_date")} required />
         </Field>
-        <Field label="Purpose of visit" required className="sm:col-span-2">
+        <Field label="Purpose of visit" htmlFor="purposeOfVisit" required className="sm:col-span-2">
           <LabeledSelect
+            id="purposeOfVisit"
             name="purposeOfVisit"
             defaultValue={v.purposeOfVisit ?? str("purpose")}
             placeholder="Select purpose of visit"
@@ -661,7 +673,7 @@ export function StepTravelInfo({
 
       {questions.length > 0 ? (
         <div className="space-y-5 border-t border-border pt-5">
-          <p className="text-sm font-semibold">Additional questions for {destination}</p>
+          <h3 className="font-heading text-base font-bold">Additional questions for {destination}</h3>
           <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
             {questions.map((q) => {
               const fieldName = `answer_${q.key}`;
@@ -678,8 +690,9 @@ export function StepTravelInfo({
               }
               if (q.type === "select") {
                 return (
-                  <Field key={q.key} label={q.label} required={q.required}>
+                  <Field key={q.key} label={q.label} htmlFor={fieldName} required={q.required}>
                     <LabeledSelect
+                      id={fieldName}
                       name={fieldName}
                       defaultValue={existing}
                       placeholder="Select an option"
@@ -700,10 +713,10 @@ export function StepTravelInfo({
 
       <ErrorAlert state={state} />
 
-      <div className="flex items-center justify-between">
+      <div className={STEP_FOOTER}>
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=2`} />
-        <SubmitButton pendingText="Saving…" className="gap-2">
-          Continue <ArrowRight className="size-4" />
+        <SubmitButton size="lg" pendingText="Saving…" className="gap-2">
+          Continue <ArrowRight className="size-4" aria-hidden />
         </SubmitButton>
       </div>
     </form>
@@ -755,20 +768,20 @@ function UploadSlot({
     <div className="space-y-1.5">
       <p className="text-sm font-semibold">
         {slot.label}
-        {slot.required ? <span className="text-destructive"> *</span> : <span className="font-normal text-muted-foreground"> (Optional)</span>}
+        {slot.required ? <span className="text-destructive"> *</span> : <span className="font-normal text-muted-foreground"> (optional)</span>}
       </p>
       {slot.description ? <p className="text-xs text-muted-foreground">{slot.description}</p> : null}
 
       {existing ? (
         <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
-          <FileText className="size-5 shrink-0 text-primary" />
+          <FileText className="size-5 shrink-0 text-primary" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{existing.file_name ?? slot.label}</p>
-            <p className="text-xs text-muted-foreground">
-              {formatBytes(existing.file_size)} · Uploaded
+            <p className="text-xs text-muted-foreground tabular-nums">
+              {[formatBytes(existing.file_size), "Uploaded"].filter(Boolean).join(" · ")}
             </p>
           </div>
-          <CheckCircle2 className="size-4 shrink-0 text-primary" />
+          <CheckCircle2 className="size-4 shrink-0 text-primary" aria-hidden />
           <form action={removeVisaDocument}>
             <input type="hidden" name="documentId" value={existing.id} />
             <input type="hidden" name="applicationId" value={applicationId} />
@@ -777,10 +790,10 @@ function UploadSlot({
               description={existing.file_name ?? slot.label}
               confirmLabel="Remove"
               variant="ghost"
-              size="icon-sm"
+              size="icon"
               aria-label={`Remove ${slot.label}`}
             >
-              <X className="size-3.5" />
+              <X className="size-4" aria-hidden />
             </ConfirmButton>
           </form>
         </div>
@@ -795,7 +808,11 @@ function UploadSlot({
             autoSubmit
             label="Drop JPG, PNG or PDF"
           />
-          {state?.error ? <p className="mt-1.5 text-xs text-destructive">{state.error}</p> : null}
+          {state?.error ? (
+            <p role="alert" className="mt-1.5 text-sm text-destructive">
+              {state.error}
+            </p>
+          ) : null}
         </form>
       )}
 
@@ -814,7 +831,7 @@ function UploadSlot({
             name="documentId"
             defaultValue=""
             required
-            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-transparent px-2 text-xs shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+            className={cn(NATIVE_SELECT_CLASS, "w-auto flex-1")}
           >
             <option value="" disabled>
               Use a document from your vault…
@@ -825,11 +842,13 @@ function UploadSlot({
               </option>
             ))}
           </select>
-          <Button type="submit" size="sm" variant="outline" disabled={attaching}>
-            {attaching ? "Attaching…" : "Attach"}
+          <Button type="submit" variant="outline" loading={attaching}>
+            Attach
           </Button>
           {attachState?.error ? (
-            <p className="w-full text-xs text-destructive">{attachState.error}</p>
+            <p role="alert" className="w-full text-sm text-destructive">
+              {attachState.error}
+            </p>
           ) : null}
         </form>
       ) : null}
@@ -871,12 +890,12 @@ export function StepDocuments({
 
       <ErrorAlert state={state} />
 
-      <form action={formAction} className="flex items-center justify-between">
+      <form action={formAction} className={STEP_FOOTER}>
         <input type="hidden" name="applicationId" value={application.id} />
         {desk ? <input type="hidden" name="desk" value="1" /> : null}
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=3`} />
-        <SubmitButton pendingText="Checking…" className="gap-2">
-          Continue <ArrowRight className="size-4" />
+        <SubmitButton size="lg" pendingText="Checking…" className="gap-2">
+          Continue <ArrowRight className="size-4" aria-hidden />
         </SubmitButton>
       </form>
     </div>
@@ -888,30 +907,29 @@ export function StepDocuments({
 /* ------------------------------------------------------------------------- */
 
 function ReviewSection({
-  icon: Icon,
   title,
   editHref,
   children,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
   title: string;
   editHref: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border">
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <p className="flex items-center gap-2 text-sm font-bold">
-          <span className="flex size-7 items-center justify-center rounded-full bg-secondary text-primary">
-            <Icon className="size-3.5" />
-          </span>
-          {title}
-        </p>
-        <Button variant="ghost" size="sm" className="gap-1.5 text-primary" render={<Link href={editHref} />}>
-          <Pencil className="size-3.5" /> Edit
+    <section className="overflow-hidden rounded-2xl border border-border">
+      <div className="flex items-center justify-between gap-3 border-b border-border bg-secondary/40 py-1.5 pr-2 pl-4 sm:pl-5">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Edit ${title.toLowerCase()}`}
+          title="Edit"
+          render={<Link href={editHref} />}
+        >
+          <Pencil aria-hidden />
         </Button>
       </div>
-      <div className="px-5 py-4">{children}</div>
+      <div className="px-4 py-4 sm:px-5">{children}</div>
     </section>
   );
 }
@@ -922,7 +940,7 @@ function ReviewGrid({ rows }: { rows: Array<[string, string]> }) {
       {rows.map(([label, value]) => (
         <div key={label}>
           <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-          <dd className={cn("text-sm break-words", value ? "font-semibold text-foreground" : "text-muted-foreground/50")}>{value || "—"}</dd>
+          <dd className={cn("text-sm break-words tabular-nums", value ? "font-semibold text-foreground" : "text-muted-foreground")}>{value || "—"}</dd>
         </div>
       ))}
     </dl>
@@ -966,15 +984,15 @@ export function StepReview({
     <div className="space-y-6">
       <StepHeading index={5} title="Review your application" />
 
-      <ReviewSection icon={User} title="Personal information" editHref={`${editBase}2`}>
+      <ReviewSection title="Personal information" editHref={`${editBase}2`}>
         <ReviewGrid
           rows={[
-            ["Full Name", t.full_name],
-            ["Date of Birth", date(t.date_of_birth)],
+            ["Full name", t.full_name],
+            ["Date of birth", date(t.date_of_birth)],
             ["Gender", GENDER_LABELS[t.gender] ?? t.gender],
             ["Nationality", t.nationality ? countryName(t.nationality) : ""],
-            ["Passport Number", t.passport_number],
-            ["Passport Expiry Date", date(t.passport_expiry)],
+            ["Passport number", t.passport_number],
+            ["Passport expiry date", date(t.passport_expiry)],
             ["Email", c.email],
             ["Mobile", c.mobile],
           ]}
@@ -982,14 +1000,14 @@ export function StepReview({
       </ReviewSection>
 
       {application.applicant_type !== "single" ? (
-        <ReviewSection icon={Users} title={`Members (${application.members.length})`} editHref={`${editBase}1`}>
+        <ReviewSection title={`Members (${application.members.length})`} editHref={`${editBase}1`}>
           <div className="space-y-2">
             {application.members.map((member) => (
               <div key={member.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                 <span className="font-medium">{member.full_name}</span>
-                <Badge className="border-transparent bg-muted text-[10px] text-muted-foreground">
+                <Badge variant="neutral">
                   {member.is_primary
-                    ? "Primary Applicant"
+                    ? "Primary applicant"
                     : (RELATIONSHIP_LABELS[member.relationship] ?? member.relationship)}
                 </Badge>
                 <span className="font-mono text-xs text-muted-foreground">
@@ -1001,33 +1019,33 @@ export function StepReview({
         </ReviewSection>
       ) : null}
 
-      <ReviewSection icon={MapPin} title="Travel information" editHref={`${editBase}3`}>
+      <ReviewSection title="Travel information" editHref={`${editBase}3`}>
         <ReviewGrid
           rows={[
-            ["Date of Arrival", date(travel.arrival_date)],
-            ["Date of Departure", date(travel.departure_date)],
-            ["Purpose of Visit", PURPOSE_LABELS[str(travel.purpose)] ?? str(travel.purpose)],
-            ["Address / Hotel", str(travel.address)],
+            ["Date of arrival", date(travel.arrival_date)],
+            ["Date of departure", date(travel.departure_date)],
+            ["Purpose of visit", PURPOSE_LABELS[str(travel.purpose)] ?? str(travel.purpose)],
+            ["Address / hotel", str(travel.address)],
           ]}
         />
       </ReviewSection>
 
       {questions.length > 0 ? (
-        <ReviewSection icon={Info} title="Additional Questions" editHref={`${editBase}3`}>
+        <ReviewSection title="Additional questions" editHref={`${editBase}3`}>
           <ReviewGrid rows={questions.map((q) => [q.label, answers[q.key] ?? ""])} />
         </ReviewSection>
       ) : null}
 
-      <ReviewSection icon={FileText} title="Document Summary" editHref={`${editBase}4`}>
+      <ReviewSection title="Documents" editHref={`${editBase}4`}>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {slots.map((slot) => {
             const doc = byKey.get(slot.key);
             return (
               <p key={slot.key} className="flex items-center gap-2 text-sm">
                 {doc ? (
-                  <CheckCircle2 className="size-4 shrink-0 text-primary" />
+                  <CheckCircle2 className="size-4 shrink-0 text-primary" aria-label="Provided" />
                 ) : (
-                  <X className="size-4 shrink-0 text-muted-foreground" />
+                  <X className="size-4 shrink-0 text-muted-foreground" aria-label="Not provided" />
                 )}
                 <span className="font-medium">{slot.label}</span>
                 <span className="truncate text-xs text-muted-foreground">
@@ -1039,11 +1057,16 @@ export function StepReview({
         </div>
       </ReviewSection>
 
-      <div className="flex items-center justify-between rounded-2xl border border-border px-5 py-4">
-        <p className="text-sm font-semibold">
-          Total{travellers > 1 ? ` · ${travellers} travellers × ${fmtMoney(unitPrice + unitFee, currency)}` : ""}
-        </p>
-        <p className="font-heading text-xl font-bold text-primary">{fmtMoney(total, currency)}</p>
+      <div className="flex items-baseline justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-4 sm:px-5">
+        <div>
+          <p className="text-sm font-semibold">Total</p>
+          {travellers > 1 ? (
+            <p className="text-xs text-muted-foreground tabular-nums">
+              {travellers} travellers × {fmtMoney(unitPrice + unitFee, currency)}
+            </p>
+          ) : null}
+        </div>
+        <p className="font-heading text-2xl font-bold text-primary tabular-nums">{fmtMoney(total, currency)}</p>
       </div>
 
       <form action={formAction} className="space-y-4">
@@ -1051,13 +1074,13 @@ export function StepReview({
         {desk ? <input type="hidden" name="desk" value="1" /> : null}
         {termsAndConditions ? (
           <div className="space-y-2 rounded-lg border border-border p-4">
-            <p className="text-sm font-semibold">Terms &amp; Conditions</p>
+            <p className="text-sm font-semibold">Terms and conditions</p>
             <div className="max-h-40 overflow-y-auto rounded-md bg-secondary/40 p-3 text-xs whitespace-pre-wrap text-muted-foreground">
               {termsAndConditions}
             </div>
             <label className="flex items-start gap-2.5 text-sm">
               <input type="checkbox" name="agreeTerms" className="mt-0.5 size-4 accent-primary" required />
-              <span>I agree to the Terms &amp; Conditions.</span>
+              <span>I agree to the terms and conditions.</span>
             </label>
           </div>
         ) : null}
@@ -1071,10 +1094,10 @@ export function StepReview({
 
         <ErrorAlert state={state} />
 
-        <div className="flex items-center justify-between">
+        <div className={STEP_FOOTER}>
           <BackButton href={`${editBase}4`} />
-          <SubmitButton pendingText="Submitting…" className="gap-2">
-            Proceed to Payment <ArrowRight className="size-4" />
+          <SubmitButton size="lg" pendingText="Submitting…" className="gap-2">
+            Continue to payment <ArrowRight className="size-4" aria-hidden />
           </SubmitButton>
         </div>
       </form>

@@ -1,4 +1,4 @@
-import { BadgePercent, CalendarClock, Gift, Headset, Network, Wallet, type LucideIcon } from "lucide-react";
+import { BadgePercent, CalendarClock, Headset, Network, UsersRound, Wallet, type LucideIcon } from "lucide-react";
 
 import { FadeIn, StaggerGroup, StaggerItem } from "@/components/ui/aceternity/motion-primitives";
 
@@ -8,11 +8,11 @@ import { FadeIn, StaggerGroup, StaggerItem } from "@/components/ui/aceternity/mo
  * through) keep it reading as a set, not six separate cards.
  */
 const OFFERINGS: Array<{ Icon: LucideIcon; title: string; detail: string }> = [
-  { Icon: Gift, title: "STS Rewards", detail: "on every reservation" },
-  { Icon: Wallet, title: "Secure Wallet", detail: "for digital payments" },
+  { Icon: UsersRound, title: "Saved travellers", detail: "for faster checkout" },
+  { Icon: Wallet, title: "Saved wallets", detail: "EVC Plus and card" },
   { Icon: CalendarClock, title: "Flexible", detail: "cancellation policy" },
   { Icon: BadgePercent, title: "Zero payment", detail: "gateway charges*" },
-  { Icon: Headset, title: "24×7 service", detail: "support in Somali" },
+  { Icon: Headset, title: "Somali-speaking", detail: "support desk" },
   { Icon: Network, title: "Agent & API", detail: "connectivity" },
 ];
 
@@ -24,8 +24,8 @@ export function OfferingsBand() {
           <h2 className="font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl">
             Get more with STS Somalia
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-base text-muted-foreground">
-            Rewards, a secure wallet and Somali-language support on every booking.
+          <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground">
+            One account for every booking, with support in Somali.
           </p>
         </FadeIn>
 

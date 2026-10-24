@@ -2,26 +2,19 @@
 
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Download,
-  FileText,
-  ImageIcon,
-  Plus,
-  ShieldCheck,
-  Trash2,
-} from "lucide-react";
+import { Download, FileText, FolderLock, ImageIcon, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { PageHeader } from "@/components/ui/page-header";
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { shortDate } from "@/lib/money";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -108,6 +101,7 @@ export function DocumentVault({
       utils.travelers.myDocuments.invalidate();
       setUploadOpen(false);
       setFormKey((k) => k + 1);
+      toast.success("Document uploaded.");
     },
   });
 
@@ -115,7 +109,9 @@ export function DocumentVault({
     onSuccess: () => {
       utils.travelers.myDocuments.invalidate();
       setConfirmDelete(null);
+      toast.success("Document deleted.");
     },
+    onError: (error) => toast.error(error.message),
   });
 
   // Bumped on every successful upload to remount the form. A file input cannot
@@ -142,88 +138,69 @@ export function DocumentVault({
 
   const typeItems = TRAVELER_DOCUMENT_TYPES.map((t) => ({ value: t.value, label: t.label }));
 
-  return (
-    <div className="space-y-4">
-      <Alert>
-        <ShieldCheck />
-        <AlertDescription>
-          Files here are stored privately and are only visible to you. STS staff see a document
-          when you attach it to a specific application — never before.
-        </AlertDescription>
-      </Alert>
+  const uploadButton = (
+    <Button onClick={() => setUploadOpen(true)}>
+      <Plus data-icon="inline-start" /> Upload document
+    </Button>
+  );
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {documents.length === 0
-            ? "Your vault is empty."
-            : `${documents.length} document${documents.length === 1 ? "" : "s"} stored.`}
-        </p>
-        <Button onClick={() => setUploadOpen(true)} className="gap-1.5">
-          <Plus className="size-4" /> Upload document
-        </Button>
-      </div>
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Document vault"
+        status={documents.length > 0 ? <Badge variant="secondary">{documents.length}</Badge> : null}
+        actions={uploadButton}
+      />
 
       {documents.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center gap-3 p-12 text-center">
-            <span className="flex size-12 items-center justify-center rounded-full bg-secondary text-primary">
-              <FileText className="size-5" />
-            </span>
-            <p className="font-medium">Upload once, reuse everywhere</p>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Store a passport scan, photograph or bank statement here and attach it to any visa or
-              Umrah application instead of finding and re-uploading it each time.
-            </p>
-            <Button onClick={() => setUploadOpen(true)} className="mt-1 gap-1.5">
-              <Plus className="size-4" /> Upload your first document
-            </Button>
-          </CardContent>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <FolderLock />
+              </EmptyMedia>
+              <EmptyTitle>No documents</EmptyTitle>
+            </EmptyHeader>
+            <EmptyContent>{uploadButton}</EmptyContent>
+          </Empty>
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {documents.map((doc) => {
-            const expired = isExpired(doc.expires_at);
-            const isImage = doc.content_type?.startsWith("image/");
-            const Icon = isImage ? ImageIcon : FileText;
+        <Card className="py-0">
+          <ul className="divide-y divide-border">
+            {documents.map((doc) => {
+              const expired = isExpired(doc.expires_at);
+              const isImage = doc.content_type?.startsWith("image/");
+              const Icon = isImage ? ImageIcon : FileText;
+              const name = doc.label || TYPE_LABELS.get(doc.document_type) || "Document";
+              const size = formatSize(doc.file_size);
 
-            return (
-              <Card key={doc.id}>
-                <CardContent className="flex h-full flex-col gap-3 p-5">
-                  <div className="flex items-start gap-3">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
-                      <Icon className="size-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">
-                        {doc.label || TYPE_LABELS.get(doc.document_type) || "Document"}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground" title={doc.file_name}>
-                        {doc.file_name}
-                        {formatSize(doc.file_size) ? ` · ${formatSize(doc.file_size)}` : ""}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="secondary">{TYPE_LABELS.get(doc.document_type)}</Badge>
-                    {doc.traveler ? (
-                      <Badge variant="outline">
-                        {doc.traveler.is_self ? "You" : doc.traveler.full_name}
-                      </Badge>
-                    ) : null}
+              return (
+                <li key={doc.id} className="flex items-center gap-3 px-4 py-3.5 sm:gap-4 sm:px-5">
+                  <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{name}</p>
+                    <p className="truncate text-sm text-muted-foreground" title={doc.file_name}>
+                      {[
+                        TYPE_LABELS.get(doc.document_type) !== name ? TYPE_LABELS.get(doc.document_type) : null,
+                        doc.traveler ? (doc.traveler.is_self ? "You" : doc.traveler.full_name) : null,
+                        doc.file_name,
+                        size,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
                     {doc.expires_at ? (
-                      <Badge variant={expired ? "destructive" : "outline"} className="gap-1">
-                        {expired ? <AlertTriangle className="size-3" /> : null}
-                        {expired ? "Expired" : "Expires"} {doc.expires_at}
+                      <Badge variant={expired ? "destructive" : "neutral"} className="mt-1.5 tabular-nums">
+                        {expired ? "Expired" : "Expires"} {shortDate(doc.expires_at)}
                       </Badge>
                     ) : null}
                   </div>
-
-                  <div className="mt-auto flex gap-2 pt-1">
+                  <div className="flex shrink-0 gap-1">
                     <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
+                      size="icon"
+                      variant="ghost"
+                      aria-label={`Download ${doc.file_name}`}
+                      title="Download"
                       render={
                         <a
                           href={`/api/traveler-documents/${doc.id}`}
@@ -232,99 +209,100 @@ export function DocumentVault({
                         />
                       }
                     >
-                      <Download className="size-3.5" /> Open
+                      <Download />
                     </Button>
                     <Button
-                      size="sm"
+                      size="icon"
                       variant="ghost"
+                      className="text-destructive hover:text-destructive"
                       aria-label={`Delete ${doc.file_name}`}
+                      title="Delete"
                       onClick={() => setConfirmDelete(doc)}
                     >
-                      <Trash2 className="size-3.5 text-destructive" />
+                      <Trash2 />
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       )}
 
       <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Upload a document</DialogTitle>
-            <DialogDescription>
-              JPG, PNG, WebP, HEIC or PDF, up to 10 MB.
-            </DialogDescription>
+            <DialogTitle>Upload document</DialogTitle>
           </DialogHeader>
 
-          <form key={formKey} action={handleUpload} className="space-y-4">
-            {upload.error ? (
-              <Alert variant="destructive">
-                <AlertDescription>{upload.error.message}</AlertDescription>
-              </Alert>
-            ) : null}
+          <form key={formKey} action={handleUpload}>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="vault-file">File</FieldLabel>
+                <FileField
+                  id="vault-file"
+                  name="file"
+                  required
+                  maxBytes={10 * 1024 * 1024}
+                  accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,image/jpeg,image/png,image/webp,image/heic,application/pdf"
+                />
+              </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="vault-file">File</Label>
-              <FileField
-                id="vault-file"
-                name="file"
-                required
-                accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,image/jpeg,image/png,image/webp,image/heic,application/pdf"
-              />
-            </div>
+              <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="vault-type">Document type</FieldLabel>
+                  <Select name="documentType" defaultValue="passport_bio" items={typeItems}>
+                    <SelectTrigger id="vault-type" className="w-full">
+                      <SelectValue placeholder="Select a type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {typeItems.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="vault-type">Document type</Label>
-              <Select name="documentType" defaultValue="passport_bio" items={typeItems}>
-                <SelectTrigger id="vault-type" className="w-full">
-                  <SelectValue placeholder="Select a type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {typeItems.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <Field>
+                  <FieldLabel htmlFor="vault-traveler">Belongs to</FieldLabel>
+                  <Select name="travelerId" defaultValue="" items={travelerItems}>
+                    <SelectTrigger id="vault-traveler" className="w-full">
+                      <SelectValue placeholder="Not tied to one person" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {travelerItems.map((item) => (
+                        <SelectItem key={item.value || "none"} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="vault-traveler">Belongs to</Label>
-              <Select name="travelerId" defaultValue="" items={travelerItems}>
-                <SelectTrigger id="vault-traveler" className="w-full">
-                  <SelectValue placeholder="Not tied to one person" />
-                </SelectTrigger>
-                <SelectContent>
-                  {travelerItems.map((item) => (
-                    <SelectItem key={item.value || "none"} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="vault-label">Label (optional)</Label>
-                <Input id="vault-label" name="label" placeholder="e.g. Old passport" />
+                <Field>
+                  <FieldLabel htmlFor="vault-label">Label</FieldLabel>
+                  <Input id="vault-label" name="label" placeholder="Optional, e.g. Old passport" />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="vault-expires">Expires on</FieldLabel>
+                  <Input id="vault-expires" name="expiresAt" type="date" />
+                </Field>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="vault-expires">Expires on (optional)</Label>
-                <Input id="vault-expires" name="expiresAt" type="date" />
-              </div>
-            </div>
 
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setUploadOpen(false)}>
-                Cancel
-              </Button>
-              <SubmitButton pendingText="Uploading…">Upload</SubmitButton>
-            </div>
+              <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-end">
+                {upload.error ? (
+                  <p role="alert" className="text-sm text-destructive sm:mr-auto">
+                    {upload.error.message}
+                  </p>
+                ) : null}
+                <Button type="button" variant="outline" onClick={() => setUploadOpen(false)}>
+                  Cancel
+                </Button>
+                <SubmitButton pendingText="Uploading…">Upload</SubmitButton>
+              </div>
+            </FieldGroup>
           </form>
         </DialogContent>
       </Dialog>
@@ -337,14 +315,14 @@ export function DocumentVault({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this document?</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmDelete?.file_name} will be permanently removed from your vault. Copies already
-              attached to a submitted application stay with that application.
+              {confirmDelete?.file_name} is permanently removed from your vault.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
+              loading={remove.isPending}
               onClick={() => confirmDelete && remove.mutate({ documentId: confirmDelete.id })}
             >
               Delete
@@ -352,13 +330,6 @@ export function DocumentVault({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {upload.isSuccess ? (
-        <Alert>
-          <CheckCircle2 />
-          <AlertDescription>Document uploaded to your vault.</AlertDescription>
-        </Alert>
-      ) : null}
     </div>
   );
 }

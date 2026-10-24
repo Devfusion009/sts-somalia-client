@@ -7,7 +7,7 @@ import { WhatsAppInlineLink } from "@/components/marketing/whatsapp-button";
 /** Full-bleed lead-capture band: pitch on the left, callback form on the right. */
 export function SupportCta() {
   return (
-    <section className="relative isolate overflow-hidden bg-sidebar py-20 lg:py-28">
+    <section id="plan" className="relative isolate scroll-mt-32 overflow-hidden bg-sidebar py-16 sm:py-20 lg:py-24">
       <Image
         src="/marketing/support-team.webp"
         alt=""
@@ -24,13 +24,13 @@ export function SupportCta() {
             Talk to a real person before you book
           </h2>
           <p className="mt-4 max-w-lg text-lg leading-relaxed text-white/85">
-            Not sure which fare, which hotel, or whether your documents are enough? That&rsquo;s
-            what our desk is for. Ask first — booking online or over the phone costs the same.
+            Not sure which fare, which hotel, or whether your documents are enough? Ask first —
+            booking online or over the phone costs the same.
           </p>
 
           <a
             href="tel:+252611444420"
-            className="mt-8 inline-flex items-center gap-3 font-heading text-2xl font-semibold text-white transition-colors hover:text-teal-200 sm:text-3xl"
+            className="mt-8 inline-flex items-center gap-3 rounded-full font-heading text-2xl font-semibold text-white tabular-nums transition-colors hover:text-teal-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none sm:text-3xl"
           >
             <span className="grid size-12 place-items-center rounded-full bg-white/10 ring-1 ring-white/25">
               <Phone className="size-5" aria-hidden />
@@ -38,8 +38,8 @@ export function SupportCta() {
             +252 611 444 420
           </a>
 
-          <p className="mt-5 flex items-center gap-2 text-sm text-white/70">
-            <Clock3 className="size-4" aria-hidden />
+          <p className="mt-5 flex items-start gap-2 text-sm text-white/70 sm:items-center">
+            <Clock3 className="size-4 shrink-0" aria-hidden />
             Saturday–Thursday, 8:00–18:00 EAT · emergencies answered around the clock
           </p>
           <p className="mt-2 text-sm text-white/70">

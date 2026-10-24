@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeftIcon } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getApplicationForWizard } from "@/modules/visa/queries";
 import { countryName } from "@/lib/countries";
@@ -54,12 +54,12 @@ export default async function AgentVisaWizardPage({
   const destination = countryName(visaType.destination_country_code);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <Link
         href="/agent/book/visa"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="inline-flex w-fit items-center gap-1.5 rounded-md text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
       >
-        <ArrowLeft className="size-3.5" /> Visa
+        <ArrowLeftIcon className="size-3.5" aria-hidden="true" /> Visa
       </Link>
 
       <VisaTypeBanner visaType={visaType} />
@@ -72,7 +72,7 @@ export default async function AgentVisaWizardPage({
           basePath="/agent/book/visa/apply"
         />
 
-        <main className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7">
+        <section className="min-w-0 rounded-xl bg-card p-5 shadow-xs ring-1 ring-foreground/[0.08] sm:p-7">
           {step === 1 ? (
             <StepApplicantType application={application} backHref="/agent/book/visa" desk />
           ) : step === 2 ? (
@@ -84,7 +84,7 @@ export default async function AgentVisaWizardPage({
           ) : (
             <StepReview application={application} desk />
           )}
-        </main>
+        </section>
 
         <div className="hidden xl:block">
           <ApplicationSummary application={application} priceLabel="Price" />

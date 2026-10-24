@@ -7,17 +7,12 @@ import { getServerTrpc } from "@/lib/trpc/server";
 import type { CheckoutOrderRow } from "api/dist/modules/payments/checkout.service";
 import { describeOrderItem, hotelGuestNames } from "@/modules/orders/format";
 import { UnavailableNotice } from "@/components/portal/unavailable-notice";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { money } from "@/lib/money";
 import { WhatsAppInlineLink } from "@/components/marketing/whatsapp-button";
 
 export const metadata: Metadata = { title: "Payment Confirmation" };
-
-function money(amount: number | string, currency: string) {
-  return `${currency} ${Number(amount).toFixed(2)}`;
-}
 
 export default async function CheckoutSuccessPage({
   params,
@@ -56,82 +51,80 @@ export default async function CheckoutSuccessPage({
   const primaryItem = order.order_items[0];
   const primaryHref = primaryItem ? describeOrderItem(primaryItem).href : "/account/bookings";
 
-  return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-12">
-      <div className="text-center">
-        {paid ? (
-          <>
-            <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-primary/10">
-              <CheckCircle2 className="size-9 text-primary" />
-            </span>
-            <h1 className="mt-4 font-heading text-2xl font-bold tracking-tight lg:text-3xl">
-              Payment received — thank you!
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Order <span className="font-medium text-foreground">{order.order_number}</span>{" "}
-              confirmed. Receipt added to your account.
-            </p>
-          </>
-        ) : (
-          <>
-            <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-muted">
-              <Clock className="size-9 text-muted-foreground" />
-            </span>
-            <h1 className="mt-4 font-heading text-2xl font-bold tracking-tight">Order {order.status}</h1>
-          </>
-        )}
-      </div>
+  const statusLabel = order.status.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="text-base">Order Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
+  return (
+    <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6 lg:py-16">
+      <header className="text-center">
+        {paid ? (
+          <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-primary/10" aria-hidden>
+            <CheckCircle2 className="size-9 text-primary" />
+          </span>
+        ) : (
+          <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-muted" aria-hidden>
+            <Clock className="size-9 text-muted-foreground" />
+          </span>
+        )}
+        <h1 className="mt-4 font-heading text-2xl font-bold tracking-tight text-balance lg:text-3xl">
+          {paid ? "Payment received" : `Order ${statusLabel.toLowerCase()}`}
+        </h1>
+        <p className="mt-2 font-mono text-sm text-muted-foreground">{order.order_number}</p>
+      </header>
+
+      <section aria-labelledby="order-details-heading" className="mt-8 rounded-2xl border border-border bg-card shadow-xs">
+        <h2 id="order-details-heading" className="border-b border-border px-5 py-4 font-heading text-base font-semibold">
+          Order details
+        </h2>
+        <ul className="divide-y divide-border px-5">
           {order.order_items.map((item) => {
             const info = describeOrderItem(item);
             const guestNames =
               item.item_type === "hotel" ? hotelGuestNames(item.hotel_booking?.guest_details) : [];
             return (
-              <div key={item.id} className="flex items-start justify-between gap-4">
-                <div>
-                  <Link href={info.href} className="font-medium hover:underline">
+              <li key={item.id} className="flex items-start justify-between gap-4 py-3 text-sm">
+                <div className="min-w-0">
+                  <Link
+                    href={info.href}
+                    className="rounded-sm font-medium hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  >
                     {info.title}
                   </Link>
-                  {info.subtitle ? (
-                    <p className="text-xs text-muted-foreground">{info.subtitle}</p>
-                  ) : null}
+                  {info.subtitle ? <p className="text-xs text-muted-foreground">{info.subtitle}</p> : null}
                   {guestNames.length > 0 ? (
                     <p className="text-xs text-muted-foreground">Guests: {guestNames.join(", ")}</p>
                   ) : null}
                 </div>
-                <p className="shrink-0 font-medium">{money(item.total_price, order.currency)}</p>
-              </div>
+                <p className="shrink-0 font-medium tabular-nums">{money(item.total_price, order.currency)}</p>
+              </li>
             );
           })}
-          <Separator />
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Payment Method</span>
-            <span className="font-medium">{successfulPayment?.method_label ?? "—"}</span>
+        </ul>
+        <dl className="space-y-2.5 border-t border-border px-5 py-4 text-sm">
+          <div className="flex items-center justify-between gap-4">
+            <dt className="text-muted-foreground">Payment method</dt>
+            <dd className="font-medium">{successfulPayment?.method_label ?? "—"}</dd>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Status</span>
-            <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
-              {order.status.replace("_", " ")}
-            </Badge>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="text-muted-foreground">Status</dt>
+            <dd>
+              <Badge variant={statusBadgeVariant(order.status)}>{statusLabel}</Badge>
+            </dd>
           </div>
-          <div className="flex justify-between text-base font-semibold">
-            <span>Total Paid</span>
-            <span className="text-primary">{money(order.total, order.currency)}</span>
-          </div>
-        </CardContent>
-      </Card>
+        </dl>
+        <div className="flex items-baseline justify-between gap-4 rounded-b-2xl border-t border-border bg-secondary/40 px-5 py-4">
+          <span className="text-sm font-semibold">Order total</span>
+          <span className="font-heading text-2xl font-bold text-primary tabular-nums">
+            {money(order.total, order.currency)}
+          </span>
+        </div>
+      </section>
 
       <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
         <Button size="lg" className="gap-2" render={<Link href={primaryHref} />}>
-          Track your booking <ArrowRight className="size-4" />
+          Track your booking <ArrowRight className="size-4" aria-hidden />
         </Button>
         <Button size="lg" variant="outline" render={<Link href="/account/bookings" />}>
-          My Bookings
+          My bookings
         </Button>
         {invoiceAvailable ? (
           <Button
@@ -140,17 +133,16 @@ export default async function CheckoutSuccessPage({
             className="gap-2"
             render={<a href={`/api/invoices/${order.id}`} target="_blank" rel="noopener noreferrer" />}
           >
-            <Download className="size-4" /> Download Invoice
+            <Download className="size-4" aria-hidden /> Download invoice
           </Button>
         ) : null}
       </div>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
+      <p className="mt-8 text-center text-sm text-muted-foreground">
         Questions about this booking?{" "}
         <WhatsAppInlineLink message={`Hello STS! I have a question about my order ${order.order_number}.`}>
           Message us on WhatsApp
-        </WhatsAppInlineLink>{" "}
-        — include your order number and we&apos;ll take it from there.
+        </WhatsAppInlineLink>
       </p>
     </div>
   );

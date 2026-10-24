@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { format } from "date-fns";
-import { AlertTriangle, Banknote, CheckCircle2, XCircle } from "lucide-react";
+import { AlertTriangle, Banknote, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +16,8 @@ import {
   settleAgencyPayoutRequest,
 } from "@/modules/agencies/admin-actions";
 import { FileField } from "@/components/ui/upload";
+import { money } from "@/lib/money";
+import { selectClass } from "./form-footer";
 
 type PendingEntry = {
   id: string;
@@ -24,9 +26,7 @@ type PendingEntry = {
   createdAt: string;
 };
 
-function money(amount: number) {
-  return `USD ${amount.toFixed(2)}`;
-}
+const usd = (amount: number) => money(amount, "USD");
 
 /**
  * Bulk approve/reject over the entries the admin actually ticks. Approving
@@ -51,32 +51,41 @@ export function CommissionEntryReview({ agencyId, entries }: { agencyId: string;
 
   return (
     <div className="space-y-3">
-      <div className="divide-y divide-border rounded-lg border border-border">
-        <label className="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs font-medium">
+      <div className="-mx-1 divide-y divide-border">
+        <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-1 py-2 text-xs font-medium text-muted-foreground tabular-nums">
           <input
             type="checkbox"
-            className="size-3.5 accent-primary"
+            className="size-4 accent-primary"
             checked={allSelected}
             onChange={() => setSelected(allSelected ? new Set() : new Set(entries.map((e) => e.id)))}
           />
-          {selected.size} of {entries.length} selected · {money(selectedTotal)}
+          {selected.size} of {entries.length} selected · {usd(selectedTotal)}
         </label>
         {entries.map((entry) => (
-          <label key={entry.id} className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm">
+          <label
+            key={entry.id}
+            className="flex cursor-pointer items-center gap-2.5 px-1 py-2 text-sm transition-colors hover:bg-muted/40"
+          >
             <input
               type="checkbox"
-              className="size-3.5 accent-primary"
+              className="size-4 accent-primary"
               checked={selected.has(entry.id)}
               onChange={() => toggle(entry.id)}
             />
             <span className="font-mono text-xs">{entry.orderNumber ?? "—"}</span>
-            <span className="text-xs text-muted-foreground">{format(new Date(entry.createdAt), "d MMM yyyy")}</span>
-            <span className="ml-auto font-semibold">{money(entry.amount)}</span>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {format(new Date(entry.createdAt), "d MMM yyyy")}
+            </span>
+            <span className="ml-auto font-medium tabular-nums">{usd(entry.amount)}</span>
           </label>
         ))}
       </div>
 
-      {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
+      {state?.error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {state.error}
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap justify-end gap-1.5">
         <form action={formAction}>
@@ -85,8 +94,8 @@ export function CommissionEntryReview({ agencyId, entries }: { agencyId: string;
           {[...selected].map((id) => (
             <input key={id} type="hidden" name="entryIds" value={id} />
           ))}
-          <SubmitButton size="sm" variant="outline" className="gap-1" disabled={selected.size === 0} pendingText="Reversing…">
-            <XCircle className="size-3.5" /> Reverse
+          <SubmitButton size="sm" variant="outline" disabled={selected.size === 0} pendingText="Reversing…">
+            <X data-icon="inline-start" /> Reverse
           </SubmitButton>
         </form>
         <form action={formAction}>
@@ -95,17 +104,14 @@ export function CommissionEntryReview({ agencyId, entries }: { agencyId: string;
           {[...selected].map((id) => (
             <input key={id} type="hidden" name="entryIds" value={id} />
           ))}
-          <SubmitButton size="sm" className="gap-1" disabled={selected.size === 0} pendingText="Approving…">
-            <CheckCircle2 className="size-3.5" /> Approve {money(selectedTotal)}
+          <SubmitButton size="sm" disabled={selected.size === 0} pendingText="Approving…">
+            <Check data-icon="inline-start" /> Approve <span className="tabular-nums">{usd(selectedTotal)}</span>
           </SubmitButton>
         </form>
       </div>
     </div>
   );
 }
-
-const selectClass =
-  "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -150,25 +156,25 @@ export function PayoutRequestActions({
               <input type="hidden" name="agencyId" value={agencyId} />
               <input type="hidden" name="requestId" value={requestId} />
               <input type="hidden" name="decision" value="approved" />
-              <SubmitButton size="sm" className="gap-1" pendingText="Approving…">
-                <CheckCircle2 className="size-3.5" /> Approve
+              <SubmitButton size="sm" pendingText="Approving…">
+                <Check data-icon="inline-start" /> Approve
               </SubmitButton>
             </form>
             <Button
               type="button"
               size="sm"
               variant={rejecting ? "destructive" : "outline"}
-              className="gap-1"
+              aria-expanded={rejecting}
               onClick={() => setRejecting((v) => !v)}
             >
-              <XCircle className="size-3.5" /> Decline
+              <X data-icon="inline-start" /> Decline
             </Button>
           </>
         ) : null}
 
         {status === "approved" ? (
-          <Button type="button" size="sm" className="gap-1" onClick={() => setRecording((v) => !v)}>
-            <Banknote className="size-3.5" /> Record transfer
+          <Button type="button" size="sm" aria-expanded={recording} onClick={() => setRecording((v) => !v)}>
+            <Banknote data-icon="inline-start" /> Record transfer
           </Button>
         ) : null}
 
@@ -176,8 +182,8 @@ export function PayoutRequestActions({
           <form action={settleAction}>
             <input type="hidden" name="agencyId" value={agencyId} />
             <input type="hidden" name="requestId" value={requestId} />
-            <SubmitButton size="sm" className="gap-1" pendingText="Confirming…">
-              <CheckCircle2 className="size-3.5" /> Confirm received
+            <SubmitButton size="sm" pendingText="Confirming…">
+              <Check data-icon="inline-start" /> Confirm received
             </SubmitButton>
           </form>
         ) : null}
@@ -187,28 +193,32 @@ export function PayoutRequestActions({
             type="button"
             size="sm"
             variant={failing ? "destructive" : "outline"}
-            className="gap-1"
+            aria-expanded={failing}
             onClick={() => setFailing((v) => !v)}
           >
-            <AlertTriangle className="size-3.5" /> Mark failed
+            <AlertTriangle data-icon="inline-start" /> Mark failed
           </Button>
         ) : null}
       </div>
 
-      {error ? <p className="text-right text-xs text-destructive">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="text-right text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
 
       {rejecting ? (
         <form action={rejectAction} className="space-y-1.5">
           <input type="hidden" name="agencyId" value={agencyId} />
           <input type="hidden" name="requestId" value={requestId} />
           <input type="hidden" name="decision" value="rejected" />
-          <Textarea name="note" placeholder="Reason (shown to the agency)" rows={2} required />
+          <Textarea name="note" placeholder="Reason (shown to the agency)" rows={2} required aria-label="Reason" />
           <div className="flex justify-end gap-1.5">
             <Button type="button" size="sm" variant="ghost" onClick={() => setRejecting(false)}>
               Cancel
             </Button>
             <SubmitButton size="sm" variant="destructive" pendingText="Declining…">
-              Confirm
+              Decline request
             </SubmitButton>
           </div>
         </form>
@@ -218,26 +228,33 @@ export function PayoutRequestActions({
         <form action={landed ? settleAction : sentAction} className="space-y-2 text-left">
           <input type="hidden" name="agencyId" value={agencyId} />
           <input type="hidden" name="requestId" value={requestId} />
-          <select name="method" defaultValue="bank_transfer" className={selectClass} required>
+          <select name="method" defaultValue="bank_transfer" className={selectClass} required aria-label="Method">
             {PAYOUT_METHODS.map((method) => (
               <option key={method.id} value={method.id}>
                 {method.label}
               </option>
             ))}
           </select>
-          <Input name="reference" placeholder="Transfer reference" />
-          <Input type="date" name={landed ? "paidAt" : "sentAt"} defaultValue={today()} max={today()} />
+          <Input name="reference" placeholder="Transfer reference" aria-label="Transfer reference" />
+          <Input
+            type="date"
+            name={landed ? "paidAt" : "sentAt"}
+            defaultValue={today()}
+            max={today()}
+            aria-label={landed ? "Paid on" : "Sent on"}
+          />
           <FileField name="proof" accept="image/jpeg,image/png,image/webp,application/pdf" label="Transfer proof" compact />
-          <div className="space-y-1 text-xs">
-            <label className="flex items-center gap-2">
-              <input type="radio" checked={!landed} onChange={() => setLanded(false)} />
-              Sent — not confirmed yet
+          <fieldset className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm">
+            <legend className="sr-only">Transfer state</legend>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input type="radio" className="size-4 accent-primary" checked={!landed} onChange={() => setLanded(false)} />
+              Sent
             </label>
-            <label className="flex items-center gap-2">
-              <input type="radio" checked={landed} onChange={() => setLanded(true)} />
-              Completed — money landed
+            <label className="flex cursor-pointer items-center gap-2">
+              <input type="radio" className="size-4 accent-primary" checked={landed} onChange={() => setLanded(true)} />
+              Landed
             </label>
-          </div>
+          </fieldset>
           <div className="flex justify-end gap-1.5">
             <Button type="button" size="sm" variant="ghost" onClick={() => setRecording(false)}>
               Cancel
@@ -253,13 +270,19 @@ export function PayoutRequestActions({
         <form action={failAction} className="space-y-1.5">
           <input type="hidden" name="agencyId" value={agencyId} />
           <input type="hidden" name="requestId" value={requestId} />
-          <Textarea name="reason" placeholder="What went wrong (shown to the agency)" rows={2} required />
+          <Textarea
+            name="reason"
+            placeholder="What went wrong (shown to the agency)"
+            rows={2}
+            required
+            aria-label="Failure reason"
+          />
           <div className="flex justify-end gap-1.5">
             <Button type="button" size="sm" variant="ghost" onClick={() => setFailing(false)}>
               Cancel
             </Button>
             <SubmitButton size="sm" variant="destructive" pendingText="Saving…">
-              Confirm
+              Mark failed
             </SubmitButton>
           </div>
         </form>

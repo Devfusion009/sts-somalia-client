@@ -1,18 +1,18 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { AlertCircle, Plus, UserRoundPlus } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { createAgencyCustomer } from "@/modules/agencies/customer-actions";
@@ -33,51 +33,48 @@ export function AddCustomerForm() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button className="gap-1.5" />}>
-        <Plus className="size-4" /> Add customer
+      <DialogTrigger render={<Button />}>
+        <Plus data-icon="inline-start" aria-hidden="true" /> Add customer
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <UserRoundPlus className="size-4 text-primary" /> New customer
-          </DialogTitle>
+          <DialogTitle>New customer</DialogTitle>
         </DialogHeader>
         <form
           action={(formData) => {
             submitted.current = true;
             formAction(formData);
           }}
-          className="space-y-4"
+          className="space-y-5"
         >
-          {state?.error ? (
-            <Alert variant="destructive">
-              <AlertCircle />
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          ) : null}
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="fullName">
+                Full name <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input id="fullName" name="fullName" required autoComplete="off" />
+            </Field>
+            <Field>
+              <FieldLabel>Phone</FieldLabel>
+              <PhoneField name="phone" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="email">Email</FieldLabel>
+              <Input id="email" name="email" type="email" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="notes">Notes</FieldLabel>
+              <Textarea id="notes" name="notes" rows={2} placeholder="Preferences, passport info…" />
+            </Field>
+            <FieldError>{state?.error}</FieldError>
+          </FieldGroup>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="fullName">
-              Full name <span className="text-destructive">*</span>
-            </Label>
-            <Input id="fullName" name="fullName" required />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Phone</Label>
-            <PhoneField name="phone" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" name="notes" rows={2} placeholder="Preferences, passport info…" />
-          </div>
-
-          <SubmitButton className="w-full" pendingText="Saving…">
-            Save customer
-          </SubmitButton>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <SubmitButton pendingText="Saving…">Save customer</SubmitButton>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

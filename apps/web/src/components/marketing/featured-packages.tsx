@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Landmark } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { SectionHeading } from "@/components/marketing/section-heading";
 import { PackageCard } from "@/modules/umrah/components/package-card";
 import { getFeaturedPackages } from "@/modules/umrah/queries";
@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 const FALLBACK_TEASERS = [
   {
     name: "Economy Umrah",
-    blurb: "Flights, shared rooms near the Haram, visa and ground transport — the essentials done right.",
+    blurb: "Flights, shared rooms near the Haram, visa and ground transport.",
     badge: null,
   },
   {
@@ -34,11 +34,11 @@ function Heading() {
     <SectionHeading
       align="left"
       title="Upcoming Umrah packages"
-      lead="Flights, hotels, visa and guidance — one price, one group, zero guesswork."
+      lead="Flights, hotels, visa and a guide — one price per pilgrim."
       action={
         <Link
           href="/umrah/group"
-          className="flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+          className="flex h-11 items-center gap-1 rounded-md text-sm font-semibold text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           View all packages <ArrowRight className="size-4" aria-hidden />
         </Link>
@@ -79,14 +79,13 @@ export async function FeaturedPackages() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" aria-hidden />
                     {teaser.badge ? (
-                      <Badge className="absolute top-3 left-3 border-transparent bg-brand-gold font-semibold text-black">
+                      <Badge className="absolute top-3 left-3 border-transparent bg-brand-accent font-semibold text-brand-accent-foreground">
                         {teaser.badge}
                       </Badge>
                     ) : null}
                   </div>
                   <div className="flex flex-1 flex-col gap-2 p-5">
-                    <h3 className="flex items-center gap-2 font-heading text-lg font-semibold group-hover:text-primary">
-                      <Landmark className="size-4.5 text-primary" aria-hidden />
+                    <h3 className="font-heading text-lg font-semibold group-hover:text-primary">
                       {teaser.name}
                     </h3>
                     <p className="flex-1 text-sm leading-relaxed text-muted-foreground">{teaser.blurb}</p>

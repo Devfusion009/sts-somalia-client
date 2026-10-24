@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import Image from "next/image";
+import { AuthLogo } from "@/components/auth/auth-frame";
 import { LoginForm } from "./login-form";
 import { DEMO_LOGIN_ENABLED, DEMO_ACCOUNTS } from "@/modules/demo/config";
 import type { DemoAccountEntry } from "@/modules/demo/demo-accounts-list";
@@ -37,9 +36,7 @@ export default async function LoginPage({
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-secondary/30 px-4 py-12">
-      <Link href="/" className="flex items-center">
-        <Image src="/logo.png" alt="STS Somalia" width={714} height={312} priority className="h-11 w-auto" />
-      </Link>
+      <AuthLogo href="/" />
       <LoginForm
         redirectTo={redirect_to}
         notice={notice}

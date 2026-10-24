@@ -15,7 +15,7 @@ export default async function VenueLoginPage({
   return (
     <PortalLoginShell portalLabel="Venue Portal" accent="venue">
       <PortalLoginForm
-        title="Venue partner sign-in"
+        title="Sign in"
         action={signInToVenuePortalAction}
         redirectTo={redirect_to}
       />

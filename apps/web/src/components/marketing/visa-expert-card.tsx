@@ -33,12 +33,10 @@ export function VisaExpertCard({
         className,
       )}
     >
-      <div className="pointer-events-none absolute -top-16 -right-16 size-48 rounded-full bg-primary/8" aria-hidden />
-
       <div className="relative">
         <span className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
-          <span className="relative flex size-2">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />
+          <span className="relative flex size-2" aria-hidden>
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60 motion-reduce:hidden" />
             <span className="relative inline-flex size-2 rounded-full bg-primary" />
           </span>
           Visa desk · 24/7
@@ -50,7 +48,7 @@ export function VisaExpertCard({
             wide ? "text-2xl sm:text-3xl" : "text-xl",
           )}
         >
-          Your visa comes with more
+          Document review by our visa desk
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Refused before? Our desk checks every document against what the consulate requires before
@@ -63,14 +61,12 @@ export function VisaExpertCard({
       <div className={cn("relative mt-5", wide && "lg:mt-0")}>
         <div className="relative flex items-center gap-4 overflow-hidden rounded-xl bg-[linear-gradient(135deg,var(--sidebar)_0%,color-mix(in_oklch,var(--primary),black_35%)_100%)] p-4 text-white shadow-sm">
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold tracking-[0.14em] text-white/65 uppercase">
-              Families &amp; groups
-            </p>
+            <p className="text-xs font-semibold text-white/70">Families and groups</p>
             <p className="mt-1 font-heading text-base leading-snug font-bold">One application for everyone</p>
             <ul className="mt-2.5 space-y-1.5">
               {GROUP_POINTS.map((point) => (
                 <li key={point} className="flex items-center gap-1.5 text-xs font-medium text-white/90">
-                  <Check className="size-3.5 shrink-0 text-teal-300" strokeWidth={2.75} />
+                  <Check className="size-3.5 shrink-0 text-white" strokeWidth={2.75} aria-hidden />
                   {point}
                 </li>
               ))}
@@ -100,10 +96,10 @@ function DeskActions({ message, className }: { message: string; className?: stri
       <ExpertCtaButton href={whatsappLink(message)}>Talk to a visa expert</ExpertCtaButton>
       <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <ShieldCheck className="size-3.5 text-primary" /> Licensed Somali travel agency
+          <ShieldCheck className="size-3.5 text-primary" aria-hidden /> Licensed Somali travel agency
         </span>
         <span className="flex items-center gap-1.5">
-          <Wallet className="size-3.5 text-primary" /> EVC Plus, bank &amp; card
+          <Wallet className="size-3.5 text-primary" aria-hidden /> EVC Plus, bank and card
         </span>
       </div>
     </div>

@@ -21,6 +21,7 @@ import {
   MapPinned,
   MoreVertical,
   Paperclip,
+  Pencil,
   Receipt,
   Shield,
   ShieldCheck,
@@ -228,31 +229,31 @@ function StepNav({
   note?: string;
 }) {
   return (
-    <div className="flex items-center justify-between pt-2">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
+      <div className="flex min-w-0 items-center gap-3">
         {backHref ? (
-          <Button type="button" variant="outline" className="gap-1.5" render={<Link href={backHref} />}>
-            <ArrowLeft className="size-3.5" /> Back
+          <Button type="button" variant="outline" render={<Link href={backHref} />}>
+            <ArrowLeft data-icon="inline-start" aria-hidden="true" /> Back
           </Button>
         ) : (
           <span />
         )}
         {saving ? (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" /> Saving…
+          <span role="status" className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Loader2 className="size-3 animate-spin" aria-hidden="true" /> Saving…
           </span>
         ) : saved ? (
-          <span className="flex items-center gap-1 text-xs text-primary">
-            <Check className="size-3" /> All changes saved
+          <span role="status" className="flex items-center gap-1 text-xs text-primary">
+            <Check className="size-3" aria-hidden="true" /> Saved
           </span>
         ) : note ? (
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <ShieldCheck className="size-3.5 text-primary" /> {note}
+            <ShieldCheck className="size-3.5 text-primary" aria-hidden="true" /> {note}
           </span>
         ) : null}
       </div>
-      <SubmitButton name="intent" value="continue" className="gap-1.5" pendingText="Saving…">
-        {nextLabel} <ArrowRight className="size-3.5" />
+      <SubmitButton name="intent" value="continue" pendingText="Saving…">
+        {nextLabel} <ArrowRight data-icon="inline-end" aria-hidden="true" />
       </SubmitButton>
     </div>
   );
@@ -842,14 +843,9 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
             options={PAYOUT_FREQUENCIES.map((f) => ({ value: f, label: PAYOUT_FREQUENCY_LABELS[f] }))}
           />
         </div>
-        <p className="text-xs text-muted-foreground">
-          {kind === "hotel_partner" ? "Guests" : "Customers"} pay STS Somalia at booking. Your share for completed{" "}
-          {kind === "hotel_partner" ? "stays" : "events"} is paid out to the account below on this schedule, less the
-          platform commission.
-        </p>
 
         <Separator />
-        <p className="text-sm font-medium">Bank account details (for payouts) *</p>
+        <p className="text-sm font-semibold">Payout bank account</p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="space-y-1.5">
             <Label>Bank name *</Label>
@@ -938,7 +934,7 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
       </div>
 
       <Separator />
-      <p className="text-sm font-medium">Bank account details (for refunds / payouts)</p>
+      <p className="text-sm font-semibold">Bank account</p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="space-y-1.5">
           <Label>Bank name</Label>
@@ -1072,8 +1068,10 @@ function DocUploadRow({
           ) : null}
           {existing ? (
             <DropdownMenu>
-              <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon" className="size-8" />}>
-                <MoreVertical className="size-4" />
+              <DropdownMenuTrigger
+                render={<Button type="button" variant="ghost" size="icon" aria-label={`${slot.label} actions`} />}
+              >
+                <MoreVertical className="size-4" aria-hidden="true" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem render={<button type="button" className="w-full" onClick={handleView} />}>View document</DropdownMenuItem>
@@ -1125,9 +1123,9 @@ function DocUploadRow({
           {!existing ? null : expiryPending ? (
             <p className="text-xs text-muted-foreground">Saving…</p>
           ) : isExpired ? (
-            <p className="text-xs text-destructive">This license has expired — you&apos;ll need a current one to submit.</p>
+            <p role="alert" className="text-xs text-destructive">Expired.</p>
           ) : null}
-          {expiryState?.error ? <p className="text-xs text-destructive">{expiryState.error}</p> : null}
+          {expiryState?.error ? <p role="alert" className="text-xs text-destructive">{expiryState.error}</p> : null}
         </form>
       ) : null}
 
@@ -1191,7 +1189,7 @@ export function StepDocuments({
         <Alert variant="destructive">
           <XCircle />
           <AlertDescription>
-            Re-upload before you continue: {rejectedDocs.map((s) => s.label).join(", ")}.
+            Re-upload: {rejectedDocs.map((s) => s.label).join(", ")}.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -1199,7 +1197,7 @@ export function StepDocuments({
         <Alert variant="destructive">
           <AlertCircle />
           <AlertDescription>
-            Still needed before you can continue: {missingUpload.map((s) => s.label).join(", ")}.
+            Missing: {missingUpload.map((s) => s.label).join(", ")}.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -1207,7 +1205,7 @@ export function StepDocuments({
         <Alert variant="destructive">
           <AlertCircle />
           <AlertDescription>
-            Set an expiry date before you can continue: {missingExpiry.map((s) => s.label).join(", ")}.
+            Expiry date needed: {missingExpiry.map((s) => s.label).join(", ")}.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -1217,8 +1215,7 @@ export function StepDocuments({
         <ErrorAlert state={state} />
         <StepNav
           backHref={`/account/become/${kind}/${application.id}?step=${backStep}`}
-          nextLabel="Continue to Review"
-          note="Your documents are secure and encrypted"
+          nextLabel="Continue to review"
         />
       </form>
     </div>
@@ -1228,6 +1225,20 @@ export function StepDocuments({
 /* -------------------------------------------------------------------------- */
 /* Step 6 — review & submit                                                   */
 /* -------------------------------------------------------------------------- */
+function EditStepLink({ kind, applicationId, step }: { kind: ApplicationKind; applicationId: string; step: number }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label={`Edit ${stepLabel(kind, step)}`}
+      title="Edit"
+      render={<Link href={`/account/become/${kind}/${applicationId}?step=${step}`} />}
+    >
+      <Pencil />
+    </Button>
+  );
+}
+
 function SummaryRow({ label, value }: { label: string; value: unknown }) {
   if (value === null || value === undefined || value === "") return null;
   const display = Array.isArray(value) ? (value as unknown[]).map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v))).join(", ") : String(value);
@@ -1249,12 +1260,10 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-border p-4">
+      <div className="rounded-xl bg-muted/40 p-4">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-sm font-semibold">{stepLabel(kind, 1)}</p>
-          <Link href={`/account/become/${kind}/${application.id}?step=1`} className="text-xs text-primary hover:underline">
-            Edit
-          </Link>
+          <EditStepLink kind={kind} applicationId={application.id} step={1} />
         </div>
         {kind === "affiliate" ? (
           <>
@@ -1290,12 +1299,10 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
         )}
       </div>
 
-      <div className="rounded-xl border border-border p-4">
+      <div className="rounded-xl bg-muted/40 p-4">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-sm font-semibold">{stepLabel(kind, 2)}</p>
-          <Link href={`/account/become/${kind}/${application.id}?step=2`} className="text-xs text-primary hover:underline">
-            Edit
-          </Link>
+          <EditStepLink kind={kind} applicationId={application.id} step={2} />
         </div>
         {kind === "affiliate" ? (
           <SummaryRow label="ID number" value={d.idNumber} />
@@ -1308,12 +1315,10 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
         )}
       </div>
 
-      <div className="rounded-xl border border-border p-4">
+      <div className="rounded-xl bg-muted/40 p-4">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-sm font-semibold">{stepLabel(kind, 3)}</p>
-          <Link href={`/account/become/${kind}/${application.id}?step=3`} className="text-xs text-primary hover:underline">
-            Edit
-          </Link>
+          <EditStepLink kind={kind} applicationId={application.id} step={3} />
         </div>
         {kind === "agency" ? (
           <>
@@ -1365,12 +1370,10 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
       </div>
 
       {APP_CONFIG[kind].hasSettlementStep ? (
-        <div className="rounded-xl border border-border p-4">
+        <div className="rounded-xl bg-muted/40 p-4">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-sm font-semibold">Settlement</p>
-            <Link href={`/account/become/${kind}/${application.id}?step=4`} className="text-xs text-primary hover:underline">
-              Edit
-            </Link>
+            <EditStepLink kind={kind} applicationId={application.id} step={4} />
           </div>
           {kind === "hotel_partner" || kind === "venue_partner" ? (
             <SummaryRow label="Payout frequency" value={d.payoutFrequency ? PAYOUT_FREQUENCY_LABELS[String(d.payoutFrequency)] : null} />
@@ -1388,20 +1391,18 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-border p-4">
+      <div className="rounded-xl bg-muted/40 p-4">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-sm font-semibold">Documents ({refs.length})</p>
-          <Link href={`/account/become/${kind}/${application.id}?step=5`} className="text-xs text-primary hover:underline">
-            Edit
-          </Link>
+          <EditStepLink kind={kind} applicationId={application.id} step={5} />
         </div>
         {refs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No documents uploaded yet.</p>
+          <p className="text-sm text-muted-foreground">No documents</p>
         ) : (
           <ul className="space-y-1 text-sm">
             {refs.map((r) => (
               <li key={r.key} className="flex items-center gap-1.5 text-muted-foreground">
-                <FileCheck2 className="size-3.5 text-primary" /> {r.label}
+                <FileCheck2 className="size-3.5 text-primary" aria-hidden="true" /> {r.label}
               </li>
             ))}
           </ul>
@@ -1410,7 +1411,7 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
           <Alert variant="destructive" className="mt-3">
             <AlertCircle />
             <AlertDescription>
-              Still needed before you can submit: {missingUpload.map((s) => s.label).join(", ")}.
+              Missing: {missingUpload.map((s) => s.label).join(", ")}.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -1418,7 +1419,7 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
           <Alert variant="destructive" className="mt-3">
             <AlertCircle />
             <AlertDescription>
-              Set an expiry date before you can submit: {missingExpiry.map((s) => s.label).join(", ")}.
+              Expiry date needed: {missingExpiry.map((s) => s.label).join(", ")}.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -1429,16 +1430,16 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
         <input type="hidden" name="applicationId" value={application.id} />
         <ErrorAlert state={state} />
         <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" name="agreeTerms" required className="mt-0.5" />
+          <input type="checkbox" name="agreeTerms" required className="mt-0.5 size-4 shrink-0 accent-primary" />
           <span>
             I agree to the STS Somalia{" "}
-            <Link href="/partner-terms" className="text-primary hover:underline" target="_blank">
+            <Link href="/partner-terms" className="font-medium text-primary hover:underline" target="_blank">
               Partner Terms &amp; Conditions
             </Link>
             .
           </span>
         </label>
-<StepNav backHref={`/account/become/${kind}/${application.id}?step=5`} nextLabel="Submit Application" />
+        <StepNav backHref={`/account/become/${kind}/${application.id}?step=5`} nextLabel="Submit application" />
       </form>
     </div>
   );

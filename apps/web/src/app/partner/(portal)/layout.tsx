@@ -9,7 +9,9 @@ import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-she
 import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
 import { PartnerVerificationGate } from "@/components/portal/partner-verification-gate";
 import { OnboardingStatusBanner } from "@/components/portal/onboarding-status-banner";
-import { Card, CardContent } from "@/components/ui/card";
+import { Building2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
 
 /** Portal-scoped title — see the admin portal layout for why this lives on the layout. */
@@ -65,17 +67,19 @@ export default async function PartnerLayout({ children }: { children: React.Reac
 
   if (!partnerId && scope.hotelIds.length === 0) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
-        <Card>
-          <CardContent className="space-y-3 p-6 text-center">
-            <p className="font-medium">No active hotel partner membership found</p>
-            <p className="text-sm text-muted-foreground">
-              You don&apos;t currently have an active hotel partner membership on this account.
-            </p>
-            <Button render={<Link href="/account/become" />}>Apply to list your hotel</Button>
-          </CardContent>
+      <main className="mx-auto flex min-h-dvh w-full max-w-md items-center justify-center px-4">
+        <Card className="w-full">
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Building2 />
+            </EmptyMedia>
+            <EmptyTitle>No hotel partner membership</EmptyTitle>
+            <EmptyContent>
+              <Button render={<Link href="/account/become?program=partner" />}>Apply to list your hotel</Button>
+            </EmptyContent>
+          </Empty>
         </Card>
-      </div>
+      </main>
     );
   }
 

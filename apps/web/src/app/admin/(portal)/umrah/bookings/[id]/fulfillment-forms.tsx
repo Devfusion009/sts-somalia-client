@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Ban, Check, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -30,9 +30,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useRestoreOnError } from "@/lib/use-restore-on-error";
 import { UMRAH_DOC_TYPES, UMRAH_DOC_TYPE_LABELS, UMRAH_STAGE_LABELS, type UmrahStage } from "../stages";
 import { FileField } from "@/components/ui/upload";
-
-const selectClass =
-  "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 function useRefreshOnSuccess(state: FulfillmentActionState, onSuccess?: () => void) {
   const router = useRouter();
@@ -59,21 +57,23 @@ export function StageForm({ bookingId, nextStages }: { bookingId: string; nextSt
           <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       ) : null}
-      <div className="space-y-1.5">
-        <Label htmlFor="stage">Move to</Label>
-        <select id="stage" name="stage" className={selectClass} defaultValue={nextStages[0]} required>
+      <Field>
+        <FieldLabel htmlFor="stage">Move to</FieldLabel>
+        <select id="stage" name="stage" className={NATIVE_SELECT_CLASS} defaultValue={nextStages[0]} required>
           {nextStages.map((s) => (
             <option key={s} value={s}>
               {UMRAH_STAGE_LABELS[s]}
             </option>
           ))}
         </select>
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="stage-note">Note</Label>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="stage-note">Note</FieldLabel>
         <Textarea id="stage-note" name="note" rows={2} maxLength={500} placeholder="Optional" />
+      </Field>
+      <div className="flex justify-end">
+        <SubmitButton pendingText="Updating…">Update stage</SubmitButton>
       </div>
-      <SubmitButton pendingText="Updating…">Update stage</SubmitButton>
     </form>
   );
 }
@@ -97,20 +97,20 @@ export function DocumentUploadForm({
           <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       ) : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="docType">Type</Label>
-          <select id="docType" name="docType" className={selectClass} defaultValue="visa" required>
+      <div className="grid grid-cols-2 gap-4">
+        <Field>
+          <FieldLabel htmlFor="docType">Type</FieldLabel>
+          <select id="docType" name="docType" className={NATIVE_SELECT_CLASS} defaultValue="visa" required>
             {UMRAH_DOC_TYPES.map((t) => (
               <option key={t} value={t}>
                 {UMRAH_DOC_TYPE_LABELS[t]}
               </option>
             ))}
           </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="pilgrimId">Pilgrim</Label>
-          <select id="pilgrimId" name="pilgrimId" className={selectClass} defaultValue="">
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="pilgrimId">Pilgrim</FieldLabel>
+          <select id="pilgrimId" name="pilgrimId" className={NATIVE_SELECT_CLASS} defaultValue="">
             <option value="">Whole booking</option>
             {pilgrims.map((p) => (
               <option key={p.id} value={p.id}>
@@ -118,19 +118,21 @@ export function DocumentUploadForm({
               </option>
             ))}
           </select>
-        </div>
+        </Field>
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="docTitle">Title</Label>
+      <Field>
+        <FieldLabel htmlFor="docTitle">Title</FieldLabel>
         <Input id="docTitle" name="title" maxLength={120} required />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="docFile">File</Label>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="docFile">File</FieldLabel>
         <FileField id="docFile" name="file" accept="application/pdf,image/jpeg,image/png,image/webp" required />
+      </Field>
+      <div className="flex justify-end">
+        <SubmitButton pendingText="Uploading…">
+          <Upload aria-hidden="true" /> Upload
+        </SubmitButton>
       </div>
-      <SubmitButton pendingText="Uploading…">
-        <Upload /> Upload
-      </SubmitButton>
     </form>
   );
 }
@@ -144,12 +146,12 @@ export function DeleteDocumentButton({ documentId, title }: { documentId: string
     <>
       <Button
         size="icon"
-        variant="outline"
-        className="size-8"
+        variant="ghost"
+        className="text-muted-foreground hover:text-destructive"
         aria-label={`Delete ${title}`}
         onClick={() => setOpen(true)}
       >
-        <Trash2 className="size-3.5" />
+        <Trash2 />
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
@@ -158,7 +160,11 @@ export function DeleteDocumentButton({ documentId, title }: { documentId: string
             <AlertDialogHeader>
               <AlertDialogTitle>Delete {title}?</AlertDialogTitle>
             </AlertDialogHeader>
-            {state?.error ? <p className="my-2 text-xs text-destructive">{state.error}</p> : null}
+            {state?.error ? (
+              <p role="alert" className="my-2 text-xs text-destructive">
+                {state.error}
+              </p>
+            ) : null}
             <AlertDialogFooter className="mt-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
@@ -192,13 +198,14 @@ export function CancelBookingButton({
   return (
     <>
       <Button
-        size="icon"
-        variant="outline"
-        className="size-8 text-destructive hover:text-destructive"
+        size="icon-sm"
+        variant="ghost"
+        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
         aria-label="Cancel booking"
+        title="Cancel booking"
         onClick={() => setOpen(true)}
       >
-        <Ban className="size-3.5" />
+        <Ban />
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
@@ -212,15 +219,15 @@ export function CancelBookingButton({
                 <AlertDescription>{state.error}</AlertDescription>
               </Alert>
             ) : null}
-            <div className="space-y-1.5">
-              <Label htmlFor="cancel-reason">Reason</Label>
+            <Field>
+              <FieldLabel htmlFor="cancel-reason">Reason</FieldLabel>
               <Textarea id="cancel-reason" name="reason" rows={2} maxLength={500} required />
-            </div>
+            </Field>
             {paid > 0 ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="cancel-refund">
-                  Refund ({currency}, paid {paid.toFixed(2)})
-                </Label>
+              <Field>
+                <FieldLabel htmlFor="cancel-refund">
+                  Refund ({currency}, paid {paid.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                </FieldLabel>
                 <Input
                   id="cancel-refund"
                   name="refundAmount"
@@ -229,9 +236,10 @@ export function CancelBookingButton({
                   max={paid}
                   step="0.01"
                   defaultValue={paid.toFixed(2)}
+                  className="tabular-nums"
                   required
                 />
-              </div>
+              </Field>
             ) : null}
             <AlertDialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
@@ -261,20 +269,25 @@ export function ReviewDocumentButtons({ documentId }: { documentId: string }) {
       <form action={acceptAction}>
         <input type="hidden" name="documentId" value={documentId} />
         <input type="hidden" name="decision" value="accepted" />
-        <SubmitButton size="icon" variant="outline" className="size-8" aria-label="Accept document" pendingText="">
-          <Check className="size-3.5" />
+        <SubmitButton size="icon" variant="ghost" className="text-primary hover:text-primary" aria-label="Accept document" title="Accept" pendingText="">
+          <Check />
         </SubmitButton>
       </form>
       <Button
         size="icon"
-        variant="outline"
-        className="size-8 text-destructive hover:text-destructive"
+        variant="ghost"
+        className="text-destructive hover:text-destructive"
         aria-label="Reject document"
+        title="Reject"
         onClick={() => setOpen(true)}
       >
-        <X className="size-3.5" />
+        <X />
       </Button>
-      {error ? <span className="text-xs text-destructive">{error}</span> : null}
+      {error ? (
+        <span role="alert" className="text-xs text-destructive">
+          {error}
+        </span>
+      ) : null}
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
           <form action={rejectAction} className="space-y-4">
@@ -288,10 +301,10 @@ export function ReviewDocumentButtons({ documentId }: { documentId: string }) {
                 <AlertDescription>{rejectState.error}</AlertDescription>
               </Alert>
             ) : null}
-            <div className="space-y-1.5">
-              <Label htmlFor={`reject-note-${documentId}`}>Reason</Label>
+            <Field>
+              <FieldLabel htmlFor={`reject-note-${documentId}`}>Reason</FieldLabel>
               <Textarea id={`reject-note-${documentId}`} name="note" rows={2} maxLength={500} required />
-            </div>
+            </Field>
             <AlertDialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
@@ -337,19 +350,19 @@ export function SegmentDialog({ bookingId, segment }: { bookingId: string; segme
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {segment ? (
-        <DialogTrigger render={<Button size="icon" variant="outline" className="size-8" aria-label={`Edit ${segment.title}`} />}>
-          <Pencil className="size-3.5" />
+        <DialogTrigger render={<Button size="icon" variant="ghost" aria-label={`Edit ${segment.title}`} title="Edit" />}>
+          <Pencil />
         </DialogTrigger>
       ) : (
-        <DialogTrigger render={<Button size="sm" variant="outline" className="gap-1.5" />}>
-          <Plus className="size-3.5" /> Add
+        <DialogTrigger render={<Button size="sm" variant="outline" />}>
+          <Plus aria-hidden="true" /> Add
         </DialogTrigger>
       )}
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{segment ? "Edit travel detail" : "Add travel detail"}</DialogTitle>
         </DialogHeader>
-        <form ref={formRef} action={formAction} className="space-y-3">
+        <form ref={formRef} action={formAction} className="space-y-4">
           <input type="hidden" name="bookingId" value={bookingId} />
           <input type="hidden" name="segmentId" value={segment?.id ?? ""} />
           {state?.error ? (
@@ -357,29 +370,29 @@ export function SegmentDialog({ bookingId, segment }: { bookingId: string; segme
               <AlertDescription>{state.error}</AlertDescription>
             </Alert>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor={`seg-kind-${key}`}>Type</Label>
-              <select id={`seg-kind-${key}`} name="kind" className={selectClass} defaultValue={segment?.kind ?? "flight"}>
+          <div className="grid grid-cols-2 gap-4">
+            <Field>
+              <FieldLabel htmlFor={`seg-kind-${key}`}>Type</FieldLabel>
+              <select id={`seg-kind-${key}`} name="kind" className={NATIVE_SELECT_CLASS} defaultValue={segment?.kind ?? "flight"}>
                 <option value="flight">Flight</option>
                 <option value="hotel">Hotel</option>
                 <option value="transfer">Transfer</option>
                 <option value="train">Train</option>
               </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={`seg-city-${key}`}>City</Label>
-              <select id={`seg-city-${key}`} name="city" className={selectClass} defaultValue={segment?.city ?? ""}>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`seg-city-${key}`}>City</FieldLabel>
+              <select id={`seg-city-${key}`} name="city" className={NATIVE_SELECT_CLASS} defaultValue={segment?.city ?? ""}>
                 <option value="">—</option>
                 <option value="makkah">Makkah</option>
                 <option value="madinah">Madinah</option>
                 <option value="jeddah">Jeddah</option>
                 <option value="other">Other</option>
               </select>
-            </div>
+            </Field>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor={`seg-title-${key}`}>Title</Label>
+          <Field>
+            <FieldLabel htmlFor={`seg-title-${key}`}>Title</FieldLabel>
             <Input
               id={`seg-title-${key}`}
               name="title"
@@ -388,30 +401,35 @@ export function SegmentDialog({ bookingId, segment }: { bookingId: string; segme
               defaultValue={segment?.title ?? ""}
               required
             />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor={`seg-provider-${key}`}>Provider</Label>
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field>
+              <FieldLabel htmlFor={`seg-provider-${key}`}>Provider</FieldLabel>
               <Input id={`seg-provider-${key}`} name="provider" maxLength={80} defaultValue={segment?.provider ?? ""} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={`seg-ref-${key}`}>Reference</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`seg-ref-${key}`}>Reference</FieldLabel>
               <Input id={`seg-ref-${key}`} name="reference" maxLength={60} defaultValue={segment?.reference ?? ""} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={`seg-start-${key}`}>Starts</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`seg-start-${key}`}>Starts</FieldLabel>
               <Input id={`seg-start-${key}`} name="startsAt" type="datetime-local" defaultValue={toLocalInput(segment?.starts_at ?? null)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={`seg-end-${key}`}>Ends</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`seg-end-${key}`}>Ends</FieldLabel>
               <Input id={`seg-end-${key}`} name="endsAt" type="datetime-local" defaultValue={toLocalInput(segment?.ends_at ?? null)} />
-            </div>
+            </Field>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor={`seg-notes-${key}`}>Notes</Label>
+          <Field>
+            <FieldLabel htmlFor={`seg-notes-${key}`}>Notes</FieldLabel>
             <Textarea id={`seg-notes-${key}`} name="notes" rows={2} maxLength={500} defaultValue={segment?.notes ?? ""} />
+          </Field>
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <SubmitButton pendingText="Saving…">{segment ? "Save changes" : "Add"}</SubmitButton>
           </div>
-          <SubmitButton pendingText="Saving…">{segment ? "Save" : "Add"}</SubmitButton>
         </form>
       </DialogContent>
     </Dialog>
@@ -425,8 +443,15 @@ export function DeleteSegmentButton({ segmentId, title }: { segmentId: string; t
 
   return (
     <>
-      <Button size="icon" variant="outline" className="size-8" aria-label={`Delete ${title}`} onClick={() => setOpen(true)}>
-        <Trash2 className="size-3.5" />
+      <Button
+        size="icon"
+        variant="ghost"
+        className="text-muted-foreground hover:text-destructive"
+        aria-label={`Delete ${title}`}
+        title="Delete"
+        onClick={() => setOpen(true)}
+      >
+        <Trash2 />
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
@@ -435,7 +460,11 @@ export function DeleteSegmentButton({ segmentId, title }: { segmentId: string; t
             <AlertDialogHeader>
               <AlertDialogTitle>Delete {title}?</AlertDialogTitle>
             </AlertDialogHeader>
-            {state?.error ? <p className="my-2 text-xs text-destructive">{state.error}</p> : null}
+            {state?.error ? (
+              <p role="alert" className="my-2 text-xs text-destructive">
+                {state.error}
+              </p>
+            ) : null}
             <AlertDialogFooter className="mt-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel

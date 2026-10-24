@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { getSocialLinks } from "@/lib/site-settings";
 import { MuiProvider } from "@/components/mui-provider";
+import { PageHeader } from "@/components/ui/page-header";
 import { SocialLinksForm } from "./social-links-form";
 import { UmrahOperationsForm } from "./umrah-operations-form";
 import { getUmrahOperations } from "@/modules/umrah/settings";
@@ -13,8 +14,8 @@ export default async function AdminSiteSettingsPage() {
   const [links, umrah] = await Promise.all([getSocialLinks(), getUmrahOperations()]);
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-semibold">Site settings</h1>
+    <div className="max-w-5xl space-y-8">
+      <PageHeader title="Site settings" />
       <section className="space-y-3">
         <h2 className="font-heading text-base font-semibold">Social links</h2>
         <MuiProvider>

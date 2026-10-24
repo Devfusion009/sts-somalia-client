@@ -1,18 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, Download, Pencil } from "lucide-react";
+import { ChevronRight, Download, Pencil, Users } from "lucide-react";
 import { BackLink } from "@/components/back-link";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { FilterChips } from "@/components/dashboard/filter-chips";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 import { getDepartureAdmin } from "@/modules/umrah/departure-admin-queries";
 import { formatMoney } from "@/modules/umrah/pricing";
 import { ReadinessBadges } from "@/modules/umrah/components/pilgrim-editor";
-import { ORDER_STATUS_LABELS, UMRAH_STAGE_LABELS, isUmrahStage } from "../../bookings/stages";
-import { formatDay } from "../../bookings/shared";
+import { ORDER_STATUS_LABELS, isUmrahStage } from "../../bookings/stages";
+import { StageBadge, formatDay } from "../../bookings/shared";
 import {
   AddRoomDialog,
   AssignOccupantForm,
@@ -31,14 +33,7 @@ const CITIES = [
 
 const GENDER_LABEL: Record<string, string> = { male: "Men", female: "Women", family: "Family" };
 
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex items-baseline gap-1.5">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-semibold text-foreground">{value}</dd>
-    </div>
-  );
-}
+const STATUS_OVERRIDES = { open: "success", full: "warning" } as const;
 
 export default async function AdminUmrahDeparturePage({
   params,
@@ -65,90 +60,81 @@ export default async function AdminUmrahDeparturePage({
   const pilgrimName = new Map(manifest.map((m) => [m.pilgrim_id, m.full_name]));
   const guestOf = (m: (typeof manifest)[number]) => m.guest_name ?? m.customer_name ?? "Customer";
 
-  const chip = (active: boolean) =>
-    cn(
-      "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-      active ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/50"
-    );
-
   return (
     <div className="space-y-8">
-      <div className="space-y-4">
-        <div>
-          <BackLink href="/admin/umrah/departures" label="All departures" className="mb-3" />
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight">{departure.package?.name ?? "Umrah"}</h1>
-            <Badge
-              className={cn(
-                "border-transparent capitalize",
-                departure.status === "cancelled" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
-              )}
-            >
-              {departure.status}
-            </Badge>
-            <div className="ml-auto flex items-center gap-2">
-              {departure.package ? (
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="size-8"
-                  aria-label="Edit departure"
-                  render={<Link href={`/admin/catalog/umrah/${departure.package.id}`} />}
-                >
-                  <Pencil className="size-3.5" />
-                </Button>
-              ) : null}
-              {departure.status !== "cancelled" ? <CancelDepartureButton departureId={departure.id} label={dates} /> : null}
+      <div className="space-y-5">
+        <BackLink href="/admin/umrah/departures" label="All departures" />
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">
+                {departure.package?.name ?? "Umrah"}
+              </h1>
+              <Badge variant={statusBadgeVariant(departure.status, STATUS_OVERRIDES)} className="capitalize">
+                {departure.status}
+              </Badge>
             </div>
+            <p className="text-sm text-muted-foreground tabular-nums">
+              {[
+                dates,
+                [departure.outbound_airline, departure.outbound_flight_number].filter(Boolean).join(" ") || null,
+                [departure.return_airline, departure.return_flight_number].filter(Boolean).join(" ") || null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {[
-              dates,
-              [departure.outbound_airline, departure.outbound_flight_number].filter(Boolean).join(" ") || null,
-              [departure.return_airline, departure.return_flight_number].filter(Boolean).join(" ") || null,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        </div>
+          <div className="flex shrink-0 items-center gap-1">
+            {departure.package ? (
+              <Button
+                size="icon"
+                variant="outline"
+                aria-label="Edit departure"
+                title="Edit in catalog"
+                render={<Link href={`/admin/catalog/umrah/${departure.package.id}`} />}
+              >
+                <Pencil />
+              </Button>
+            ) : null}
+            {departure.status !== "cancelled" ? <CancelDepartureButton departureId={departure.id} label={dates} /> : null}
+          </div>
+        </header>
 
-        <dl className="flex flex-wrap gap-x-8 gap-y-2 rounded-lg bg-secondary/40 px-4 py-3 text-sm">
-          <Stat label="Seats" value={departure.total_seats} />
-          <Stat label="Booked" value={departure.booked_seats} />
-          <Stat label="Offline" value={departure.offline_seats} />
-          <Stat label="Free" value={free} />
-          <Stat label="Bookings" value={bookingIds.length} />
-          <Stat label="Pilgrims ready" value={`${ready} / ${manifest.length}`} />
-          <Stat label="Outstanding" value={formatMoney(outstanding, currency)} />
-        </dl>
+        <StatRail className="lg:grid-cols-7">
+          <StatRailItem label="Seats" value={departure.total_seats} />
+          <StatRailItem label="Booked" value={departure.booked_seats} />
+          <StatRailItem label="Offline" value={departure.offline_seats} />
+          <StatRailItem label="Free" value={free} tone={free <= 0 ? "destructive" : undefined} />
+          <StatRailItem label="Bookings" value={bookingIds.length} />
+          <StatRailItem
+            label="Pilgrims ready"
+            value={`${ready} / ${manifest.length}`}
+            tone={ready < manifest.length ? "warn" : undefined}
+          />
+          <StatRailItem label="Outstanding" value={formatMoney(outstanding, currency)} tone={outstanding > 0 ? "warn" : undefined} />
+        </StatRail>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Link href={`/admin/umrah/departures/${departure.id}`} className={chip(activeTab === "manifest")}>
-          Manifest
-        </Link>
-        <Link href={`/admin/umrah/departures/${departure.id}?tab=rooming`} className={chip(activeTab === "rooming")}>
-          Rooming
-        </Link>
-        <div className="ml-auto flex gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <FilterChips
+          label="Departure view"
+          active={activeTab}
+          items={[
+            { key: "manifest", label: "Manifest", href: `/admin/umrah/departures/${departure.id}` },
+            { key: "rooming", label: "Rooming", href: `/admin/umrah/departures/${departure.id}?tab=rooming` },
+          ]}
+        />
+        <div className="flex flex-wrap gap-2">
           {activeTab === "rooming" ? <AddRoomDialog departureId={departure.id} /> : null}
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            nativeButton={false}
-            render={<a href={`/api/admin/umrah-manifest/${departure.id}`} />}
-          >
-            <Download className="size-3.5" /> Manifest CSV
+          <Button variant="outline" nativeButton={false} render={<a href={`/api/admin/umrah-manifest/${departure.id}`} />}>
+            <Download aria-hidden="true" /> Manifest CSV
           </Button>
           <Button
-            size="sm"
             variant="outline"
-            className="gap-1.5"
             nativeButton={false}
             render={<a href={`/api/admin/umrah-manifest/${departure.id}?kind=rooming`} />}
           >
-            <Download className="size-3.5" /> Rooming CSV
+            <Download aria-hidden="true" /> Rooming CSV
           </Button>
         </div>
       </div>
@@ -164,7 +150,14 @@ export default async function AdminUmrahDeparturePage({
           ) : null}
 
           <Card className="overflow-hidden py-0">
-            <div className="overflow-x-auto">
+            {manifest.length === 0 ? (
+              <Empty>
+                <EmptyMedia variant="icon">
+                  <Users />
+                </EmptyMedia>
+                <EmptyTitle>No pilgrims on this departure</EmptyTitle>
+              </Empty>
+            ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -173,72 +166,81 @@ export default async function AdminUmrahDeparturePage({
                     <TableHead>Passport</TableHead>
                     <TableHead>Readiness</TableHead>
                     <TableHead>Rooms</TableHead>
-                    <TableHead>Balance</TableHead>
+                    <TableHead numeric>Balance</TableHead>
                     <TableHead>Stage</TableHead>
-                    <TableHead className="text-right" />
+                    <TableHead numeric>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {manifest.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
-                        No pilgrims on this departure.
+                  {manifest.map((m) => (
+                    <TableRow key={m.pilgrim_id}>
+                      <TableCell>
+                        <p className="font-medium">{m.full_name}</p>
+                        <p className="text-xs text-muted-foreground capitalize tabular-nums">
+                          {[m.gender, m.nationality, m.date_of_birth ? formatDay(m.date_of_birth) : null].filter(Boolean).join(" · ")}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/admin/umrah/bookings/${m.booking_id}`}
+                          className="rounded-sm font-mono text-xs outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                        >
+                          {m.order_number ?? "—"}
+                        </Link>
+                        <p className="text-xs text-muted-foreground">
+                          {[guestOf(m), m.agency_name, m.order_status ? (ORDER_STATUS_LABELS[m.order_status] ?? m.order_status) : null]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <p className="font-mono text-xs">{m.passport_number ?? "—"}</p>
+                        <p className="text-xs text-muted-foreground tabular-nums">
+                          {m.passport_expiry ? formatDay(m.passport_expiry) : ""}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex max-w-56 flex-wrap gap-1">
+                          <ReadinessBadges readiness={{ missing: m.missing, warnings: m.warnings }} />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {[m.room_makkah ? `Makkah ${m.room_makkah}` : null, m.room_madinah ? `Madinah ${m.room_madinah}` : null]
+                          .filter(Boolean)
+                          .join(" · ") || "—"}
+                      </TableCell>
+                      <TableCell numeric className="whitespace-nowrap">
+                        {Number(m.balance) > 0 ? (
+                          formatMoney(Number(m.balance), m.currency)
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isUmrahStage(m.fulfillment_stage) ? (
+                          <StageBadge stage={m.fulfillment_stage} />
+                        ) : (
+                          <span className="text-xs">{m.fulfillment_stage}</span>
+                        )}
+                      </TableCell>
+                      <TableCell numeric>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label={`Open booking for ${m.full_name}`}
+                          title="Open booking"
+                          render={<Link href={`/admin/umrah/bookings/${m.booking_id}`} />}
+                        >
+                          <ChevronRight />
+                        </Button>
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    manifest.map((m) => (
-                      <TableRow key={m.pilgrim_id}>
-                        <TableCell>
-                          <p className="font-medium">{m.full_name}</p>
-                          <p className="text-xs capitalize text-muted-foreground">
-                            {[m.gender, m.nationality, m.date_of_birth ? formatDay(m.date_of_birth) : null].filter(Boolean).join(" · ")}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <p className="font-mono text-xs">{m.order_number ?? "—"}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {[guestOf(m), m.agency_name, m.order_status ? (ORDER_STATUS_LABELS[m.order_status] ?? m.order_status) : null]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <p className="font-mono text-xs">{m.passport_number ?? "—"}</p>
-                          <p className="text-xs text-muted-foreground">{m.passport_expiry ? formatDay(m.passport_expiry) : ""}</p>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex max-w-56 flex-wrap gap-1">
-                            <ReadinessBadges readiness={{ missing: m.missing, warnings: m.warnings }} />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {[m.room_makkah ? `Makkah ${m.room_makkah}` : null, m.room_madinah ? `Madinah ${m.room_madinah}` : null]
-                            .filter(Boolean)
-                            .join(" · ") || "—"}
-                        </TableCell>
-                        <TableCell className="tabular-nums">
-                          {Number(m.balance) > 0 ? formatMoney(Number(m.balance), m.currency) : "—"}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {isUmrahStage(m.fulfillment_stage) ? UMRAH_STAGE_LABELS[m.fulfillment_stage] : m.fulfillment_stage}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            className="size-8"
-                            aria-label="Open booking"
-                            render={<Link href={`/admin/umrah/bookings/${m.booking_id}`} />}
-                          >
-                            <ArrowRight className="size-3.5" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
+                  ))}
                 </TableBody>
               </Table>
-            </div>
+            )}
           </Card>
         </>
       ) : (
@@ -265,17 +267,17 @@ export default async function AdminUmrahDeparturePage({
 
             return (
               <section key={city.key} className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="font-heading text-base font-semibold">
-                    {city.label}
-                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-heading text-base font-semibold">{city.label}</h2>
+                  {unroomed.length > 0 ? (
+                    <Badge variant="warning" className="tabular-nums">
                       {unroomed.length} without a room
-                    </span>
-                  </h2>
+                    </Badge>
+                  ) : null}
                 </div>
                 <Card className="overflow-hidden py-0">
                   {cityRooms.length === 0 ? (
-                    <p className="px-5 py-6 text-sm text-muted-foreground">No rooms.</p>
+                    <p className="px-5 py-6 text-sm text-muted-foreground">No rooms</p>
                   ) : (
                     <ul className="divide-y divide-border">
                       {cityRooms.map((room) => (
@@ -283,7 +285,7 @@ export default async function AdminUmrahDeparturePage({
                           <div className="flex items-center gap-2">
                             <p className="flex-1 text-sm font-medium">
                               Room {room.room_label}
-                              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                              <span className="ml-2 text-xs font-normal text-muted-foreground tabular-nums">
                                 {[`${room.occupants.length} / ${room.capacity}`, room.gender ? GENDER_LABEL[room.gender] : null]
                                   .filter(Boolean)
                                   .join(" · ")}

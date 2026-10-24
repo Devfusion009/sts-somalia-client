@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Search, Star } from "lucide-react";
+import { Hotel, Search, Star } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getMyAgency } from "@/modules/agencies/queries";
@@ -8,8 +8,11 @@ import { getBookingCustomer } from "@/modules/agencies/booking-context";
 import { searchHotels } from "@/modules/hotels/queries";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
+import { money } from "@/lib/money";
 import {
   Table,
   TableBody,
@@ -18,6 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+export const metadata = { title: "Hotels" };
 
 export default async function AgentHotelDeskPage({
   searchParams,
@@ -41,97 +46,92 @@ export default async function AgentHotelDeskPage({
   ).toString();
 
   return (
-    <div className="space-y-4">
-      <Link
-        href="/agent/book"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" /> Services
-      </Link>
-
-      <h1 className="font-heading text-2xl font-bold">Hotels</h1>
+    <div className="space-y-6">
+      <PageHeader title="Hotels" back={{ href: "/agent/book", label: "Services" }} />
 
       <Card>
         <CardContent>
-          <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
-            <div className="space-y-1.5 lg:col-span-2">
-              <Label htmlFor="city">City</Label>
+          <form
+            role="search"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))_auto] lg:items-end"
+          >
+            <Field className="sm:col-span-2 lg:col-span-1">
+              <FieldLabel htmlFor="city">City</FieldLabel>
               <Input id="city" name="city" defaultValue={city} placeholder="Mogadishu" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="checkIn">Check-in</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="checkIn">Check-in</FieldLabel>
               <Input id="checkIn" name="checkIn" type="date" defaultValue={checkIn} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="checkOut">Check-out</Label>
-              <Input id="checkOut" name="checkOut" type="date" defaultValue={checkOut} />
-            </div>
-            <Button type="submit" className="gap-1.5">
-              <Search className="size-4" /> Search
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="checkOut">Check-out</FieldLabel>
+              <Input id="checkOut" name="checkOut" type="date" defaultValue={checkOut} min={checkIn || undefined} />
+            </Field>
+            <Button type="submit" className="sm:col-span-2 lg:col-span-1">
+              <Search data-icon="inline-start" aria-hidden="true" /> Search
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      {hotels.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            {city ? `No hotels match “${city}”.` : "No hotels published yet."}
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="overflow-hidden py-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Hotel</TableHead>
-                  <TableHead>City</TableHead>
-                  <TableHead>Rating</TableHead>
-                  <TableHead className="text-right">From</TableHead>
-                  <TableHead className="text-right" />
+      <Card className="overflow-hidden py-0">
+        {hotels.length === 0 ? (
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Hotel />
+            </EmptyMedia>
+            <EmptyTitle>{city ? `No hotels match “${city}”` : "No hotels"}</EmptyTitle>
+          </Empty>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Hotel</TableHead>
+                <TableHead>City</TableHead>
+                <TableHead>Rating</TableHead>
+                <TableHead numeric>From</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {hotels.map((hotel) => (
+                <TableRow key={hotel.id}>
+                  <TableCell className="font-medium">{hotel.name}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{hotel.city}</TableCell>
+                  <TableCell>
+                    {hotel.star_rating ? (
+                      <span className="flex items-center gap-1 text-sm" aria-label={`${hotel.star_rating} stars`}>
+                        <Star className="size-3.5 fill-brand-gold text-brand-gold" aria-hidden="true" />
+                        {hotel.star_rating}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell numeric className="text-sm font-medium">
+                    {hotel.minPrice ? (
+                      money(Number(hotel.minPrice), hotel.currency)
+                    ) : (
+                      <span className="font-normal text-muted-foreground">On request</span>
+                    )}
+                  </TableCell>
+                  <TableCell numeric>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      render={<Link href={`/agent/book/hotels/${hotel.slug}${stay ? `?${stay}` : ""}`} />}
+                    >
+                      Rooms
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {hotels.map((hotel) => (
-                  <TableRow key={hotel.id}>
-                    <TableCell className="font-medium">{hotel.name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{hotel.city}</TableCell>
-                    <TableCell>
-                      {hotel.star_rating ? (
-                        <span className="flex items-center gap-1 text-sm">
-                          <Star className="size-3.5 fill-brand-gold text-brand-gold" />
-                          {hotel.star_rating}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">
-                      {hotel.minPrice
-                        ? `${hotel.currency} ${Number(hotel.minPrice).toFixed(0)}`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        render={
-                          <Link
-                            href={`/agent/book/hotels/${hotel.slug}${stay ? `?${stay}` : ""}`}
-                          />
-                        }
-                      >
-                        Rooms
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
-      )}
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
     </div>
   );
 }

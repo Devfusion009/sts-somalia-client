@@ -1,19 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { addDays, format } from "date-fns";
-import {
-  ArrowRight,
-  CalendarPlus,
-  ChevronLeft,
-  ChevronRight,
-  Lightbulb,
-  Pencil,
-} from "lucide-react";
+import { BedDouble, CalendarPlus, ChevronLeft, ChevronRight, ReceiptText } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import {
-  getMyManagedHotel,
-  hasPermission,
-} from "@/modules/hotels/manager-queries";
+import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
 import {
   getHotelFrontDesk,
   getPartnerStats,
@@ -25,58 +15,19 @@ import { getTodayCounts } from "@/modules/hotels/booking-detail-queries";
 import { hotelGuestNames } from "@/modules/orders/format";
 import { FrontDeskList } from "@/modules/hotels/components/front-desk-list";
 import { OccupancyDonut } from "@/components/dashboard/lazy-charts";
-import { Badge } from "@/components/ui/badge";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { dateSpan, money } from "@/lib/money";
 import { HotelLogo } from "@/modules/hotels/components/hotel-logo";
-
-const INSIGHT_TIER = {
-  low: {
-    className: "border-destructive/30 bg-destructive/5",
-    message:
-      "Occupancy is low this week. Review pricing for these dates to attract more bookings.",
-  },
-  medium: {
-    className: "border-brand-gold/30 bg-brand-gold/5",
-    message:
-      "Occupancy is moderate this week. A short-term rate adjustment could fill the remaining rooms.",
-  },
-  high: {
-    className: "border-primary/30 bg-primary/5",
-    message:
-      "Occupancy is high this week. Confirm any pending requests before rooms sell out.",
-  },
-} as const;
-
-function occupancyTier(pct: number): keyof typeof INSIGHT_TIER {
-  if (pct >= 70) return "high";
-  if (pct >= 40) return "medium";
-  return "low";
-}
-
-const HOTEL_STATUS_BADGE: Record<string, string> = {
-  published: "bg-primary/10 text-primary",
-  draft: "bg-muted text-muted-foreground",
-  pending_review: "bg-brand-gold/15 text-brand-gold",
-  suspended: "bg-destructive/10 text-destructive",
-};
-
-const BOOKING_STATUS_BADGE: Record<string, string> = {
-  confirmed: "bg-primary/10 text-primary",
-  pending: "bg-brand-gold/15 text-brand-gold",
-  waitlisted: "bg-brand-gold/15 text-brand-gold",
-  cancelled: "bg-destructive/10 text-destructive",
-  completed: "bg-muted text-muted-foreground",
-};
 
 function GuestList({
   title,
-  emptyLabel,
   bookings,
 }: {
   title: string;
-  emptyLabel: string;
   bookings: Array<{
     id: string;
     check_in: string;
@@ -90,30 +41,28 @@ function GuestList({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           {title}
-          <Badge variant="secondary">{bookings.length}</Badge>
+          <Badge variant="secondary" className="tabular-nums">
+            {bookings.length}
+          </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
         {bookings.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <BedDouble />
+            </EmptyMedia>
+            <EmptyTitle>No guests in house</EmptyTitle>
+          </Empty>
         ) : (
           <ul className="divide-y divide-border">
             {bookings.map((b) => (
-              <li
-                key={b.id}
-                className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
-              >
+              <li key={b.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {hotelGuestNames(b.guest_details)[0] ?? "Guest"}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {b.hotel_rooms?.name}
-                  </p>
+                  <p className="truncate text-sm font-medium">{hotelGuestNames(b.guest_details)[0] ?? "Guest"}</p>
+                  <p className="truncate text-xs text-muted-foreground">{b.hotel_rooms?.name}</p>
                 </div>
-                <p className="shrink-0 text-xs text-muted-foreground">
-                  {b.check_in} → {b.check_out}
-                </p>
+                <p className="shrink-0 text-xs text-muted-foreground tabular-nums">{dateSpan(b.check_in, b.check_out)}</p>
               </li>
             ))}
           </ul>
@@ -152,213 +101,174 @@ export default async function ManagerDashboardPage({
   ]);
 
   const canEditBookings = hasPermission(managed, "bookings");
-  const insight = INSIGHT_TIER[occupancyTier(forecast.occupancyPct)];
+  const base = `/manager/${hotelId}`;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center gap-4">
-        <HotelLogo path={managed.hotel.logo_path} />
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="font-heading text-2xl font-semibold">
-              {managed.hotel.name}
-            </h1>
-            <Badge
-              className={cn(
-                "border-transparent capitalize",
-                HOTEL_STATUS_BADGE[managed.hotel.status] ??
-                  "bg-muted text-muted-foreground",
-              )}
-            >
-              {managed.hotel.status.replace(/_/g, " ")}
-            </Badge>
+      <div className="space-y-5">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <div className="flex min-w-0 items-center gap-4">
+            <HotelLogo path={managed.hotel.logo_path} className="max-sm:size-12" />
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">
+                  {managed.hotel.name}
+                </h1>
+                <Badge variant={statusBadgeVariant(managed.hotel.status)} className="capitalize">
+                  {managed.hotel.status.replace(/_/g, " ")}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {managed.hotel.city}, {managed.hotel.country_code}
+              </p>
+            </div>
           </div>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {managed.hotel.city}, {managed.hotel.country_code}
-          </p>
-        </div>
+          {canEditBookings ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Button variant="outline" render={<Link href={`${base}/front-desk`} />}>
+                Front desk
+              </Button>
+              <Button render={<Link href={`${base}/bookings/new`} />}>
+                <CalendarPlus aria-hidden="true" /> Book now
+              </Button>
+            </div>
+          ) : null}
+        </header>
+
+        <StatRail>
+          <StatRailItem label="In house" value={frontDesk.inHouse.length} />
+          <StatRailItem label="Arriving today" value={frontDesk.arrivingToday.length} />
+          <StatRailItem label="Departing today" value={frontDesk.departingToday.length} />
+          <StatRailItem
+            label="Pending bookings"
+            value={stats.pendingCount}
+            tone={stats.pendingCount > 0 ? "warn" : undefined}
+          />
+          <StatRailItem label="New today" value={today.newToday} />
+          <StatRailItem label="Checked out today" value={today.checkedOutToday} />
+          <StatRailItem label="Cancelled today" value={today.cancelledToday} />
+          <StatRailItem label="No-shows today" value={today.noShowToday} />
+        </StatRail>
       </div>
 
-      {canEditBookings ? (
-        <Link
-          href={`/manager/${hotelId}/bookings/new`}
-          className="flex items-center gap-3 rounded-xl bg-primary px-5 py-4 text-primary-foreground transition-opacity hover:opacity-90"
-        >
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary-foreground/15">
-            <CalendarPlus className="size-5" />
-          </span>
-          <span className="min-w-0 flex-1 text-sm font-bold">
-            Book now
-          </span>
-          <ArrowRight className="size-4.5 shrink-0" />
-        </Link>
-      ) : null}
-
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border sm:grid-cols-4">
-        {[
-          { label: "In house", value: frontDesk.inHouse.length },
-          { label: "Arriving today", value: frontDesk.arrivingToday.length },
-          { label: "Departing today", value: frontDesk.departingToday.length },
-          { label: "Pending bookings", value: stats.pendingCount },
-          { label: "New today", value: today.newToday },
-          { label: "Checked out today", value: today.checkedOutToday },
-          { label: "Cancelled today", value: today.cancelledToday },
-          { label: "No-shows today", value: today.noShowToday },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-secondary/40 px-4 py-3">
-            <dt className="text-xs text-muted-foreground">{stat.label}</dt>
-            <dd className="font-heading text-xl font-semibold">{stat.value}</dd>
-          </div>
-        ))}
-      </dl>
-
       <div className="grid items-start gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           <FrontDeskList
             title="Arriving today"
-            emptyLabel="No arrivals today."
+            emptyLabel="No arrivals today"
             bookings={frontDesk.arrivingToday}
             mode="arriving"
             canEdit={canEditBookings}
           />
           <FrontDeskList
             title="Departing today"
-            emptyLabel="No departures today."
+            emptyLabel="No departures today"
             bookings={frontDesk.departingToday}
             mode="departing"
             canEdit={canEditBookings}
           />
-          <GuestList
-            title="In house"
-            emptyLabel="No guests in house."
-            bookings={frontDesk.inHouse}
-          />
+          <GuestList title="In house" bookings={frontDesk.inHouse} />
         </div>
 
         <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardHeader>
             <CardTitle className="text-base">Forecast</CardTitle>
-            <div className="flex items-center gap-1">
+            <p className="text-xs text-muted-foreground tabular-nums">
+              {format(weekStartDate, "d MMM")} – {format(weekEndDate, "d MMM yyyy")}
+            </p>
+            <CardAction className="flex items-center gap-1">
               <Button
                 variant="outline"
-                size="icon"
-                className="size-7"
+                size="icon-sm"
+                aria-label="Previous week"
                 render={<Link href={`?week=${prevWeek}`} />}
               >
-                <ChevronLeft className="size-3.5" />
+                <ChevronLeft aria-hidden="true" />
               </Button>
               <Button
                 variant="outline"
-                size="icon"
-                className="size-7"
+                size="icon-sm"
+                aria-label="Next week"
                 render={<Link href={`?week=${nextWeek}`} />}
               >
-                <ChevronRight className="size-3.5" />
+                <ChevronRight aria-hidden="true" />
               </Button>
-            </div>
+            </CardAction>
           </CardHeader>
           <CardContent className="space-y-5">
-            <p className="text-xs text-muted-foreground">
-              {format(weekStartDate, "EEE d MMM")} –{" "}
-              {format(weekEndDate, "EEE d MMM")}
-            </p>
-
-            <dl className="grid grid-cols-3 gap-2 text-center">
-              <div>
+            <dl className="grid grid-cols-3 divide-x divide-border text-center">
+              <div className="px-2">
                 <dt className="text-xs text-muted-foreground">Occupancy</dt>
-                <dd className="font-heading text-lg font-semibold">
-                  {forecast.occupancyPct}%
-                </dd>
+                <dd className="font-heading text-lg font-semibold tabular-nums">{forecast.occupancyPct}%</dd>
               </div>
-              <div>
+              <div className="px-2">
                 <dt className="text-xs text-muted-foreground">Arrivals</dt>
-                <dd className="font-heading text-lg font-semibold">
-                  {forecast.arrivals}
-                </dd>
+                <dd className="font-heading text-lg font-semibold tabular-nums">{forecast.arrivals}</dd>
               </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Nights booked</dt>
-                <dd className="font-heading text-lg font-semibold">
-                  {forecast.bookedNights}/{forecast.capacityNights}
+              <div className="px-2">
+                <dt className="text-xs text-muted-foreground">Room nights</dt>
+                <dd className="font-heading text-lg font-semibold tabular-nums">
+                  {forecast.bookedNights}
+                  <span className="text-sm font-normal text-muted-foreground">/{forecast.capacityNights}</span>
                 </dd>
               </div>
             </dl>
 
-            <OccupancyDonut
-              booked={forecast.bookedNights}
-              capacity={forecast.capacityNights}
-            />
+            <OccupancyDonut booked={forecast.bookedNights} capacity={forecast.capacityNights} />
 
-            <div
-              className={cn(
-                "space-y-2 rounded-lg border p-3",
-                insight.className,
-              )}
-            >
-              <p className="flex items-center gap-1.5 text-sm font-medium">
-                <Lightbulb className="size-4" /> Insight
-              </p>
-              <p className="text-sm text-muted-foreground">{insight.message}</p>
-              {canEditBookings ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  render={<Link href={`/manager/${hotelId}/rooms`} />}
-                >
-                  <Pencil className="size-3.5" /> Adjust room pricing
-                </Button>
-              ) : null}
-            </div>
+            {canEditBookings ? (
+              <Button variant="outline" className="w-full" render={<Link href={`${base}/rooms`} />}>
+                Adjust pricing
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
+        <CardHeader>
           <CardTitle className="text-base">Recent bookings</CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1 text-primary"
-            render={<Link href={`/manager/${hotelId}/bookings`} />}
-          >
-            View all <ArrowRight className="size-3.5" />
-          </Button>
+          <CardAction>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="All bookings"
+              title="All bookings"
+              render={<Link href={`${base}/bookings`} />}
+            >
+              <ChevronRight aria-hidden="true" />
+            </Button>
+          </CardAction>
         </CardHeader>
         <CardContent>
           {recent.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No bookings yet.</p>
+            <Empty>
+              <EmptyMedia variant="icon">
+                <ReceiptText />
+              </EmptyMedia>
+              <EmptyTitle>No bookings</EmptyTitle>
+            </Empty>
           ) : (
-            <ul className="divide-y divide-border">
+            <ul className="-mx-2 divide-y divide-border">
               {recent.map((b) => (
-                <li
-                  key={b.id}
-                  className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {b.hotel_rooms?.name ?? "Room"}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {b.check_in} → {b.check_out} · booked{" "}
-                      {format(new Date(b.created_at), "dd MMM")}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <span className="text-sm font-medium">
-                      {b.currency} {Number(b.total_price).toFixed(0)}
-                    </span>
-                    <Badge
-                      className={cn(
-                        "border-transparent capitalize",
-                        BOOKING_STATUS_BADGE[b.status] ??
-                          "bg-muted text-muted-foreground",
-                      )}
-                    >
-                      {b.status.replace(/_/g, " ")}
-                    </Badge>
-                  </div>
+                <li key={b.id}>
+                  <Link
+                    href={`${base}/bookings/${b.id}`}
+                    className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{b.hotel_rooms?.name ?? "Room"}</p>
+                      <p className="truncate text-xs text-muted-foreground tabular-nums">
+                        {dateSpan(b.check_in, b.check_out)} · Booked {format(new Date(b.created_at), "d MMM")}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+                      <span className="text-sm font-medium tabular-nums">{money(b.total_price, b.currency)}</span>
+                      <Badge variant={statusBadgeVariant(b.status)} className="capitalize">
+                        {b.status.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>

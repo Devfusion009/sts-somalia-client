@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { CheckCircle2, CircleDashed } from "lucide-react";
+import { ArrowRight, CheckCircle2, CircleDashed, History, NotebookPen, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { money as formatMoney } from "@/lib/money";
 import { countryName } from "@/lib/countries";
 import { cn } from "@/lib/utils";
 import { parseApplicationQuestions } from "@/modules/visa/schemas";
@@ -16,6 +18,17 @@ import { MessageThread } from "@/modules/visa/components/message-thread";
 import { MessageComposer } from "@/modules/visa/components/message-composer";
 import { adminSendMessage } from "@/modules/visa/admin-actions";
 import { DetailGrid, EventList, SectionHeading, formatWhen } from "./case-ui";
+
+function NoActivity() {
+  return (
+    <Empty>
+      <EmptyMedia variant="icon">
+        <History />
+      </EmptyMedia>
+      <EmptyTitle>No activity</EmptyTitle>
+    </Empty>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Overview
@@ -56,14 +69,20 @@ export function OverviewTab({ data, actions }: { data: VisaCase; actions: VisaAc
         <CardContent className="space-y-3">
           <SectionHeading
             action={
-              <Button variant="ghost" size="sm" render={<Link href={`?tab=activity`} scroll={false} />}>
-                All activity
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="All activity"
+                title="All activity"
+                render={<Link href={`?tab=activity`} scroll={false} />}
+              >
+                <ArrowRight />
               </Button>
             }
           >
             Recent activity
           </SectionHeading>
-          <EventList events={recent} />
+          {recent.length === 0 ? <NoActivity /> : <EventList events={recent} />}
         </CardContent>
       </Card>
     </div>
@@ -148,13 +167,13 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
                     <TableCell className="font-medium">
                       {member.full_name}
                       {member.is_primary ? (
-                        <Badge variant="outline" className="ml-2 text-[10px]">
+                        <Badge variant="outline" className="ml-2">
                           Primary
                         </Badge>
                       ) : null}
                     </TableCell>
                     <TableCell className="capitalize">{member.relationship.replace(/_/g, " ")}</TableCell>
-                    <TableCell>{day(member.date_of_birth) ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">{day(member.date_of_birth) ?? "—"}</TableCell>
                     <TableCell>{member.nationality ? countryName(member.nationality) : "—"}</TableCell>
                     <TableCell className="font-mono text-xs">{member.passport_number ?? "—"}</TableCell>
                   </TableRow>
@@ -184,14 +203,17 @@ export function PaymentTab({ data }: { data: VisaCase }) {
   const order = data.order;
   if (!order) {
     return (
-      <Card>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">No order.</p>
-        </CardContent>
+      <Card className="max-w-xl">
+        <Empty>
+          <EmptyMedia variant="icon">
+            <Receipt />
+          </EmptyMedia>
+          <EmptyTitle>No order</EmptyTitle>
+        </Empty>
       </Card>
     );
   }
-  const money = (v: number | string) => `${order.currency} ${Number(v).toFixed(2)}`;
+  const money = (v: number | string) => formatMoney(v, order.currency);
   const rows: Array<[string, string, boolean?]> = [
     ["Visa service", money(order.subtotal)],
     ...(Number(order.markup_amount) > 0 ? ([["Agency service fee", money(order.markup_amount)]] as Array<[string, string]>) : []),
@@ -207,7 +229,7 @@ export function PaymentTab({ data }: { data: VisaCase }) {
         <CardContent className="space-y-4">
           <SectionHeading
             action={
-              <Badge className="border-transparent bg-secondary text-foreground">
+              <Badge variant={statusBadgeVariant(data.paymentState, { not_billed: "neutral" })}>
                 {PAYMENT_STATE_LABELS[data.paymentState]}
               </Badge>
             }
@@ -222,9 +244,11 @@ export function PaymentTab({ data }: { data: VisaCase }) {
               </div>
             ))}
           </dl>
-          <Button variant="outline" size="sm" render={<Link href="/admin/orders" />}>
-            Open in Orders
-          </Button>
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" render={<Link href="/admin/orders" />}>
+              Open in Orders
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -249,13 +273,18 @@ export function NotesTab({ data, canWrite }: { data: VisaCase; canWrite: boolean
         <CardContent className="space-y-3">
           <SectionHeading>Internal notes</SectionHeading>
           {notes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No notes.</p>
+            <Empty>
+              <EmptyMedia variant="icon">
+                <NotebookPen />
+              </EmptyMedia>
+              <EmptyTitle>No notes</EmptyTitle>
+            </Empty>
           ) : (
             <ol className="divide-y divide-border">
               {notes.map((n) => (
                 <li key={n.id} className="space-y-1 py-2.5 text-sm">
                   <p className="whitespace-pre-wrap break-words">{n.note}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground tabular-nums">
                     {n.author?.full_name ?? "System"} · {formatWhen(n.created_at)}
                   </p>
                 </li>
@@ -276,7 +305,7 @@ export function ActivityTab({ data }: { data: VisaCase }) {
     <Card>
       <CardContent className="space-y-3">
         <SectionHeading>Activity</SectionHeading>
-        <EventList events={data.events} />
+        {data.events.length === 0 ? <NoActivity /> : <EventList events={data.events} />}
       </CardContent>
     </Card>
   );

@@ -9,7 +9,7 @@ export default async function AdminHotelGuestPage({ params }: { params: Promise<
   await requirePlatformAdmin();
   return (
     <div className="space-y-6">
-      <HotelSectionHeader id={id} active="guests" />
+      <HotelSectionHeader id={id} active="guests" back={false} />
       <GuestView hotelId={id} guestKey={guestKey} base={`/admin/hotels/${id}`} />
     </div>
   );

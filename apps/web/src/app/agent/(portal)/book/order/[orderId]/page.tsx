@@ -1,29 +1,40 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { AlertCircle, ArrowLeft, CheckCircle2, Download } from "lucide-react";
+import {
+  AlertCircle,
+  Building2,
+  CheckCircle2,
+  Download,
+  FileText,
+  Landmark,
+  PartyPopper,
+  Plane,
+  type LucideIcon,
+} from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyOrder, getAgencyTopupRequests } from "@/modules/agencies/queries";
 import { describeOrderItem } from "@/modules/orders/format";
 import { WalletPaymentPanel } from "@/modules/agencies/components/wallet-payment-panel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { money } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { PayFromWalletForm } from "./pay-from-wallet-form";
 import { hallAwaitingQuote } from "@sts/shared-types";
 
-const ORDER_STATUS_STYLES: Record<string, string> = {
-  held: "bg-brand-gold/15 text-brand-gold",
-  pending_payment: "bg-brand-gold/15 text-brand-gold",
-  partially_paid: "bg-brand-gold/15 text-brand-gold",
-  paid: "bg-primary/10 text-primary",
-  processing: "bg-chart-3/10 text-chart-3",
-  completed: "bg-primary/10 text-primary",
-  cancelled: "bg-muted text-muted-foreground",
-  refunded: "bg-destructive/10 text-destructive",
+const ITEM_ICON: Record<string, LucideIcon> = {
+  hotel: Building2,
+  flight: Plane,
+  visa: FileText,
+  umrah: Landmark,
+  hall: PartyPopper,
 };
+
+export const metadata = { title: "Review & pay" };
 
 const PAYABLE = ["pending_payment", "held", "partially_paid"];
 
@@ -66,89 +77,52 @@ export default async function DeskOrderPage({
   // a free booking.
   const awaitingPrice = total === 0 && PAYABLE.includes(order.status);
 
+  const statusLabel = awaitingPrice
+    ? "Awaiting price"
+    : awaitingConfirmation
+      ? "Awaiting confirmation"
+      : order.status.replace(/_/g, " ");
+  const margin = Number(order.markup_amount ?? 0);
+
   return (
-    <div className="space-y-4">
-      <Link
-        href="/agent/book"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" /> New booking
-      </Link>
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-bold">{order.order_number}</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {[
-              order.agency_customer?.full_name,
-              order.agency_customer?.phone,
-              format(new Date(order.created_at), "d MMM yyyy"),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        </div>
-        <Badge
-          className={cn(
-            "border-transparent capitalize",
-            ORDER_STATUS_STYLES[order.status] ?? "bg-muted text-muted-foreground"
-          )}
-        >
-          {awaitingPrice ? "Awaiting price" : awaitingConfirmation ? "Awaiting confirmation" : order.status.replace(/_/g, " ")}
-        </Badge>
-      </div>
-
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg bg-secondary/40 px-4 py-3 sm:grid-cols-4">
-        <div>
-          <dt className="text-xs text-muted-foreground">Net</dt>
-          <dd className="font-medium tabular-nums">
-            {order.currency} {Number(order.subtotal).toFixed(2)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Your margin</dt>
-          <dd className="font-medium tabular-nums">
-            {order.currency} {Number(order.markup_amount ?? 0).toFixed(2)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">
-            Customer pays
-          </dt>
-          <dd className="font-semibold tabular-nums">
-            {awaitingPrice ? "On request" : `${order.currency} ${total.toFixed(2)}`}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Balance</dt>
-          <dd className="font-semibold tabular-nums">
-            {awaitingPrice ? "On request" : `${order.currency} ${balance.toFixed(2)}`}
-          </dd>
-        </div>
-      </dl>
-
-      <Card className="py-0">
-        <CardContent className="divide-y divide-border px-4 py-0">
-          {order.order_items.map((item) => {
-            const info = describeOrderItem(item);
-            return (
-              <div key={item.id} className="flex items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{info.title}</p>
-                  {info.subtitle ? (
-                    <p className="truncate text-xs text-muted-foreground">{info.subtitle}</p>
-                  ) : null}
-                </div>
-                {item.item_type === "hotel" && item.hotel_booking?.status === "waitlisted" ? (
-                  <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">
-                    Waitlisted
-                  </Badge>
-                ) : null}
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      <PageHeader
+        back={{ href: "/agent/book", label: "New booking" }}
+        title={<span className="tabular-nums">{order.order_number}</span>}
+        status={
+          <Badge
+            variant={awaitingPrice || awaitingConfirmation ? "warning" : statusBadgeVariant(order.status)}
+            className="capitalize"
+          >
+            {statusLabel}
+          </Badge>
+        }
+        meta={[
+          order.agency_customer?.full_name,
+          order.agency_customer?.phone,
+          format(new Date(order.created_at), "d MMM yyyy"),
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        actions={
+          <>
+            {order.status === "paid" || order.status === "completed" ? (
+              <Button
+                variant="outline"
+                render={<a href={`/api/invoices/${order.id}`} target="_blank" rel="noopener noreferrer" />}
+              >
+                <Download data-icon="inline-start" aria-hidden="true" /> Invoice
+              </Button>
+            ) : null}
+            <Button variant="outline" render={<Link href="/agent/bookings" />}>
+              All bookings
+            </Button>
+            <Button variant="outline" render={<Link href="/agent/book" />}>
+              Book another service
+            </Button>
+          </>
+        }
+      />
 
       {topup === "success" ? (
         <Alert>
@@ -156,49 +130,141 @@ export default async function DeskOrderPage({
           <AlertDescription>Wallet topped up.</AlertDescription>
         </Alert>
       ) : topup === "pending" ? (
-        <Alert>
+        <Alert variant="warning">
           <AlertCircle />
           <AlertDescription>Approve the payment on your phone to finish this top-up.</AlertDescription>
         </Alert>
       ) : null}
 
-      {payable ? (
-        <WalletPaymentPanel
-          due={balance}
-          available={available}
-          currency={order.currency}
-          canTopUp={canTopUp}
-          pendingTopupTotal={pendingTopupTotal}
-          returnTo={`/agent/book/order/${order.id}`}
-        >
-          <PayFromWalletForm
-            orderId={order.id}
-            amount={balance}
-            available={available}
-            currency={order.currency}
-          />
-        </WalletPaymentPanel>
-      ) : null}
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="min-w-0 space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-base font-semibold">Items</h2>
+            <Badge variant="neutral" className="tabular-nums">
+              {order.order_items.length}
+            </Badge>
+          </div>
+          <Card className="overflow-hidden py-0">
+            <ul className="divide-y divide-border">
+              {order.order_items.map((item) => {
+                const info = describeOrderItem(item);
+                const Icon = ITEM_ICON[item.item_type] ?? FileText;
+                return (
+                  <li key={item.id} className="flex items-start gap-3 px-4 py-3 sm:px-5">
+                    <span
+                      aria-hidden="true"
+                      className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+                    >
+                      <Icon className="size-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                        <span className="min-w-0 break-words">{info.title}</span>
+                        {item.item_type === "hotel" && item.hotel_booking?.status === "waitlisted" ? (
+                          <Badge variant="warning">Waitlisted</Badge>
+                        ) : null}
+                      </p>
+                      {info.subtitle ? (
+                        <p className="text-xs text-muted-foreground">{info.subtitle}</p>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0 text-right text-sm font-medium tabular-nums">
+                      {awaitingPrice ? (
+                        <span className="font-normal text-muted-foreground">On request</span>
+                      ) : (
+                        money(Number(item.total_price), order.currency)
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        </section>
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" render={<Link href="/agent/book" />}>
-          Book another service
-        </Button>
-        <Button variant="outline" render={<Link href="/agent/bookings" />}>
-          All bookings
-        </Button>
-        {order.status === "paid" || order.status === "completed" ? (
-          <Button
-            variant="outline"
-            className="gap-1.5"
-            render={
-              <a href={`/api/invoices/${order.id}`} target="_blank" rel="noopener noreferrer" />
-            }
-          >
-            <Download className="size-3.5" /> Invoice
-          </Button>
-        ) : null}
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-24">
+          <Card>
+            <CardHeader>
+              <CardTitle>Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="space-y-2 text-sm">
+                <SummaryRow label="Net" value={money(Number(order.subtotal), order.currency)} />
+                <SummaryRow label="Your margin" value={money(margin, order.currency)} />
+                <SummaryRow
+                  label="Customer pays"
+                  value={awaitingPrice ? "On request" : money(total, order.currency)}
+                  strong
+                  divided
+                />
+                {paid > 0 ? <SummaryRow label="Paid" value={money(paid, order.currency)} /> : null}
+                {!awaitingPrice ? (
+                  <SummaryRow
+                    label="Balance due"
+                    value={money(balance, order.currency)}
+                    strong
+                    divided={paid > 0}
+                    tone={balance > 0 ? "warn" : undefined}
+                  />
+                ) : null}
+              </dl>
+            </CardContent>
+          </Card>
+
+          {payable ? (
+            <WalletPaymentPanel
+              due={balance}
+              available={available}
+              currency={order.currency}
+              canTopUp={canTopUp}
+              pendingTopupTotal={pendingTopupTotal}
+              returnTo={`/agent/book/order/${order.id}`}
+            >
+              <PayFromWalletForm
+                orderId={order.id}
+                amount={balance}
+                available={available}
+                currency={order.currency}
+              />
+            </WalletPaymentPanel>
+          ) : null}
+        </aside>
       </div>
+    </div>
+  );
+}
+
+function SummaryRow({
+  label,
+  value,
+  strong = false,
+  divided = false,
+  tone,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  divided?: boolean;
+  tone?: "warn";
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-baseline justify-between gap-3",
+        divided && "border-t border-border pt-2",
+        strong && "font-medium"
+      )}
+    >
+      <dt className={strong ? "text-foreground" : "text-muted-foreground"}>{label}</dt>
+      <dd
+        className={cn(
+          "text-right tabular-nums",
+          strong && "font-heading text-base font-semibold",
+          tone === "warn" && "text-[color-mix(in_oklch,var(--brand-gold),black_30%)] dark:text-brand-gold"
+        )}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

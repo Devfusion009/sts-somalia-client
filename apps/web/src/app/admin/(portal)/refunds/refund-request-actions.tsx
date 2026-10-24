@@ -41,16 +41,16 @@ export function RefundRequestActions({ requestId }: { requestId: string }) {
         <form action={approveAction}>
           <input type="hidden" name="requestId" value={requestId} />
           <SubmitButton size="sm" pendingText="Approving…">
-            <Check /> Approve
+            <Check aria-hidden="true" /> Approve
           </SubmitButton>
         </form>
         <Button size="sm" variant="destructive" onClick={() => setRejectOpen(true)}>
-          <X /> Reject
+          <X aria-hidden="true" /> Reject
         </Button>
       </div>
       {approveState?.error ? (
-        <span title={approveState.error} className="flex items-center gap-1 text-xs text-destructive">
-          <AlertCircle className="size-3.5" /> {approveState.error}
+        <span role="alert" title={approveState.error} className="flex max-w-64 items-center gap-1 text-xs whitespace-normal text-destructive">
+          <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" /> {approveState.error}
         </span>
       ) : null}
 
@@ -60,14 +60,14 @@ export function RefundRequestActions({ requestId }: { requestId: string }) {
             <input type="hidden" name="requestId" value={requestId} />
             <AlertDialogHeader>
               <AlertDialogTitle>Reject this refund request?</AlertDialogTitle>
-              <AlertDialogDescription>The wallet is not credited — the agency can see why below.</AlertDialogDescription>
+              <AlertDialogDescription>The wallet is not credited.</AlertDialogDescription>
             </AlertDialogHeader>
             {rejectState?.error ? (
               <Alert variant="destructive" className="my-2">
                 <AlertDescription>{rejectState.error}</AlertDescription>
               </Alert>
             ) : null}
-            <Textarea name="notes" placeholder="Reason (shown to the agency)" className="my-2" rows={3} />
+            <Textarea name="notes" aria-label="Reason" placeholder="Reason (shown to the agency)" className="my-2" rows={3} />
             <AlertDialogFooter>
               <Button type="button" variant="outline" onClick={() => setRejectOpen(false)}>
                 Cancel

@@ -26,7 +26,7 @@ export function UserStatusToggle({ userId, status }: { userId: string; status: A
         formAction(formData);
       }}
     >
-      <Button size="sm" variant={status === "suspended" ? "outline" : "destructive"} disabled={isPending} type="submit">
+      <Button size="sm" variant={status === "suspended" ? "outline" : "destructive"} loading={isPending} type="submit">
         {status === "suspended" ? "Reactivate" : "Suspend"}
       </Button>
     </form>

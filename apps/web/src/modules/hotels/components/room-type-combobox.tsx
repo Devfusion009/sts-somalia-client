@@ -49,7 +49,7 @@ export function RoomTypeCombobox({
       <ComboboxPortal>
         <ComboboxPositioner>
           <ComboboxPopup>
-            <ComboboxEmpty>No matching room type — your typed name will be added to the shared list.</ComboboxEmpty>
+            <ComboboxEmpty>No matching room type</ComboboxEmpty>
             <ComboboxList>
               {(type: string) => (
                 <ComboboxItem key={type} value={type}>

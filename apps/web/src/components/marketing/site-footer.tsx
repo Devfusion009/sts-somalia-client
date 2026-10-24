@@ -35,8 +35,8 @@ export async function SiteFooter() {
 
           <div>
             <p className="text-sm text-sidebar-foreground/70">Contact our booking desk</p>
-            <a href={SUPPORT_PHONE_TEL} className="mt-1 flex items-center gap-2 font-heading text-xl font-bold hover:text-sidebar-primary">
-              <PhoneInTalkIcon sx={{ fontSize: 20 }} />
+            <a href={SUPPORT_PHONE_TEL} className="mt-1 flex w-fit items-center gap-2 rounded font-heading text-xl font-bold tabular-nums hover:text-sidebar-primary focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none">
+              <PhoneInTalkIcon sx={{ fontSize: 20 }} aria-hidden />
               {SUPPORT_PHONE_DISPLAY}
             </a>
             <p className="mt-0.5 text-xs text-sidebar-foreground/60">Sat–Thu 8:00–18:00 EAT · emergencies 24/7</p>
@@ -53,12 +53,12 @@ export async function SiteFooter() {
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
         <div>
           <p className="max-w-xs text-sm leading-relaxed text-sidebar-foreground/70">
-            Scout Travel Solution — flights, hotels, visas, Umrah journeys and event halls, booked with
-            confidence and backed by a real team in Mogadishu.
+            Scout Travel Solution — flights, hotels, visas, Umrah and event halls, from our offices in
+            Mogadishu and Nairobi.
           </p>
           <div className="mt-5 flex flex-col gap-2.5 text-sm text-sidebar-foreground/70">
-            <a href="mailto:info@scoutsts.com" className="flex items-center gap-2 transition-colors hover:text-sidebar-primary">
-              <EmailIcon sx={{ fontSize: 17 }} /> info@scoutsts.com
+            <a href="mailto:info@scoutsts.com" className="flex w-fit items-center gap-2 rounded transition-colors hover:text-sidebar-primary focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none">
+              <EmailIcon sx={{ fontSize: 17 }} aria-hidden /> info@scoutsts.com
             </a>
             {/* Both offices, so the footer matches the About page rather than
                 implying Mogadishu is the only place we can be reached. */}
@@ -144,9 +144,9 @@ export async function SiteFooter() {
       <div className="border-t border-sidebar-border bg-black/20">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-5 text-xs text-sidebar-foreground/60 sm:flex-row sm:px-6 lg:px-8">
           <p>© {new Date().getFullYear()} Scout Travel Solution. All rights reserved.</p>
-          <div className="flex flex-wrap items-center justify-center gap-2" aria-label="Accepted payment methods">
+          <div role="list" className="flex flex-wrap items-center justify-center gap-2" aria-label="Accepted payment methods">
             {["EVC Plus", "Bank transfer", "Visa", "Mastercard"].map((method) => (
-              <span key={method} className="rounded-md border border-sidebar-border bg-white/5 px-2.5 py-1 font-medium">
+              <span key={method} role="listitem" className="rounded-md border border-sidebar-border bg-white/5 px-2.5 py-1 font-medium">
                 {method}
               </span>
             ))}

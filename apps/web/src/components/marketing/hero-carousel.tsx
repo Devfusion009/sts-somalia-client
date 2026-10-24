@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Pause, Play } from "lucide-react";
 
 import { usePrefersReducedMotion } from "@/components/ui/aceternity/motion-primitives";
 import { useRouter } from "next/navigation";
@@ -17,7 +18,7 @@ const SLIDES = [
     video: "/marketing/slide-gulf-city.mp4",
     eyebrow: "Gulf & Middle East",
     title: "Direct Fares to Dubai & Doha",
-    subtitle: "Business trips and family visits, sorted in minutes",
+    subtitle: "Business trips and family visits from Mogadishu",
     priceLabel: "From",
     price: "$240",
     priceSuffix: "one way",
@@ -26,7 +27,7 @@ const SLIDES = [
     titleFont: "font-display tracking-tight",
     deal: {
       kind: "flight",
-      tag: "Limited seats",
+      tag: "Fare guide",
       fromCode: "MGQ",
       fromLabel: "Mogadishu",
       toCode: "DXB",
@@ -84,7 +85,7 @@ const SLIDES = [
     titleFont: "font-african font-normal tracking-tight",
     deal: {
       kind: "stay",
-      tag: "Best rate",
+      tag: "Partner hotel",
       fromCode: "MGQ",
       fromLabel: "Mogadishu seafront",
       toCode: "3N",
@@ -138,7 +139,7 @@ const SLIDES = [
     titleFont: "font-display tracking-tight",
     deal: {
       kind: "stay",
-      tag: "Popular route",
+      tag: "Partner hotel",
       fromCode: "NBO",
       fromLabel: "Nairobi CBD",
       toCode: "2N",
@@ -195,7 +196,12 @@ export function HeroCarousel() {
   const [index, setIndex] = useState(0);
   const [query, setQuery] = useState("");
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [paused, setPaused] = useState(false);
+  // Hover and keyboard focus pause the rotation for as long as they last; the
+  // pause button stops it until pressed again (WCAG 2.2.2).
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [stopped, setStopped] = useState(false);
+  const paused = hovered || focused || stopped;
 
   const go = useCallback((next: number) => setIndex((next + SLIDES.length) % SLIDES.length), []);
 
@@ -209,9 +215,18 @@ export function HeroCarousel() {
 
   return (
     <section
-      className="relative isolate min-h-[540px] overflow-hidden bg-sidebar lg:min-h-[620px]"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      className="relative isolate min-h-[600px] overflow-hidden bg-sidebar lg:min-h-[640px]"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.target instanceof HTMLInputElement) return;
+        if (e.key === "ArrowRight") go(index + 1);
+        if (e.key === "ArrowLeft") go(index - 1);
+      }}
       aria-roledescription="carousel"
       aria-label="Featured travel offers"
     >
@@ -335,14 +350,15 @@ export function HeroCarousel() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search a destination — Mogadishu, Dubai, Istanbul…"
+              placeholder="Mogadishu, Dubai, Istanbul…"
               aria-label="Search a destination"
               autoComplete="off"
-              className="h-12 w-full bg-transparent pr-3 pl-12 text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
+              className="h-12 w-full min-w-0 bg-transparent pr-3 pl-12 text-base text-neutral-900 outline-none placeholder:text-neutral-500 sm:text-sm"
             />
           </div>
           <button
             type="submit"
+            aria-label="Search hotels"
             className="flex h-12 shrink-0 items-center gap-1.5 rounded-xl bg-brand-accent px-6 font-heading text-sm font-bold text-brand-accent-foreground transition-colors hover:bg-brand-accent/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:px-8"
           >
             <SearchIcon sx={{ fontSize: 18 }} />
@@ -351,21 +367,35 @@ export function HeroCarousel() {
         </form>
       </div>
 
-      {/* Slide dots */}
-      <div className="absolute inset-x-0 bottom-6 z-20 flex justify-center gap-2">
+      {/* Slide dots — the visible pill is small, the hit area is 32px tall. */}
+      <div className="absolute inset-x-0 bottom-3 z-20 flex items-center justify-center gap-1">
         {SLIDES.map((s, i) => (
           <button
             key={s.image}
             type="button"
             onClick={() => go(i)}
             aria-label={`Show slide ${i + 1}: ${s.title}`}
-            aria-current={i === index}
-            className={cn(
-              "h-2 rounded-full transition-all duration-300 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none",
-              i === index ? "w-8 bg-white" : "w-2 bg-white/50 hover:bg-white/80"
-            )}
-          />
+            aria-current={i === index ? "true" : undefined}
+            className="group/dot grid h-8 place-items-center rounded-full px-1 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+          >
+            <span
+              className={cn(
+                "block h-2 rounded-full transition-all duration-300",
+                i === index ? "w-8 bg-white" : "w-2 bg-white/50 group-hover/dot:bg-white/80"
+              )}
+            />
+          </button>
         ))}
+        {reduced ? null : (
+          <button
+            type="button"
+            onClick={() => setStopped((v) => !v)}
+            aria-label={stopped ? "Play slideshow" : "Pause slideshow"}
+            className="ml-2 grid size-8 place-items-center rounded-full bg-white/15 text-white ring-1 ring-white/25 backdrop-blur-sm transition-colors hover:bg-white/25 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+          >
+            {stopped ? <Play className="size-3.5" aria-hidden /> : <Pause className="size-3.5" aria-hidden />}
+          </button>
+        )}
       </div>
     </section>
   );

@@ -15,11 +15,11 @@ export function BackLink({ href, label, className }: { href: string; label: stri
       aria-label={label}
       title={label}
       className={cn(
-        "inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors hover:bg-accent",
+        "inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors outline-none hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:size-10",
         className
       )}
     >
-      <ArrowLeft className="size-5" strokeWidth={2.5} />
+      <ArrowLeft className="size-5" strokeWidth={2.5} aria-hidden="true" />
     </Link>
   );
 }

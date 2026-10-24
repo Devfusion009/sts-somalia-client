@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft, CheckCircle2, Download, ExternalLink, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, FileText, XCircle } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { countryFlag, countryName } from "@/lib/countries";
-import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusTimeline } from "@/modules/bookings/components/status-timeline";
 import { getApplicationDetail, getOrderForVisaApplication } from "@/modules/visa/queries";
 import { applicationDocumentSlots } from "@/modules/visa/schemas";
@@ -32,10 +31,18 @@ export const metadata: Metadata = { title: "Visa Application" };
 
 const STAFF_DOCS = new Set(["visa_result", "decision_letter", "submission_receipt", "passport_authorization"]);
 
-const DOC_STATUS: Record<string, { label: string; className: string }> = {
-  pending: { label: "Received", className: "bg-chart-3/10 text-chart-3" },
-  accepted: { label: "Verified", className: "bg-primary/10 text-primary" },
-  rejected: { label: "Replace", className: "bg-destructive/10 text-destructive" },
+const DOC_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
+  pending: { label: "Received", variant: "info" },
+  accepted: { label: "Verified", variant: "success" },
+  rejected: { label: "Replace", variant: "destructive" },
+};
+
+const APPOINTMENT_VARIANT: Partial<Record<string, BadgeVariant>> = {
+  booked: "info",
+  attended: "success",
+  no_show: "destructive",
+  cancelled: "neutral",
+  rescheduled: "neutral",
 };
 
 function SectionTitle({ children, id }: { children: React.ReactNode; id?: string }) {
@@ -97,37 +104,41 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
   const travellers = application.applicant_type === "single" ? 1 : Math.max(application.members.length, 1);
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
+    <div className="mx-auto w-full max-w-6xl space-y-6">
+      <header className="space-y-3">
         <Link
           href="/account/visa"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex w-fit items-center gap-1.5 rounded-md text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          <ArrowLeft className="size-3.5" /> Visa applications
+          <ArrowLeft className="size-3.5" aria-hidden="true" /> Visa applications
         </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-4xl leading-none" aria-hidden>
+        <div className="flex items-center gap-3">
+          <span className="text-4xl leading-none" aria-hidden="true">
             {countryFlag(visaType.destination_country_code)}
           </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="font-heading text-2xl font-bold">{countryName(visaType.destination_country_code)}</h1>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="font-heading text-2xl font-semibold tracking-tight break-words">
+                {countryName(visaType.destination_country_code)}
+              </h1>
               <VisaStatusBadge status={application.status} />
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground tabular-nums">
               {visaType.name} · <span className="font-mono">{application.application_ref}</span>
-              {application.submitted_at ? ` · ${format(new Date(application.submitted_at), "dd MMM yyyy")}` : ""}
+              {application.submitted_at ? ` · ${format(new Date(application.submitted_at), "d MMM yyyy")}` : ""}
               {` · ${travellers} traveller${travellers === 1 ? "" : "s"}`}
             </p>
           </div>
         </div>
-      </div>
+      </header>
 
       <NextActionCard action={next} />
 
       <Card>
-        <CardContent className="space-y-4">
-          <p className="text-sm font-medium text-muted-foreground">{progress.stepLabel}</p>
+        <CardHeader>
+          <CardTitle>{progress.stepLabel}</CardTitle>
+        </CardHeader>
+        <CardContent>
           <StatusTimeline stages={progress.stages} currentIndex={progress.index} outcome={progress.outcome} />
         </CardContent>
       </Card>
@@ -141,19 +152,19 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-3">
                     {approved ? (
-                      <CheckCircle2 className="size-6 text-primary" />
+                      <CheckCircle2 className="size-6 shrink-0 text-primary" aria-hidden="true" />
                     ) : (
-                      <XCircle className="size-6 text-destructive" />
+                      <XCircle className="size-6 shrink-0 text-destructive" aria-hidden="true" />
                     )}
                     <div>
                       <p className="font-heading text-lg font-semibold">{approved ? "Approved" : "Refused"}</p>
                       <p className="text-sm text-muted-foreground">
-                        {decision.authority} · {format(new Date(decision.decision_date), "dd MMM yyyy")}
+                        {decision.authority} · {format(new Date(decision.decision_date), "d MMM yyyy")}
                       </p>
                     </div>
                   </div>
                   {approved ? (
-                    <dl className="grid grid-cols-3 gap-3 text-sm">
+                    <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-lg bg-border text-sm [&>div]:bg-secondary/40 [&>div]:px-3 [&>div]:py-2">
                       <div>
                         <dt className="text-xs text-muted-foreground">Validity</dt>
                         <dd className="font-medium">{visaType.validity_days ? `${visaType.validity_days} days` : "—"}</dd>
@@ -171,19 +182,17 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                   <div className="flex flex-wrap gap-2">
                     {result ? (
                       <Button
-                        className="gap-1.5"
                         render={<a href={`/api/visa/documents/${result.id}`} target="_blank" rel="noopener noreferrer" />}
                       >
-                        <Download className="size-4" /> Visa
+                        <Download data-icon="inline-start" aria-hidden="true" /> Download visa
                       </Button>
                     ) : null}
                     {letter ? (
                       <Button
                         variant="outline"
-                        className="gap-1.5"
                         render={<a href={`/api/visa/documents/${letter}`} target="_blank" rel="noopener noreferrer" />}
                       >
-                        <ExternalLink className="size-4" /> Decision letter
+                        <FileText data-icon="inline-start" aria-hidden="true" /> Decision letter
                       </Button>
                     ) : null}
                   </div>
@@ -203,25 +212,28 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                       <li key={doc.id} className="space-y-2 py-3">
                         <div className="flex flex-wrap items-center gap-3">
                           <p className="min-w-0 flex-1 text-sm font-medium">{labelFor(doc.document_type)}</p>
-                          <Badge className={cn("border-transparent", status.className)}>{status.label}</Badge>
+                          <Badge variant={status.variant}>{status.label}</Badge>
                           {doc.review_status === "rejected" ? (
                             <ReplaceUpload documentId={doc.id} applicationId={application.id} />
                           ) : null}
                         </div>
                         {doc.review_status === "rejected" && doc.rejection_reason ? (
-                          <p className="text-xs text-destructive">{doc.rejection_reason}</p>
+                          <p className="text-sm text-destructive">{doc.rejection_reason}</p>
                         ) : null}
                       </li>
                     );
                   })}
+                  {currentDocs.length === 0 && application.document_requests.length === 0 ? (
+                    <li className="py-6 text-center text-sm text-muted-foreground">No documents</li>
+                  ) : null}
                   {application.document_requests.map((request) => (
                     <li key={request.id} className="flex flex-wrap items-center gap-3 py-3">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{request.title}</p>
                         {request.description || request.due_date ? (
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             {request.description}
-                            {request.due_date ? `${request.description ? " · " : ""}by ${format(new Date(request.due_date), "dd MMM yyyy")}` : ""}
+                            {request.due_date ? `${request.description ? " · " : ""}by ${format(new Date(request.due_date), "d MMM yyyy")}` : ""}
                           </p>
                         ) : null}
                       </div>
@@ -229,10 +241,9 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                         <RequestUpload requestId={request.id} applicationId={application.id} />
                       ) : (
                         <Badge
-                          className={cn(
-                            "border-transparent",
-                            request.status === "waived" ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"
-                          )}
+                          variant={
+                            request.status === "waived" ? "neutral" : request.status === "uploaded" ? "info" : "success"
+                          }
                         >
                           {request.status === "uploaded" ? "Received" : request.status === "waived" ? "Not needed" : "Verified"}
                         </Badge>
@@ -257,21 +268,13 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                             {APPOINTMENT_TYPE_LABELS[a.appointment_type]} ·{" "}
                             {formatInZone(a.scheduled_at, a.centre?.timezone ?? "Africa/Mogadishu")}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             {a.centre?.name}
                             {a.centre?.address ? `, ${a.centre.address}` : ""}
                             {a.confirmation_number ? ` · ${a.confirmation_number}` : ""}
                           </p>
                         </div>
-                        <Badge
-                          className={cn(
-                            "border-transparent",
-                            a.status === "booked" && "bg-chart-3/10 text-chart-3",
-                            a.status === "attended" && "bg-primary/10 text-primary",
-                            a.status === "no_show" && "bg-destructive/10 text-destructive",
-                            ["cancelled", "rescheduled"].includes(a.status) && "bg-muted text-muted-foreground"
-                          )}
-                        >
+                        <Badge variant={statusBadgeVariant(a.status, APPOINTMENT_VARIANT)}>
                           {APPOINTMENT_STATUS_LABELS[a.status]}
                         </Badge>
                       </li>
@@ -295,7 +298,7 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                           {p.tracking_reference ? (
                             <span className="font-mono text-xs text-muted-foreground">{p.tracking_reference}</span>
                           ) : null}
-                          <Badge variant="outline">{PASSPORT_STATUS_LABELS[p.status]}</Badge>
+                          <Badge variant="neutral">{PASSPORT_STATUS_LABELS[p.status]}</Badge>
                         </span>
                       </li>
                     ))}
@@ -326,8 +329,8 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                     {updates.map((e) => (
                       <li key={e.id} className="space-y-0.5 py-2.5 text-sm">
                         <p>{e.customer_summary}</p>
-                        <time className="text-xs text-muted-foreground" dateTime={e.created_at}>
-                          {format(new Date(e.created_at), "dd MMM yyyy, HH:mm")}
+                        <time className="text-sm text-muted-foreground tabular-nums" dateTime={e.created_at}>
+                          {format(new Date(e.created_at), "d MMM yyyy, HH:mm")}
                         </time>
                       </li>
                     ))}
@@ -366,9 +369,7 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                         <dt className="font-medium">Balance due</dt>
                         <dd className="flex items-center gap-3">
                           <span className="font-semibold tabular-nums">{fmtMoney(balance, order.currency)}</span>
-                          <Button size="sm" render={<Link href={`/checkout/${order.id}`} />}>
-                            Pay
-                          </Button>
+                          <Button render={<Link href={`/checkout/${order.id}`} />}>Pay</Button>
                         </dd>
                       </div>
                     ) : null}

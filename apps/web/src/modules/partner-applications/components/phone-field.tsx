@@ -18,10 +18,13 @@ export function PhoneField({
   name,
   defaultValue,
   required,
+  id,
 }: {
   name: string;
   defaultValue?: string;
   required?: boolean;
+  /** Put on the number input so a `<label htmlFor>` reaches it. */
+  id?: string;
 }) {
   const initial = splitPhoneValue(defaultValue ?? "");
   const [dial, setDial] = useState(initial.dial);
@@ -57,6 +60,7 @@ export function PhoneField({
       <input type="hidden" name={name} value={number ? `${dial}${number}` : ""} />
       <CountryCodeSelect value={dial} onChange={setDial} />
       <Input
+        id={id}
         inputMode="numeric"
         autoComplete="tel-national"
         value={number}

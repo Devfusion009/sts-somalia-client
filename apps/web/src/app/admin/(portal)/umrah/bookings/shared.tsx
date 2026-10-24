@@ -1,9 +1,8 @@
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { UMRAH_STAGE_LABELS, UMRAH_STAGE_STYLES, type UmrahStage } from "./stages";
+import { UMRAH_STAGE_LABELS, UMRAH_STAGE_VARIANTS, type UmrahStage } from "./stages";
 
 export function StageBadge({ stage }: { stage: UmrahStage }) {
-  return <Badge className={cn("border-transparent", UMRAH_STAGE_STYLES[stage])}>{UMRAH_STAGE_LABELS[stage]}</Badge>;
+  return <Badge variant={UMRAH_STAGE_VARIANTS[stage]}>{UMRAH_STAGE_LABELS[stage]}</Badge>;
 }
 
 /** Date-only columns are calendar days, so they are parsed as local midnight, not UTC. */

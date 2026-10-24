@@ -1,23 +1,12 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import {
-  AlertCircle,
-  ArrowLeft,
-  ArrowRight,
-  BedDouble,
-  Check,
-  MapPin,
-  Receipt,
-  Sparkles,
-  Star,
-} from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Check, MapPin, Receipt, Star } from "lucide-react";
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
   SheetContent,
@@ -35,7 +24,6 @@ import {
   ROOM_SHARING_OPTIONS,
   UMRAH_CATEGORIES,
   UMRAH_TIER_LABELS,
-  UMRAH_TIER_CHIP_CLASS,
   type RoomSharing,
   type UmrahCategoryConfig,
   type UmrahService,
@@ -166,10 +154,6 @@ export function StepServices({
 
         <div>
           <h2 className="font-heading text-xl font-bold">Choose your services</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Your <span className="font-semibold text-foreground">{UMRAH_TIER_LABELS[tier]}</span>{" "}
-            picks are already selected below — change anything you like.
-          </p>
         </div>
 
         {/* Quick-jump rail: seven categories is a long page to scroll blind
@@ -191,7 +175,7 @@ export function StepServices({
                 href={`#${category.value}`}
                 aria-disabled={!applicable}
                 className={cn(
-                  "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                  "flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                   !applicable
                     ? "border-border text-muted-foreground/50"
                     : count > 0
@@ -199,7 +183,12 @@ export function StepServices({
                       : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
                 )}
               >
-                {count > 0 ? <Check className="size-3.5" /> : <category.icon className="size-3.5" />}
+                {count > 0 ? (
+                  <Check className="size-3.5" aria-hidden />
+                ) : (
+                  <category.icon className="size-3.5" aria-hidden />
+                )}
+                {count > 0 ? <span className="sr-only">Chosen: </span> : null}
                 {category.label}
               </a>
             );
@@ -207,16 +196,13 @@ export function StepServices({
         </nav>
 
         <section aria-labelledby="room-type-heading">
-          <h3 id="room-type-heading" className="flex items-center gap-2.5 font-heading text-base font-bold">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-secondary text-primary">
-              <BedDouble className="size-4.5" />
-            </span>
+          <h3 id="room-type-heading" className="font-heading text-base font-bold">
             Room type
           </h3>
           <div
             role="radiogroup"
             aria-labelledby="room-type-heading"
-            className="mt-3 ml-11.5 grid grid-cols-2 gap-3 sm:grid-cols-4"
+            className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4"
           >
             {ROOM_SHARING_OPTIONS.map((option) => {
               const active = roomSharing === option.value;
@@ -228,7 +214,7 @@ export function StepServices({
                   aria-checked={active}
                   onClick={() => setRoomSharing(option.value)}
                   className={cn(
-                    "flex flex-col rounded-2xl border-2 px-4 py-3 text-left transition-all",
+                    "flex flex-col rounded-2xl border-2 px-4 py-3 text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                     active
                       ? "border-primary bg-primary/[0.04] shadow-sm"
                       : "border-border bg-card hover:border-primary/40"
@@ -266,25 +252,16 @@ export function StepServices({
           return (
             <section key={category.value} className="scroll-mt-40" id={category.value}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="flex items-center gap-2.5 font-heading text-base font-bold">
-                  <span className="flex size-9 items-center justify-center rounded-xl bg-secondary text-primary">
-                    <category.icon className="size-4.5" />
-                  </span>
+                <h3 className="flex flex-wrap items-center gap-2 font-heading text-base font-bold">
                   {category.label}
                   {category.selection === "single" && !notApplicable ? (
-                    <Badge variant="outline" className="gap-1 border-primary/30 text-[10px] text-primary">
-                      <span className="size-1.5 rounded-full bg-primary" /> Choose one
-                    </Badge>
+                    <Badge variant="outline">Choose one</Badge>
                   ) : null}
-                  {category.selection === "multi" ? (
-                    <Badge variant="outline" className="gap-1 border-brand-accent/30 text-[10px] text-brand-accent">
-                      <span className="size-1.5 rounded-xs bg-brand-accent" /> Optional
-                    </Badge>
-                  ) : null}
+                  {category.selection === "multi" ? <Badge variant="neutral">Optional</Badge> : null}
                 </h3>
                 {chosenCount > 0 ? (
-                  <span className="flex items-center gap-1 text-xs font-semibold text-primary">
-                    <Check className="size-3.5" /> {chosenCount} selected
+                  <span className="flex items-center gap-1 text-xs font-semibold text-primary tabular-nums">
+                    <Check className="size-3.5" aria-hidden /> {chosenCount} selected
                   </span>
                 ) : null}
               </div>
@@ -295,16 +272,15 @@ export function StepServices({
                   guidance; the same sentence repeated on every category
                   reads as noise. */}
               {category.value !== "hotel_makkah" && category.value !== "hotel_madinah" ? (
-                <p className="mt-1 ml-11.5 text-sm text-muted-foreground">{category.hint}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{category.hint}</p>
               ) : null}
 
               {notApplicable ? (
-                <p className="mt-3 ml-11.5 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                  You have no nights booked in this city, so no hotel is needed. Go back to step 1
-                  to add nights.
+                <p className="mt-3 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  No nights booked in this city.
                 </p>
               ) : (
-                <div className="mt-3 ml-11.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {visible.map((service) => (
                     <ServiceOptionCard
                       key={service.id}
@@ -333,12 +309,17 @@ export function StepServices({
           </Alert>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6 pb-20">
-          <Button render={<Link href={`${basePath}/${requestId}?step=1`} />} variant="ghost" className="gap-2">
-            <ArrowLeft className="size-4" /> Back
+        <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 pb-20 sm:flex-row sm:items-center sm:justify-between">
+          <Button
+            render={<Link href={`${basePath}/${requestId}?step=1`} />}
+            variant="ghost"
+            size="lg"
+            className="gap-2"
+          >
+            <ArrowLeft className="size-4" aria-hidden /> Back
           </Button>
           <SubmitButton size="lg" pendingText="Saving your selection…" className="gap-2">
-            Continue to traveller details <ArrowRight className="size-4" />
+            Continue to traveller details <ArrowRight className="size-4" aria-hidden />
           </SubmitButton>
         </div>
       </form>
@@ -389,15 +370,15 @@ function ServiceOptionCard({
       onClick={onToggle}
       aria-pressed={active}
       className={cn(
-        "group relative flex flex-col rounded-2xl border-2 p-4 pt-5 text-left transition-all",
+        "group relative flex flex-col rounded-2xl border-2 p-4 pt-5 text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
         active
           ? "border-primary bg-primary/[0.04] shadow-sm"
           : "border-border bg-card hover:border-primary/40 hover:shadow-sm"
       )}
     >
       {recommended ? (
-        <span className="absolute -top-2.5 left-4 flex items-center gap-1 rounded-full bg-brand-accent px-2 py-0.5 text-xs font-bold text-brand-accent-foreground">
-          <Sparkles className="size-2.5" /> Recommended
+        <span className="absolute -top-2.5 left-4 rounded-full bg-brand-accent px-2 py-0.5 text-xs font-bold text-brand-accent-foreground">
+          Recommended
         </span>
       ) : null}
 
@@ -438,32 +419,28 @@ function ServiceOptionCard({
           {service.star_rating ? (
             <span className="flex items-center gap-0.5" aria-label={`${service.star_rating} star`}>
               {Array.from({ length: service.star_rating }).map((_, i) => (
-                <Star key={i} className="size-3 fill-brand-gold text-brand-gold" />
+                <Star key={i} className="size-3 fill-brand-gold text-brand-gold" aria-hidden />
               ))}
             </span>
           ) : null}
           {service.distance_to_haram_m !== null ? (
-            <span className="flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
-              <MapPin className="size-3" />
+            <span className="flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground tabular-nums">
+              <MapPin className="size-3" aria-hidden />
               {service.distance_to_haram_m < 1000
                 ? `${service.distance_to_haram_m}m from the Haram`
                 : `${(service.distance_to_haram_m / 1000).toFixed(1)}km from the Haram`}
             </span>
           ) : null}
-          {/* A colour a reader recognises at a glance beats "PREMIUM OPTION"
-              in small caps, which they have to actually read. One pill,
-              folded into the row it already scans for stars and distance,
-              instead of a whole extra line at the bottom of the card. */}
+          {/* Options from another standard carry its name, folded into the
+              row already scanned for stars and distance. */}
           {service.tier && service.tier !== tier ? (
-            <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", UMRAH_TIER_CHIP_CLASS[service.tier])}>
-              {UMRAH_TIER_LABELS[service.tier]}
-            </span>
+            <Badge variant="outline">{UMRAH_TIER_LABELS[service.tier]}</Badge>
           ) : null}
         </span>
       ) : null}
 
       <span className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-border pt-3">
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground tabular-nums">
           <span className="font-semibold text-foreground">{formatMoney(priced.unitPrice, service.currency)}</span>{" "}
           {PRICE_UNIT_LABELS[service.price_unit]}
           {byOccupancy ? ` · ${ROOM_SHARING_LABELS[sharing.roomSharing]}` : null}
@@ -520,15 +497,16 @@ function FloatingSummary({
             type="button"
             // bottom-24 clears the site-wide WhatsApp button (fixed bottom-5,
             // size-13) with room to spare, rather than stacking on top of it.
-            className="fixed right-5 bottom-24 z-40 flex items-center gap-3 rounded-full border border-border bg-card py-2 pr-4 pl-3 shadow-lg transition-transform hover:scale-[1.03]"
+            aria-label={`Price summary, ${formatMoney(total, currency)}`}
+            className="fixed right-5 bottom-24 z-40 flex items-center gap-3 rounded-full border border-border bg-card py-2 pr-4 pl-3 shadow-lg transition-shadow outline-none hover:shadow-xl focus-visible:ring-3 focus-visible:ring-ring/50"
           />
         }
       >
-        <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary" aria-hidden>
           <Receipt className="size-4.5" />
         </span>
-        <span className="text-left leading-tight">
-          <span className="block text-[11px] text-muted-foreground">
+        <span className="text-left leading-tight" aria-hidden>
+          <span className="block text-xs text-muted-foreground tabular-nums">
             {lines.length > 0 ? `${completedCount}/${requiredCount} chosen` : "View summary"}
           </span>
           <span className="block font-heading text-sm font-bold text-primary tabular-nums">
@@ -546,8 +524,8 @@ function FloatingSummary({
             {ROOM_SHARING_LABELS[roomSharing]} room
           </SheetDescription>
           <div className="flex items-center justify-between pt-1">
-            <span className="text-[11px] font-semibold text-muted-foreground">Services chosen</span>
-            <span className={cn("text-[11px] font-semibold", done ? "text-primary" : "text-muted-foreground")}>
+            <span className="text-xs font-semibold text-muted-foreground">Services chosen</span>
+            <span className={cn("text-xs font-semibold tabular-nums", done ? "text-primary" : "text-muted-foreground")}>
               {completedCount}/{requiredCount}
             </span>
           </div>
@@ -559,7 +537,7 @@ function FloatingSummary({
         <div className="flex-1 overflow-y-auto px-4">
           {lines.length === 0 ? (
             <p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
-              Nothing selected yet. Tick the services you need and your total will build up here.
+              No services selected.
             </p>
           ) : (
             // Grouped in the SAME order the categories appear in the picker
@@ -573,7 +551,7 @@ function FloatingSummary({
                 return (
                   <div key={category.value}>
                     <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                      <category.icon className="size-3.5 text-primary" />
+                      <category.icon className="size-3.5 text-primary" aria-hidden />
                       {category.label}
                     </p>
                     <ul className="mt-1.5 space-y-2 border-l border-border pl-2.5">
@@ -585,11 +563,8 @@ function FloatingSummary({
                               {formatMoney(line.lineTotal, currency)}
                             </span>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            <span className="font-semibold text-foreground">
-                              {formatMoney(line.unitPrice, currency)}
-                            </span>{" "}
-                            × {line.quantity}
+                          <p className="text-xs text-muted-foreground tabular-nums">
+                            {formatMoney(line.unitPrice, currency)} × {line.quantity}
                           </p>
                         </li>
                       ))}
@@ -602,7 +577,6 @@ function FloatingSummary({
         </div>
 
         <SheetFooter className="border-t border-border">
-          <Separator className="mb-1" />
           <div className="flex items-baseline justify-between">
             <span className="text-sm font-semibold">Total</span>
             <span className="font-heading text-2xl font-bold text-primary tabular-nums">
@@ -610,12 +584,12 @@ function FloatingSummary({
             </span>
           </div>
           {trip.numPilgrims > 1 && total > 0 ? (
-            <p className="text-right text-xs text-muted-foreground">
+            <p className="text-right text-xs text-muted-foreground tabular-nums">
               {formatMoney(total / trip.numPilgrims, currency)} per traveller
             </p>
           ) : null}
           <Button type="submit" form="services-form" className="mt-2 w-full gap-2" size="lg">
-            Continue to traveller details <ArrowRight className="size-4" />
+            Continue to traveller details <ArrowRight className="size-4" aria-hidden />
           </Button>
         </SheetFooter>
       </SheetContent>

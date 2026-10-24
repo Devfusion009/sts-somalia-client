@@ -4,15 +4,13 @@ import { useActionState } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
 import { updateUmrahPackageDetails } from "@/modules/umrah/admin-actions";
 import { countryFlag } from "@/lib/countries";
 import type { Airport } from "@sts/shared-types";
-
-const selectClass =
-  "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 // Basic / Standard / Premium is the ladder the group product is sold on.
 // Economy and VIP stay listed because live packages already carry them and
@@ -35,7 +33,7 @@ function AirportSelect({
 }) {
   return (
     <Select name={name} defaultValue={defaultValue || undefined}>
-      <SelectTrigger id={id} className="w-full">
+      <SelectTrigger id={id} className="w-full" aria-label={placeholder}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -107,20 +105,20 @@ export function PackageDetailsForm({
         </Alert>
       ) : null}
 
-      <div className="space-y-1.5">
-        <Label htmlFor="tagline">Tagline</Label>
+      <Field>
+        <FieldLabel htmlFor="tagline">Tagline</FieldLabel>
         <Input
           id="tagline"
           name="tagline"
           defaultValue={tagline ?? ""}
           placeholder="Mogadishu's most trusted 14-night Umrah"
         />
-      </div>
+      </Field>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="tier">Tier badge</Label>
-          <select id="tier" name="tier" defaultValue={tier ?? ""} className={selectClass}>
+        <Field>
+          <FieldLabel htmlFor="tier">Tier badge</FieldLabel>
+          <select id="tier" name="tier" defaultValue={tier ?? ""} className={NATIVE_SELECT_CLASS}>
             <option value="">No tier badge</option>
             {TIERS.map((t) => (
               <option key={t} value={t}>
@@ -128,9 +126,9 @@ export function PackageDetailsForm({
               </option>
             ))}
           </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="originIata">From (airport)</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="originIata">From (airport)</FieldLabel>
           <AirportSelect
             id="originIata"
             name="originIata"
@@ -138,9 +136,9 @@ export function PackageDetailsForm({
             defaultValue={originIata ?? ""}
             placeholder="Select origin"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="destinationIata">To (airport)</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="destinationIata">To (airport)</FieldLabel>
           <AirportSelect
             id="destinationIata"
             name="destinationIata"
@@ -148,12 +146,12 @@ export function PackageDetailsForm({
             defaultValue={destinationIata ?? ""}
             placeholder="Select destination"
           />
-        </div>
+        </Field>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="originalPrice">Was price ({currency})</Label>
+        <Field>
+          <FieldLabel htmlFor="originalPrice">Was price ({currency})</FieldLabel>
           <Input
             id="originalPrice"
             name="originalPrice"
@@ -161,47 +159,48 @@ export function PackageDetailsForm({
             min={0}
             step="0.01"
             defaultValue={originalPrice ?? ""}
-            placeholder="Leave blank for no discount"
+            placeholder="No discount"
+            className="tabular-nums"
           />
-        </div>
-        <div className="flex items-end pb-2">
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input type="checkbox" name="isFeatured" defaultChecked={isFeatured} className="size-4" />
+        </Field>
+        <div className="flex items-end">
+          <label className="flex h-8 cursor-pointer items-center gap-2 text-sm">
+            <input type="checkbox" name="isFeatured" defaultChecked={isFeatured} className="size-4 accent-primary" />
             Highlight as <span className="font-medium">Most Popular</span>
           </label>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="mealPlan">Meals</Label>
-          <select id="mealPlan" name="mealPlan" defaultValue={mealPlan} className={selectClass}>
+        <Field>
+          <FieldLabel htmlFor="mealPlan">Meals</FieldLabel>
+          <select id="mealPlan" name="mealPlan" defaultValue={mealPlan} className={NATIVE_SELECT_CLASS}>
             <option value="none">No meals included</option>
             <option value="breakfast">Breakfast only</option>
             <option value="half_board">Half board (breakfast + dinner)</option>
             <option value="full_board">Full board (all meals)</option>
           </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="mealsNote">Food notes</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="mealsNote">Food notes</FieldLabel>
           <Input
             id="mealsNote"
             name="mealsNote"
             defaultValue={mealsNote ?? ""}
             placeholder="Somali & Arabic buffet, halal certified"
           />
-        </div>
+        </Field>
       </div>
 
-      <div className="space-y-3 rounded-lg border border-border p-4">
-        <p className="text-sm font-medium">Responsible person</p>
+      <FieldSet className="gap-4 border-t border-border pt-5">
+        <FieldLegend>Responsible person</FieldLegend>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="contactPersonName">Name</Label>
+          <Field>
+            <FieldLabel htmlFor="contactPersonName">Name</FieldLabel>
             <Input id="contactPersonName" name="contactPersonName" defaultValue={contactPersonName ?? ""} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="contactPersonPhone">Phone</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="contactPersonPhone">Phone</FieldLabel>
             <Input
               id="contactPersonPhone"
               name="contactPersonPhone"
@@ -209,33 +208,33 @@ export function PackageDetailsForm({
               defaultValue={contactPersonPhone ?? ""}
               placeholder="+252 61 144 4420"
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="contactWhatsapp">WhatsApp</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="contactWhatsapp">WhatsApp</FieldLabel>
             <Input
               id="contactWhatsapp"
               name="contactWhatsapp"
               defaultValue={contactWhatsapp ?? ""}
               placeholder="252611444420"
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="contactPersonEmail">Email</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="contactPersonEmail">Email</FieldLabel>
             <Input
               id="contactPersonEmail"
               name="contactPersonEmail"
               type="email"
               defaultValue={contactPersonEmail ?? ""}
             />
-          </div>
+          </Field>
         </div>
-      </div>
+      </FieldSet>
 
-      <div className="space-y-3 rounded-lg border border-border p-4">
-        <p className="text-sm font-medium">Payment terms</p>
+      <FieldSet className="gap-4 border-t border-border pt-5">
+        <FieldLegend>Payment terms</FieldLegend>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="depositPercent">Deposit (%)</Label>
+          <Field>
+            <FieldLabel htmlFor="depositPercent">Deposit (%)</FieldLabel>
             <Input
               id="depositPercent"
               name="depositPercent"
@@ -246,9 +245,9 @@ export function PackageDetailsForm({
               placeholder="50"
               defaultValue={depositPercent ?? ""}
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="balanceDueDays">Balance due (days before departure)</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="balanceDueDays">Balance due (days before)</FieldLabel>
             <Input
               id="balanceDueDays"
               name="balanceDueDays"
@@ -258,20 +257,22 @@ export function PackageDetailsForm({
               defaultValue={balanceDueDays}
               required
             />
-          </div>
+          </Field>
         </div>
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <input
             type="checkbox"
             name="fullPaymentBeforeDocuments"
             defaultChecked={fullPaymentBeforeDocuments}
-            className="size-4"
+            className="size-4 accent-primary"
           />
           Full payment before e-tickets and hotel vouchers
         </label>
-      </div>
+      </FieldSet>
 
-      <SubmitButton pendingText="Saving…">Save details</SubmitButton>
+      <div className="flex justify-end border-t border-border pt-5">
+        <SubmitButton pendingText="Saving…">Save details</SubmitButton>
+      </div>
     </form>
   );
 }

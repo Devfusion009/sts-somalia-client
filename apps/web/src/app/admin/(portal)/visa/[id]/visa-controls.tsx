@@ -1,10 +1,11 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
+import { format } from "date-fns";
 import { FilePlus2, RefreshCw, Send, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -51,8 +52,8 @@ export function RequestDocumentDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant={trigger} size="sm" />}>
-        <FilePlus2 /> Request document
+      <DialogTrigger render={<Button variant={trigger} />}>
+        <FilePlus2 data-icon="inline-start" /> Request document
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <form action={formAction}>
@@ -61,17 +62,17 @@ export function RequestDocumentDialog({
             <DialogTitle>Request a document</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="req-title">Document name</Label>
+            <Field>
+              <FieldLabel htmlFor="req-title">Document name</FieldLabel>
               <Input id="req-title" name="title" placeholder="e.g. Bank Statement (Last 3 Months)" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="req-desc">Instructions</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="req-desc">Instructions</FieldLabel>
               <Textarea id="req-desc" name="description" rows={2} placeholder="Optional" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Requirement</Label>
+            </Field>
+            <div className="grid grid-cols-2 gap-4">
+              <Field>
+                <FieldLabel>Requirement</FieldLabel>
                 <Select
                   name="requirement"
                   defaultValue="required"
@@ -80,7 +81,7 @@ export function RequestDocumentDialog({
                     { value: "optional", label: "Optional" },
                   ]}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full" aria-label="Requirement">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -88,16 +89,16 @@ export function RequestDocumentDialog({
                     <SelectItem value="optional">Optional</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="req-due">Due by</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="req-due">Due by</FieldLabel>
                 <Input id="req-due" name="dueDate" type="date" min={new Date().toISOString().slice(0, 10)} />
-              </div>
+              </Field>
             </div>
             {state?.error ? (
-              <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
-              </Alert>
+              <p role="alert" className="text-sm text-destructive">
+                {state.error}
+              </p>
             ) : null}
           </div>
           <DialogFooter>
@@ -136,14 +137,13 @@ export function ResultUpload({ applicationId }: { applicationId: string }) {
       <Button
         type="button"
         variant="outline"
-        disabled={pending}
         onClick={() => inputRef.current?.click()}
-        className="w-full gap-2"
+        loading={pending}
+        className="w-full"
       >
-        <Upload className="size-4" />
+        {pending ? null : <Upload data-icon="inline-start" />}
         {pending ? "Uploading…" : "Upload visa document"}
       </Button>
-      {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
       <UploadStatus file={chosen} pending={pending} error={state?.error} className="w-full min-w-60" />
     </form>
   );
@@ -170,52 +170,51 @@ export function PartnerControl({
 
   return (
     <div className="space-y-3 text-sm">
-      <dl className="space-y-3">
-        <div>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+        <div className="col-span-2 min-w-0">
           <dt className="text-xs text-muted-foreground">Partner</dt>
-          <dd className="font-medium">{partnerName}</dd>
+          <dd className="mt-0.5 font-medium">{partnerName}</dd>
         </div>
         {partnerRef ? (
           <>
-            <div>
-              <dt className="text-xs text-muted-foreground">Partner reference</dt>
-              <dd className="font-mono text-xs">{partnerRef}</dd>
+            <div className="min-w-0">
+              <dt className="text-xs text-muted-foreground">Reference</dt>
+              <dd className="mt-0.5 truncate font-mono text-xs">{partnerRef}</dd>
             </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Partner status</dt>
-              <dd className="font-medium capitalize">{partnerStatus?.replace(/_/g, " ") ?? "—"}</dd>
+            <div className="min-w-0">
+              <dt className="text-xs text-muted-foreground">Status</dt>
+              <dd className="mt-0.5 font-medium capitalize">{partnerStatus?.replace(/_/g, " ") ?? "—"}</dd>
+            </div>
+            <div className="col-span-2 min-w-0">
+              <dt className="text-xs text-muted-foreground">Last synced</dt>
+              <dd className="mt-0.5 font-medium tabular-nums">
+                {partnerLastSyncedAt ? format(new Date(partnerLastSyncedAt), "d MMM yyyy, HH:mm") : "Never"}
+              </dd>
             </div>
           </>
         ) : null}
       </dl>
       {partnerRef ? (
-        <>
-          <p className="text-xs text-muted-foreground">
-            {partnerLastSyncedAt
-              ? `Last synced ${new Date(partnerLastSyncedAt).toLocaleString()}`
-              : "Not yet synced."}
-          </p>
-          <form action={adminSyncPartnerStatus}>
-            <input type="hidden" name="applicationId" value={applicationId} />
-            <Button type="submit" variant="outline" size="sm" className="w-full gap-1.5">
-              <RefreshCw className="size-3.5" /> Sync status
-            </Button>
-          </form>
-        </>
+        <form action={adminSyncPartnerStatus}>
+          <input type="hidden" name="applicationId" value={applicationId} />
+          <SubmitButton variant="outline" className="w-full" pendingText="Syncing…">
+            <RefreshCw data-icon="inline-start" /> Sync status
+          </SubmitButton>
+        </form>
       ) : !partnerAvailable ? (
         <Alert variant="destructive">
-          <AlertDescription>{partnerName} has no active credentials — configure it under Integrations.</AlertDescription>
+          <AlertDescription>{partnerName} has no active credentials.</AlertDescription>
         </Alert>
       ) : (
-        <form action={submitAction}>
+        <form action={submitAction} className="space-y-2">
           <input type="hidden" name="applicationId" value={applicationId} />
           {state?.error ? (
-            <Alert variant="destructive" className="mb-2">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
+            <p role="alert" className="text-sm text-destructive">
+              {state.error}
+            </p>
           ) : null}
-          <SubmitButton pendingText="Submitting…" className="w-full gap-1.5">
-            <Send className="size-3.5" /> Submit to partner
+          <SubmitButton pendingText="Submitting…" className="w-full">
+            <Send data-icon="inline-start" /> Submit to partner
           </SubmitButton>
         </form>
       )}

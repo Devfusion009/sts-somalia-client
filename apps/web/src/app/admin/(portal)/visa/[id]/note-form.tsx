@@ -16,7 +16,13 @@ export function NoteForm({ applicationId }: { applicationId: string }) {
       </label>
       <Textarea id="internal-note" name="note" rows={3} maxLength={4000} required placeholder="Internal note" />
       <div className="flex items-center justify-between gap-3">
-        {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : <span />}
+        {state?.error ? (
+          <p role="alert" className="text-xs text-destructive">
+            {state.error}
+          </p>
+        ) : (
+          <span />
+        )}
         <SubmitButton size="sm" pendingText="Adding…">
           Add note
         </SubmitButton>

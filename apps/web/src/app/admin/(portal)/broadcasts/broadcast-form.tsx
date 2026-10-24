@@ -1,16 +1,15 @@
 "use client";
 
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Send } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { trpc } from "@/lib/trpc/react";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
-const selectClass =
-  "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
-
+// Native select so the value posts with the form; styled to match Input.
 export function BroadcastForm() {
   const utils = trpc.useUtils();
   const sendBroadcast = trpc.notifications.admin.sendBroadcast.useMutation({
@@ -33,39 +32,45 @@ export function BroadcastForm() {
   }
 
   return (
-    <form action={handleSubmit} className="space-y-4">
-      {sendBroadcast.error ? (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertDescription>{sendBroadcast.error.message}</AlertDescription>
-        </Alert>
-      ) : null}
-      {sendBroadcast.isSuccess ? (
-        <Alert>
-          <CheckCircle2 />
-          <AlertDescription>Broadcast sent.</AlertDescription>
-        </Alert>
-      ) : null}
+    <form action={handleSubmit}>
+      <FieldGroup className="gap-4">
+        {sendBroadcast.error ? (
+          <Alert variant="destructive">
+            <AlertCircle />
+            <AlertDescription>{sendBroadcast.error.message}</AlertDescription>
+          </Alert>
+        ) : null}
+        {sendBroadcast.isSuccess ? (
+          <Alert>
+            <CheckCircle2 />
+            <AlertDescription>Broadcast sent.</AlertDescription>
+          </Alert>
+        ) : null}
 
-      <div className="space-y-1.5">
-        <Label htmlFor="title">Title</Label>
-        <Input id="title" name="title" placeholder="New fare deal to Jeddah" required />
-      </div>
+        <Field>
+          <FieldLabel htmlFor="title">Title</FieldLabel>
+          <Input id="title" name="title" placeholder="New fare deal to Jeddah" required />
+        </Field>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="body">Message (optional)</Label>
-        <Textarea id="body" name="body" rows={4} placeholder="Details agencies should know…" />
-      </div>
+        <Field>
+          <FieldLabel htmlFor="body">Message (optional)</FieldLabel>
+          <Textarea id="body" name="body" rows={4} placeholder="Details agencies should know…" />
+        </Field>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="audience">Audience</Label>
-        <select id="audience" name="audience" defaultValue="all_agency_owners" className={selectClass}>
-          <option value="all_agency_owners">Agency owners &amp; admins only</option>
-          <option value="all_agency_members">Everyone in every agency</option>
-        </select>
-      </div>
+        <Field>
+          <FieldLabel htmlFor="audience">Audience</FieldLabel>
+          <select id="audience" name="audience" defaultValue="all_agency_owners" className={NATIVE_SELECT_CLASS}>
+            <option value="all_agency_owners">Agency owners &amp; admins only</option>
+            <option value="all_agency_members">Everyone in every agency</option>
+          </select>
+        </Field>
 
-      <SubmitButton pendingText="Sending…">Send broadcast</SubmitButton>
+        <div className="flex justify-end">
+          <SubmitButton pendingText="Sending…" className="max-sm:w-full">
+            <Send aria-hidden="true" /> Send broadcast
+          </SubmitButton>
+        </div>
+      </FieldGroup>
     </form>
   );
 }

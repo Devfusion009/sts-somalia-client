@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Loader2, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,9 +23,7 @@ export function NewsletterSignup() {
       if (result.ok) {
         setError(null);
         formRef.current?.reset();
-        toast.success("You're on the list!", {
-          description: "Fare deals and travel updates, straight to your inbox.",
-        });
+        toast.success("Subscribed.");
       } else {
         setError(result.error);
       }
@@ -47,15 +45,15 @@ export function NewsletterSignup() {
           placeholder="you@example.com"
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? "newsletter-error" : undefined}
-          className="h-12 flex-1 border-white/20 bg-white/10 text-sidebar-foreground placeholder:text-sidebar-foreground/50 focus-visible:border-sidebar-ring focus-visible:ring-sidebar-ring/40 dark:bg-white/10"
+          className="h-12 min-w-0 flex-1 border-white/20 bg-white/10 text-sidebar-foreground placeholder:text-sidebar-foreground/50 focus-visible:border-sidebar-ring focus-visible:ring-sidebar-ring/40 dark:bg-white/10"
         />
         <Button
           type="submit"
-          disabled={pending}
+          loading={pending}
           aria-label="Subscribe"
           className="h-12 shrink-0 bg-brand-accent px-5 font-semibold text-brand-accent-foreground hover:bg-brand-accent/90"
         >
-          {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
+          {pending ? null : <Send aria-hidden />}
           <span className="hidden sm:inline">Subscribe</span>
         </Button>
       </div>

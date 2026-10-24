@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
+import { Receipt } from "lucide-react";
 import { getServerTrpc } from "@/lib/trpc/server";
-import {
-  TYPE_ICON,
-  TYPE_LABEL,
-  StatusBadge,
-  formatMoney,
-  formatDate,
-} from "@/modules/bookings/components/booking-shared";
+import { TYPE_ICON, TYPE_LABEL, formatDate } from "@/modules/bookings/components/booking-shared";
 import type { UnifiedBooking } from "@/modules/bookings/types";
-import { Card, CardContent } from "@/components/ui/card";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
 import { UnavailableNotice } from "@/components/portal/unavailable-notice";
+import { money } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Personal Bookings" };
 
@@ -26,60 +25,66 @@ export default async function AgentPersonalBookingsPage() {
   try {
     ({ bookings } = await trpc.bookings.myPersonalBookings.query());
   } catch {
-    return <UnavailableNotice label="Personal Bookings" />;
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Personal bookings" />
+        <UnavailableNotice label="Personal bookings" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Personal Bookings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Bookings made on this account before it became an agent.
-        </p>
-      </div>
+      <PageHeader
+        title="Personal bookings"
+        meta={bookings.length > 0 ? `${bookings.length} booking${bookings.length === 1 ? "" : "s"}` : undefined}
+      />
 
-      {bookings.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-16 text-center">
-            <p className="font-medium">Nothing here</p>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              No bookings were made on this account before it became an agent.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <ul className="divide-y divide-border">
-              {bookings.map((booking) => {
-                const Icon = TYPE_ICON[booking.type];
-                return (
-                  <li key={`${booking.type}-${booking.id}`} className="flex items-center gap-4 px-5 py-4">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
-                      <Icon className="size-4.5" />
+      <Card className="overflow-hidden py-0">
+        {bookings.length === 0 ? (
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Receipt />
+            </EmptyMedia>
+            <EmptyTitle>No personal bookings</EmptyTitle>
+          </Empty>
+        ) : (
+          <ul className="divide-y divide-border">
+            {bookings.map((booking) => {
+              const Icon = TYPE_ICON[booking.type];
+              const date = formatDate(booking.travelDate ?? booking.createdAt);
+              return (
+                <li
+                  key={`${booking.type}-${booking.id}`}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+                  >
+                    <Icon className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{booking.title}</p>
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {TYPE_LABEL[booking.type]}
+                      {date ? <> · {date}</> : null}
+                    </p>
+                  </div>
+                  <div className="ml-13 flex items-center gap-3 sm:ml-0">
+                    <Badge variant={statusBadgeVariant(booking.status)} className="capitalize">
+                      {booking.status.replace(/_/g, " ")}
+                    </Badge>
+                    <span className="min-w-28 text-right text-sm font-medium tabular-nums">
+                      {money(booking.price, booking.currency)}
                     </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{booking.title}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {TYPE_LABEL[booking.type]}
-                        {formatDate(booking.travelDate ?? booking.createdAt) ? (
-                          <> · {formatDate(booking.travelDate ?? booking.createdAt)}</>
-                        ) : null}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <StatusBadge status={booking.status} />
-                      <span className="w-24 text-right font-semibold">
-                        {formatMoney(booking.price, booking.currency)}
-                      </span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
     </div>
   );
 }

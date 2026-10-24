@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
@@ -19,37 +19,45 @@ export function MarkupRequestReview({ requestId, agencyId }: { requestId: string
           <input type="hidden" name="requestId" value={requestId} />
           <input type="hidden" name="agencyId" value={agencyId} />
           <input type="hidden" name="decision" value="approved" />
-          <SubmitButton size="sm" className="gap-1" pendingText="Approving…">
-            <CheckCircle2 className="size-3.5" /> Approve
+          <SubmitButton size="sm" pendingText="Approving…">
+            <Check data-icon="inline-start" /> Approve
           </SubmitButton>
         </form>
         <Button
           type="button"
           size="sm"
           variant={rejecting ? "destructive" : "outline"}
-          className="gap-1"
+          aria-expanded={rejecting}
           onClick={() => setRejecting((v) => !v)}
         >
-          <XCircle className="size-3.5" /> Reject
+          <X data-icon="inline-start" /> Reject
         </Button>
       </div>
-      {approveState?.error ? <p className="text-right text-xs text-destructive">{approveState.error}</p> : null}
+      {approveState?.error ? (
+        <p role="alert" className="text-right text-xs text-destructive">
+          {approveState.error}
+        </p>
+      ) : null}
 
       {rejecting ? (
         <form action={rejectAction} className="space-y-1.5">
           <input type="hidden" name="requestId" value={requestId} />
           <input type="hidden" name="agencyId" value={agencyId} />
           <input type="hidden" name="decision" value="rejected" />
-          <Textarea name="note" placeholder="Reason (shown to the agency)" rows={2} required />
+          <Textarea name="note" placeholder="Reason (shown to the agency)" rows={2} required aria-label="Rejection reason" />
           <div className="flex justify-end gap-1.5">
             <Button type="button" size="sm" variant="ghost" onClick={() => setRejecting(false)}>
               Cancel
             </Button>
             <SubmitButton size="sm" variant="destructive" pendingText="Rejecting…">
-              Confirm rejection
+              Reject
             </SubmitButton>
           </div>
-          {rejectState?.error ? <p className="text-right text-xs text-destructive">{rejectState.error}</p> : null}
+          {rejectState?.error ? (
+            <p role="alert" className="text-right text-xs text-destructive">
+              {rejectState.error}
+            </p>
+          ) : null}
         </form>
       ) : null}
     </div>

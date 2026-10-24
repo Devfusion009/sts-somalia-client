@@ -1,27 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
+import { ChevronRight, Handshake } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import {
   getPartnerAccountsIndex,
   ACCOUNT_SLUG_FROM_TYPE,
   ACCOUNT_TYPE_LABEL,
-  type PartnerAccountStatus,
 } from "@/modules/admin/partner-accounts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { ACCOUNT_STATUS_VARIANT } from "./status";
 
 export const metadata: Metadata = { title: "Partner Accounts" };
-
-const STATUS_STYLES: Record<PartnerAccountStatus, string> = {
-  onboarding: "bg-chart-3/10 text-chart-3",
-  live: "bg-primary/10 text-primary",
-  suspended: "bg-destructive/10 text-destructive",
-  offboarded: "bg-muted text-muted-foreground",
-};
 
 export default async function PartnerAccountsIndexPage() {
   await requirePlatformAdmin();
@@ -29,26 +24,36 @@ export default async function PartnerAccountsIndexPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold">Partner Accounts</h1>
-      </div>
+      <PageHeader
+        title="Partner accounts"
+        status={
+          <Badge variant="neutral" className="tabular-nums">
+            {accounts.length}
+          </Badge>
+        }
+      />
 
       <Card className="overflow-hidden py-0">
         {accounts.length === 0 ? (
-          <CardContent className="py-14 text-center text-sm text-muted-foreground">
-            No partner accounts yet — approve an application to create the first one.
-          </CardContent>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Handshake />
+            </EmptyMedia>
+            <EmptyTitle>No partner accounts</EmptyTitle>
+          </Empty>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Account ID</TableHead>
                 <TableHead>Partner</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Went live</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Account ID</TableHead>
+                <TableHead numeric>Created</TableHead>
+                <TableHead numeric>Went live</TableHead>
+                <TableHead numeric>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -56,27 +61,40 @@ export default async function PartnerAccountsIndexPage() {
                 const href = `/admin/partners/${ACCOUNT_SLUG_FROM_TYPE[account.type]}/${account.id}`;
                 return (
                   <TableRow key={account.id}>
-                    <TableCell>
-                      <Link href={href} className="font-mono text-xs text-primary hover:underline">
-                        {account.id}
+                    <TableCell className="max-w-72">
+                      <Link
+                        href={href}
+                        className="block truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        {account.name}
                       </Link>
                     </TableCell>
-                    <TableCell className="font-medium">{account.name}</TableCell>
-                    <TableCell className="text-sm">{ACCOUNT_TYPE_LABEL[account.type]}</TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {ACCOUNT_TYPE_LABEL[account.type]}
+                    </TableCell>
                     <TableCell>
-                      <Badge className={cn("border-transparent capitalize", STATUS_STYLES[account.status])}>
+                      <Badge variant={ACCOUNT_STATUS_VARIANT[account.status]} className="capitalize">
                         {account.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="max-w-40 truncate font-mono text-xs text-muted-foreground" title={account.id}>
+                      {account.id}
+                    </TableCell>
+                    <TableCell numeric className="whitespace-nowrap text-muted-foreground tabular-nums">
                       {format(new Date(account.created_at), "d MMM yyyy")}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell numeric className="whitespace-nowrap text-muted-foreground tabular-nums">
                       {account.went_live_at ? format(new Date(account.went_live_at), "d MMM yyyy") : "—"}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm" variant="outline" render={<Link href={href} />}>
-                        Manage
+                    <TableCell numeric>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Manage ${account.name}`}
+                        title="Manage"
+                        render={<Link href={href} />}
+                      >
+                        <ChevronRight />
                       </Button>
                     </TableCell>
                   </TableRow>

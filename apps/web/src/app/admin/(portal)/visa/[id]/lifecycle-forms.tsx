@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { CalendarClock, CheckCircle2, CircleX, RotateCcw, Undo2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field as UiField, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -41,7 +41,11 @@ import { FileField } from "@/components/ui/upload";
 type Option = { value: string; label: string };
 
 function ErrorLine({ state }: { state: ActionState }) {
-  return state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null;
+  return state?.error ? (
+    <p role="alert" className="text-sm text-destructive">
+      {state.error}
+    </p>
+  ) : null;
 }
 
 /** Closes a dialog once its action succeeds (derived during render, no effect). */
@@ -55,10 +59,10 @@ function useCloseOnSuccess(state: ActionState, setOpen: (open: boolean) => void)
 
 function Field({ label, htmlFor, children, className }: { label: string; htmlFor?: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("space-y-1.5", className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
+    <UiField className={className}>
+      <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
       {children}
-    </div>
+    </UiField>
   );
 }
 
@@ -102,14 +106,16 @@ function PillChoice({
   options,
   value,
   onChange,
+  label,
 }: {
   name: string;
+  label: string;
   options: Array<Option & { tone?: "good" | "bad" }>;
   value: string;
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2" role="radiogroup">
+    <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={label}>
       <input type="hidden" name={name} value={value} />
       {options.map((o) => {
         const active = o.value === value;
@@ -121,12 +127,12 @@ function PillChoice({
             aria-checked={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              "rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+              "inline-flex h-8 items-center rounded-full border px-3.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:h-10",
               active
                 ? o.tone === "bad"
                   ? "border-destructive bg-destructive text-white"
                   : "border-primary bg-primary text-primary-foreground"
-                : "border-border text-muted-foreground hover:text-foreground"
+                : "border-border bg-card text-muted-foreground hover:text-foreground"
             )}
           >
             {o.label}
@@ -155,12 +161,12 @@ export function BookAppointmentForm({
 }) {
   const [state, formAction] = useActionState(adminBookAppointment, null);
   if (centres.length === 0) {
-    return <p className="text-sm text-muted-foreground">No active application centres.</p>;
+    return <p className="text-sm text-muted-foreground">No active application centres</p>;
   }
   return (
-    <form action={formAction} className="space-y-3">
+    <form action={formAction} className="space-y-4">
       <input type="hidden" name="applicationId" value={applicationId} />
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Centre">
           <SimpleSelect name="centreId" options={centres} />
         </Field>
@@ -188,8 +194,8 @@ export function BookAppointmentForm({
       </label>
       <div className="flex items-center justify-between gap-3">
         <ErrorLine state={state} />
-        <SubmitButton pendingText="Booking…" className="ml-auto gap-1.5">
-          <CalendarClock className="size-4" /> Book
+        <SubmitButton pendingText="Booking…" className="ml-auto">
+          <CalendarClock data-icon="inline-start" /> Book
         </SubmitButton>
       </div>
     </form>
@@ -213,7 +219,7 @@ export function AppointmentOutcome({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size="sm" variant="outline" disabled={!due} title={due ? undefined : "Not yet due"} />}>
-        <CheckCircle2 className="size-3.5" /> Outcome
+        <CheckCircle2 data-icon="inline-start" /> Outcome
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
@@ -229,10 +235,10 @@ export function AppointmentOutcome({
           <ErrorLine state={state} />
           <DialogFooter className="gap-2">
             <SubmitButton name="outcome" value="no_show" variant="outline" pendingText="Saving…">
-              <XCircle className="size-3.5" /> No-show
+              <XCircle data-icon="inline-start" /> No-show
             </SubmitButton>
             <SubmitButton name="outcome" value="attended" pendingText="Saving…">
-              <CheckCircle2 className="size-3.5" /> Attended
+              <CheckCircle2 data-icon="inline-start" /> Attended
             </SubmitButton>
           </DialogFooter>
         </form>
@@ -258,19 +264,19 @@ export function RescheduleAppointment({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size="icon-sm" variant="ghost" aria-label="Reschedule" title="Reschedule" />}>
-        <RotateCcw className="size-3.5" />
+        <RotateCcw />
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Reschedule appointment</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="space-y-3">
+        <form action={formAction} className="space-y-4">
           <input type="hidden" name="applicationId" value={applicationId} />
           <input type="hidden" name="appointmentId" value={appointmentId} />
           <Field label="Centre">
             <SimpleSelect name="centreId" options={centres} defaultValue={centreId} />
           </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="New date and time" htmlFor={`rs-at-${appointmentId}`}>
               <Input id={`rs-at-${appointmentId}`} name="scheduledAt" type="datetime-local" required />
             </Field>
@@ -283,6 +289,9 @@ export function RescheduleAppointment({
           </Field>
           <ErrorLine state={state} />
           <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
             <SubmitButton pendingText="Saving…">Reschedule</SubmitButton>
           </DialogFooter>
         </form>
@@ -298,15 +307,23 @@ export function CancelAppointment({ applicationId, appointmentId }: { applicatio
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        render={<Button size="icon-sm" variant="ghost" className="text-destructive" aria-label="Cancel appointment" title="Cancel appointment" />}
+        render={
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            className="text-destructive hover:text-destructive"
+            aria-label="Cancel appointment"
+            title="Cancel appointment"
+          />
+        }
       >
-        <CircleX className="size-3.5" />
+        <CircleX />
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Cancel appointment?</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="space-y-3">
+        <form action={formAction} className="space-y-4">
           <input type="hidden" name="applicationId" value={applicationId} />
           <input type="hidden" name="appointmentId" value={appointmentId} />
           <Field label="Reason" htmlFor={`ca-${appointmentId}`}>
@@ -314,6 +331,9 @@ export function CancelAppointment({ applicationId, appointmentId }: { applicatio
           </Field>
           <ErrorLine state={state} />
           <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Keep
+            </Button>
             <SubmitButton variant="destructive" pendingText="Cancelling…">
               Cancel appointment
             </SubmitButton>
@@ -339,9 +359,9 @@ export function RecordSubmissionForm({
   const [state, formAction] = useActionState(adminRecordSubmission, null);
   const [centre, setCentre] = useState(centres[0]?.value ?? "");
   return (
-    <form action={formAction} className="space-y-3">
+    <form action={formAction} className="space-y-4">
       <input type="hidden" name="applicationId" value={applicationId} />
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Lodged at">
           <SimpleSelect
             name="centreId"
@@ -392,19 +412,19 @@ export function CentreResponse({ applicationId, accepted }: { applicationId: str
           <input type="hidden" name="applicationId" value={applicationId} />
           <input type="hidden" name="centreStatus" value="accepted" />
           <SubmitButton size="sm" variant="outline" pendingText="Saving…">
-            <CheckCircle2 className="size-3.5" /> Accepted by centre
+            <CheckCircle2 data-icon="inline-start" /> Accepted by centre
           </SubmitButton>
         </form>
       ) : null}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger render={<Button size="sm" variant="ghost" className="text-destructive" />}>
-          <Undo2 className="size-3.5" /> Returned
+        <DialogTrigger render={<Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" />}>
+          <Undo2 data-icon="inline-start" /> Returned
         </DialogTrigger>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Returned for correction</DialogTitle>
           </DialogHeader>
-          <form action={returnAction} className="space-y-3">
+          <form action={returnAction} className="space-y-4">
             <input type="hidden" name="applicationId" value={applicationId} />
             <input type="hidden" name="centreStatus" value="returned_for_correction" />
             <Field label="What needs correcting" htmlFor="ret-reason">
@@ -412,6 +432,9 @@ export function CentreResponse({ applicationId, accepted }: { applicationId: str
             </Field>
             <ErrorLine state={returnState} />
             <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
               <SubmitButton variant="destructive" pendingText="Saving…">
                 Return to ready
               </SubmitButton>
@@ -427,9 +450,9 @@ export function CentreResponse({ applicationId, accepted }: { applicationId: str
 export function ProcessingUpdateForm({ applicationId, current }: { applicationId: string; current: string }) {
   const [state, formAction] = useActionState(adminRecordProcessingUpdate, null);
   return (
-    <form action={formAction} className="space-y-3">
+    <form action={formAction} className="space-y-4">
       <input type="hidden" name="applicationId" value={applicationId} />
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Now">
           <SimpleSelect
             name="stage"
@@ -466,10 +489,10 @@ export function RecordDecisionForm({ applicationId, authority }: { applicationId
   const [state, formAction] = useActionState(adminRecordDecision, null);
   const [outcome, setOutcome] = useState("approved");
   return (
-    <form action={formAction} className="space-y-3">
+    <form action={formAction} className="space-y-4">
       <input type="hidden" name="applicationId" value={applicationId} />
-      <PillChoice name="outcome" options={OUTCOMES} value={outcome} onChange={setOutcome} />
-      <div className="grid gap-3 sm:grid-cols-2">
+      <PillChoice name="outcome" label="Outcome" options={OUTCOMES} value={outcome} onChange={setOutcome} />
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Issuing authority" htmlFor="dec-auth">
           <Input id="dec-auth" name="authority" defaultValue={authority} required />
         </Field>
@@ -516,14 +539,14 @@ export function CorrectDecisionDialog({
         <DialogHeader>
           <DialogTitle>Correct the recorded decision</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="space-y-3">
+        <form action={formAction} className="space-y-4">
           <input type="hidden" name="applicationId" value={applicationId} />
           <input type="hidden" name="decisionId" value={decisionId} />
-          <PillChoice name="outcome" options={OUTCOMES} value={outcome} onChange={setOutcome} />
+          <PillChoice name="outcome" label="Outcome" options={OUTCOMES} value={outcome} onChange={setOutcome} />
           <Field label="Reason for correction" htmlFor="cor-reason">
             <Textarea id="cor-reason" name="reason" rows={3} minLength={10} required />
           </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Authority reference" htmlFor="cor-ref">
               <Input id="cor-ref" name="reference" placeholder="Unchanged" />
             </Field>
@@ -536,6 +559,9 @@ export function CorrectDecisionDialog({
           </Field>
           <ErrorLine state={state} />
           <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
             <SubmitButton pendingText="Saving…">Record correction</SubmitButton>
           </DialogFooter>
         </form>
@@ -568,10 +594,10 @@ export function PassportMoveForm({
   const collecting = to === "collected";
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form action={formAction} className="space-y-4">
       <input type="hidden" name="applicationId" value={applicationId} />
       <input type="hidden" name="passportId" value={passportId} />
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Move to">
           <SimpleSelect
             name="toStatus"
@@ -587,15 +613,16 @@ export function PassportMoveForm({
         ) : null}
       </div>
       {collecting ? (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <PillChoice
             name="deliveryMode"
+            label="Return mode"
             options={collectModes.map((m) => ({ value: m, label: DELIVERY_MODE_LABELS[m] ?? m }))}
             value={mode}
             onChange={setMode}
           />
           {mode === "third_party" ? (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Collected by" htmlFor={`pp-col-${passportId}`}>
                 <Input id={`pp-col-${passportId}`} name="collectorName" required />
               </Field>

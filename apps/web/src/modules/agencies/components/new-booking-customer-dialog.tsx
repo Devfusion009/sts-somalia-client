@@ -2,18 +2,18 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Plus, UserRoundPlus } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/submit-button";
 import { PhoneField } from "@/modules/partner-applications/components/phone-field";
 import { createBookingCustomer } from "@/modules/agencies/booking-context-actions";
@@ -38,47 +38,44 @@ export function NewBookingCustomerDialog({ redirectTo }: { redirectTo?: string }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" className="gap-1.5" />}>
-        <Plus className="size-4" /> New customer
+      <DialogTrigger render={<Button variant="outline" />}>
+        <Plus data-icon="inline-start" aria-hidden="true" /> New customer
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <UserRoundPlus className="size-4 text-primary" /> New customer
-          </DialogTitle>
+          <DialogTitle>New customer</DialogTitle>
         </DialogHeader>
         <form
           action={(formData) => {
             submitted.current = true;
             formAction(formData);
           }}
-          className="space-y-4"
+          className="space-y-5"
         >
-          {state?.error ? (
-            <Alert variant="destructive">
-              <AlertCircle />
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          ) : null}
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="fullName">
+                Full name <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input id="fullName" name="fullName" required autoFocus autoComplete="off" />
+            </Field>
+            <Field>
+              <FieldLabel>Phone</FieldLabel>
+              <PhoneField name="phone" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="email">Email</FieldLabel>
+              <Input id="email" name="email" type="email" placeholder="Links to their STS account" />
+            </Field>
+            <FieldError>{state?.error}</FieldError>
+          </FieldGroup>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="fullName">
-              Full name <span className="text-destructive">*</span>
-            </Label>
-            <Input id="fullName" name="fullName" required autoFocus />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Phone</Label>
-            <PhoneField name="phone" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" placeholder="Links to their STS account" />
-          </div>
-
-          <SubmitButton className="w-full" pendingText="Saving…">
-            Save and continue
-          </SubmitButton>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <SubmitButton pendingText="Saving…">Save and continue</SubmitButton>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

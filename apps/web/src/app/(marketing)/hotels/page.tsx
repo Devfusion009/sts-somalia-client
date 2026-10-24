@@ -3,15 +3,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { Suspense } from "react";
 import { BadgeCheck, Building2, Headset, ShieldCheck } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { searchHotels } from "@/modules/hotels/queries";
 import { HotelListRow } from "@/modules/hotels/components/hotel-list-row";
 import { amenityLabel } from "@/modules/hotels/images";
 import { HotelSearchFilters } from "./hotel-search-filters";
-import { HotelFilters } from "./hotel-filters";
+import { HotelFilters, HotelFiltersSheet } from "./hotel-filters";
 import { priceBandOf } from "@/modules/hotels/price-bands";
 import { HotelRail, type RailProperty } from "@/components/marketing/hotel-rail";
-import { HotelsFaq, GuestVoices, ExploreMore, MapCard, HOTEL_FAQS } from "@/components/marketing/hotels-extras";
+import { HotelsFaq, GuestVoices, ExploreMore, HOTEL_FAQS } from "@/components/marketing/hotels-extras";
 import { jsonLdScript } from "@/lib/json-ld";
 import type { HotelCardData } from "@/modules/hotels/components/hotel-card";
 
@@ -30,7 +31,7 @@ const faqJsonLd = (faqs: Array<{ question: string; answer: string }>) => ({
 const TRUST_POINTS = [
   { icon: BadgeCheck, text: "Verified local & international properties" },
   { icon: ShieldCheck, text: "Secure payment — card, mobile money, or bank" },
-  { icon: Headset, text: "24/7 support before, during, and after your stay" },
+  { icon: Headset, text: "Support in Somali, English and Arabic" },
 ];
 
 /* Curated rails shown alongside real inventory. Prices are PLACEHOLDERS for
@@ -121,7 +122,8 @@ export default async function HotelsPage({
   if (guests) bookingQuery.set("guests", guests);
   const bookingSuffix = bookingQuery.toString() ? `?${bookingQuery.toString()}` : "";
 
-  const heading = city ? `${city} — ${hotels.length} propert${hotels.length === 1 ? "y" : "ies"}` : `${hotels.length} propert${hotels.length === 1 ? "y" : "ies"} available`;
+  // The hero h1 already names the city, so the results heading is just the count.
+  const heading = `${hotels.length} propert${hotels.length === 1 ? "y" : "ies"}`;
 
   return (
     <div>
@@ -144,24 +146,20 @@ export default async function HotelsPage({
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/55 to-black/40" aria-hidden />
 
-        <div className="relative z-10 mx-auto max-w-7xl px-4 pt-10 pb-12 sm:px-6 lg:px-8 lg:pt-14">
-          <Badge className="border-white/25 bg-white/15 text-white backdrop-blur-sm">Hotel booking</Badge>
-          <h1 className="mt-3 font-heading text-2xl font-bold tracking-tight text-white drop-shadow-lg sm:text-3xl lg:text-4xl">
-            Search hotels {city ? `in ${city}` : "across Somalia and beyond"}
+        <div className="relative z-10 mx-auto max-w-7xl px-4 pt-10 pb-10 sm:px-6 lg:px-8 lg:pt-14 lg:pb-12">
+          <h1 className="font-heading text-3xl font-bold tracking-tight text-balance text-white drop-shadow-lg sm:text-4xl">
+            {city ? `Hotels in ${city}` : "Hotels across Somalia and beyond"}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm text-white/85 drop-shadow sm:text-base">
-            Enter your dates to see the latest prices and availability from our verified partner properties.
-          </p>
 
           {/* Accent-outlined search bar, as in the reference */}
-          <div className="mt-6 rounded-xl border-[3px] border-brand-accent">
+          <div className="mt-6 rounded-xl border-2 border-brand-accent">
             <HotelSearchFilters initial={{ city, checkIn, checkOut, guests }} />
           </div>
 
           <ul className="mt-4 flex flex-wrap gap-x-7 gap-y-2">
             {TRUST_POINTS.map((point) => (
               <li key={point.text} className="flex items-center gap-2 text-sm font-medium text-white/85 drop-shadow">
-                <point.icon className="size-4 text-teal-300" /> {point.text}
+                <point.icon className="size-4 shrink-0 text-teal-300" aria-hidden /> {point.text}
               </li>
             ))}
           </ul>
@@ -171,19 +169,27 @@ export default async function HotelsPage({
       {/* Results — filter sidebar + list */}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid gap-6 lg:grid-cols-[268px_1fr]">
-          <aside className="space-y-4 lg:sticky lg:top-44 lg:self-start">
-            <MapCard city={city} />
+          <aside aria-label="Filters" className="hidden lg:sticky lg:top-44 lg:block lg:self-start">
             <Suspense fallback={<div className="h-96 rounded-xl border border-border bg-card" />}>
               <HotelFilters amenities={facetAmenities} counts={{ stars: starCounts, price: priceCounts }} />
             </Suspense>
           </aside>
 
-          <main>
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="font-heading text-xl font-bold">{heading}</h2>
-              {hotels.length !== all.length ? (
-                <p className="text-sm text-muted-foreground">Filtered from {all.length}</p>
-              ) : null}
+          {/* A <section>, not <main>: the marketing layout already owns the
+              page's one <main> landmark. */}
+          <section aria-labelledby="hotel-results-heading" className="min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h2 id="hotel-results-heading" className="font-heading text-xl font-bold">
+                  {heading}
+                </h2>
+                {hotels.length !== all.length ? (
+                  <p className="text-sm text-muted-foreground tabular-nums">Filtered from {all.length}</p>
+                ) : null}
+              </div>
+              <Suspense fallback={null}>
+                <HotelFiltersSheet amenities={facetAmenities} counts={{ stars: starCounts, price: priceCounts }} />
+              </Suspense>
             </div>
 
             {hotels.length > 0 ? (
@@ -193,21 +199,21 @@ export default async function HotelsPage({
                 ))}
               </div>
             ) : (
-              <div className="mt-10 flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
-                <span className="flex size-12 items-center justify-center rounded-full bg-secondary text-primary">
-                  <Building2 className="size-5" />
-                </span>
-                <p className="text-lg font-medium">No properties match those filters</p>
-                <p className="max-w-sm text-sm text-muted-foreground">
-                  Try clearing a filter, or{" "}
-                  <Link href="/hotels" className="text-primary hover:underline">
-                    browse every property
-                  </Link>
-                  .
-                </p>
-              </div>
+              <Empty className="mt-6 border border-border bg-card">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Building2 />
+                  </EmptyMedia>
+                  <EmptyTitle className="text-base">No properties match those filters</EmptyTitle>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button variant="outline" render={<Link href="/hotels" />}>
+                    Browse all hotels
+                  </Button>
+                </EmptyContent>
+              </Empty>
             )}
-          </main>
+          </section>
         </div>
       </div>
 

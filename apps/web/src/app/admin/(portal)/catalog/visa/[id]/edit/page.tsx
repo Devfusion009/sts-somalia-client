@@ -28,7 +28,7 @@ export default async function EditVisaTypePage({ params }: { params: Promise<{ i
   return (
     <div className="space-y-6">
       <VisaTypeEditor visaType={visaType} centres={centres} selectedCentreIds={selectedCentreIds} />
-      <Card>
+      <Card className="mx-auto max-w-4xl">
         <CardHeader>
           <CardTitle className="text-base">Nationality overrides</CardTitle>
         </CardHeader>

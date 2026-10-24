@@ -1,10 +1,15 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { BedDouble, Building2, CalendarCheck, ChevronLeft, ChevronRight, LogIn, LogOut, Wrench } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
 import { getFrontDeskBoard, getFrontDeskDayStats } from "@/modules/hotels/front-desk-queries";
 import { FrontDeskGrid } from "@/modules/hotels/components/front-desk-grid";
+import { PageHeader } from "@/components/ui/page-header";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Front Desk" };
 
@@ -50,80 +55,67 @@ export default async function ManagerFrontDeskPage({
     year: "numeric",
     timeZone: "UTC",
   });
-  const tiles = [
-    { label: "Arrivals", value: stats.arrivals, icon: LogIn, tone: "bg-primary/10 text-primary" },
-    { label: "Departures", value: stats.departures, icon: LogOut, tone: "bg-destructive/10 text-destructive" },
-    { label: "Occupied", value: stats.occupied, icon: BedDouble, tone: "bg-chart-4/10 text-chart-4" },
-    { label: "Booked rooms", value: stats.totalBooked, icon: CalendarCheck, tone: "bg-chart-2/10 text-chart-2" },
-    { label: "Total rooms", value: stats.totalRooms, icon: Building2, tone: "bg-secondary text-foreground" },
-    { label: "Out of order", value: stats.outOfOrder, icon: Wrench, tone: "bg-muted text-muted-foreground" },
-  ];
+  const base = `/manager/${hotelId}/front-desk`;
+  const segment = "h-7 rounded-md px-2.5 text-xs font-medium tabular-nums text-muted-foreground transition-colors outline-none hover:bg-background/60 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:h-9 inline-flex items-center";
+  const segmentOn = "bg-background text-foreground shadow-xs hover:bg-background";
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">Front Desk</h1>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {board.unassignedCount > 0 ? (
-            <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-brand-gold/15 px-3 text-xs font-semibold text-amber-700 dark:text-brand-gold">
-              <span className="size-1.5 rounded-full bg-brand-gold" />
+    <div className="space-y-6">
+      <PageHeader
+        title="Front Desk"
+        status={
+          board.unassignedCount > 0 ? (
+            <Badge variant="warning" className="tabular-nums">
               {board.unassignedCount} unassigned
-            </span>
-          ) : null}
-
-          <div className="inline-flex items-center rounded-full border border-border bg-card p-0.5 shadow-sm">
-            <Link
-              href={prevHref}
-              aria-label="Previous"
-              className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
-              <ChevronLeft className="size-4" />
-            </Link>
-            <Link
-              href={`/manager/${hotelId}/front-desk?date=${todayIso()}&days=${days}`}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${isToday ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
-            >
-              {isToday ? `Today · ${shortDate}` : shortDate}
-            </Link>
-            <Link
-              href={nextHref}
-              aria-label="Next"
-              className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
-              <ChevronRight className="size-4" />
-            </Link>
-          </div>
-
-          <div className="inline-flex items-center rounded-full border border-border bg-card p-0.5 shadow-sm">
-            {([7, 14] as const).map((d) => (
-              <Link
-                key={d}
-                href={`/manager/${hotelId}/front-desk?date=${startDate}&days=${d}`}
-                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${days === d ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
+            </Badge>
+          ) : null
+        }
+        actions={
+          <>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" aria-label={`Previous ${days} days`} render={<Link href={prevHref} />}>
+                <ChevronLeft aria-hidden="true" />
+              </Button>
+              <Button
+                variant={isToday ? "secondary" : "outline"}
+                className="tabular-nums"
+                aria-current={isToday ? "date" : undefined}
+                render={<Link href={`${base}?date=${todayIso()}&days=${days}`} />}
               >
-                {d} days
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <dl className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {tiles.map((s) => (
-          <div key={s.label} className="flex items-center gap-3 rounded-2xl bg-card p-3.5 ring-1 ring-foreground/10">
-            <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${s.tone}`}>
-              <s.icon className="size-[18px]" />
-            </span>
-            <div className="min-w-0">
-              <dd className="font-heading text-2xl leading-none font-bold tabular-nums">{s.value}</dd>
-              <dt className="mt-1 truncate text-xs text-muted-foreground">{s.label}</dt>
+                {isToday ? `Today · ${shortDate}` : shortDate}
+              </Button>
+              <Button variant="outline" size="icon" aria-label={`Next ${days} days`} render={<Link href={nextHref} />}>
+                <ChevronRight aria-hidden="true" />
+              </Button>
             </div>
-          </div>
-        ))}
-      </dl>
+            <div role="group" aria-label="Days shown" className="flex items-center gap-0.5 rounded-lg bg-muted p-[3px]">
+              {([7, 14] as const).map((d) => (
+                <Link
+                  key={d}
+                  href={`${base}?date=${startDate}&days=${d}`}
+                  aria-current={days === d ? "true" : undefined}
+                  className={cn(segment, days === d && segmentOn)}
+                >
+                  {d} days
+                </Link>
+              ))}
+            </div>
+          </>
+        }
+      />
+
+      <StatRail className="sm:grid-cols-3 lg:grid-cols-6">
+        <StatRailItem label="Arrivals" value={stats.arrivals} />
+        <StatRailItem label="Departures" value={stats.departures} />
+        <StatRailItem label="Occupied" value={stats.occupied} />
+        <StatRailItem label="Booked rooms" value={stats.totalBooked} />
+        <StatRailItem label="Total rooms" value={stats.totalRooms} />
+        <StatRailItem
+          label="Out of order"
+          value={stats.outOfOrder}
+          tone={stats.outOfOrder > 0 ? "destructive" : undefined}
+        />
+      </StatRail>
 
       <FrontDeskGrid
         hotelId={hotelId}

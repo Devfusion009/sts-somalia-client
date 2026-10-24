@@ -3,9 +3,9 @@
 import { useActionState, useState } from "react";
 import { toast } from "sonner";
 import { Ban } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
 import { blockVenueDates, quoteHallBookingPrice } from "@/modules/events/venue-manager-actions";
 
@@ -32,23 +32,32 @@ export function DeskPriceForm({
       <input type="hidden" name="venueId" value={venueId} />
       <input type="hidden" name="bookingId" value={bookingId} />
       <div className="flex items-center gap-1.5">
-        <span className="text-xs text-muted-foreground">{currency}</span>
-        <Input
-          name="price"
-          type="number"
-          min={0}
-          step="0.01"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className="h-8 w-28"
-          placeholder="Price"
-          aria-label="Price"
-        />
-        <SubmitButton size="sm" variant="outline" pendingText="…" disabled={!(Number(value) > 0) || Number(value) === price}>
+        <InputGroup className="w-36">
+          <InputGroupAddon>
+            <InputGroupText>{currency}</InputGroupText>
+          </InputGroupAddon>
+          <InputGroupInput
+            name="price"
+            type="number"
+            min={0}
+            step="0.01"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="text-right tabular-nums"
+            placeholder="Price"
+            aria-label={`Price (${currency})`}
+            aria-invalid={state?.error ? true : undefined}
+          />
+        </InputGroup>
+        <SubmitButton variant="outline" pendingText="Saving…" disabled={!(Number(value) > 0) || Number(value) === price}>
           Save
         </SubmitButton>
       </div>
-      {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
+      {state?.error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {state.error}
+        </p>
+      ) : null}
     </form>
   );
 }
@@ -73,8 +82,8 @@ export function BlockDatesForm({ venueId, today }: { venueId: string; today: str
     <form action={formAction} className="space-y-3">
       <input type="hidden" name="venueId" value={venueId} />
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="block-start">From</Label>
+        <Field>
+          <FieldLabel htmlFor="block-start">From</FieldLabel>
           <Input
             id="block-start"
             name="dateStart"
@@ -84,9 +93,9 @@ export function BlockDatesForm({ venueId, today }: { venueId: string; today: str
             onChange={(e) => setStart(e.target.value)}
             required
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="block-end">To</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="block-end">To</FieldLabel>
           <Input
             id="block-end"
             name="dateEnd"
@@ -95,10 +104,10 @@ export function BlockDatesForm({ venueId, today }: { venueId: string; today: str
             value={end}
             onChange={(e) => setEnd(e.target.value)}
           />
-        </div>
+        </Field>
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="block-reason">Reason</Label>
+      <Field>
+        <FieldLabel htmlFor="block-reason">Reason</FieldLabel>
         <Input
           id="block-reason"
           name="reason"
@@ -107,11 +116,15 @@ export function BlockDatesForm({ venueId, today }: { venueId: string; today: str
           value={reason}
           onChange={(e) => setReason(e.target.value)}
         />
-      </div>
-      {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      <Button type="submit" variant="outline" className="w-full gap-1.5">
-        <Ban className="size-3.5" /> Block dates
-      </Button>
+      </Field>
+      {state?.error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {state.error}
+        </p>
+      ) : null}
+      <SubmitButton variant="outline" className="w-full" pendingText="Blocking…">
+        <Ban aria-hidden="true" /> Block dates
+      </SubmitButton>
     </form>
   );
 }

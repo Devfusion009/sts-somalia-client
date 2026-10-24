@@ -3,15 +3,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import {
-  ExternalLink,
-  FileText,
-  CheckCircle2,
-  Circle,
-  ChevronRight,
+  Banknote,
   BedDouble,
+  CheckCircle2,
+  ChevronRight,
+  Circle,
+  FileStack,
+  FileText,
+  History,
   Landmark,
-  Link2,
+  PartyPopper,
   ShieldAlert,
+  UserRound,
+  Users,
 } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -20,16 +24,21 @@ import {
   evaluateAutoLive,
   ACCOUNT_TYPE_FROM_SLUG,
   ACCOUNT_TYPE_LABEL,
-  type PartnerAccountStatus,
 } from "@/modules/admin/partner-accounts";
 import {
   BusinessDetailsCard,
   AffiliateDetailCards,
+  DocFileIcon,
   type Details,
 } from "@/modules/partner-applications/components/detail-cards";
-import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
+import { money } from "@/lib/money";
+import { ACCOUNT_STATUS_VARIANT } from "../../status";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -49,23 +58,18 @@ import {
 
 export const metadata: Metadata = { title: "Partner Account" };
 
-const ACCOUNT_STATUS_STYLES: Record<PartnerAccountStatus, string> = {
-  onboarding: "bg-chart-3/10 text-chart-3",
-  live: "bg-primary/10 text-primary",
-  suspended: "bg-destructive/10 text-destructive",
-  offboarded: "bg-muted text-muted-foreground",
-};
-
-function money(amount: number, currency = "USD") {
-  return `${currency} ${amount.toFixed(2)}`;
+function DetailItem({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={cn("mt-0.5 text-sm font-medium break-words", mono && "font-mono text-xs")}>{value}</dd>
+    </div>
+  );
 }
 
 function KeyDate({ label, value }: { label: string; value: string | null }) {
   return (
-    <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-sm font-medium">{value ? format(new Date(value), "d MMM yyyy, HH:mm") : "—"}</dd>
-    </div>
+    <DetailItem label={label} value={value ? format(new Date(value), "d MMM yyyy, HH:mm") : "—"} />
   );
 }
 
@@ -107,74 +111,96 @@ export default async function PartnerAccountConsolePage({
 
   const typeSpecificTabLabel =
     type === "agency" ? "Portfolio" : type === "hotel_partner" ? "Properties" : type === "venue_partner" ? "Venues" : "Affiliate";
+  const verifiedDocs = signedDocs.filter((d) => d.review?.status === "verified").length;
+  const rejectedDocs = signedDocs.filter((d) => d.review?.status === "rejected").length;
+  const activeMembers = members.filter((m) => m.status === "active").length;
+  const reviewerRow = application.reviewer as { full_name?: string | null; email?: string } | null;
+  const meta = [entity.contactEmail, entity.contactPhone].filter(Boolean).join(" · ");
 
   return (
     <div className="space-y-6">
-      <BackLink href="/admin/partners" label="All partner accounts" />
-
-      {/* Header — always present regardless of tab */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-heading text-2xl font-semibold">{entity.name}</h1>
-            <Badge variant="outline">{ACCOUNT_TYPE_LABEL[type]}</Badge>
-            <Badge className={cn("border-transparent capitalize", ACCOUNT_STATUS_STYLES[account.status])}>
-              {account.status}
-            </Badge>
+      <div className="space-y-5">
+        <BackLink href="/admin/partners" label="All partner accounts" />
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{entity.name}</h1>
+              <Badge variant={ACCOUNT_STATUS_VARIANT[account.status]} className="capitalize">
+                {account.status}
+              </Badge>
+            </div>
+            <p className="text-sm break-words text-muted-foreground">
+              {ACCOUNT_TYPE_LABEL[type]}
+              {meta ? ` · ${meta}` : ""}
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            <span className="font-mono">{account.id}</span>
-            {entity.contactEmail ? ` · ${entity.contactEmail}` : ""}
-            {entity.contactPhone ? ` · ${entity.contactPhone}` : ""}
-          </p>
-          <Link href={applicationHref} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-            <FileText className="size-3" /> View original application
-          </Link>
-        </div>
-        <StatusActions accountId={account.id} status={account.status} />
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Open original application"
+              title="Original application"
+              render={<Link href={applicationHref} />}
+            >
+              <FileText />
+            </Button>
+            <StatusActions accountId={account.id} status={account.status} />
+          </div>
+        </header>
+
+        <StatRail>
+          <StatRailItem
+            label="Onboarding"
+            value={`${doneCount}/${checklist.length}`}
+            tone={doneCount === checklist.length ? "primary" : undefined}
+          />
+          <StatRailItem
+            label="Documents verified"
+            value={signedDocs.length === 0 ? "—" : `${verifiedDocs}/${signedDocs.length}`}
+            tone={rejectedDocs > 0 ? "destructive" : undefined}
+          />
+          <StatRailItem label="Team" value={type === "affiliate" ? "—" : activeMembers} />
+          <StatRailItem
+            label="Went live"
+            value={account.went_live_at ? format(new Date(account.went_live_at), "d MMM yyyy") : "—"}
+          />
+        </StatRail>
       </div>
 
       <Tabs key={initialTab} defaultValue={initialTab}>
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
-          <TabsTrigger value="portfolio">{typeSpecificTabLabel}</TabsTrigger>
-          <TabsTrigger value="commercial">Commercial</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="activity">Activity Log</TabsTrigger>
-          <TabsTrigger value="notes">Internal Notes</TabsTrigger>
-        </TabsList>
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+            <TabsTrigger value="portfolio">{typeSpecificTabLabel}</TabsTrigger>
+            <TabsTrigger value="commercial">Commercial</TabsTrigger>
+            <TabsTrigger value="documents">
+              Documents
+              {signedDocs.length - verifiedDocs > 0 ? (
+                <Badge variant="warning" className="ml-1 tabular-nums">
+                  {signedDocs.length - verifiedDocs}
+                </Badge>
+              ) : null}
+            </TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+            <TabsTrigger value="notes">Notes</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ------------------------------- Overview ------------------------------ */}
         <TabsContent value="overview" className="mt-4 space-y-6">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="grid items-start gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Contact</CardTitle>
               </CardHeader>
               <CardContent>
                 <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Primary contact</dt>
-                    <dd className="text-sm font-medium">{application.applicant?.full_name ?? "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Email</dt>
-                    <dd className="text-sm font-medium break-words">{application.applicant?.email ?? "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Phone</dt>
-                    <dd className="text-sm font-medium">{application.applicant?.phone ?? "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Approved by</dt>
-                    <dd className="text-sm font-medium">
-                      {(application.reviewer as { full_name?: string | null; email?: string } | null)?.full_name ??
-                        (application.reviewer as { email?: string } | null)?.email ??
-                        "—"}
-                    </dd>
-                  </div>
+                  <DetailItem label="Primary contact" value={application.applicant?.full_name ?? "—"} />
+                  <DetailItem label="Email" value={application.applicant?.email ?? "—"} />
+                  <DetailItem label="Phone" value={application.applicant?.phone ?? "—"} />
+                  <DetailItem label="Approved by" value={reviewerRow?.full_name ?? reviewerRow?.email ?? "—"} />
                 </dl>
               </CardContent>
             </Card>
@@ -189,6 +215,7 @@ export default async function PartnerAccountConsolePage({
                   <KeyDate label="Went live" value={account.went_live_at} />
                   {account.suspended_at ? <KeyDate label="Last suspended" value={account.suspended_at} /> : null}
                   {account.offboarded_at ? <KeyDate label="Offboarded" value={account.offboarded_at} /> : null}
+                  <DetailItem label="Account ID" value={account.id} mono />
                 </dl>
               </CardContent>
             </Card>
@@ -202,49 +229,55 @@ export default async function PartnerAccountConsolePage({
         </TabsContent>
 
         {/* ------------------------------ Onboarding ----------------------------- */}
-        <TabsContent value="onboarding" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <CardTitle className="text-base">
-                  Onboarding — {doneCount}/{checklist.length} complete
-                </CardTitle>
-                {account.status === "onboarding" ? <SendReminderButton accountId={account.id} /> : null}
-              </div>
-              <Progress value={progressPct} className="mt-2" />
+        <TabsContent value="onboarding" className="mt-4">
+          <Card className="gap-0">
+            <CardHeader className="border-b border-border pb-4">
+              <CardTitle className="flex items-center gap-2 text-base">
+                Onboarding
+                <Badge variant={doneCount === checklist.length ? "success" : "neutral"} className="tabular-nums">
+                  {doneCount}/{checklist.length}
+                </Badge>
+              </CardTitle>
+              {account.status === "onboarding" ? (
+                <CardAction>
+                  <SendReminderButton accountId={account.id} />
+                </CardAction>
+              ) : null}
+              <Progress value={progressPct} className="col-span-full mt-3" aria-label="Onboarding progress" />
             </CardHeader>
-            <CardContent className="space-y-2">
-              {checklist.map((item) => {
-                const body = (
-                  <>
-                    {item.done ? (
-                      <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
-                    ) : (
-                      <Circle className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className={cn("text-sm font-medium", item.done && "text-muted-foreground line-through")}>
+            <CardContent className="px-0">
+              <ul className="divide-y divide-border">
+                {checklist.map((item) => {
+                  const body = (
+                    <>
+                      {item.done ? (
+                        <CheckCircle2 aria-hidden="true" className="size-5 shrink-0 text-primary" />
+                      ) : (
+                        <Circle aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
+                      )}
+                      <span className={cn("min-w-0 flex-1 text-sm font-medium", item.done && "text-muted-foreground")}>
                         {item.label}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{item.description}</p>
-                    </div>
-                    {item.tab ? <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" /> : null}
-                  </>
-                );
-                return item.tab ? (
-                  <Link
-                    key={item.key}
-                    href={`?tab=${item.tab}`}
-                    className="flex items-start gap-3 rounded-lg border border-border p-3 hover:bg-muted/50"
-                  >
-                    {body}
-                  </Link>
-                ) : (
-                  <div key={item.key} className="flex items-start gap-3 rounded-lg border border-border p-3">
-                    {body}
-                  </div>
-                );
-              })}
+                        <span className="sr-only">{item.done ? " (done)" : " (open)"}</span>
+                      </span>
+                      {item.tab ? <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /> : null}
+                    </>
+                  );
+                  return (
+                    <li key={item.key}>
+                      {item.tab ? (
+                        <Link
+                          href={`?tab=${item.tab}`}
+                          className="flex items-center gap-3 px-4 py-3 transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/50 sm:px-6"
+                        >
+                          {body}
+                        </Link>
+                      ) : (
+                        <div className="flex items-center gap-3 px-4 py-3 sm:px-6">{body}</div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             </CardContent>
           </Card>
         </TabsContent>
@@ -254,338 +287,325 @@ export default async function PartnerAccountConsolePage({
           {type === "hotel_partner" ? (
             detail.hotels.length === 0 ? (
               <Card>
-                <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                  No properties listed yet — the partner creates these in their own portal.
-                </CardContent>
+                <Empty>
+                  <EmptyMedia variant="icon">
+                    <BedDouble />
+                  </EmptyMedia>
+                  <EmptyTitle>No properties</EmptyTitle>
+                </Empty>
               </Card>
             ) : (
               <>
                 {!docsVerified && detail.hotels.some((h) => h.status === "published") ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                    <ShieldAlert className="size-4 shrink-0" />
-                    This partner has a published (live, bookable) property, but KYC documents
-                    aren&apos;t all verified yet — check the Documents tab.
-                  </div>
+                  <Alert variant="destructive">
+                    <ShieldAlert />
+                    <AlertDescription>Published property with unverified KYC documents.</AlertDescription>
+                  </Alert>
                 ) : null}
                 {detail.hotels.map((hotel) => (
-                <Card key={hotel.id} className="overflow-hidden py-0">
-                  <CardHeader className="border-b border-border !py-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <BedDouble className="size-4" /> {hotel.name}
-                        <span className="text-xs font-normal text-muted-foreground">
+                  <Card key={hotel.id} className="gap-0 overflow-hidden py-0">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-6">
+                      <div className="min-w-0">
+                        <h3 className="truncate font-heading text-base font-semibold">{hotel.name}</h3>
+                        <p className="text-xs text-muted-foreground">
                           {hotel.city}
                           {hotel.star_rating ? ` · ${hotel.star_rating}★` : ""}
-                        </span>
-                      </CardTitle>
+                        </p>
+                      </div>
                       <ListingStatusControl kind="hotel" id={hotel.id} currentStatus={hotel.status} />
                     </div>
-                  </CardHeader>
-                  {hotel.rooms.length === 0 ? (
-                    <CardContent className="py-6 text-center text-sm text-muted-foreground">
-                      No room types configured yet.
-                    </CardContent>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Room type</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Rate / night</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {hotel.rooms.map((room) => (
-                          <TableRow key={room.id}>
-                            <TableCell className="font-medium">{room.name}</TableCell>
-                            <TableCell>
-                              <ListingStatusControl kind="room" id={room.id} currentStatus={room.status} />
-                            </TableCell>
-                            <TableCell className="text-right">{money(room.base_price, room.currency)}</TableCell>
+                    {hotel.rooms.length === 0 ? (
+                      <Empty>
+                        <EmptyMedia variant="icon">
+                          <BedDouble />
+                        </EmptyMedia>
+                        <EmptyTitle>No room types</EmptyTitle>
+                      </Empty>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Room type</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead numeric>Rate / night</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </Card>
+                        </TableHeader>
+                        <TableBody>
+                          {hotel.rooms.map((room) => (
+                            <TableRow key={room.id}>
+                              <TableCell className="font-medium">{room.name}</TableCell>
+                              <TableCell>
+                                <ListingStatusControl kind="room" id={room.id} currentStatus={room.status} />
+                              </TableCell>
+                              <TableCell numeric className="tabular-nums">
+                                {money(room.base_price, room.currency)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </Card>
                 ))}
               </>
             )
           ) : type === "venue_partner" ? (
-            detail.venues.length === 0 ? (
-              <Card>
-                <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                  No venues listed yet — the partner creates these in their own Venue Portal.
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="overflow-hidden py-0">
+            <Card className="overflow-hidden py-0">
+              {detail.venues.length === 0 ? (
+                <Empty>
+                  <EmptyMedia variant="icon">
+                    <PartyPopper />
+                  </EmptyMedia>
+                  <EmptyTitle>No venues</EmptyTitle>
+                </Empty>
+              ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Venue</TableHead>
                       <TableHead>City</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Base price</TableHead>
+                      <TableHead numeric>Base price</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {detail.venues.map((venue) => (
                       <TableRow key={venue.id}>
                         <TableCell className="font-medium">{venue.name}</TableCell>
-                        <TableCell>{venue.city}</TableCell>
+                        <TableCell className="text-muted-foreground">{venue.city}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className="capitalize">
+                          <Badge variant={statusBadgeVariant(venue.status)} className="capitalize">
                             {venue.status.replace(/_/g, " ")}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">{money(venue.basePrice, venue.currency)}</TableCell>
+                        <TableCell numeric className="tabular-nums">
+                          {money(venue.basePrice, venue.currency)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              </Card>
-            )
-          ) : type === "agency" ? (
-            <>
-              <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
-                {[
-                  {
-                    label: "Wallet balance",
-                    value: money(detail.agencySnapshot?.creditBalance ?? 0),
-                  },
-                  { label: "Credit limit", value: money(detail.agencySnapshot?.creditLimit ?? 0) },
-                  { label: "Tier", value: detail.agencySnapshot?.tierName ?? "None" },
-                ].map((stat) => (
-                  <Card key={stat.label}>
-                    <CardContent className="pt-6">
-                      <p className="text-xs text-muted-foreground">{stat.label}</p>
-                      <p className="mt-1 font-heading text-xl font-bold">{stat.value}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              <Card>
-                <CardContent className="flex flex-wrap items-center justify-between gap-3 py-5">
-                  <div>
-                    <p className="text-sm font-medium">Full agency finance console</p>
-                    <p className="text-xs text-muted-foreground">
-                      Wallet top-ups, credit/debit notes, tiers, markups and ledgers live in the dedicated agency
-                      console.
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    render={<Link href={`/admin/agencies/${account.entity_id}`} />}
-                  >
-                    <Landmark className="size-3.5" /> Open finance console
-                  </Button>
-                </CardContent>
-              </Card>
-            </>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Link2 className="size-4" /> Affiliate program
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Referral code</dt>
-                    <dd className="font-mono text-sm font-medium">{detail.affiliateSnapshot?.referralCode}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Links created</dt>
-                    <dd className="text-sm font-medium">{detail.affiliateSnapshot?.linkCount ?? 0}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Total earned</dt>
-                    <dd className="text-sm font-medium">{money(detail.affiliateSnapshot?.totalEarned ?? 0)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Total paid</dt>
-                    <dd className="text-sm font-medium">{money(detail.affiliateSnapshot?.totalPaid ?? 0)}</dd>
-                  </div>
-                </dl>
-              </CardContent>
+              )}
             </Card>
+          ) : type === "agency" ? (
+            <div className="space-y-4">
+              <StatRail className="sm:grid-cols-3">
+                <StatRailItem label="Wallet balance" value={money(detail.agencySnapshot?.creditBalance ?? 0, "USD")} />
+                <StatRailItem label="Credit limit" value={money(detail.agencySnapshot?.creditLimit ?? 0, "USD")} />
+                <StatRailItem label="Tier" value={detail.agencySnapshot?.tierName ?? "None"} />
+              </StatRail>
+              <div className="flex justify-end">
+                <Button variant="outline" render={<Link href={`/admin/agencies/${account.entity_id}`} />}>
+                  <Landmark data-icon="inline-start" /> Agency finance
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <StatRail>
+              <StatRailItem label="Referral code" value={detail.affiliateSnapshot?.referralCode ?? "—"} />
+              <StatRailItem label="Links created" value={detail.affiliateSnapshot?.linkCount ?? 0} />
+              <StatRailItem label="Total earned" value={money(detail.affiliateSnapshot?.totalEarned ?? 0, "USD")} />
+              <StatRailItem label="Total paid" value={money(detail.affiliateSnapshot?.totalPaid ?? 0, "USD")} />
+            </StatRail>
           )}
         </TabsContent>
 
         {/* ------------------------------ Commercial ----------------------------- */}
         <TabsContent value="commercial" className="mt-4 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Commercial terms</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CommercialTermsForm
-                accountId={account.id}
-                commissionRate={entity.commissionRate}
-                paymentTerms={account.payment_terms}
-              />
-            </CardContent>
-          </Card>
-
-          {type === "affiliate" && detail.affiliateSnapshot ? (
+          <div className={cn("grid items-start gap-6", type === "affiliate" && detail.affiliateSnapshot && "lg:grid-cols-2")}>
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Record Commission Payout</CardTitle>
+                <CardTitle className="text-base">Commercial terms</CardTitle>
               </CardHeader>
               <CardContent>
-                <AffiliateCommissionPayoutForm accountId={account.id} affiliateId={detail.affiliateSnapshot.id} />
+                <CommercialTermsForm
+                  accountId={account.id}
+                  commissionRate={entity.commissionRate}
+                  paymentTerms={account.payment_terms}
+                />
               </CardContent>
             </Card>
-          ) : null}
 
-          <Card className="overflow-hidden py-0">
-            <CardHeader className="border-b border-border !py-4">
-              <CardTitle className="text-base">Payout history</CardTitle>
-            </CardHeader>
-            {detail.payouts.length === 0 ? (
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                No payouts recorded yet.
-              </CardContent>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Method</TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detail.payouts.map((payout) => (
-                    <TableRow key={payout.id}>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(payout.created_at), "d MMM yyyy")}
-                      </TableCell>
-                      <TableCell className="text-sm">{payout.method ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{payout.reference ?? "—"}</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {money(payout.amount, payout.currency)}
-                      </TableCell>
+            {type === "affiliate" && detail.affiliateSnapshot ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Record payout</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AffiliateCommissionPayoutForm accountId={account.id} affiliateId={detail.affiliateSnapshot.id} />
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
+
+          <section className="space-y-3">
+            <h2 className="font-heading text-base font-semibold">Payout history</h2>
+            <Card className="overflow-hidden py-0">
+              {detail.payouts.length === 0 ? (
+                <Empty>
+                  <EmptyMedia variant="icon">
+                    <Banknote />
+                  </EmptyMedia>
+                  <EmptyTitle>No payouts</EmptyTitle>
+                </Empty>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead>Reference</TableHead>
+                      <TableHead numeric>Amount</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {detail.payouts.map((payout) => (
+                      <TableRow key={payout.id}>
+                        <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
+                          {format(new Date(payout.created_at), "d MMM yyyy")}
+                        </TableCell>
+                        <TableCell>{payout.method ?? "—"}</TableCell>
+                        <TableCell className="font-mono text-xs">{payout.reference ?? "—"}</TableCell>
+                        <TableCell numeric className="font-medium tabular-nums">
+                          {money(payout.amount, payout.currency)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          </section>
         </TabsContent>
 
         {/* ------------------------------ Documents ------------------------------ */}
         <TabsContent value="documents" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                KYC documents ({signedDocs.length})
-                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  {signedDocs.filter((d) => d.review?.status === "verified").length} verified
-                  {" · "}
-                  {signedDocs.filter((d) => d.review?.status === "rejected").length} rejected
-                  {" · "}
-                  {signedDocs.filter((d) => (d.review?.status ?? "pending") === "pending").length} awaiting review
-                </span>
+          <Card className="gap-0">
+            <CardHeader className="border-b border-border pb-4">
+              <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+                KYC documents
+                {signedDocs.length > 0 ? (
+                  <>
+                    <Badge variant={verifiedDocs === signedDocs.length ? "success" : "neutral"} className="tabular-nums">
+                      {verifiedDocs}/{signedDocs.length} verified
+                    </Badge>
+                    {rejectedDocs > 0 ? (
+                      <Badge variant="destructive" className="tabular-nums">
+                        {rejectedDocs} rejected
+                      </Badge>
+                    ) : null}
+                  </>
+                ) : null}
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-0">
               {signedDocs.length === 0 ? (
-                <p className="py-10 text-center text-sm text-muted-foreground">No documents on file.</p>
+                <Empty>
+                  <EmptyMedia variant="icon">
+                    <FileStack />
+                  </EmptyMedia>
+                  <EmptyTitle>No documents</EmptyTitle>
+                </Empty>
               ) : (
-                <div className="space-y-3">
+                <ul className="divide-y divide-border">
                   {signedDocs.map((doc) => (
-                    <div key={doc.key} className="rounded-lg border border-border p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <FileText className="size-4 shrink-0 text-muted-foreground" />
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{doc.label}</p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {doc.file_name} · uploaded {format(new Date(doc.uploaded_at), "d MMM yyyy")}
-                            </p>
-                          </div>
+                    <li key={doc.key} className="flex gap-3 px-4 py-3 sm:px-6">
+                      <DocFileIcon fileName={doc.file_name} />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{doc.label}</p>
+                          <p className="truncate text-xs text-muted-foreground tabular-nums">
+                            {doc.file_name} · {format(new Date(doc.uploaded_at), "d MMM yyyy")}
+                          </p>
                         </div>
-                        {doc.url ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            render={<a href={doc.url} target="_blank" rel="noreferrer" />}
-                            className="shrink-0 gap-1 text-primary"
-                          >
-                            View <ExternalLink className="size-3.5" />
-                          </Button>
-                        ) : null}
+                        <DocumentReviewControls
+                          applicationId={application.id}
+                          type={type}
+                          docKey={doc.key}
+                          status={(doc.review?.status as "pending" | "verified" | "rejected" | undefined) ?? "pending"}
+                          note={doc.review?.note ?? null}
+                          reviewedAt={doc.review?.reviewed_at ?? null}
+                          reviewerName={doc.review?.reviewer?.full_name ?? doc.review?.reviewer?.email ?? null}
+                          viewUrl={doc.url}
+                        />
                       </div>
-                      <DocumentReviewControls
-                        applicationId={application.id}
-                        type={type}
-                        docKey={doc.key}
-                        status={(doc.review?.status as "pending" | "verified" | "rejected" | undefined) ?? "pending"}
-                        note={doc.review?.note ?? null}
-                        reviewedAt={doc.review?.reviewed_at ?? null}
-                        reviewerName={doc.review?.reviewer?.full_name ?? doc.review?.reviewer?.email ?? null}
-                      />
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* -------------------------------- Users -------------------------------- */}
-        <TabsContent value="users" className="mt-4 space-y-4">
+        <TabsContent value="users" className="mt-4 space-y-6">
           {type === "affiliate" ? (
             <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                Affiliate accounts are single-user — the affiliate signs in with their own account.
-              </CardContent>
+              <Empty>
+                <EmptyMedia variant="icon">
+                  <UserRound />
+                </EmptyMedia>
+                <EmptyTitle>Single-user account</EmptyTitle>
+              </Empty>
             </Card>
           ) : (
             <>
-              <Card className="overflow-hidden py-0">
-                <CardHeader className="border-b border-border !py-4">
-                  <CardTitle className="text-base">Team logins</CardTitle>
-                </CardHeader>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Member</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Manage</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {members.map((member) => (
-                      <TableRow key={member.id}>
-                        <TableCell>
-                          <p className="font-medium">{member.profile?.full_name ?? "—"}</p>
-                          <p className="text-xs text-muted-foreground">{member.profile?.email}</p>
-                        </TableCell>
-                        <TableCell className="capitalize">{member.role.replace(/_/g, " ")}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="capitalize">
-                            {member.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <MemberRowControls accountId={account.id} type={type} member={member} />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-heading text-base font-semibold">Team logins</h2>
+                  <Badge variant="neutral" className="tabular-nums">
+                    {members.length}
+                  </Badge>
+                </div>
+                <Card className="overflow-hidden py-0">
+                  {members.length === 0 ? (
+                    <Empty>
+                      <EmptyMedia variant="icon">
+                        <Users />
+                      </EmptyMedia>
+                      <EmptyTitle>No team members</EmptyTitle>
+                    </Empty>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Member</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead numeric>
+                            <span className="sr-only">Actions</span>
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {members.map((member) => (
+                          <TableRow key={member.id}>
+                            <TableCell className="max-w-64">
+                              <p className="truncate font-medium">{member.profile?.full_name ?? "—"}</p>
+                              <p className="truncate text-xs text-muted-foreground">{member.profile?.email}</p>
+                            </TableCell>
+                            <TableCell className="capitalize">{member.role.replace(/_/g, " ")}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={statusBadgeVariant(member.status, { removed: "neutral" })}
+                                className="capitalize"
+                              >
+                                {member.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell numeric>
+                              <MemberRowControls accountId={account.id} type={type} member={member} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </Card>
+              </section>
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Add a team member</CardTitle>
+                  <CardTitle className="text-base">Add team member</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <AddMemberForm accountId={account.id} type={type} />
@@ -603,28 +623,33 @@ export default async function PartnerAccountConsolePage({
             </CardHeader>
             <CardContent>
               {events.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
+                <Empty>
+                  <EmptyMedia variant="icon">
+                    <History />
+                  </EmptyMedia>
+                  <EmptyTitle>No activity</EmptyTitle>
+                </Empty>
               ) : (
                 <ol className="space-y-3">
                   {events.map((event) => (
                     <li key={event.id} className="flex items-start gap-3 text-sm">
-                      <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
-                      <div>
-                        <p className="flex flex-wrap items-center gap-2">
+                      <span aria-hidden="true" className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
+                      <div className="min-w-0">
+                        <p className="flex flex-wrap items-baseline gap-x-2">
                           <span className="font-medium capitalize">{event.action.replace(/_/g, " ")}</span>
                           {event.from_status && event.to_status ? (
                             <span className="text-xs text-muted-foreground capitalize">
                               {event.from_status} → {event.to_status}
                             </span>
                           ) : null}
-                          <span className="text-xs text-muted-foreground">
-                            {format(new Date(event.created_at), "d MMM yyyy, HH:mm")}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            by {event.actor ? (event.actor.full_name ?? event.actor.email) : "System"}
+                          <span className="text-xs text-muted-foreground tabular-nums">
+                            {format(new Date(event.created_at), "d MMM yyyy, HH:mm")} ·{" "}
+                            {event.actor ? (event.actor.full_name ?? event.actor.email) : "System"}
                           </span>
                         </p>
-                        {event.reason ? <p className="text-xs text-muted-foreground">{event.reason}</p> : null}
+                        {event.reason ? (
+                          <p className="text-xs break-words text-muted-foreground">{event.reason}</p>
+                        ) : null}
                       </div>
                     </li>
                   ))}
@@ -636,12 +661,9 @@ export default async function PartnerAccountConsolePage({
 
         {/* --------------------------------- Notes ------------------------------- */}
         <TabsContent value="notes" className="mt-4">
-          <Card>
+          <Card className="max-w-3xl">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                Internal notes
-                <Badge variant="outline">Admin-only</Badge>
-              </CardTitle>
+              <CardTitle className="text-base">Internal notes</CardTitle>
             </CardHeader>
             <CardContent>
               <AccountNotesForm accountId={account.id} initialNotes={account.internal_notes} />

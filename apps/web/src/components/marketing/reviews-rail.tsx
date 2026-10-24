@@ -1,14 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import Rating from "@mui/material/Rating";
 import Avatar from "@mui/material/Avatar";
 
 import { CarouselRail } from "@/components/ui/aceternity/carousel-rail";
 import { FadeIn } from "@/components/ui/aceternity/motion-primitives";
+import { SectionHeading } from "@/components/marketing/section-heading";
 
-import { ArrowForwardIcon } from "@/components/ui/mui-icons";
 /**
  * PLACEHOLDER reviews — plausible but fictional, with initials-only avatars.
  * Replace with real, permissioned customer reviews before launch; never pair
@@ -47,22 +46,14 @@ const REVIEWS = [
 
 export function ReviewsRail() {
   return (
-    <section className="bg-gradient-to-b from-secondary/50 to-background py-14 sm:py-16 lg:py-20">
+    <section id="reviews" className="scroll-mt-32 bg-gradient-to-b from-secondary/50 to-background py-16 sm:py-20 lg:py-24">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-12 lg:gap-12 lg:px-8">
         <FadeIn direction="right" className="lg:col-span-4">
-          <h2 className="font-heading text-2xl leading-tight font-bold tracking-tight text-balance sm:text-3xl lg:text-4xl">
-            Dear travellers, we are grateful for being part of your lifetime memories
-          </h2>
-          <p className="mt-4 text-muted-foreground">
-            Word of mouth built this agency long before the website did.
-          </p>
-          <Link
-            href="/#reviews"
-            className="mt-7 inline-flex h-11 items-center gap-1.5 rounded-lg border-2 border-brand-accent px-6 font-heading text-sm font-bold text-brand-accent transition-colors hover:bg-brand-accent hover:text-brand-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-          >
-            View all reviews
-            <ArrowForwardIcon sx={{ fontSize: 16 }} />
-          </Link>
+          <SectionHeading
+            align="left"
+            title="What travellers say"
+            lead="Word of mouth built this agency long before the website did."
+          />
         </FadeIn>
 
         <FadeIn delay={0.12} className="min-w-0 lg:col-span-8">
@@ -70,7 +61,7 @@ export function ReviewsRail() {
             {REVIEWS.map((review) => (
               <figure
                 key={review.name}
-                className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow duration-300 hover:shadow-xl"
+                className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
               >
                 <div className="relative h-36 w-full">
                   <Image src={review.image} alt="" fill sizes="320px" className="object-cover" />

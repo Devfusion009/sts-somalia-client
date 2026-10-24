@@ -35,10 +35,10 @@ export default async function NewOfflineBookingPage({
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center gap-3">
+      <header className="flex items-center gap-3">
         <BackLink href={`/manager/${hotelId}/bookings`} label="Bookings" />
-        <h1 className="font-heading text-2xl font-semibold">Book now</h1>
-      </div>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">Book now</h1>
+      </header>
       <NewBookingForm hotelId={hotelId} today={today} initialQuote={initial.quote} preferredRoomId={room} />
     </div>
   );

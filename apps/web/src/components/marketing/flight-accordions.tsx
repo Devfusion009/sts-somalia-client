@@ -20,10 +20,8 @@ export function DealsByDestination({ groups }: { groups: DealGroup[] }) {
           <h2 className="font-heading text-xl font-bold tracking-tight text-white sm:text-2xl">
             Flight deals by destination
           </h2>
-          <p className="mt-1.5 font-semibold text-sidebar-foreground/80">Find and compare cheap flights</p>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-sidebar-foreground/60">
-            We compare live fares from the airlines that actually serve Somalia, so you can find the
-            cheapest, quickest and best-value ticket for your route — then have a real person issue it.
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-sidebar-foreground/70">
+            Live fares from the airlines that serve Somalia, issued by our ticketing desk.
           </p>
         </FadeIn>
 
@@ -42,7 +40,7 @@ export function DealsByDestination({ groups }: { groups: DealGroup[] }) {
                   <li key={route.href + route.label}>
                     <Link
                       href={route.href}
-                      className="block py-1.5 text-sm text-sidebar-foreground/65 transition-colors hover:text-sidebar-primary"
+                      className="block rounded-sm py-2 text-sm text-sidebar-foreground/70 transition-colors hover:text-sidebar-primary focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
                     >
                       {route.label}
                     </Link>
@@ -84,7 +82,7 @@ export function FlightsFaq({
                   className="shrink-0 text-sidebar-foreground/60 transition-transform duration-300 group-open:rotate-180"
                 />
               </summary>
-              <p className="pb-4 text-sm leading-relaxed text-sidebar-foreground/65">{faq.answer}</p>
+              <p className="pb-4 text-sm leading-relaxed text-sidebar-foreground/70">{faq.answer}</p>
             </details>
           ))}
         </FadeIn>

@@ -4,7 +4,9 @@ import { requirePlatformAdmin } from "@/lib/auth/session";
 import { getCalendarBookings } from "@/modules/admin/calendar-queries";
 import { getPublicHolidaysInRange } from "@/lib/provider-runtime/holidays";
 import { getAdminCalendarEvents } from "@/modules/admin/calendar-events";
+import { PageHeader } from "@/components/ui/page-header";
 import { AdminEventCalendar } from "./admin-event-calendar";
+import { AdminEventForm } from "./admin-event-form";
 
 export const metadata: Metadata = { title: "Booking Calendar" };
 
@@ -31,9 +33,10 @@ export default async function AdminCalendarPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Booking Calendar</h1>
-      </div>
+      <PageHeader
+        title="Booking Calendar"
+        actions={<AdminEventForm prefillDate={format(new Date(), "yyyy-MM-dd")} />}
+      />
       <AdminEventCalendar month={month} events={events} holidays={holidays} adminEvents={adminEvents} />
     </div>
   );

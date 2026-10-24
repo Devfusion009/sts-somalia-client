@@ -42,16 +42,16 @@ type TitleProps = {
 
 export function Title({ title, badge, actions, className }: TitleProps) {
   const heading = (
-    <div className="flex items-center gap-2">
-      <h1 className={cn("font-heading text-2xl font-semibold", className)}>{title}</h1>
+    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+      <h1 className={cn("font-heading text-2xl font-semibold tracking-tight", className)}>{title}</h1>
       {typeof badge === "string" ? <Badge variant="secondary">{badge}</Badge> : badge ? <Skeleton className="h-5 w-9 rounded-full" /> : null}
     </div>
   );
   if (!actions?.length) return heading;
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
       {heading}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {actions.map((w, i) => (
           <Skeleton key={i} className={cn("h-8 rounded-lg", w)} />
         ))}
@@ -82,13 +82,13 @@ export function SearchBar({ placeholder, selects = 0, urgent }: { placeholder: s
 /** Filter chips. The first is drawn active, as it is on a fresh visit. */
 export function Chips({ labels, size = "md", counts }: { labels: string[]; size?: "sm" | "md"; counts?: boolean }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="-mx-4 flex gap-2 overflow-hidden px-4 sm:mx-0 sm:flex-wrap sm:px-0">
       {labels.map((label, i) => (
         <span
           key={label}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border font-medium",
-            size === "md" ? "px-3.5 py-1.5 text-sm" : "px-3 py-1 text-xs",
+            "inline-flex shrink-0 items-center gap-1.5 rounded-full border font-medium whitespace-nowrap",
+            size === "md" ? "h-8 px-3.5 text-sm max-sm:h-10" : "px-3 py-1 text-xs",
             i === 0 ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"
           )}
         >
@@ -162,7 +162,31 @@ export function Pager() {
 export const PillCell = <Skeleton className="h-5 w-20 rounded-full" />;
 
 /** Stat tiles: static label, placeholder value. */
-export function StatTiles({ labels, className }: { labels: string[]; className?: string }) {
+export function StatTiles({
+  labels,
+  className,
+  compact,
+}: {
+  labels: string[];
+  className?: string;
+  /** Mirrors `StatTile` (label, value, hint; no icon tile). */
+  compact?: boolean;
+}) {
+  if (compact) {
+    return (
+      <div className={cn("grid grid-cols-2 gap-4 lg:grid-cols-4", className)}>
+        {labels.map((label) => (
+          <Card key={label} size="sm" className="h-full">
+            <CardContent className="flex flex-col gap-2 px-4 py-1">
+              <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+              <Skeleton className="h-6 w-20" />
+              <Skeleton className="h-3 w-14" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className={cn("grid gap-4 sm:grid-cols-2 lg:grid-cols-4", className)}>
       {labels.map((label) => (
@@ -281,7 +305,7 @@ export function DetailHead({
       {back ? <Skeleton className="h-4 w-24" /> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          {title ? <h1 className="font-heading text-2xl font-semibold">{title}</h1> : <Skeleton className="h-8 w-64" />}
+          {title ? <h1 className="font-heading text-2xl font-semibold tracking-tight">{title}</h1> : <Skeleton className="h-8 w-64" />}
           {Array.from({ length: badges }, (_, i) => (
             <Skeleton key={i} className="h-5 w-20 rounded-full" />
           ))}
@@ -392,20 +416,23 @@ export function OrderCards({ rows = 3 }: { rows?: number }) {
   );
 }
 
-/** Divided stat strip of the finance pages. */
+/** Divided stat strip of the finance pages (mirrors `StatStrip` in filter-chips.tsx). */
 export function StatStrip({ labels }: { labels: string[] }) {
   return (
     <dl
       className={cn(
-        "grid divide-y divide-border rounded-lg border border-border bg-card sm:divide-x sm:divide-y-0",
-        labels.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-4"
+        "grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border shadow-xs ring-1 ring-foreground/[0.08]",
+        labels.length === 3 ? "sm:grid-cols-3 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2" : "lg:grid-cols-4"
       )}
     >
       {labels.map((label) => (
-        <div key={label} className="p-4">
-          <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+        <div key={label} className="min-w-0 bg-card p-4">
+          <dt className="truncate text-xs font-medium text-muted-foreground">{label}</dt>
           <dd className="mt-2">
-            <Skeleton className="h-7 w-28" />
+            <Skeleton className="h-7 w-28 max-w-full" />
+          </dd>
+          <dd className="mt-1.5">
+            <Skeleton className="h-3 w-16" />
           </dd>
         </div>
       ))}
@@ -437,5 +464,54 @@ export function QueueGroups({ groups }: { groups: Array<{ label: string; queues:
         </div>
       ))}
     </nav>
+  );
+}
+
+/** Entity-detail stat rail (mirrors `StatRail` in stat-rail.tsx): static labels, placeholder values. */
+export function RailSkeleton({ labels, className }: { labels: string[]; className?: string }) {
+  return (
+    <dl
+      className={cn(
+        "grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border sm:grid-cols-4 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2",
+        className
+      )}
+    >
+      {labels.map((label) => (
+        <div key={label} className="min-w-0 bg-secondary/40 px-4 py-3">
+          <dt className="truncate text-xs text-muted-foreground">{label}</dt>
+          <dd>
+            <Skeleton className="mt-1 h-6 w-16 max-w-full" />
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Entity-detail header: round back button, optional logo, h1 + status pill, one meta line. */
+export function EntityHead({ logo, actions = [] }: { logo?: boolean; actions?: string[] }) {
+  return (
+    <div className="space-y-5">
+      <Skeleton className="size-9 rounded-full" />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-center gap-4">
+          {logo ? <Skeleton className="size-14 shrink-0 rounded-lg max-sm:size-12" /> : null}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2.5">
+              <Skeleton className="h-7 w-56 max-w-[60vw]" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+            </div>
+            <Skeleton className="h-4 w-72 max-w-full" />
+          </div>
+        </div>
+        {actions.length ? (
+          <div className="flex flex-wrap gap-2">
+            {actions.map((w, i) => (
+              <Skeleton key={i} className={cn("h-8 rounded-lg", w)} />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }

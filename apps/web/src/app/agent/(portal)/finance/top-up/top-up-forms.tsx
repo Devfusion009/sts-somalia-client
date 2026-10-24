@@ -3,7 +3,6 @@
 import { useActionState, useEffect, useRef, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import {
-  AlertCircle,
   Banknote,
   Check,
   CheckCircle2,
@@ -14,8 +13,10 @@ import {
   Wallet,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { cn } from "@/lib/utils";
@@ -58,7 +59,7 @@ function MethodPicker({
   name: string;
 }) {
   return (
-    <div className="grid gap-2">
+    <div role="radiogroup" aria-label="Payment method" className="grid gap-2">
       <input type="hidden" name={name} value={value} />
       {methods.map((method) => {
         const selected = value === method.id;
@@ -67,43 +68,40 @@ function MethodPicker({
           <button
             key={method.id}
             type="button"
+            role="radio"
+            aria-checked={selected}
             onClick={() => onChange(method.id)}
             className={cn(
-              "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
-              selected ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
+              "flex min-h-14 items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/60"
             )}
           >
             <span
+              aria-hidden="true"
               className={cn(
                 "flex size-9 shrink-0 items-center justify-center rounded-lg",
-                selected ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"
+                selected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
               )}
             >
-              <Icon className="size-4.5" />
+              <Icon className="size-4" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex flex-wrap items-center gap-1.5">
                 <span className="text-sm font-medium">{method.label}</span>
-                {method.simulated ? (
-                  <span className="rounded bg-brand-gold/15 px-1.5 py-0.5 text-[10px] font-semibold text-brand-gold">
-                    Simulated
-                  </span>
-                ) : null}
+                {method.simulated ? <Badge variant="warning">Simulated</Badge> : null}
                 {method.badges.map((badge) => (
-                  <span
-                    key={badge}
-                    className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-                  >
+                  <Badge key={badge} variant="neutral">
                     {badge}
-                  </span>
+                  </Badge>
                 ))}
               </span>
               <span className="mt-0.5 block truncate text-xs text-muted-foreground">{method.description}</span>
             </span>
             <span
+              aria-hidden="true"
               className={cn(
                 "flex size-4 shrink-0 items-center justify-center rounded-full border",
-                selected ? "border-primary" : "border-border"
+                selected ? "border-primary" : "border-input"
               )}
             >
               {selected ? <span className="size-2 rounded-full bg-primary" /> : null}
@@ -132,9 +130,10 @@ function CopyRow({ label, value, mono }: { label: string; value: string; mono?: 
           setTimeout(() => setCopied(false), 1500);
         }}
         aria-label={`Copy ${label.toLowerCase()}`}
-        className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+        title={copied ? "Copied" : `Copy ${label.toLowerCase()}`}
+        className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-background hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
       >
-        {copied ? <Check className="size-3.5 text-primary" /> : <Copy className="size-3.5" />}
+        {copied ? <Check className="size-3.5 text-primary" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
       </button>
     </div>
   );
@@ -142,7 +141,7 @@ function CopyRow({ label, value, mono }: { label: string; value: string; mono?: 
 
 export function BankTransferDetails({ bankTransfer }: { bankTransfer: BankTransfer }) {
   return (
-    <div className="divide-y divide-border rounded-lg border border-border bg-secondary/40">
+    <div className="divide-y divide-border rounded-lg bg-secondary/40">
       <CopyRow label="Bank" value={bankTransfer.bankName} />
       <CopyRow label="Account name" value={bankTransfer.accountName} />
       <CopyRow label="Account number" value={bankTransfer.accountNumber} mono />
@@ -152,37 +151,38 @@ export function BankTransferDetails({ bankTransfer }: { bankTransfer: BankTransf
 
 function AmountField({ id, defaultValue }: { id: string; defaultValue?: number }) {
   return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>
+    <Field>
+      <FieldLabel htmlFor={id}>
         Amount (USD) <span className="text-destructive">*</span>
-      </Label>
-      <div className="relative">
-        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-          $
-        </span>
-        <Input
+      </FieldLabel>
+      <InputGroup>
+        <InputGroupAddon>
+          <InputGroupText>$</InputGroupText>
+        </InputGroupAddon>
+        <InputGroupInput
           id={id}
           name="amount"
           type="number"
+          inputMode="decimal"
           step="0.01"
           min="0.01"
           defaultValue={defaultValue ? defaultValue.toFixed(2) : undefined}
           required
-          className="pl-5"
+          className="tabular-nums"
         />
-      </div>
-    </div>
+      </InputGroup>
+    </Field>
   );
 }
 
 function ReceiptField() {
   return (
-    <div className="grid gap-2">
-      <Label htmlFor="offline-proof">
+    <Field>
+      <FieldLabel htmlFor="offline-proof">
         Receipt <span className="text-destructive">*</span>
-      </Label>
+      </FieldLabel>
       <FileField id="offline-proof" name="proof" accept={PROOF_ACCEPT} maxBytes={5 * 1024 * 1024} required />
-    </div>
+    </Field>
   );
 }
 
@@ -213,37 +213,39 @@ export function OfflineTopupForm({
   }, [submitted, onSuccess]);
 
   return (
-    <form action={formAction} className="space-y-4">
-      {state?.error ? (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      ) : submitted ? (
-        <Alert>
-          <CheckCircle2 />
-          <AlertDescription>Sent to STS for confirmation.</AlertDescription>
-        </Alert>
-      ) : null}
+    <form action={formAction}>
+      <FieldGroup className="gap-4">
+        {submitted ? (
+          <Alert>
+            <CheckCircle2 />
+            <AlertDescription>Sent to STS for confirmation.</AlertDescription>
+          </Alert>
+        ) : null}
 
-      <MethodPicker methods={methods} value={method} onChange={setMethod} name="method" />
+        <MethodPicker methods={methods} value={method} onChange={setMethod} name="method" />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <AmountField id="offline-amount" defaultValue={defaultAmount} />
-        <div className="grid gap-2">
-          <Label htmlFor="offline-reference">Reference</Label>
-          <Input id="offline-reference" name="reference" placeholder="Transfer ref, transaction id, receipt no." />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <AmountField id="offline-amount" defaultValue={defaultAmount} />
+          <Field>
+            <FieldLabel htmlFor="offline-reference">Reference</FieldLabel>
+            <Input id="offline-reference" name="reference" placeholder="Transfer ref, transaction id, receipt no." />
+          </Field>
         </div>
-      </div>
 
-      <ReceiptField />
+        <ReceiptField />
 
-      <div className="grid gap-2">
-        <Label htmlFor="offline-note">Note</Label>
-        <Textarea id="offline-note" name="note" rows={2} placeholder="Anything STS should know" />
-      </div>
+        <Field>
+          <FieldLabel htmlFor="offline-note">Note</FieldLabel>
+          <Textarea id="offline-note" name="note" rows={2} placeholder="Anything STS should know" />
+        </Field>
 
-      <SubmitButton pendingText="Sending…">Send for confirmation</SubmitButton>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <FieldError className="sm:mr-auto">{state?.error}</FieldError>
+          <SubmitButton pendingText="Sending…" className="max-sm:w-full">
+            Send for confirmation
+          </SubmitButton>
+        </div>
+      </FieldGroup>
     </form>
   );
 }
@@ -270,30 +272,30 @@ export function OnlineTopupForm({
   }, [state, router]);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction}>
       {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
-      {state?.error ? (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      ) : null}
+      <FieldGroup className="gap-4">
+        <MethodPicker methods={methods} value={methodId} onChange={setMethodId} name="method" />
 
-      <MethodPicker methods={methods} value={methodId} onChange={setMethodId} name="method" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <AmountField id="online-amount" defaultValue={defaultAmount} />
+          {selected?.requiresPhone ? (
+            <Field>
+              <FieldLabel htmlFor="online-phone">
+                Mobile number <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input id="online-phone" name="payerPhone" type="tel" inputMode="tel" placeholder="+252…" required />
+            </Field>
+          ) : null}
+        </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <AmountField id="online-amount" defaultValue={defaultAmount} />
-        {selected?.requiresPhone ? (
-          <div className="grid gap-2">
-            <Label htmlFor="online-phone">
-              Mobile number <span className="text-destructive">*</span>
-            </Label>
-            <Input id="online-phone" name="payerPhone" inputMode="tel" placeholder="+252…" required />
-          </div>
-        ) : null}
-      </div>
-
-      <SubmitButton pendingText="Starting…">Pay {selected ? `with ${selected.label}` : "now"}</SubmitButton>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <FieldError className="sm:mr-auto">{state?.error}</FieldError>
+          <SubmitButton pendingText="Starting…" className="max-sm:w-full">
+            Pay {selected ? `with ${selected.label}` : "now"}
+          </SubmitButton>
+        </div>
+      </FieldGroup>
     </form>
   );
 }

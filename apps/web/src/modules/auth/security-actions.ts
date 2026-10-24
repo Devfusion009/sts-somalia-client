@@ -119,7 +119,7 @@ export async function requestAccountDeletionAction(
   if (error) {
     // The partial unique index guarantees one open request per profile.
     if (error.code === "23505") {
-      return { error: "You already have a deletion request open. We'll be in touch about it." };
+      return { error: "A deletion request is already open." };
     }
     return { error: error.message };
   }

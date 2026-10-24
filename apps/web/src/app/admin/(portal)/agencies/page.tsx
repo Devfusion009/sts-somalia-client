@@ -1,11 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
-import { ArrowRight } from "lucide-react";
+import { Building2, ChevronRight } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { getAllAgenciesForAdmin, getPendingMarkupRequestsForAdmin } from "@/modules/agencies/queries";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
+import { money } from "@/lib/money";
 import {
   Table,
   TableBody,
@@ -17,11 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { MarkupApprovalQueue, type MarkupQueueItem } from "./markup-approval-queue";
 
-const STATUS_STYLES: Record<string, string> = {
-  active: "bg-primary/10 text-primary",
-  pending: "bg-brand-gold/15 text-brand-gold",
-  suspended: "bg-destructive/10 text-destructive",
-};
+export const metadata: Metadata = { title: "Agencies" };
 
 export default async function AdminAgenciesPage() {
   await requirePlatformAdmin();
@@ -55,76 +55,97 @@ export default async function AdminAgenciesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <h1 className="font-heading text-2xl font-semibold">Agencies</h1>
-        <Badge variant="secondary">{agencies.length}</Badge>
-      </div>
+      <PageHeader
+        title="Agencies"
+        status={
+          <Badge variant="neutral" className="tabular-nums">
+            {agencies.length}
+          </Badge>
+        }
+      />
 
       {queueItems.length > 0 ? <MarkupApprovalQueue items={queueItems} /> : null}
 
       <Card className="overflow-hidden py-0">
-        <div className="overflow-x-auto">
+        {agencies.length === 0 ? (
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Building2 />
+            </EmptyMedia>
+            <EmptyTitle>No agencies</EmptyTitle>
+          </Empty>
+        ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Agency</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Tier</TableHead>
-                <TableHead className="text-right">Commission</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead className="text-right">Credit Limit</TableHead>
-                <TableHead className="text-right">Members</TableHead>
-                <TableHead className="text-right">Manage</TableHead>
+                <TableHead numeric>Commission</TableHead>
+                <TableHead numeric>Balance</TableHead>
+                <TableHead numeric>Credit limit</TableHead>
+                <TableHead numeric>Members</TableHead>
+                <TableHead numeric>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {agencies.map((agency) => {
                 const pending = pendingByAgency.get(agency.id) ?? 0;
+                const balance = Number(agency.credit_balance);
                 return (
                   <TableRow key={agency.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{agency.name}</p>
+                    <TableCell className="max-w-72">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <Link
+                          href={`/admin/agencies/${agency.id}`}
+                          className="rounded-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                        >
+                          {agency.name}
+                        </Link>
                         {pending > 0 ? (
-                          <Link href={`/admin/agencies/${agency.id}#markups`}>
-                            <Badge className="border-transparent bg-brand-gold/15 text-brand-gold hover:bg-brand-gold/25">
-                              {pending} markup {pending === 1 ? "request" : "requests"}
-                            </Badge>
-                          </Link>
+                          <Badge
+                            variant="warning"
+                            className="tabular-nums"
+                            render={<Link href={`/admin/agencies/${agency.id}#markups`} />}
+                          >
+                            {pending} markup {pending === 1 ? "request" : "requests"}
+                          </Badge>
                         ) : null}
                       </div>
-                      <p className="text-xs text-muted-foreground">{agency.contact_email}</p>
+                      <p className="truncate text-xs text-muted-foreground">{agency.contact_email}</p>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        className={cn(
-                          "border-transparent capitalize",
-                          STATUS_STYLES[agency.status] ?? "bg-muted text-muted-foreground"
-                        )}
-                      >
+                      <Badge variant={statusBadgeVariant(agency.status)} className="capitalize">
                         {agency.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{agency.agency_tiers?.name ?? "—"}</TableCell>
-                    <TableCell className="text-right">{agency.commission_rate}%</TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right font-semibold",
-                        Number(agency.credit_balance) < 0 ? "text-destructive" : undefined
-                      )}
-                    >
-                      USD {Number(agency.credit_balance).toFixed(2)}
+                    <TableCell numeric className="tabular-nums">
+                      {agency.commission_rate}%
                     </TableCell>
-                    <TableCell className="text-right">USD {Number(agency.credit_limit).toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{agency.agency_members?.[0]?.count ?? 0}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell
+                      numeric
+                      className={cn("font-medium tabular-nums", balance < 0 ? "text-destructive" : undefined)}
+                    >
+                      {money(balance, "USD")}
+                    </TableCell>
+                    <TableCell numeric className="tabular-nums text-muted-foreground">
+                      {money(agency.credit_limit, "USD")}
+                    </TableCell>
+                    <TableCell numeric className="tabular-nums">
+                      {agency.agency_members?.[0]?.count ?? 0}
+                    </TableCell>
+                    <TableCell numeric>
                       <Button
                         variant="ghost"
-                        size="sm"
-                        className="gap-1 text-primary"
+                        size="icon-sm"
+                        aria-label={`Open ${agency.name}`}
+                        title="Open"
                         render={<Link href={`/admin/agencies/${agency.id}`} />}
                       >
-                        Open <ArrowRight className="size-3.5" />
+                        <ChevronRight />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -132,7 +153,7 @@ export default async function AdminAgenciesPage() {
               })}
             </TableBody>
           </Table>
-        </div>
+        )}
       </Card>
     </div>
   );

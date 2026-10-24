@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { Check, DollarSign, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Check, X } from "lucide-react";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { SubmitButton } from "@/components/submit-button";
 import {
   updateUmrahBookingStatus,
@@ -26,8 +26,8 @@ export function UmrahRequestActions({ bookingId }: { bookingId: string }) {
         <form action={confirmAction}>
           <input type="hidden" name="bookingId" value={bookingId} />
           <input type="hidden" name="status" value="confirmed" />
-          <SubmitButton size="sm" pendingText="Confirming…" className="gap-1">
-            <Check className="size-3.5" /> Confirm
+          <SubmitButton pendingText="Confirming…">
+            <Check aria-hidden="true" /> Confirm
           </SubmitButton>
         </form>
         <form action={declineAction}>
@@ -37,15 +37,18 @@ export function UmrahRequestActions({ bookingId }: { bookingId: string }) {
             title="Decline this Umrah request?"
             confirmLabel="Decline"
             icon="x"
-            size="sm"
             variant="outline"
-            className="gap-1 text-destructive hover:text-destructive"
+            className="text-destructive hover:text-destructive"
           >
-            <X className="size-3.5" /> Decline
+            <X aria-hidden="true" /> Decline
           </ConfirmButton>
         </form>
       </div>
-      {error ? <p className="max-w-64 text-right text-xs text-destructive">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="max-w-64 text-right text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -68,25 +71,36 @@ export function UmrahPriceQuoteForm({
   const [state, formAction] = useActionState(updateUmrahRequestPrice, null);
 
   return (
-    <form action={formAction} className="flex flex-wrap items-center gap-2">
+    <form action={formAction} className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
       <input type="hidden" name="bookingId" value={bookingId} />
-      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-        <DollarSign className="size-3.5" /> {currency}
-      </span>
-      <Input
-        name="price"
-        type="number"
-        min={0}
-        step="0.01"
-        defaultValue={currentPrice}
-        className="h-8 w-32"
-        aria-label="Confirmed price"
-      />
-      <SubmitButton size="sm" variant="outline" pendingText="Saving…">
+      <InputGroup className="w-40 max-sm:h-10">
+        <InputGroupAddon>
+          <InputGroupText>{currency}</InputGroupText>
+        </InputGroupAddon>
+        <InputGroupInput
+          name="price"
+          type="number"
+          min={0}
+          step="0.01"
+          defaultValue={currentPrice}
+          className="text-right tabular-nums"
+          aria-label={`Confirmed price (${currency})`}
+          aria-invalid={state?.error ? true : undefined}
+        />
+      </InputGroup>
+      <SubmitButton variant="outline" pendingText="Saving…">
         Update price
       </SubmitButton>
-      {state?.error ? <span className="text-xs text-destructive">{state.error}</span> : null}
-      {state && !state.error ? <span className="text-xs text-primary">Saved</span> : null}
+      {state?.error ? (
+        <p role="alert" className="w-full text-right text-xs text-destructive">
+          {state.error}
+        </p>
+      ) : null}
+      {state && !state.error ? (
+        <p role="status" className="w-full text-right text-xs text-primary">
+          Price updated.
+        </p>
+      ) : null}
     </form>
   );
 }

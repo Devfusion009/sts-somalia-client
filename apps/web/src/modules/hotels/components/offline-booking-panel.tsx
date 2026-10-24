@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
-import { CalendarPlus, PhoneCall, Globe, CircleCheck, CircleAlert, CircleX } from "lucide-react";
+import { CalendarPlus, PhoneCall, Globe, CircleCheck, CircleAlert, CircleX, CalendarX2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { dateSpan, money } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
@@ -34,12 +35,6 @@ export type RoomTypeOption = {
   name: string;
   currency: string;
   basePrice: number;
-};
-
-const STATUS_STYLE: Record<string, string> = {
-  confirmed: "bg-primary/10 text-primary",
-  pending: "bg-brand-gold/15 text-brand-gold",
-  waitlisted: "bg-destructive/10 text-destructive",
 };
 
 /** Lowest "available" across every night in [checkIn, checkOut) that this room type has data for. Null when the range is empty, unpicked, or outside the fetched window — never treated as a block. */
@@ -117,54 +112,57 @@ export function OfflineBookingPanel({
   return (
     <div className="space-y-4">
       {bookings.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No live bookings for these nights.</p>
+        <Empty className="p-6">
+          <EmptyMedia variant="icon">
+            <CalendarX2 />
+          </EmptyMedia>
+          <EmptyTitle>No live bookings</EmptyTitle>
+        </Empty>
       ) : (
         <ul className="divide-y divide-border">
-          {bookings.map((b) => {
-            const guest = b.guestName;
-            return (
-              <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0 text-sm">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 font-medium">
-                    {b.check_in} → {b.check_out}
-                    <Badge className={cn("border-transparent capitalize", STATUS_STYLE[b.status] ?? "bg-muted text-muted-foreground")}>
-                      {b.status}
-                    </Badge>
-                    <Badge variant="outline" className="gap-1">
-                      {b.source === "offline" ? <PhoneCall className="size-3" /> : <Globe className="size-3" />}
-                      {b.source === "offline" ? "Offline" : "Online"}
-                    </Badge>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {guest ?? "Guest"} · {b.num_rooms} room{b.num_rooms > 1 ? "s" : ""} · {b.num_adults} adult{b.num_adults > 1 ? "s" : ""}
-                    {b.num_children > 0 ? `, ${b.num_children} child${b.num_children > 1 ? "ren" : ""}` : ""}
-                  </p>
-                  {b.special_requests ? <p className="text-xs text-muted-foreground">{b.special_requests}</p> : null}
-                </div>
-              </li>
-            );
-          })}
+          {bookings.map((b) => (
+            <li key={b.id} className="space-y-1 py-2.5 text-sm first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-medium tabular-nums">{dateSpan(b.check_in, b.check_out)}</span>
+                <Badge variant={statusBadgeVariant(b.status)} className="capitalize">
+                  {b.status.replace(/_/g, " ")}
+                </Badge>
+                <Badge variant="outline">
+                  {b.source === "offline" ? <PhoneCall aria-hidden="true" /> : <Globe aria-hidden="true" />}
+                  {b.source === "offline" ? "Offline" : "Online"}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground tabular-nums">
+                {b.guestName ?? "Guest"} · {b.num_rooms} room{b.num_rooms > 1 ? "s" : ""} · {b.num_adults} adult
+                {b.num_adults > 1 ? "s" : ""}
+                {b.num_children > 0 ? `, ${b.num_children} child${b.num_children > 1 ? "ren" : ""}` : ""}
+              </p>
+              {b.special_requests ? <p className="text-xs text-muted-foreground">{b.special_requests}</p> : null}
+            </li>
+          ))}
         </ul>
       )}
 
       {canEdit && newBookingHref ? (
         <div className="border-t border-border pt-4">
-          <Button className="w-full gap-1.5" render={<Link href={newBookingHref} />}>
-            <CalendarPlus className="size-4" /> Record offline booking
+          <Button className="w-full" render={<Link href={newBookingHref} />}>
+            <CalendarPlus aria-hidden="true" /> Record offline booking
           </Button>
         </div>
       ) : canEdit ? (
-        <form key={formKey} action={formAction} className="space-y-3 border-t border-border pt-4">
+        <form key={formKey} action={formAction} className="space-y-4 border-t border-border pt-4">
           <input type="hidden" name="hotelId" value={hotelId} />
           <input type="hidden" name="roomTypeId" value={roomTypeId} />
-          {state?.error ? (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          ) : null}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="offRoomType">Room type</Label>
+          <Field>
+            <div className="flex items-baseline justify-between gap-2">
+              <FieldLabel htmlFor="offRoomType">Room type</FieldLabel>
+              {selectedRoomType ? (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {money(selectedRoomType.basePrice, selectedRoomType.currency)} / night
+                </span>
+              ) : null}
+            </div>
             <Select value={roomTypeId} onValueChange={(v) => setRoomTypeId(v ?? defaultRoomTypeId)}>
               <SelectTrigger id="offRoomType" className="w-full">
                 <SelectValue />
@@ -177,16 +175,11 @@ export function OfflineBookingPanel({
                 ))}
               </SelectContent>
             </Select>
-            {selectedRoomType ? (
-              <p className="text-xs text-muted-foreground">
-                {selectedRoomType.currency} {selectedRoomType.basePrice.toFixed(0)} / night
-              </p>
-            ) : null}
-          </div>
+          </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="offCheckIn">Check-in</Label>
+            <Field>
+              <FieldLabel htmlFor="offCheckIn">Check-in</FieldLabel>
               <Input
                 id="offCheckIn"
                 name="checkIn"
@@ -196,9 +189,9 @@ export function OfflineBookingPanel({
                 onChange={(e) => setCheckIn(e.target.value)}
                 required
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="offCheckOut">Check-out</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="offCheckOut">Check-out</FieldLabel>
               <Input
                 id="offCheckOut"
                 name="checkOut"
@@ -208,45 +201,50 @@ export function OfflineBookingPanel({
                 onChange={(e) => setCheckOut(e.target.value)}
                 required
               />
-            </div>
+            </Field>
           </div>
 
           {available !== null ? (
             <p
+              role="status"
               className={cn(
-                "flex items-center gap-1.5 text-sm font-medium",
-                willWaitlist ? (available <= 0 ? "text-destructive" : "text-brand-gold") : "text-primary"
+                "flex items-center gap-1.5 text-sm font-medium tabular-nums",
+                willWaitlist
+                  ? available <= 0
+                    ? "text-destructive"
+                    : "text-[color-mix(in_oklch,var(--brand-gold),black_30%)] dark:text-brand-gold"
+                  : "text-primary"
               )}
             >
               {available <= 0 ? (
                 <>
-                  <CircleX className="size-4 shrink-0" /> Fully booked for these dates — this will go on the waitlist.
+                  <CircleX aria-hidden="true" className="size-4 shrink-0" /> Fully booked
                 </>
               ) : willWaitlist ? (
                 <>
-                  <CircleAlert className="size-4 shrink-0" /> Only {available} room{available > 1 ? "s" : ""} left, {numRooms} requested — this will go on the waitlist.
+                  <CircleAlert aria-hidden="true" className="size-4 shrink-0" /> {available} of {numRooms} rooms available
                 </>
               ) : (
                 <>
-                  <CircleCheck className="size-4 shrink-0" /> {available} room{available > 1 ? "s" : ""} available for these dates.
+                  <CircleCheck aria-hidden="true" className="size-4 shrink-0" /> {available} room{available > 1 ? "s" : ""} available
                 </>
               )}
             </p>
           ) : null}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="offGuestName">Guest name</Label>
+            <Field>
+              <FieldLabel htmlFor="offGuestName">Guest name</FieldLabel>
               <Input id="offGuestName" name="guestName" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="offGuestPhone">Phone</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="offGuestPhone">Phone</FieldLabel>
               <Input id="offGuestPhone" name="guestPhone" type="tel" />
-            </div>
+            </Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="offNumRooms">Rooms</Label>
+          <div className="grid grid-cols-[6rem_1fr] gap-3">
+            <Field>
+              <FieldLabel htmlFor="offNumRooms">Rooms</FieldLabel>
               <Input
                 id="offNumRooms"
                 name="numRooms"
@@ -257,16 +255,19 @@ export function OfflineBookingPanel({
                 onChange={(e) => setNumRooms(Math.max(1, Number(e.target.value) || 1))}
                 required
                 aria-invalid={willWaitlist}
+                className="tabular-nums"
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="offNotes">Notes</Label>
-              <Textarea id="offNotes" name="notes" rows={1} />
-            </div>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="offNotes">Notes</FieldLabel>
+              <Textarea id="offNotes" name="notes" rows={1} className="min-h-8" />
+            </Field>
           </div>
 
-          <SubmitButton className="w-full gap-1.5" pendingText="Recording…">
-            <CalendarPlus className="size-4" /> {willWaitlist ? "Add to waitlist" : "Record offline booking"}
+          <FieldError>{state?.error}</FieldError>
+
+          <SubmitButton className="w-full" pendingText="Recording…">
+            <CalendarPlus aria-hidden="true" /> {willWaitlist ? "Add to waitlist" : "Record offline booking"}
           </SubmitButton>
         </form>
       ) : null}

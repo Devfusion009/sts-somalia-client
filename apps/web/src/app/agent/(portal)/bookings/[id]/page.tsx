@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import {
   ArrowRight,
   Building2,
+  CreditCard,
   Download,
   Landmark,
   PartyPopper,
@@ -19,9 +20,12 @@ import { StatusTimeline } from "@/modules/bookings/components/status-timeline";
 import { FlightDetails, hasFlightDetails } from "@/app/(marketing)/umrah/[slug]/flight-details";
 import { umrahTimeline, UMRAH_STAGE_LABEL, UMRAH_DOC_TYPE_LABEL, formatFileSize } from "@/modules/umrah/timeline";
 import { BackLink } from "@/components/back-link";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
+import { money as formatMoney } from "@/lib/money";
 import {
   Table,
   TableBody,
@@ -47,30 +51,16 @@ const TYPE_ICON = {
   hall: PartyPopper,
 } as const;
 
-const ORDER_STATUS_STYLES: Record<string, string> = {
-  held: "bg-brand-gold/15 text-brand-gold",
-  pending_payment: "bg-brand-gold/15 text-brand-gold",
-  paid: "bg-primary/10 text-primary",
-  processing: "bg-chart-3/10 text-chart-3",
-  completed: "bg-primary/10 text-primary",
-  cancelled: "bg-muted text-muted-foreground",
-  refunded: "bg-destructive/10 text-destructive",
-};
-
-const PAYMENT_STATUS_STYLES: Record<string, string> = {
-  succeeded: "bg-primary/10 text-primary",
-  processing: "bg-chart-3/10 text-chart-3",
-  requires_action: "bg-brand-gold/15 text-brand-gold",
-  failed: "bg-destructive/10 text-destructive",
-  refunded: "bg-destructive/10 text-destructive",
-  partially_refunded: "bg-destructive/10 text-destructive",
-};
+/** A manual payment waiting on STS is the one to act on. */
+const PAYMENT_STATUS_VARIANT = { requires_action: "warning", partially_refunded: "neutral" } as const;
 
 const PAYABLE = ["pending_payment", "held", "partially_paid"];
 
 function money(amount: number, currency: string) {
-  return `${currency} ${amount.toFixed(0)}`;
+  return formatMoney(amount, currency);
 }
+
+export const metadata = { title: "Booking" };
 
 export default async function AgentBookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const profile = await requireUser();
@@ -139,88 +129,142 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
     .map((doc) => ({ ...doc, url: signedUrls.get(doc.storage_path) ?? null }));
   const umrahContact = contactLine(umrahTravel?.contact ?? null);
 
+  const statusLabel = awaitingPrice ? "Awaiting price" : order.status.replace(/_/g, " ");
+  const invoiceReady = order.status === "paid" || order.status === "completed";
+  const balanceDueBy =
+    order.balance_due_at && balance > 0 && PAYABLE.includes(order.status)
+      ? format(new Date(`${order.balance_due_at}T00:00:00`), "d MMM yyyy")
+      : null;
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <BackLink href="/agent/bookings" label="Bookings" className="mb-3" />
-          <h1 className="font-heading text-2xl font-bold">{order.order_number}</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {[
-              order.agency_customer?.full_name,
-              order.agency_customer?.phone,
-              format(new Date(order.created_at), "d MMM yyyy"),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        </div>
-        <Badge
-          className={cn(
-            "border-transparent capitalize",
-            ORDER_STATUS_STYLES[order.status] ?? "bg-muted text-muted-foreground"
-          )}
-        >
-          {awaitingPrice ? "Awaiting price" : order.status.replace(/_/g, " ")}
-        </Badge>
+      <div className="space-y-4">
+        <BackLink href="/agent/bookings" label="Bookings" />
+        <header className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="font-heading text-2xl font-semibold tracking-tight tabular-nums">
+                {order.order_number}
+              </h1>
+              <Badge
+                variant={awaitingPrice ? "warning" : statusBadgeVariant(order.status)}
+                className="capitalize"
+              >
+                {statusLabel}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {[
+                order.agency_customer?.full_name,
+                order.agency_customer?.phone,
+                format(new Date(order.created_at), "d MMM yyyy"),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {cancellable ? <CancelOrderButton orderId={order.id} redirectTo="/agent/bookings" size="default" /> : null}
+            {umrahRequestable ? (
+              <>
+                <BookingRequestDialog
+                  orderId={order.id}
+                  kind="cancellation"
+                  currency={order.currency}
+                  size="default"
+                  disabled={openRequests.some((r) => r.kind === "cancellation")}
+                />
+                <BookingRequestDialog
+                  orderId={order.id}
+                  kind="refund"
+                  currency={order.currency}
+                  size="default"
+                  disabled={openRequests.some((r) => r.kind === "refund")}
+                />
+              </>
+            ) : null}
+            {umrahBooking ? (
+              <Button
+                variant="outline"
+                disabled={!voucherAvailable}
+                render={
+                  voucherAvailable ? (
+                    <a href={`/api/vouchers/${order.id}`} target="_blank" rel="noopener noreferrer" />
+                  ) : undefined
+                }
+              >
+                <Download data-icon="inline-start" aria-hidden="true" /> Voucher
+              </Button>
+            ) : null}
+            {umrahBooking ? (
+              <Button
+                variant="outline"
+                disabled={!voucherAvailable}
+                render={
+                  voucherAvailable ? (
+                    <a href={`/api/umrah-itinerary/${order.id}`} target="_blank" rel="noopener noreferrer" />
+                  ) : undefined
+                }
+              >
+                <Download data-icon="inline-start" aria-hidden="true" /> Itinerary
+              </Button>
+            ) : null}
+            {invoiceReady ? (
+              <Button
+                variant="outline"
+                render={<a href={`/api/invoices/${order.id}`} target="_blank" rel="noopener noreferrer" />}
+              >
+                <Download data-icon="inline-start" aria-hidden="true" /> Invoice
+              </Button>
+            ) : null}
+            {payable ? (
+              <Button render={<Link href={`/agent/book/order/${order.id}`} />}>
+                Pay now <ArrowRight data-icon="inline-end" aria-hidden="true" />
+              </Button>
+            ) : null}
+          </div>
+        </header>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg bg-secondary/40 px-4 py-3 sm:grid-cols-4">
-        <div>
-          <dt className="text-xs text-muted-foreground">Net</dt>
-          <dd className="font-medium tabular-nums">{money(Number(order.subtotal), order.currency)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Your margin</dt>
-          <dd className="font-medium tabular-nums">
-            {money(Number(order.markup_amount ?? 0), order.currency)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Customer pays</dt>
-          <dd className="font-semibold tabular-nums">
-            {awaitingPrice ? "On request" : money(total, order.currency)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Balance</dt>
-          <dd className="font-semibold tabular-nums">
-            {awaitingPrice ? "On request" : money(balance, order.currency)}
-          </dd>
-        </div>
-        {order.balance_due_at && balance > 0 && PAYABLE.includes(order.status) ? (
-          <div>
-            <dt className="text-xs text-muted-foreground">Balance due by</dt>
-            <dd className="font-medium tabular-nums">{format(new Date(`${order.balance_due_at}T00:00:00`), "d MMM yyyy")}</dd>
-          </div>
-        ) : null}
-      </dl>
+      <StatRail className={cn(balanceDueBy && "lg:grid-cols-5")}>
+        <StatRailItem label="Net" value={money(Number(order.subtotal), order.currency)} />
+        <StatRailItem label="Your margin" value={money(Number(order.markup_amount ?? 0), order.currency)} />
+        <StatRailItem
+          label="Customer pays"
+          value={awaitingPrice ? "On request" : money(total, order.currency)}
+        />
+        <StatRailItem
+          label="Balance"
+          value={awaitingPrice ? "On request" : money(balance, order.currency)}
+          tone={!awaitingPrice && balance > 0 && PAYABLE.includes(order.status) ? "warn" : undefined}
+        />
+        {balanceDueBy ? <StatRailItem label="Balance due by" value={balanceDueBy} tone="warn" /> : null}
+      </StatRail>
 
-      <section className="space-y-3">
-        <h2 className="font-heading text-base font-semibold">Items</h2>
+      <Section title="Items" count={order.order_items.length}>
         <Card className="overflow-hidden py-0">
-          <CardContent className="divide-y divide-border px-4 py-0">
+          <ul className="divide-y divide-border">
             {order.order_items.map((item) => {
               const info = describeOrderItem(item);
               const Icon = TYPE_ICON[item.item_type];
               const guestNames =
                 item.item_type === "hotel" ? hotelGuestNames(item.hotel_booking?.guest_details) : [];
               return (
-                <div key={item.id} className="flex items-start gap-3 py-3">
-                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary text-primary">
+                <li key={item.id} className="flex items-start gap-3 px-4 py-3 sm:px-5">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+                  >
                     <Icon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-medium">{info.title}</p>
                       {item.item_type === "hotel" && item.hotel_booking?.status === "waitlisted" ? (
-                        <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">
-                          Waitlisted
-                        </Badge>
+                        <Badge variant="warning">Waitlisted</Badge>
                       ) : item.item_type === "hotel" && item.hotel_booking?.status === "confirmed" ? (
-                        <Badge className="border-transparent bg-primary/10 text-primary">
-                          Room confirmed
-                        </Badge>
+                        <Badge variant="success">Room confirmed</Badge>
                       ) : null}
                     </div>
                     {info.subtitle ? (
@@ -240,23 +284,24 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
                       </p>
                     ) : null}
                   </div>
-                </div>
+                </li>
               );
             })}
-          </CardContent>
+          </ul>
         </Card>
-      </section>
+      </Section>
 
       {umrahBooking && umrahTrack ? (
-        <section className="space-y-3">
-          <h2 className="flex flex-wrap items-center gap-2 font-heading text-base font-semibold">
-            Umrah progress
-            {umrahBooking.custom_request ? (
-              <span className="font-mono text-xs font-normal text-muted-foreground">
+        <Section
+          title="Umrah progress"
+          badge={
+            umrahBooking.custom_request ? (
+              <span className="font-mono text-xs text-muted-foreground">
                 {umrahBooking.custom_request.reference}
               </span>
-            ) : null}
-          </h2>
+            ) : null
+          }
+        >
           <Card>
             <CardContent>
               <StatusTimeline
@@ -266,23 +311,35 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
               />
             </CardContent>
           </Card>
-        </section>
+        </Section>
       ) : null}
 
-      {umrahDeparture && hasFlightDetails(umrahDeparture) ? (
-        <section className="space-y-3">
-          <h2 className="font-heading text-base font-semibold">Flights</h2>
-          <Card>
-            <CardContent>
-              <FlightDetails departure={umrahDeparture} />
-            </CardContent>
-          </Card>
-        </section>
+      {(umrahDeparture && hasFlightDetails(umrahDeparture)) || (umrahTravel && umrahTravel.hotels.length > 0) ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {umrahDeparture && hasFlightDetails(umrahDeparture) ? (
+            <Section title="Flights">
+              <Card>
+                <CardContent>
+                  <FlightDetails departure={umrahDeparture} />
+                </CardContent>
+              </Card>
+            </Section>
+          ) : null}
+
+          {umrahTravel && umrahTravel.hotels.length > 0 ? (
+            <Section title="Hotels" count={umrahTravel.hotels.length}>
+              <Card className="overflow-hidden py-0">
+                <CardContent className="px-0 py-0">
+                  <HotelStayList hotels={umrahTravel.hotels} />
+                </CardContent>
+              </Card>
+            </Section>
+          ) : null}
+        </div>
       ) : null}
 
       {umrahTravel?.itinerary ? (
-        <section className="space-y-3">
-          <h2 className="font-heading text-base font-semibold">Day by day</h2>
+        <Section title="Day by day">
           <Card className="overflow-hidden py-0">
             <CardContent className="px-0 py-0">
               <ItineraryList itinerary={umrahTravel.itinerary} />
@@ -291,34 +348,21 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
               ) : null}
             </CardContent>
           </Card>
-        </section>
-      ) : null}
-
-      {umrahTravel && umrahTravel.hotels.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="font-heading text-base font-semibold">Hotels</h2>
-          <Card className="overflow-hidden py-0">
-            <CardContent className="px-0 py-0">
-              <HotelStayList hotels={umrahTravel.hotels} />
-            </CardContent>
-          </Card>
-        </section>
+        </Section>
       ) : null}
 
       {umrahPilgrims.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="font-heading text-base font-semibold">Pilgrims</h2>
+        <Section title="Pilgrims" count={umrahPilgrims.length}>
           <Card className="overflow-hidden py-0">
             <CardContent className="px-0 py-0">
               <PilgrimEditor pilgrims={umrahPilgrims} readiness={umrahReadiness} editable={umrahOpenForChanges} />
             </CardContent>
           </Card>
-        </section>
+        </Section>
       ) : null}
 
       {umrahBooking && umrahPilgrims.length > 0 && (umrahOpenForChanges || umrahHandedIn.length > 0) ? (
-        <section className="space-y-3">
-          <h2 className="font-heading text-base font-semibold">Passports and photos</h2>
+        <Section title="Passports and photos">
           <Card>
             <CardContent>
               <PilgrimDocuments
@@ -329,191 +373,151 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
               />
             </CardContent>
           </Card>
-        </section>
+        </Section>
       ) : null}
 
-      {umrahDocuments.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="font-heading text-base font-semibold">Travel documents</h2>
-          <Card className="overflow-hidden py-0">
-            <CardContent className="divide-y divide-border px-4 py-0">
-              {umrahDocuments.map((doc) => {
-                const pilgrimName = doc.pilgrim_id ? pilgrimNames.get(doc.pilgrim_id) : null;
-                const meta = [
-                  UMRAH_DOC_TYPE_LABEL[doc.doc_type] ?? doc.doc_type,
-                  pilgrimName,
-                  formatFileSize(doc.file_size),
-                  format(new Date(doc.created_at), "d MMM yyyy"),
-                ]
-                  .filter(Boolean)
-                  .join(" · ");
-                return (
-                  <div key={doc.id} className="flex items-center gap-3 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{doc.title}</p>
-                      <p className="text-xs text-muted-foreground">{meta}</p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      aria-label={`Download ${doc.title}`}
-                      render={
-                        <a
-                          href={signedUrls.get(doc.storage_path)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        />
-                      }
-                    >
-                      <Download className="size-4" />
-                    </Button>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </section>
-      ) : null}
-
-      {umrahHistory.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="font-heading text-base font-semibold">Umrah updates</h2>
-          <Card className="overflow-hidden py-0">
-            <CardContent className="divide-y divide-border px-4 py-0">
-              {umrahHistory.map((entry) => (
-                <div key={entry.id} className="flex flex-wrap items-start gap-x-4 gap-y-1 py-3">
-                  <span className="w-36 shrink-0 text-xs text-muted-foreground tabular-nums">
-                    {format(new Date(entry.created_at), "d MMM yyyy, HH:mm")}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{UMRAH_STAGE_LABEL[entry.stage]}</p>
-                    {entry.note ? <p className="text-sm text-muted-foreground">{entry.note}</p> : null}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </section>
-      ) : null}
-
-      <section className="space-y-3">
-        <h2 className="font-heading text-base font-semibold">Payments</h2>
-        {order.payments.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              No payments recorded yet.
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="overflow-hidden py-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Method</TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {order.payments.map((payment) => (
-                    <TableRow key={payment.id}>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {format(new Date(payment.created_at), "d MMM yyyy")}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {payment.method_label ?? payment.provider}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {payment.provider_ref ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">
-                        {money(Number(payment.amount), payment.currency)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={cn(
-                            "border-transparent capitalize",
-                            PAYMENT_STATUS_STYLES[payment.status] ?? "bg-muted text-muted-foreground"
-                          )}
+      {umrahDocuments.length > 0 || umrahHistory.length > 0 ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {umrahDocuments.length > 0 ? (
+            <Section title="Travel documents" count={umrahDocuments.length}>
+              <Card className="overflow-hidden py-0">
+                <ul className="divide-y divide-border">
+                  {umrahDocuments.map((doc) => {
+                    const pilgrimName = doc.pilgrim_id ? pilgrimNames.get(doc.pilgrim_id) : null;
+                    const meta = [
+                      UMRAH_DOC_TYPE_LABEL[doc.doc_type] ?? doc.doc_type,
+                      pilgrimName,
+                      formatFileSize(doc.file_size),
+                      format(new Date(doc.created_at), "d MMM yyyy"),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+                    return (
+                      <li key={doc.id} className="flex items-center gap-3 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{doc.title}</p>
+                          <p className="text-xs text-muted-foreground">{meta}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Download ${doc.title}`}
+                          title="Download"
+                          render={
+                            <a
+                              href={signedUrls.get(doc.storage_path)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            />
+                          }
                         >
-                          {payment.status.replace(/_/g, " ")}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
-        )}
-      </section>
+                          <Download aria-hidden="true" />
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card>
+            </Section>
+          ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        {payable ? (
-          <Button className="gap-1.5" render={<Link href={`/agent/book/order/${order.id}`} />}>
-            Pay now <ArrowRight className="size-3.5" />
-          </Button>
-        ) : null}
-        {umrahBooking ? (
-          <Button
-            variant="outline"
-            className="gap-1.5"
-            disabled={!voucherAvailable}
-            render={
-              voucherAvailable ? (
-                <a href={`/api/vouchers/${order.id}`} target="_blank" rel="noopener noreferrer" />
-              ) : undefined
-            }
-          >
-            <Download className="size-3.5" /> Travel voucher
-          </Button>
-        ) : null}
-        {umrahBooking ? (
-          <Button
-            variant="outline"
-            className="gap-1.5"
-            disabled={!voucherAvailable}
-            render={
-              voucherAvailable ? (
-                <a href={`/api/umrah-itinerary/${order.id}`} target="_blank" rel="noopener noreferrer" />
-              ) : undefined
-            }
-          >
-            <Download className="size-3.5" /> Itinerary
-          </Button>
-        ) : null}
-        {umrahRequestable ? (
-          <>
-            <BookingRequestDialog
-              orderId={order.id}
-              kind="cancellation"
-              currency={order.currency}
-              disabled={openRequests.some((r) => r.kind === "cancellation")}
-            />
-            <BookingRequestDialog
-              orderId={order.id}
-              kind="refund"
-              currency={order.currency}
-              disabled={openRequests.some((r) => r.kind === "refund")}
-            />
-          </>
-        ) : null}
-        {order.status === "paid" || order.status === "completed" ? (
-          <Button
-            variant="outline"
-            className="gap-1.5"
-            render={<a href={`/api/invoices/${order.id}`} target="_blank" rel="noopener noreferrer" />}
-          >
-            <Download className="size-3.5" /> Invoice
-          </Button>
-        ) : null}
-        {cancellable ? (
-          <CancelOrderButton orderId={order.id} redirectTo="/agent/bookings" />
-        ) : null}
-      </div>
+          {umrahHistory.length > 0 ? (
+            <Section title="Umrah updates" count={umrahHistory.length}>
+              <Card className="overflow-hidden py-0">
+                <ol className="divide-y divide-border">
+                  {umrahHistory.map((entry) => (
+                    <li key={entry.id} className="flex flex-wrap items-start gap-x-4 gap-y-1 px-4 py-3">
+                      <span className="w-32 shrink-0 text-xs text-muted-foreground tabular-nums">
+                        {format(new Date(entry.created_at), "d MMM yyyy, HH:mm")}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{UMRAH_STAGE_LABEL[entry.stage]}</p>
+                        {entry.note ? <p className="text-sm text-muted-foreground">{entry.note}</p> : null}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </Card>
+            </Section>
+          ) : null}
+        </div>
+      ) : null}
+
+      <Section title="Payments" count={order.payments.length}>
+        <Card className="overflow-hidden py-0">
+          {order.payments.length === 0 ? (
+            <Empty>
+              <EmptyMedia variant="icon">
+                <CreditCard />
+              </EmptyMedia>
+              <EmptyTitle>No payments</EmptyTitle>
+            </Empty>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead numeric>Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {order.payments.map((payment) => (
+                  <TableRow key={payment.id}>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {format(new Date(payment.created_at), "d MMM yyyy")}
+                    </TableCell>
+                    <TableCell className="text-sm">{payment.method_label ?? payment.provider}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {payment.provider_ref ?? "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={statusBadgeVariant(payment.status, PAYMENT_STATUS_VARIANT)}
+                        className="capitalize"
+                      >
+                        {payment.status.replace(/_/g, " ")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell numeric className="text-sm font-medium">
+                      {money(Number(payment.amount), payment.currency)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
+      </Section>
     </div>
+  );
+}
+
+function Section({
+  title,
+  count,
+  badge,
+  children,
+}: {
+  title: string;
+  count?: number;
+  badge?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="min-w-0 space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="font-heading text-base font-semibold">{title}</h2>
+        {count ? (
+          <Badge variant="neutral" className="tabular-nums">
+            {count}
+          </Badge>
+        ) : null}
+        {badge}
+      </div>
+      {children}
+    </section>
   );
 }

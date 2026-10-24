@@ -3,10 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, ShieldPlus, AlertCircle, Trash2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 
@@ -104,9 +105,10 @@ export function MfaSettings({ factors }: { factors: EnrolledFactor[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldCheck className="size-4 text-primary" /> Two-Factor Authentication
-        </CardTitle>
+        <CardTitle>Two-factor authentication</CardTitle>
+        <CardAction>
+          <Badge variant={hasFactor ? "success" : "neutral"}>{hasFactor ? "On" : "Off"}</Badge>
+        </CardAction>
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
@@ -117,34 +119,37 @@ export function MfaSettings({ factors }: { factors: EnrolledFactor[] }) {
         ) : null}
 
         {enrolling ? (
-          <div className="space-y-4">
-            <div className="flex justify-center rounded-lg border border-border bg-white p-4">
+          <FieldGroup className="gap-4">
+            <div className="flex justify-center rounded-lg bg-white p-4 ring-1 ring-foreground/10">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`data:image/svg+xml;utf8,${encodeURIComponent(enrolling.qrCode)}`}
-                alt="Scan with your authenticator app"
+                alt="Authenticator QR code"
                 width={180}
                 height={180}
               />
             </div>
-            <p className="text-center font-mono text-xs text-muted-foreground">
-              Can&apos;t scan? Enter manually: {enrolling.secret}
-            </p>
-            <div className="space-y-2">
-              <Label htmlFor="mfa-code">6-digit code</Label>
+            <Field>
+              <FieldLabel htmlFor="mfa-secret">Setup key</FieldLabel>
+              <Input id="mfa-secret" readOnly value={enrolling.secret} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="mfa-code">6-digit code</FieldLabel>
               <Input
                 id="mfa-code"
                 inputMode="numeric"
+                autoComplete="one-time-code"
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="text-center text-lg tracking-[0.5em]"
+                className="h-10 text-center text-lg tracking-[0.5em] tabular-nums"
                 placeholder="000000"
               />
-            </div>
-            <div className="flex gap-2">
+            </Field>
+            <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
+                disabled={pending}
                 onClick={() => {
                   setEnrolling(null);
                   setCode("");
@@ -152,36 +157,37 @@ export function MfaSettings({ factors }: { factors: EnrolledFactor[] }) {
               >
                 Cancel
               </Button>
-              <Button onClick={confirmEnroll} disabled={pending || code.length !== 6}>
-                {pending ? "Verifying…" : "Confirm"}
+              <Button onClick={confirmEnroll} loading={pending} disabled={code.length !== 6}>
+                Confirm
               </Button>
             </div>
-          </div>
+          </FieldGroup>
         ) : hasFactor ? (
-          <div className="space-y-3">
+          <ul className="-my-2 divide-y divide-border">
             {factors.map((f) => (
-              <div key={f.id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                <span className="text-sm font-medium">{f.friendly_name ?? "Authenticator App"}</span>
+              <li key={f.id} className="flex items-center justify-between gap-3 py-2">
+                <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                  <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="truncate">{f.friendly_name ?? "Authenticator App"}</span>
+                </span>
                 <ConfirmButton
                   title="Remove this authenticator?"
                   confirmLabel="Remove"
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 text-destructive hover:text-destructive"
+                  className="text-destructive hover:text-destructive"
                   onConfirm={() => removeFactor(f.id)}
                   disabled={pending}
                 >
-                  <Trash2 className="size-3.5" /> Remove
+                  <Trash2 aria-hidden="true" /> Remove
                 </ConfirmButton>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         ) : (
-          <div className="space-y-3">
-            <Button onClick={beginEnroll} disabled={pending} className="gap-1.5">
-              <ShieldPlus className="size-4" /> Add authenticator app
-            </Button>
-          </div>
+          <Button onClick={beginEnroll} loading={pending}>
+            {pending ? null : <ShieldPlus aria-hidden="true" />} Add authenticator app
+          </Button>
         )}
       </CardContent>
     </Card>

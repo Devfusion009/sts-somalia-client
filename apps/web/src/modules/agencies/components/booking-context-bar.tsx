@@ -1,6 +1,7 @@
 import { UserRound, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { money } from "@/lib/money";
 import { clearBookingCustomer } from "@/modules/agencies/booking-context-actions";
 import type { BookingCustomer } from "@/modules/agencies/booking-context";
 
@@ -22,9 +23,12 @@ export function BookingContextBar({
   const isGroup = customers.length > 1;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-lg bg-secondary/40 px-4 py-3">
-      <div className="flex items-center gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl bg-secondary/40 px-4 py-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card text-foreground ring-1 ring-foreground/10"
+        >
           {isGroup ? <Users className="size-4" /> : <UserRound className="size-4" />}
         </span>
         <div className="min-w-0">
@@ -40,11 +44,7 @@ export function BookingContextBar({
             <>
               <p className="flex flex-wrap items-center gap-2 font-medium leading-tight">
                 {first.full_name}
-                {first.profile_id ? (
-                  <Badge className="border-transparent bg-primary/10 text-primary">
-                    STS account
-                  </Badge>
-                ) : null}
+                {first.profile_id ? <Badge variant="info">STS account</Badge> : null}
               </p>
               {first.phone || first.email ? (
                 <p className="truncate text-xs text-muted-foreground">
@@ -59,12 +59,12 @@ export function BookingContextBar({
       <div className="flex items-center gap-5">
         <div className="text-right">
           <p className="text-xs text-muted-foreground">Available</p>
-          <p className="font-semibold tabular-nums leading-tight">
-            {currency} {available.toFixed(0)}
+          <p className="font-heading font-semibold tabular-nums leading-tight">
+            {money(available, currency)}
           </p>
         </div>
         <form action={clearBookingCustomer}>
-          <Button type="submit" variant="outline" size="sm">
+          <Button type="submit" variant="outline">
             Change
           </Button>
         </form>

@@ -1,4 +1,4 @@
-import { Star, MessageSquareText } from "lucide-react";
+import { Star } from "lucide-react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,6 @@ export function PropertyReviews({ reviews }: { reviews: PropertyReview[] }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <MessageSquareText className="size-4 text-muted-foreground" />
           Reviews
           <span className="flex items-center gap-1.5 text-sm font-normal text-muted-foreground">
             <Stars rating={Math.round(average)} />

@@ -38,7 +38,7 @@ export function SalesTimelineChart({
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Sales ({currency})</CardTitle>
+          <CardTitle>Sales ({currency})</CardTitle>
         </CardHeader>
         <CardContent>
           <ChartContainer config={salesConfig} className="aspect-auto h-56 w-full">
@@ -76,7 +76,7 @@ export function SalesTimelineChart({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Tickets cut</CardTitle>
+          <CardTitle>Tickets cut</CardTitle>
         </CardHeader>
         <CardContent>
           <ChartContainer config={ticketsConfig} className="aspect-auto h-56 w-full">

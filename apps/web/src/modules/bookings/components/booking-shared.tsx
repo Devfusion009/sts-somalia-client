@@ -1,5 +1,6 @@
 import { Building2, Plane, FileText, Landmark, PartyPopper, type LucideIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/badge";
+import { money } from "@/lib/money";
 import type { BookingType } from "../types";
 
 export const TYPE_ICON: Record<BookingType, LucideIcon> = {
@@ -18,47 +19,24 @@ export const TYPE_LABEL: Record<BookingType, string> = {
   hall: "Event hall",
 };
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = {
-  confirmed: "default",
-  completed: "default",
-  approved: "default",
-  issued: "default",
-  paid: "default",
-  pending: "secondary",
-  pending_payment: "secondary",
-  processing: "secondary",
-  submitted: "secondary",
-  in_review: "secondary",
-  additional_info_required: "secondary",
-  draft: "secondary",
-  held: "secondary",
-  refunded: "secondary",
-  cancelled: "destructive",
-  rejected: "destructive",
-  failed: "destructive",
+// Customer-facing overrides on the app-wide status map.
+const STATUS_OVERRIDES: Partial<Record<string, BadgeVariant>> = {
+  additional_info_required: "warning",
+  awaiting_confirmation: "warning",
   no_show: "destructive",
 };
 
 export function StatusBadge({ status }: { status: string }) {
   return (
-    <Badge variant={STATUS_VARIANT[status] ?? "secondary"} className="capitalize">
+    <Badge variant={statusBadgeVariant(status, STATUS_OVERRIDES)} className="capitalize">
       {status.replace(/_/g, " ")}
     </Badge>
   );
 }
 
+/** `USD 1,234.00` — same format as the consoles (lib/money). */
 export function formatMoney(amount: number, currency: string) {
-  // Intl throws on a malformed currency code, and a bad row in the database
-  // must not take the whole bookings page down with it.
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toFixed(2)}`;
-  }
+  return money(amount, currency);
 }
 
 export function formatDate(iso: string | null) {

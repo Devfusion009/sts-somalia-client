@@ -10,7 +10,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
@@ -26,7 +25,7 @@ const TRANSITION_UI: Record<
     icon: typeof Ban;
     variant: "outline" | "destructive" | "default";
     title: string;
-    description: string;
+    description?: string;
     confirmLabel: string;
   }
 > = {
@@ -35,8 +34,7 @@ const TRANSITION_UI: Record<
     icon: Ban,
     variant: "outline",
     title: "Suspend this partner account?",
-    description:
-      "The partner loses access to their portal and stops transacting until reactivated. The reason is recorded in the activity log.",
+    description: "Portal access and transacting stop until reactivated.",
     confirmLabel: "Suspend account",
   },
   live: {
@@ -44,7 +42,6 @@ const TRANSITION_UI: Record<
     icon: PlayCircle,
     variant: "default",
     title: "Reactivate this partner account?",
-    description: "Portal access and transacting are restored immediately.",
     confirmLabel: "Reactivate account",
   },
   offboarded: {
@@ -52,8 +49,7 @@ const TRANSITION_UI: Record<
     icon: Archive,
     variant: "destructive",
     title: "Offboard this partner permanently?",
-    description:
-      "Offboarding is terminal — there is no reactivate. Bringing this partner back requires a completely new application. The reason is recorded in the activity log.",
+    description: "This cannot be undone. Returning partners need a new application.",
     confirmLabel: "Offboard permanently",
   },
 };
@@ -80,32 +76,26 @@ export function StatusActions({ accountId, status }: { accountId: string; status
     (to): to is TransitionTarget => !(status === "onboarding" && to === "live")
   );
 
-  if (targets.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        Offboarded accounts are closed for good — reinstating requires a new application.
-      </p>
-    );
-  }
+  if (targets.length === 0) return null;
 
   const ui = openTarget ? TRANSITION_UI[openTarget] : null;
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
-      <div className="flex gap-2">
+    <div className="flex flex-col gap-1.5 sm:items-end">
+      <div className="flex flex-wrap gap-2">
         {targets.map((to) => {
           const { label, icon: Icon, variant } = TRANSITION_UI[to];
           return (
-            <Button key={to} size="sm" variant={variant} onClick={() => setOpenTarget(to)} className="gap-1.5">
-              <Icon className="size-3.5" /> {label}
+            <Button key={to} variant={variant} onClick={() => setOpenTarget(to)}>
+              <Icon data-icon="inline-start" /> {label}
             </Button>
           );
         })}
       </div>
       {state?.error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
+        <p role="alert" className="text-sm text-destructive">
+          {state.error}
+        </p>
       ) : null}
 
       <AlertDialog open={openTarget !== null} onOpenChange={(open) => !open && setOpenTarget(null)}>
@@ -116,9 +106,15 @@ export function StatusActions({ accountId, status }: { accountId: string; status
               <input type="hidden" name="to" value={openTarget} />
               <AlertDialogHeader>
                 <AlertDialogTitle>{ui.title}</AlertDialogTitle>
-                <AlertDialogDescription>{ui.description}</AlertDialogDescription>
+                {ui.description ? <AlertDialogDescription>{ui.description}</AlertDialogDescription> : null}
               </AlertDialogHeader>
-              <Textarea name="reason" placeholder="Reason (recorded in the activity log)" className="my-2" rows={3} />
+              <Textarea
+                name="reason"
+                placeholder="Reason (recorded in the activity log)"
+                aria-label="Reason"
+                className="my-4"
+                rows={3}
+              />
               <AlertDialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpenTarget(null)}>
                   Cancel

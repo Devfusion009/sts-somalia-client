@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import { PartyPopper, Globe2, SlidersHorizontal, CalendarCheck, Banknote } from "lucide-react";
 import { ProgramLanding } from "@/components/marketing/program-landing";
 
-export const metadata: Metadata = { title: "List Your Event Hall" };
+export const metadata: Metadata = { title: "List your event hall" };
 
 export default function VenuesLandingPage() {
   return (
     <ProgramLanding
       image={{ src: "/marketing/partner-venue.webp", alt: "An event hall set for a wedding, with staff checking the layout" }}
-      eyebrow="Venue Partners"
+      eyebrow="Venue partners"
       icon={PartyPopper}
-      title="List Your Event Hall"
+      title="List your event hall"
       subtitle="Weddings, conferences, graduations — put your venue in front of customers planning events across Somalia, and handle every booking request from one dashboard."
       ctaLabel="Apply to list your venue"
       ctaHref="/account/become?program=venue"
@@ -27,8 +27,8 @@ export default function VenuesLandingPage() {
         },
         {
           icon: CalendarCheck,
-          title: "Booking requests, not surprises",
-          description: "Every event is a request you confirm or decline — nothing is booked over your head.",
+          title: "You confirm every booking",
+          description: "Every event is a request you confirm or decline.",
         },
         {
           icon: Banknote,
@@ -39,7 +39,7 @@ export default function VenuesLandingPage() {
       steps={[
         {
           title: "Create an account",
-          description: "Sign up with your email — takes less than a minute.",
+          description: "Sign up with your email.",
         },
         {
           title: "Tell us about your venue",
@@ -47,7 +47,7 @@ export default function VenuesLandingPage() {
         },
         {
           title: "Get approved",
-          description: "Our team reviews applications and approves most within a couple of business days.",
+          description: "Our team reviews your application.",
         },
         {
           title: "List your hall and take requests",

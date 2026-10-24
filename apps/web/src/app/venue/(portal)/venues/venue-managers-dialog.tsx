@@ -28,13 +28,17 @@ export function VenueManagersDialog({
         type="button"
         variant="ghost"
         size="icon"
-        className="relative size-8"
-        aria-label={`Managers of ${venueName}`}
+        className="relative"
+        aria-label={`Managers of ${venueName}${managers.length > 0 ? ` (${managers.length})` : ""}`}
+        title="Managers"
         onClick={() => setOpen(true)}
       >
-        <UsersRound className="size-4" />
+        <UsersRound aria-hidden="true" />
         {managers.length > 0 ? (
-          <span className="absolute -top-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+          <span
+            aria-hidden="true"
+            className="absolute -top-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground tabular-nums"
+          >
             {managers.length}
           </span>
         ) : null}

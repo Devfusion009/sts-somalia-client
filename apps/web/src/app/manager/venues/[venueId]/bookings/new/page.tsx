@@ -19,10 +19,10 @@ export default async function NewVenueBookingPage({
   const base = `/manager/venues/${venueId}`;
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-center gap-3">
+      <header className="flex items-center gap-3">
         <BackLink href={`${base}/bookings`} label="Bookings" />
-        <h1 className="font-heading text-2xl font-semibold">New booking</h1>
-      </div>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">New booking</h1>
+      </header>
       <VenueNewBookingView venue={venue} base={base} date={date} />
     </div>
   );

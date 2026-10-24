@@ -1,5 +1,8 @@
 "use client";
 
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
+import { cn } from "@/lib/utils";
+
 const SORT_OPTIONS = [
   { value: "newest", label: "Newest first" },
   { value: "oldest", label: "Oldest first" },
@@ -11,7 +14,7 @@ export function SortSelect({ value, hidden }: { value: string; hidden: Record<st
   return (
     <form method="get" className="flex items-center gap-2">
       {Object.entries(hidden).map(([name, val]) => (val ? <input key={name} type="hidden" name={name} value={val} /> : null))}
-      <label htmlFor="sort-select" className="text-xs font-medium text-muted-foreground">
+      <label htmlFor="sort-select" className="sr-only">
         Sort
       </label>
       <select
@@ -19,7 +22,7 @@ export function SortSelect({ value, hidden }: { value: string; hidden: Record<st
         name="sort"
         defaultValue={value}
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        className={cn(NATIVE_SELECT_CLASS, "w-auto")}
       >
         {SORT_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>

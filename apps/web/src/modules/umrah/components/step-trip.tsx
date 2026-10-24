@@ -1,39 +1,22 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import {
-  AlertCircle,
-  ArrowRight,
-  CalendarCheck,
-  CalendarDays,
-  Minus,
-  Moon,
-  Plus,
-  User,
-  Users
-} from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { AlertCircle, ArrowRight, Minus, Plus, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
 import { saveUmrahTripBasics } from "@/modules/umrah/custom-actions";
-import {
-  UMRAH_TIERS,
-  UMRAH_TIER_LABELS,
-  UMRAH_TIER_CHIP_CLASS,
-  type UmrahTier
-} from "@/modules/umrah/services";
+import { UMRAH_TIERS, UMRAH_TIER_LABELS, type UmrahTier } from "@/modules/umrah/services";
 import { tripDurationDays, tripReturnDate } from "@/modules/umrah/pricing";
 import { Field, TripNotFoundRecovery } from "./builder-shared";
 import { cn } from "@/lib/utils";
 
+// A fixed format (not toLocaleDateString) so server and client render the same text.
 function formatDisplayDate(iso: string) {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric"
-  });
+  return format(parseISO(iso), "d MMM yyyy");
 }
 
 /** A +/- stepper. Nights and travellers are small integers people nudge. */
@@ -43,7 +26,8 @@ function Counter({
   onChange,
   min = 0,
   max = 60,
-  id
+  id,
+  ariaName
 }: {
   name: string;
   value: number;
@@ -51,6 +35,8 @@ function Counter({
   min?: number;
   max?: number;
   id?: string;
+  /** Names the +/- buttons for screen readers, e.g. "nights in Makkah". */
+  ariaName?: string;
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -58,11 +44,11 @@ function Counter({
         type="button"
         variant="outline"
         size="icon"
-        aria-label="Decrease"
+        aria-label={ariaName ? `Fewer ${ariaName}` : "Decrease"}
         disabled={value <= min}
         onClick={() => onChange(Math.max(min, value - 1))}
       >
-        <Minus className="size-4" />
+        <Minus className="size-4" aria-hidden />
       </Button>
       <Input
         id={id}
@@ -78,17 +64,17 @@ function Counter({
             Number.isFinite(next) ? Math.min(max, Math.max(min, next)) : min
           );
         }}
-        className="w-20 text-center"
+        className="w-20 text-center tabular-nums"
       />
       <Button
         type="button"
         variant="outline"
         size="icon"
-        aria-label="Increase"
+        aria-label={ariaName ? `More ${ariaName}` : "Increase"}
         disabled={value >= max}
         onClick={() => onChange(Math.min(max, value + 1))}
       >
-        <Plus className="size-4" />
+        <Plus className="size-4" aria-hidden />
       </Button>
     </div>
   );
@@ -162,10 +148,6 @@ export function StepTrip({
           <h2 className="font-heading text-lg font-bold">
             1. Who is travelling?
           </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Include everyone who needs a visa, a seat and a bed — yourself
-            included.
-          </p>
           <div className="mt-4">
             <Field label="Number of travellers" htmlFor="num_pilgrims" required>
               <Counter
@@ -175,6 +157,7 @@ export function StepTrip({
                 onChange={updateNumPilgrims}
                 min={1}
                 max={40}
+                ariaName="travellers"
               />
             </Field>
           </div>
@@ -185,11 +168,10 @@ export function StepTrip({
                 key={i}
                 label={
                   i === 0 ? (
-                    <span className="flex items-center gap-2">
+                    <span className="flex flex-wrap items-center gap-2">
                       Lead traveller&apos;s full name (as in passport)
-                      <Badge className="border-transparent bg-chart-3/10 text-[10px] text-chart-3">
-                        That&apos;s you
-                      </Badge>
+                      {/* On the agent desk the agent is not the traveller. */}
+                      {!desk ? <Badge variant="info">That&apos;s you</Badge> : null}
                     </span>
                   ) : (
                     `Traveller ${i + 1}'s full name (as in passport)`
@@ -199,7 +181,7 @@ export function StepTrip({
                 required
               >
                 <div className="relative">
-                  <User className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <User className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
                   <Input
                     id={`traveller_name_${i}`}
                     name={`traveller_name_${i}`}
@@ -212,10 +194,6 @@ export function StepTrip({
                 </div>
               </Field>
             ))}
-            <p className="text-xs text-muted-foreground">
-              Passport number, gender and other details are collected on step 3
-              — just names for now.
-            </p>
           </div>
         </section>
 
@@ -223,10 +201,6 @@ export function StepTrip({
           <h2 className="font-heading text-lg font-bold">
             2. When would you like to travel?
           </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Choose your departure date and how long you would like to stay in
-            each city. Hotel prices are worked out from these nights.
-          </p>
           <div className="mt-4 grid gap-5 sm:grid-cols-3">
             <Field label="Departure date" htmlFor="departure_date" required>
               <Input
@@ -245,6 +219,7 @@ export function StepTrip({
                 name="nights_makkah"
                 value={nightsMakkah}
                 onChange={setNightsMakkah}
+                ariaName="nights in Makkah"
               />
             </Field>
             <Field label="Nights in Madinah" htmlFor="nights_madinah" required>
@@ -253,6 +228,7 @@ export function StepTrip({
                 name="nights_madinah"
                 value={nightsMadinah}
                 onChange={setNightsMadinah}
+                ariaName="nights in Madinah"
               />
             </Field>
           </div>
@@ -262,10 +238,6 @@ export function StepTrip({
           <h2 className="font-heading text-lg font-bold">
             3. What standard would you like?
           </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            This sets your starting selection on the next step. You can change
-            any individual choice afterwards.
-          </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             {UMRAH_TIERS.map((option) => {
               const active = tier === option.value;
@@ -276,21 +248,14 @@ export function StepTrip({
                   onClick={() => setTier(option.value)}
                   aria-pressed={active}
                   className={cn(
-                    "rounded-xl border bg-card p-4 text-left transition-all",
+                    "rounded-xl border bg-card p-4 text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                     active
                       ? "border-primary shadow-sm ring-2 ring-primary/20"
                       : "border-border hover:border-primary/40"
                   )}
                 >
-                  <span
-                    className={cn(
-                      "inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold",
-                      option.className
-                    )}
-                  >
-                    {option.label}
-                  </span>
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  <span className="block font-heading text-sm font-bold">{option.label}</span>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                     {option.blurb}
                   </p>
                 </button>
@@ -311,8 +276,8 @@ export function StepTrip({
         ) : null}
 
         <div className="flex justify-end">
-          <SubmitButton size="lg" pendingText="Saving…" className="gap-2">
-            Continue to services <ArrowRight className="size-4" />
+          <SubmitButton size="lg" pendingText="Saving…" className="w-full gap-2 sm:w-auto">
+            Continue to services <ArrowRight className="size-4" aria-hidden />
           </SubmitButton>
         </div>
       </form>
@@ -356,64 +321,32 @@ function TripSummary({
 }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-      <p className="text-xs font-bold text-muted-foreground">
-        Your trip so far
-      </p>
-
-      <div className="mt-3 flex items-center justify-between">
-        <span className="flex items-center gap-2 text-sm font-semibold">
-          <Users className="size-4 text-primary" />
-          {numPilgrims} traveller{numPilgrims === 1 ? "" : "s"}
-        </span>
-        <span
-          className={cn(
-            "rounded-full px-2.5 py-0.5 text-xs font-bold",
-            UMRAH_TIER_CHIP_CLASS[tier]
-          )}
-        >
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-heading text-base font-bold">Your trip</h2>
+        <Badge variant="neutral" className="font-semibold">
           {UMRAH_TIER_LABELS[tier]}
-        </span>
+        </Badge>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <TripStatTile
-          icon={CalendarDays}
-          value={duration || "–"}
-          label="Days"
-          tone="bg-primary/10 text-primary"
-        />
-        <TripStatTile
-          icon={Moon}
-          value={nightsMakkah}
-          label="Nights Makkah"
-          tone="bg-brand-gold/15 text-brand-gold"
-        />
-        <TripStatTile
-          icon={Moon}
-          value={nightsMadinah}
-          label="Nights Madinah"
-          tone="bg-chart-2/10 text-chart-2"
-        />
-      </div>
+      <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2">
+        <TripStatTile value={numPilgrims} label={numPilgrims === 1 ? "Traveller" : "Travellers"} />
+        <TripStatTile value={duration || "–"} label="Days" />
+        <TripStatTile value={nightsMakkah} label="Nights Makkah" />
+        <TripStatTile value={nightsMadinah} label="Nights Madinah" />
+      </dl>
 
       {departureDate || returnDate ? (
         <dl className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
           {departureDate ? (
-            <div className="flex items-center justify-between">
-              <dt className="flex items-center gap-1.5 text-muted-foreground">
-                <CalendarCheck className="size-3.5" /> Departure
-              </dt>
-              <dd className="font-medium">
-                {formatDisplayDate(departureDate)}
-              </dd>
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-muted-foreground">Departure</dt>
+              <dd className="font-medium tabular-nums">{formatDisplayDate(departureDate)}</dd>
             </div>
           ) : null}
           {returnDate ? (
-            <div className="flex items-center justify-between">
-              <dt className="flex items-center gap-1.5 text-muted-foreground">
-                <CalendarCheck className="size-3.5" /> Returning
-              </dt>
-              <dd className="font-medium">{formatDisplayDate(returnDate)}</dd>
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-muted-foreground">Returning</dt>
+              <dd className="font-medium tabular-nums">{formatDisplayDate(returnDate)}</dd>
             </div>
           ) : null}
         </dl>
@@ -422,33 +355,11 @@ function TripSummary({
   );
 }
 
-function TripStatTile({
-  icon: Icon,
-  value,
-  label,
-  tone
-}: {
-  icon: typeof CalendarDays;
-  value: number | string;
-  label: string;
-  tone: string;
-}) {
+function TripStatTile({ value, label }: { value: number | string; label: string }) {
   return (
-    <div className="flex flex-col items-center gap-1.5 rounded-xl border border-border bg-secondary/30 py-3 text-center">
-      <span
-        className={cn(
-          "flex size-8 items-center justify-center rounded-lg",
-          tone
-        )}
-      >
-        <Icon className="size-4" />
-      </span>
-      <span className="font-heading text-lg font-bold tabular-nums">
-        {value}
-      </span>
-      <span className="px-1 text-xs leading-tight font-semibold text-muted-foreground">
-        {label}
-      </span>
+    <div className="flex flex-col-reverse rounded-lg bg-secondary/40 px-3 py-2.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="font-heading text-lg font-bold tabular-nums">{value}</dd>
     </div>
   );
 }

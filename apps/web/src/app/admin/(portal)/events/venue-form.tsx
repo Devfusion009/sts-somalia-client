@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -63,19 +63,15 @@ export function VenueForm({ venue }: { venue?: Venue }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={<Button size={venue ? "sm" : "default"} variant={venue ? "outline" : "default"} />}
-      >
-        {venue ? (
-          <>
-            <Pencil /> Edit
-          </>
-        ) : (
-          <>
-            <Plus /> Add venue
-          </>
-        )}
-      </DialogTrigger>
+      {venue ? (
+        <DialogTrigger render={<Button size="icon" variant="ghost" aria-label={`Edit ${venue.name}`} title="Edit" />}>
+          <Pencil />
+        </DialogTrigger>
+      ) : (
+        <DialogTrigger render={<Button />}>
+          <Plus aria-hidden="true" /> Add venue
+        </DialogTrigger>
+      )}
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
         <form action={formAction}>
           {venue ? <input type="hidden" name="id" value={venue.id} /> : null}
@@ -83,7 +79,7 @@ export function VenueForm({ venue }: { venue?: Venue }) {
             <DialogTitle>{venue ? "Edit venue" : "Add venue"}</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <FieldGroup className="gap-4 py-4">
             {state?.error ? (
               <Alert variant="destructive">
                 <AlertDescription>{state.error}</AlertDescription>
@@ -91,45 +87,45 @@ export function VenueForm({ venue }: { venue?: Venue }) {
             ) : null}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="venue-name">Name</Label>
+              <Field>
+                <FieldLabel htmlFor="venue-name">Name</FieldLabel>
                 <Input id="venue-name" name="name" defaultValue={venue?.name} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="venue-city">City</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="venue-city">City</FieldLabel>
                 <Input id="venue-city" name="city" defaultValue={venue?.city} required />
-              </div>
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="venue-tagline">Tagline</Label>
+            <Field>
+              <FieldLabel htmlFor="venue-tagline">Tagline</FieldLabel>
               <Input id="venue-tagline" name="tagline" defaultValue={venue?.tagline ?? ""} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="venue-description">Description</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="venue-description">Description</FieldLabel>
               <Textarea
                 id="venue-description"
                 name="description"
                 rows={3}
                 defaultValue={venue?.description ?? ""}
               />
-            </div>
+            </Field>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="venue-address">Address</Label>
+              <Field>
+                <FieldLabel htmlFor="venue-address">Address</FieldLabel>
                 <Input id="venue-address" name="address" defaultValue={venue?.address ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="venue-phone">Phone</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="venue-phone">Phone</FieldLabel>
                 <Input id="venue-phone" name="phone" type="tel" defaultValue={venue?.phone ?? ""} />
-              </div>
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="venue-email">Contact email</Label>
+            <Field>
+              <FieldLabel htmlFor="venue-email">Contact email</FieldLabel>
               <Input id="venue-email" name="contactEmail" type="email" defaultValue={venue?.contact_email ?? ""} />
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="venue-seated">Seated capacity</Label>
+            </Field>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <Field>
+                <FieldLabel htmlFor="venue-seated">Seated capacity</FieldLabel>
                 <Input
                   id="venue-seated"
                   name="capacitySeated"
@@ -137,9 +133,9 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                   min={1}
                   defaultValue={venue?.capacity_seated ?? undefined}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="venue-standing">Standing capacity</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="venue-standing">Standing capacity</FieldLabel>
                 <Input
                   id="venue-standing"
                   name="capacityStanding"
@@ -147,9 +143,9 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                   min={1}
                   defaultValue={venue?.capacity_standing ?? undefined}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="venue-size">Size (m²)</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="venue-size">Size (m²)</FieldLabel>
                 <Input
                   id="venue-size"
                   name="sizeSqm"
@@ -158,10 +154,10 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                   step="0.1"
                   defaultValue={venue?.size_sqm ?? undefined}
                 />
-              </div>
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="venue-amenities">Amenities (comma-separated)</Label>
+            <Field>
+              <FieldLabel htmlFor="venue-amenities">Amenities</FieldLabel>
               <Textarea
                 id="venue-amenities"
                 name="amenities"
@@ -169,18 +165,18 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                 defaultValue={jsonList(venue?.amenities)}
                 placeholder="stage, sound system, catering kitchen, parking"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="venue-event-types">Suitable events (comma-separated)</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="venue-event-types">Suitable events</FieldLabel>
               <Input
                 id="venue-event-types"
                 name="eventTypes"
                 defaultValue={jsonList(venue?.event_types)}
                 placeholder="wedding, conference, graduation"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="venue-policies">Policies (cancellation, deposit, ...)</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="venue-policies">Policies</FieldLabel>
               <Textarea
                 id="venue-policies"
                 name="policies"
@@ -188,14 +184,20 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                 defaultValue={venue?.policies ?? ""}
                 placeholder="50% deposit to confirm. Free cancellation up to 7 days before the event."
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="venue-links">Links (one per line: Label | URL)</Label>
-              <Textarea id="venue-links" name="links" rows={3} defaultValue={linksList(venue?.property_links)} />
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="venue-price">Base price</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="venue-links">Links</FieldLabel>
+              <Textarea
+                id="venue-links"
+                name="links"
+                rows={3}
+                placeholder="Website | https://example.com"
+                defaultValue={linksList(venue?.property_links)}
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <Field>
+                <FieldLabel htmlFor="venue-price">Base price</FieldLabel>
                 <Input
                   id="venue-price"
                   name="basePrice"
@@ -203,23 +205,25 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                   min={0}
                   step="0.01"
                   defaultValue={venue?.base_price}
+                  className="tabular-nums"
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="venue-currency">Currency</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="venue-currency">Currency</FieldLabel>
                 <Input
                   id="venue-currency"
                   name="currency"
                   maxLength={3}
+                  className="uppercase"
                   defaultValue={venue?.currency ?? "USD"}
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Priced</Label>
+              </Field>
+              <Field className="col-span-2 sm:col-span-1">
+                <FieldLabel>Priced</FieldLabel>
                 <Select name="priceUnit" defaultValue={venue?.price_unit ?? "per_event"}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full" aria-label="Priced">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -229,13 +233,13 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                     <SelectItem value="per_person">Per person</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             </div>
             <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Status</Label>
+              <Field>
+                <FieldLabel>Status</FieldLabel>
                 <Select name="status" defaultValue={venue?.status ?? "draft"}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full" aria-label="Status">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -245,8 +249,8 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                     <SelectItem value="suspended">Suspended</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <label className="flex items-center gap-2 pb-2 text-sm">
+              </Field>
+              <label className="flex h-8 items-center gap-2 text-sm font-medium">
                 <input
                   type="checkbox"
                   name="isFeatured"
@@ -256,13 +260,13 @@ export function VenueForm({ venue }: { venue?: Venue }) {
                 Featured venue
               </label>
             </div>
-          </div>
+          </FieldGroup>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <SubmitButton pendingText="Saving…">{venue ? "Save changes" : "Create"}</SubmitButton>
+            <SubmitButton pendingText="Saving…">{venue ? "Save changes" : "Create venue"}</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

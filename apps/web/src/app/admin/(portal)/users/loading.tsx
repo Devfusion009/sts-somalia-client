@@ -12,7 +12,7 @@ export default function UsersLoading() {
     <LoadingShell label="users">
       <Title title="Users" badge />
       <SearchBar placeholder="Name or email" />
-      <DataTable headers={["Name","Email","Role","Status","Joined","Actions"]} rows={10} cell={{ 3: PillCell }} />
+      <DataTable headers={["Name","Email","Role","Status","Joined",""]} rows={10} cell={{ 3: PillCell }} />
       <Pager />
     </LoadingShell>
   );

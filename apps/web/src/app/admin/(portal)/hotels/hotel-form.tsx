@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -70,11 +70,11 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
       >
         {hotel ? (
           <>
-            <Pencil /> Edit
+            <Pencil aria-hidden="true" /> Edit
           </>
         ) : (
           <>
-            <Plus /> Add hotel
+            <Plus aria-hidden="true" /> Add hotel
           </>
         )}
       </DialogTrigger>
@@ -84,21 +84,21 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
         </DialogHeader>
 
         {hotel ? (
-          <div className="border-b border-border pb-4">
-            <Label className="mb-2 block">Logo</Label>
+          <Field className="border-b border-border pb-4">
+            <FieldLabel>Logo</FieldLabel>
             <HotelLogoUploader
               hotelId={hotel.id}
               logoUrl={hotelLogoUrl(hotel.logo_path)}
               uploadAction={uploadHotelLogoAdmin}
               removeAction={removeHotelLogoAdmin}
             />
-          </div>
+          </Field>
         ) : null}
 
         <form action={formAction}>
           {hotel ? <input type="hidden" name="id" value={hotel.id} /> : null}
 
-          <div className="grid gap-4 py-4">
+          <FieldGroup className="gap-4 py-4">
             {state?.error ? (
               <Alert variant="destructive">
                 <AlertDescription>{state.error}</AlertDescription>
@@ -106,40 +106,35 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
             ) : null}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="hotel-name">Name</Label>
+              <Field>
+                <FieldLabel htmlFor="hotel-name">Name</FieldLabel>
                 <Input id="hotel-name" name="name" defaultValue={hotel?.name} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="hotel-city">City</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="hotel-city">City</FieldLabel>
                 <LocationField id="hotel-city" name="city" defaultValue={hotel?.city} required />
-              </div>
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="hotel-description">Description</Label>
-              <Textarea
-                id="hotel-description"
-                name="description"
-                rows={3}
-                defaultValue={hotel?.description ?? ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="hotel-description-so">Description (Somali)</Label>
+            <Field>
+              <FieldLabel htmlFor="hotel-description">Description</FieldLabel>
+              <Textarea id="hotel-description" name="description" rows={3} defaultValue={hotel?.description ?? ""} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="hotel-description-so">Description (Somali)</FieldLabel>
               <Textarea
                 id="hotel-description-so"
                 name="descriptionSo"
                 rows={3}
                 defaultValue={hotel?.description_so ?? ""}
               />
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="hotel-address">Address</Label>
+            </Field>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_8rem]">
+              <Field>
+                <FieldLabel htmlFor="hotel-address">Address</FieldLabel>
                 <Input id="hotel-address" name="addressLine" defaultValue={hotel?.address_line ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="hotel-country">Country code</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="hotel-country">Country code</FieldLabel>
                 <Input
                   id="hotel-country"
                   name="countryCode"
@@ -148,42 +143,43 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
                   defaultValue={hotel?.country_code ?? "SO"}
                   required
                 />
-              </div>
+              </Field>
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="hotel-star">Star rating</Label>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[8rem_1fr]">
+              <Field>
+                <FieldLabel htmlFor="hotel-star">Star rating</FieldLabel>
                 <Input
                   id="hotel-star"
                   name="starRating"
                   type="number"
                   min={1}
                   max={5}
+                  className="tabular-nums"
                   defaultValue={hotel?.star_rating ?? undefined}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="hotel-email">Contact email</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="hotel-email">Contact email</FieldLabel>
                 <Input id="hotel-email" name="contactEmail" type="email" defaultValue={hotel?.contact_email ?? ""} />
-              </div>
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="hotel-phone">Phone</Label>
+            <Field>
+              <FieldLabel htmlFor="hotel-phone">Phone</FieldLabel>
               <PhoneField name="phone" defaultValue={hotel?.phone ?? ""} />
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="hotel-checkin">Check-in time</Label>
+            </Field>
+            <div className="grid grid-cols-2 gap-4">
+              <Field>
+                <FieldLabel htmlFor="hotel-checkin">Check-in</FieldLabel>
                 <Input id="hotel-checkin" name="checkInTime" type="time" defaultValue={hotel?.check_in_time?.slice(0, 5) ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="hotel-checkout">Check-out time</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="hotel-checkout">Check-out</FieldLabel>
                 <Input id="hotel-checkout" name="checkOutTime" type="time" defaultValue={hotel?.check_out_time?.slice(0, 5) ?? ""} />
-              </div>
+              </Field>
             </div>
             <AmenitiesField initial={amenitiesList(hotel?.amenities)} />
-            <div className="space-y-2">
-              <Label htmlFor="hotel-policies">Policies</Label>
+            <Field>
+              <FieldLabel htmlFor="hotel-policies">Policies</FieldLabel>
               <Textarea
                 id="hotel-policies"
                 name="policies"
@@ -191,9 +187,9 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
                 placeholder="Cancellation, house rules"
                 defaultValue={hotel?.policies ?? ""}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="hotel-links">Links</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="hotel-links">Links</FieldLabel>
               <Textarea
                 id="hotel-links"
                 name="links"
@@ -201,11 +197,11 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
                 placeholder="Website | https://example.com"
                 defaultValue={linksList(hotel?.property_links)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Owner</Label>
+            </Field>
+            <Field>
+              <FieldLabel>Owner</FieldLabel>
               <Select name="partnerId" defaultValue={hotel?.partner_id ?? "none"}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" aria-label="Owner">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -217,24 +213,24 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Booking mode</Label>
+            </Field>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field>
+                <FieldLabel>Booking mode</FieldLabel>
                 <Select name="bookingMode" defaultValue={hotel?.booking_mode ?? "manual"}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full" aria-label="Booking mode">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="manual">Manual — STS confirms every request</SelectItem>
-                    <SelectItem value="instant">Instant — live availability</SelectItem>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="instant">Instant</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
+              </Field>
+              <Field>
+                <FieldLabel>Status</FieldLabel>
                 <Select name="status" defaultValue={hotel?.status ?? "draft"}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full" aria-label="Status">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -244,15 +240,15 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
                     <SelectItem value="suspended">Suspended</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             </div>
-          </div>
+          </FieldGroup>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <SubmitButton pendingText="Saving…">{hotel ? "Save changes" : "Create"}</SubmitButton>
+            <SubmitButton pendingText="Saving…">{hotel ? "Save changes" : "Create hotel"}</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

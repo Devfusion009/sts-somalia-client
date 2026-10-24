@@ -1,17 +1,6 @@
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import {
-  BedDouble,
-  Check,
-  CircleDot,
-  CreditCard,
-  LogIn,
-  LogOut,
-  Mail,
-  Phone,
-  StickyNote,
-  Users,
-} from "lucide-react";
+import { CircleDot, LogIn, LogOut, Mail, Phone, StickyNote } from "lucide-react";
 import type { HotelAccess } from "@/modules/hotels/hotel-access";
 import { getBookingDetail, type BookingDetail, type BookingEvent } from "@/modules/hotels/booking-detail-queries";
 import { todayIso } from "@/modules/hotels/availability";
@@ -24,19 +13,12 @@ import { BookingMoveActions } from "@/modules/hotels/components/booking-move-act
 import { BookingRoomAssign } from "@/modules/hotels/components/booking-room-assign";
 import { BackLink } from "@/components/back-link";
 import { SubmitButton } from "@/components/submit-button";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
+import { money } from "@/lib/money";
 
-const STATUS_BADGE: Record<string, string> = {
-  pending: "bg-brand-gold/15 text-brand-gold",
-  waitlisted: "bg-brand-gold/15 text-brand-gold",
-  confirmed: "bg-primary/10 text-primary",
-  completed: "bg-primary/10 text-primary",
-  cancelled: "bg-destructive/10 text-destructive",
-  refunded: "bg-destructive/10 text-destructive",
-  no_show: "bg-muted text-muted-foreground",
-};
+const STATUS_OVERRIDES = { no_show: "neutral" } as const;
 
 function stayState(b: BookingDetail, today: string) {
   if (b.status !== "pending" && b.status !== "confirmed") return null;
@@ -81,11 +63,11 @@ function eventTitle(event: BookingEvent) {
   }
 }
 
-function Fact({ label, value }: { label: string; value: React.ReactNode }) {
+function Detail({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="bg-secondary/40 px-4 py-3">
+    <div className="min-w-0">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="font-heading text-lg font-semibold">{value}</dd>
+      <dd className="mt-0.5 text-sm font-medium">{children}</dd>
     </div>
   );
 }
@@ -119,18 +101,18 @@ export async function BookingDetailView({
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
           <BackLink href={`${base}/bookings`} label="Bookings" />
-          <div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="font-heading text-2xl font-semibold">{leadGuest}</h1>
-              <Badge className={cn("border-transparent capitalize", STATUS_BADGE[booking.status] ?? "bg-muted text-muted-foreground")}>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{leadGuest}</h1>
+              <Badge variant={statusBadgeVariant(booking.status, STATUS_OVERRIDES)} className="capitalize">
                 {booking.status.replace(/_/g, " ")}
               </Badge>
               {state ? <Badge variant="outline">{state}</Badge> : null}
             </div>
-            <p className="mt-0.5 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground tabular-nums">
               {booking.reference ?? `BK-${booking.id.slice(0, 8).toUpperCase()}`} · {channelLabel} · Booked{" "}
               {format(new Date(booking.createdAt), "d MMM yyyy, HH:mm")}
             </p>
@@ -148,40 +130,34 @@ export async function BookingDetailView({
         ) : null}
       </div>
 
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border sm:grid-cols-3 lg:grid-cols-6">
-        <Fact label="Check-in" value={format(new Date(`${booking.checkIn}T00:00:00`), "d MMM")} />
-        <Fact label="Check-out" value={format(new Date(`${booking.checkOut}T00:00:00`), "d MMM")} />
-        <Fact label="Nights" value={booking.nights} />
-        <Fact label="Rooms" value={booking.numRooms} />
-        <Fact
+      <StatRail className="sm:grid-cols-3 lg:grid-cols-6">
+        <StatRailItem label="Check-in" value={format(new Date(`${booking.checkIn}T00:00:00`), "d MMM")} />
+        <StatRailItem label="Check-out" value={format(new Date(`${booking.checkOut}T00:00:00`), "d MMM")} />
+        <StatRailItem label="Nights" value={booking.nights} />
+        <StatRailItem label="Rooms" value={booking.numRooms} />
+        <StatRailItem
           label="Guests"
           value={booking.numChildren > 0 ? `${booking.numAdults} + ${booking.numChildren}` : booking.numAdults}
         />
-        <Fact label="Total" value={`${booking.currency} ${booking.totalPrice.toFixed(0)}`} />
-      </dl>
+        <StatRailItem label="Total" value={money(booking.totalPrice, booking.currency)} />
+      </StatRail>
 
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <BedDouble className="size-4 text-primary" /> Room
-              </CardTitle>
+              <CardTitle className="text-base">Room</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <dl className="grid gap-px overflow-hidden rounded-lg bg-border sm:grid-cols-2">
-                <div className="bg-card px-3 py-2.5">
-                  <dt className="text-xs text-muted-foreground">Room type</dt>
-                  <dd className="font-medium">{booking.roomType?.name ?? "—"}</dd>
-                </div>
-                <div className="bg-card px-3 py-2.5">
-                  <dt className="text-xs text-muted-foreground">Room number</dt>
-                  <dd className="font-medium">
-                    {booking.assignedUnit
-                      ? `${booking.assignedUnit.roomNumber}${booking.assignedUnit.floor ? ` · Floor ${booking.assignedUnit.floor}` : ""}`
-                      : "Not assigned"}
-                  </dd>
-                </div>
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <Detail label="Room type">{booking.roomType?.name ?? "—"}</Detail>
+                <Detail label="Room number">
+                  {booking.assignedUnit ? (
+                    `${booking.assignedUnit.roomNumber}${booking.assignedUnit.floor ? ` · Floor ${booking.assignedUnit.floor}` : ""}`
+                  ) : (
+                    <span className="text-muted-foreground">Not assigned</span>
+                  )}
+                </Detail>
               </dl>
 
               {canManage && live ? (
@@ -189,16 +165,16 @@ export async function BookingDetailView({
                   {!booking.checkedInAt && booking.status === "confirmed" && booking.checkIn <= today ? (
                     <form action={checkInBooking}>
                       <input type="hidden" name="bookingId" value={booking.id} />
-                      <SubmitButton size="sm" className="gap-1.5" pendingText="Checking in…">
-                        <LogIn className="size-3.5" /> Check in
+                      <SubmitButton size="sm" pendingText="Checking in…">
+                        <LogIn aria-hidden="true" /> Check in
                       </SubmitButton>
                     </form>
                   ) : null}
                   {booking.checkedInAt && !booking.checkedOutAt ? (
                     <form action={checkOutBooking}>
                       <input type="hidden" name="bookingId" value={booking.id} />
-                      <SubmitButton size="sm" variant="outline" className="gap-1.5" pendingText="Checking out…">
-                        <LogOut className="size-3.5" /> Check out
+                      <SubmitButton size="sm" variant="outline" pendingText="Checking out…">
+                        <LogOut aria-hidden="true" /> Check out
                       </SubmitButton>
                     </form>
                   ) : null}
@@ -216,13 +192,11 @@ export async function BookingDetailView({
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="size-4 text-primary" /> Guests
-              </CardTitle>
+              <CardTitle className="text-base">Guests</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {booking.guests.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No guest names recorded.</p>
+                <p className="text-sm text-muted-foreground">No guest names</p>
               ) : (
                 <ul className="divide-y divide-border">
                   {booking.guests.map((g, i) => (
@@ -233,7 +207,7 @@ export async function BookingDetailView({
                       </span>
                       {g.phone ? (
                         <a href={`tel:${g.phone}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-                          <Phone className="size-3.5" /> {g.phone}
+                          <Phone className="size-3.5" aria-hidden="true" /> {g.phone}
                         </a>
                       ) : null}
                     </li>
@@ -245,12 +219,12 @@ export async function BookingDetailView({
                   href={`mailto:${booking.customerEmail}`}
                   className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
                 >
-                  <Mail className="size-3.5" /> {booking.customerEmail}
+                  <Mail className="size-3.5" aria-hidden="true" /> {booking.customerEmail}
                 </a>
               ) : null}
               {booking.specialRequests ? (
                 <div className="flex gap-2 rounded-lg bg-secondary/40 px-3 py-2.5 text-sm">
-                  <StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-label="Special requests" />
                   <span>{booking.specialRequests}</span>
                 </div>
               ) : null}
@@ -259,52 +233,40 @@ export async function BookingDetailView({
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <CreditCard className="size-4 text-primary" /> Payment
-              </CardTitle>
+              <CardTitle className="text-base">Payment</CardTitle>
             </CardHeader>
             <CardContent>
-              <dl className="grid gap-px overflow-hidden rounded-lg bg-border sm:grid-cols-3">
-                <div className="bg-card px-3 py-2.5">
-                  <dt className="text-xs text-muted-foreground">Amount</dt>
-                  <dd className="font-medium">
-                    {booking.currency} {booking.totalPrice.toFixed(2)}
-                  </dd>
-                </div>
-                <div className="bg-card px-3 py-2.5">
-                  <dt className="text-xs text-muted-foreground">Method</dt>
-                  <dd className="font-medium">
-                    {isOffline ? (paymentLabel ?? "At check-in") : (booking.onlinePayment?.methodLabel ?? "Online")}
-                  </dd>
-                </div>
-                <div className="bg-card px-3 py-2.5">
-                  <dt className="text-xs text-muted-foreground">Status</dt>
-                  <dd className="flex items-center gap-2 font-medium">
-                    {booking.paidAt || booking.onlinePayment ? (
-                      <span className="flex items-center gap-1 text-primary">
-                        <Check className="size-4" /> Paid
-                      </span>
-                    ) : (
-                      <span className="text-brand-gold">Unpaid</span>
-                    )}
-                  </dd>
-                </div>
+              <dl className="grid gap-4 sm:grid-cols-3">
+                <Detail label="Amount">
+                  <span className="tabular-nums">{money(booking.totalPrice, booking.currency)}</span>
+                </Detail>
+                <Detail label="Method">
+                  {isOffline ? (paymentLabel ?? "At check-in") : (booking.onlinePayment?.methodLabel ?? "Online")}
+                </Detail>
+                <Detail label="Status">
+                  {booking.paidAt || booking.onlinePayment ? (
+                    <Badge variant="success">Paid</Badge>
+                  ) : (
+                    <Badge variant="warning">Unpaid</Badge>
+                  )}
+                </Detail>
+                {quote && quote.paidAmount > 0 ? (
+                  <Detail label="Refund if cancelled today">
+                    <span className="tabular-nums">
+                      {quote.refundAmount !== null
+                        ? `${money(quote.refundAmount, booking.currency)} (${quote.deductionPercent}% deducted)`
+                        : "No refund rules"}
+                    </span>
+                  </Detail>
+                ) : null}
+                {booking.paymentReference ? (
+                  <Detail label="Reference">
+                    <span className="font-mono text-xs">{booking.paymentReference}</span>
+                  </Detail>
+                ) : null}
               </dl>
-              {quote && quote.paidAmount > 0 ? (
-                <p className="mt-3 text-sm">
-                  <span className="text-muted-foreground">Refund if cancelled today </span>
-                  <span className="font-medium">
-                    {quote.refundAmount !== null
-                      ? `${booking.currency} ${quote.refundAmount.toFixed(2)} (${quote.deductionPercent}% deducted)`
-                      : "No refund rules set"}
-                  </span>
-                </p>
-              ) : null}
-              {booking.paymentReference ? (
-                <p className="mt-3 text-sm text-muted-foreground">Reference {booking.paymentReference}</p>
-              ) : null}
               {canManage && isOffline && !booking.paidAt && live ? (
-                <form action={markBookingPaid} className="mt-4">
+                <form action={markBookingPaid} className="mt-4 flex justify-end border-t border-border pt-4">
                   <input type="hidden" name="bookingId" value={booking.id} />
                   <input type="hidden" name="hotelId" value={hotelId} />
                   <SubmitButton size="sm" variant="outline" pendingText="Saving…">
@@ -322,14 +284,14 @@ export async function BookingDetailView({
           </CardHeader>
           <CardContent>
             {booking.events.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No activity yet.</p>
+              <p className="text-sm text-muted-foreground">No activity</p>
             ) : (
               <ol className="relative space-y-4 border-l border-border pl-5">
                 {[...booking.events].reverse().map((event) => (
                   <li key={event.id} className="relative">
-                    <CircleDot className="absolute -left-[1.6rem] top-0.5 size-3.5 bg-card text-primary" />
+                    <CircleDot className="absolute top-0.5 -left-[1.6rem] size-3.5 bg-card text-primary" aria-hidden="true" />
                     <p className="text-sm font-medium">{eventTitle(event)}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground tabular-nums">
                       {format(new Date(event.createdAt), "d MMM, HH:mm")} · {actorLabel(event, access.profileId, booking.customerId)}
                     </p>
                   </li>

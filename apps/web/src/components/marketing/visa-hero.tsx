@@ -1,9 +1,10 @@
 import Image from "next/image";
-import { ShieldCheck, Timer } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
 import { countryFlag } from "@/lib/countries";
 import { cn } from "@/lib/utils";
 import { FadeIn, StaggerGroup, StaggerItem, SpotlightCard } from "@/components/ui/aceternity/motion-primitives";
+import { SectionHeading } from "@/components/marketing/section-heading";
 
 import { AccountBalanceIcon, BadgeIcon, DescriptionIcon, EventAvailableIcon, FactCheckIcon, FlightIcon, HealthAndSafetyIcon, HotelIcon, PhotoCameraFrontIcon, TaskAltIcon } from "@/components/ui/mui-icons";
 import type { SvgIconComponent } from "@/components/ui/mui-icons";
@@ -61,13 +62,6 @@ const COLLAGE_PHOTOS = [
   },
 ];
 
-/** A few soft, low-key particles — atmosphere, not a scavenger hunt. */
-const COLLAGE_DOTS = [
-  { className: "top-[10%] left-[42%] size-1.5", delay: 0.4 },
-  { className: "top-[42%] left-[2%] size-1", delay: 1.6 },
-  { className: "top-[86%] left-[16%] size-1.5", delay: 2.6 },
-];
-
 /** Hero band for the visa page — flat-lay artwork with the search laid over it. */
 export function VisaHeroBanner({ children }: { children: React.ReactNode }) {
   return (
@@ -87,8 +81,8 @@ export function VisaHeroBanner({ children }: { children: React.ReactNode }) {
 
         {/* Floating ribbon, top right — true and short, not a manufactured stat. */}
         <div className="absolute top-4 right-0 z-20">
-          <div className="flex items-center gap-2 rounded-l-full bg-primary py-2 pr-8 pl-6 text-xs font-semibold tracking-wide text-primary-foreground shadow-md sm:py-2.5 sm:pr-12 sm:text-sm">
-            <ShieldCheck className="size-4 shrink-0" />
+          <div className="flex items-center gap-2 rounded-l-full bg-primary py-2 pr-6 pl-5 text-xs font-semibold text-primary-foreground shadow-md sm:py-2.5 sm:pr-12 sm:pl-6 sm:text-sm">
+            <ShieldCheck className="size-4 shrink-0" aria-hidden />
             <span>Licensed Somali travel agency</span>
           </div>
         </div>
@@ -100,14 +94,6 @@ export function VisaHeroBanner({ children }: { children: React.ReactNode }) {
           <div className="absolute inset-0 bg-gradient-to-l from-black/55 via-black/25 to-transparent" />
           {/* Warm glow behind the circle, for depth. */}
           <div className="absolute top-[8%] left-[2%] size-[19rem] rounded-full bg-brand-gold/25 blur-[70px]" />
-
-          {COLLAGE_DOTS.map((dot, i) => (
-            <span
-              key={i}
-              style={{ animationDelay: `${dot.delay}s` }}
-              className={cn("tile-float absolute rounded-full bg-white/50", dot.className)}
-            />
-          ))}
 
           {COLLAGE_PHOTOS.map((photo) => (
             <div
@@ -125,20 +111,7 @@ export function VisaHeroBanner({ children }: { children: React.ReactNode }) {
           ))}
         </div>
 
-        <div className="relative z-10 mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">{children}</div>
-      </div>
-
-      {/* Trapezoid badge, straddling the seam between the photo and the page. */}
-      <div className="relative z-30 -mt-6 flex justify-center sm:-mt-7">
-        <div
-          className="flex items-center gap-2.5 bg-brand-gold px-8 py-2.5 text-neutral-900 shadow-md sm:px-14 sm:py-3"
-          style={{ clipPath: "polygon(3% 0%, 97% 0%, 100% 100%, 0% 100%)" }}
-        >
-          <Timer className="size-4 shrink-0 sm:size-5" />
-          <span className="text-sm font-bold tracking-tight whitespace-nowrap sm:text-base">
-            Real-Time Visa Tracking
-          </span>
-        </div>
+        <div className="relative z-10 mx-auto max-w-7xl px-4 pt-16 pb-14 sm:px-6 lg:px-8 lg:py-24">{children}</div>
       </div>
     </section>
   );
@@ -148,27 +121,31 @@ export function VisaHeroBanner({ children }: { children: React.ReactNode }) {
 export function VisaProcess() {
   return (
     <>
-      <section className="bg-brand-gold/10 py-14 sm:py-16 lg:py-20">
+      <section className="border-y border-border bg-secondary/30 py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <FadeIn className="text-center">
-            <h2 className="font-heading text-2xl font-bold tracking-tight text-balance sm:text-3xl">
-              Applying with STS is this simple
-            </h2>
+          <FadeIn>
+            <SectionHeading title="How a visa application works" />
           </FadeIn>
 
           <ol className="relative mt-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
             <div
-              className="absolute top-7 right-[12.5%] left-[12.5%] hidden border-t-2 border-dashed border-brand-gold/50 lg:block"
+              className="absolute top-7 right-[12.5%] left-[12.5%] hidden border-t border-dashed border-border lg:block"
               aria-hidden
             />
             {STEPS.map((step, i) => (
               <li key={step.title} className="relative flex flex-col items-center text-center">
                 <FadeIn delay={i * 0.08} className="flex flex-col items-center">
-                  <span className="relative z-10 grid size-14 shrink-0 place-items-center rounded-full bg-background text-primary shadow-md ring-4 ring-brand-gold/25">
+                  <span
+                    className="relative z-10 grid size-14 shrink-0 place-items-center rounded-full bg-background text-primary shadow-sm ring-1 ring-border"
+                    aria-hidden
+                  >
                     <step.icon sx={{ fontSize: 26 }} />
                   </span>
-                  <h3 className="mt-4 font-heading text-sm font-bold">{step.title}</h3>
-                  <p className="mt-1.5 max-w-[14rem] text-xs leading-relaxed text-muted-foreground">
+                  <h3 className="mt-4 font-heading text-base font-bold">
+                    <span className="sr-only">Step {i + 1}: </span>
+                    {step.title}
+                  </h3>
+                  <p className="mt-1.5 max-w-[15rem] text-sm leading-relaxed text-muted-foreground">
                     {step.caption}
                   </p>
                 </FadeIn>
@@ -178,23 +155,21 @@ export function VisaProcess() {
         </div>
       </section>
 
-      <section className="bg-background py-14 sm:py-16 lg:py-20">
+      <section className="bg-background py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <FadeIn>
-            <h2 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
-              What you&rsquo;ll usually need
-            </h2>
-            <p className="mt-3 max-w-2xl text-muted-foreground">
-              Requirements vary by destination and purpose of travel — this is the common core. Pick
-              your country above and we&rsquo;ll send the exact list for your case.
-            </p>
+            <SectionHeading
+              align="left"
+              title="What you’ll usually need"
+              lead="Requirements vary by destination and purpose of travel. This is the common core."
+            />
           </FadeIn>
 
           <StaggerGroup className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {DOCUMENTS.map((doc) => (
               <StaggerItem key={doc.label} className="grid">
-                <SpotlightCard className="flex h-full items-start gap-4 rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                <SpotlightCard className="flex h-full items-start gap-4 rounded-2xl border border-border bg-card p-5 transition-shadow duration-300 hover:shadow-md">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary" aria-hidden>
                     <doc.icon sx={{ fontSize: 22 }} />
                   </span>
                   <div>

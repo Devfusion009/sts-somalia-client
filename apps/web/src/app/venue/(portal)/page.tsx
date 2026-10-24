@@ -1,68 +1,92 @@
 import Link from "next/link";
-import { PartyPopper, CalendarCheck2, Clock, Wallet } from "lucide-react";
+import { ArrowRight, PartyPopper } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
   getMyVenuePartnerId,
   getMyVenues,
   getVenuePartnerStats,
 } from "@/modules/events/venue-partner-queries";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
+import { money } from "@/lib/money";
 
 export default async function VenueDashboardPage() {
   const profile = await requireUser();
   const partnerId = (await getMyVenuePartnerId(profile.id))!;
   const [venues, stats] = await Promise.all([getMyVenues(partnerId), getVenuePartnerStats(partnerId)]);
 
-  const tiles = [
-    { label: "Venues listed", value: venues.length, icon: PartyPopper },
-    { label: "Pending requests", value: stats.pending, icon: Clock },
-    { label: "Confirmed bookings", value: stats.confirmed, icon: CalendarCheck2 },
-    { label: "Booked revenue", value: `$${stats.revenue.toFixed(2)}`, icon: Wallet },
-  ];
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold">
-          Welcome back{profile.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}
-        </h1>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {tiles.map((t) => (
-          <Card key={t.label}>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-3xl">
-                <t.icon className="size-5 text-primary" /> {t.value}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 text-sm text-muted-foreground">{t.label}</CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {stats.pending > 0 ? (
-        <Card className="border-brand-gold/50 bg-brand-gold/5">
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-            <p className="text-sm font-medium">
-              {stats.pending} booking request{stats.pending > 1 ? "s" : ""} waiting for your decision.
-            </p>
-            <Button size="sm" render={<Link href="/venue/bookings" />}>
+      <PageHeader
+        title="Dashboard"
+        actions={
+          stats.pending > 0 ? (
+            <Button render={<Link href="/venue/bookings" />}>
               Review requests
+              <Badge variant="secondary" className="tabular-nums">
+                {stats.pending}
+              </Badge>
             </Button>
-          </CardContent>
-        </Card>
-      ) : null}
+          ) : null
+        }
+      />
 
-      {venues.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-            <p className="font-medium">No venues yet</p>
-            <Button render={<Link href="/venue/venues" />}>Add a venue</Button>
-          </CardContent>
-        </Card>
-      ) : null}
+      <StatRail>
+        <StatRailItem label="Venues listed" value={venues.length} />
+        <StatRailItem label="Pending requests" value={stats.pending} tone={stats.pending > 0 ? "warn" : undefined} />
+        <StatRailItem label="Confirmed bookings" value={stats.confirmed} />
+        <StatRailItem label="Booked revenue" value={money(stats.revenue, "USD")} />
+      </StatRail>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Venues</CardTitle>
+          {venues.length > 0 ? (
+            <CardAction>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Open my venues"
+                title="My venues"
+                render={<Link href="/venue/venues" />}
+              >
+                <ArrowRight />
+              </Button>
+            </CardAction>
+          ) : null}
+        </CardHeader>
+        <CardContent>
+          {venues.length === 0 ? (
+            <Empty>
+              <EmptyMedia variant="icon">
+                <PartyPopper />
+              </EmptyMedia>
+              <EmptyTitle>No venues</EmptyTitle>
+              <EmptyContent>
+                <Button render={<Link href="/venue/venues" />}>Add a venue</Button>
+              </EmptyContent>
+            </Empty>
+          ) : (
+            <ul className="divide-y divide-border">
+              {venues.map((venue) => (
+                <li key={venue.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{venue.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{venue.city}</p>
+                  </div>
+                  <Badge variant={statusBadgeVariant(venue.status)} className="shrink-0 capitalize">
+                    {venue.status.replace(/_/g, " ")}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

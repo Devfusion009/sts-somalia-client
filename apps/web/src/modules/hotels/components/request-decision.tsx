@@ -5,7 +5,7 @@ import { Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SubmitButton } from "@/components/submit-button";
@@ -47,16 +47,16 @@ export function RequestDecision({
   return (
     <>
       <div className="flex items-center gap-1.5">
-        <Button size="sm" className="gap-1" onClick={() => setDecision("approved")}>
-          <Check className="size-3.5" /> Approve
+        <Button size="sm" onClick={() => setDecision("approved")}>
+          <Check aria-hidden="true" /> Approve
         </Button>
         <Button
           size="sm"
           variant="outline"
-          className="gap-1 text-destructive hover:text-destructive"
+          className="text-destructive hover:text-destructive"
           onClick={() => setDecision("rejected")}
         >
-          <X className="size-3.5" /> Decline
+          <X aria-hidden="true" /> Decline
         </Button>
       </div>
 
@@ -70,8 +70,8 @@ export function RequestDecision({
             <input type="hidden" name="requestId" value={requestId} />
             <input type="hidden" name="decision" value={decision ?? ""} />
             {decision === "approved" && refunds ? (
-              <div className="space-y-1.5">
-                <Label htmlFor={`amount-${requestId}`}>Refund amount ({currency})</Label>
+              <Field>
+                <FieldLabel htmlFor={`amount-${requestId}`}>Refund amount ({currency})</FieldLabel>
                 <Input
                   id={`amount-${requestId}`}
                   name="amount"
@@ -81,15 +81,16 @@ export function RequestDecision({
                   step="0.01"
                   defaultValue={suggestedAmount}
                   required
+                  className="tabular-nums"
                   aria-invalid={Boolean(state?.error)}
                 />
-              </div>
+              </Field>
             ) : null}
-            <div className="space-y-1.5">
-              <Label htmlFor={`note-${requestId}`}>Note to guest</Label>
+            <Field>
+              <FieldLabel htmlFor={`note-${requestId}`}>Note to guest</FieldLabel>
               <Textarea id={`note-${requestId}`} name="note" rows={3} maxLength={500} />
-            </div>
-            <div className="flex justify-end gap-2">
+            </Field>
+            <div className="flex justify-end gap-2 border-t border-border pt-4">
               <Button type="button" variant="outline" onClick={() => setDecision(null)}>
                 Cancel
               </Button>

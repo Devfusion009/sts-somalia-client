@@ -1,30 +1,32 @@
+import type { Metadata } from "next";
+import { format } from "date-fns";
+import { Search, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getUsersPage } from "@/modules/admin/queries";
-import { Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Pager } from "@/components/dashboard/pager";
 import { parsePage } from "@/lib/pagination";
 import { accountRoleBadges } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
 import { UserStatusToggle } from "./user-status-toggle";
 
+export const metadata: Metadata = { title: "Users" };
+
 // Platform admin is a privilege rather than a business identity, so it is
 // styled to stand out from the role/membership badges beside it — an admin
 // list where every row looks alike is how a stray admin grant goes unnoticed.
-const BADGE_STYLES = {
-  platform: "border-transparent bg-brand-accent text-brand-accent-foreground",
-  business: "",
-  membership: "border-dashed text-muted-foreground",
+const BADGE_VARIANT = {
+  platform: "default",
+  business: "neutral",
+  membership: "outline",
 } as const;
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = {
-  active: "default",
-  pending_verification: "secondary",
-  suspended: "destructive",
-};
+const STATUS_OVERRIDES = { pending_verification: "warning" } as const;
 
 export default async function AdminUsersPage({
   searchParams,
@@ -38,64 +40,81 @@ export default async function AdminUsersPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <h1 className="font-heading text-2xl font-semibold">Users</h1>
-        <Badge variant="secondary">{total}</Badge>
-      </div>
+      <PageHeader
+        title="Users"
+        status={
+          <Badge variant="neutral" className="tabular-nums">
+            {total.toLocaleString("en-US")}
+          </Badge>
+        }
+      />
 
-      <form action="/admin/users" className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input name="q" defaultValue={sp.q} placeholder="Name or email" className="h-8 w-64 pl-8" aria-label="Search" />
-        </div>
-        <Button type="submit" size="sm" variant="outline">
+      <form action="/admin/users" role="search" className="flex items-center gap-2">
+        <InputGroup className="sm:w-64 max-sm:h-10">
+          <InputGroupAddon>
+            <Search aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput name="q" type="search" defaultValue={sp.q} placeholder="Name or email" aria-label="Search users" />
+        </InputGroup>
+        <Button type="submit" variant="outline">
           Apply
         </Button>
       </form>
 
       <Card className="overflow-hidden py-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Joined</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-medium">{user.full_name ?? "—"}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{user.email}</TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1.5">
-                    {accountRoleBadges(user).map((badge) => (
-                      <Badge
-                        key={`${badge.kind}-${badge.label}`}
-                        variant={badge.kind === "membership" ? "outline" : "secondary"}
-                        className={cn(BADGE_STYLES[badge.kind])}
-                      >
-                        {badge.label}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={STATUS_VARIANT[user.status] ?? "secondary"} className="capitalize">
-                    {user.status.replace(/_/g, " ")}
-                  </Badge>
-                </TableCell>
-                <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
-                <TableCell className="text-right">
-                  <UserStatusToggle userId={user.id} status={user.status} />
-                </TableCell>
+        {users.length === 0 ? (
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Users />
+            </EmptyMedia>
+            <EmptyTitle>{sp.q ? "No users match this search" : "No users"}</EmptyTitle>
+          </Empty>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Joined</TableHead>
+                <TableHead numeric>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.full_name ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1.5">
+                      {accountRoleBadges(user).map((badge) => (
+                        <Badge
+                          key={`${badge.kind}-${badge.label}`}
+                          variant={BADGE_VARIANT[badge.kind]}
+                          className={cn(badge.kind === "membership" && "border-dashed text-muted-foreground")}
+                        >
+                          {badge.label}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={statusBadgeVariant(user.status, STATUS_OVERRIDES)} className="capitalize">
+                      {user.status.replace(/_/g, " ")}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{format(new Date(user.created_at), "d MMM yyyy")}</TableCell>
+                  <TableCell numeric>
+                    <UserStatusToggle userId={user.id} status={user.status} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
 
       <Pager page={page} total={total} hrefFor={hrefFor} />

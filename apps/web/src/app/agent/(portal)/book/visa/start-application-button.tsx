@@ -3,7 +3,7 @@
 import { useActionState, useEffect } from "react";
 import { ArrowRight } from "lucide-react";
 import { SubmitButton } from "@/components/submit-button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FieldError } from "@/components/ui/field";
 import { startDeskVisaApplication } from "@/modules/visa/actions";
 
 /** Starts a desk visa application, then navigates to its wizard — a plain
@@ -23,16 +23,12 @@ export function StartApplicationButton({
   }, [state]);
 
   return (
-    <form action={formAction}>
+    <form action={formAction} className="space-y-2">
       <input type="hidden" name="visaTypeId" value={visaTypeId} />
       <input type="hidden" name="agencyCustomerId" value={agencyCustomerId} />
-      {state?.error ? (
-        <Alert variant="destructive" className="mb-2">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      ) : null}
-      <SubmitButton size="sm" pendingText="Starting…" className="gap-1.5">
-        Start application <ArrowRight className="size-3.5" />
+      <FieldError>{state?.error}</FieldError>
+      <SubmitButton variant="outline" pendingText="Starting…" className="w-full">
+        Start application <ArrowRight data-icon="inline-end" aria-hidden="true" />
       </SubmitButton>
     </form>
   );

@@ -60,7 +60,7 @@ export function CountrySearchSelect({
       <ComboboxPortal>
         <ComboboxPositioner>
           <ComboboxPopup>
-            <ComboboxEmpty>No country matches your search.</ComboboxEmpty>
+            <ComboboxEmpty>No country found.</ComboboxEmpty>
             <ComboboxList>
               {(code: string) => (
                 <ComboboxItem key={code} value={code}>

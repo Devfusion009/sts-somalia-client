@@ -1,3 +1,5 @@
+import { money } from "@/lib/money";
+
 /** Display helpers for agency markup rules and requests — shared by the agent Markups page and both admin agency views. */
 export const VERTICAL_LABELS: Record<string, string> = {
   hotel: "Hotels",
@@ -13,7 +15,7 @@ export function scopeLabel(itemType: string | null): string {
 
 export function markupLabel(markupType: string, value: number | string | null): string {
   if (value === null) return "—";
-  return markupType === "percent" ? `${Number(value)}%` : `USD ${Number(value).toFixed(2)}`;
+  return markupType === "percent" ? `${Number(value)}%` : money(value, "USD");
 }
 
 /** What a request would make the rule: the new value, or removal. */

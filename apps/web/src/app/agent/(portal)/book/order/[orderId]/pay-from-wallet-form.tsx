@@ -2,25 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field";
+import { money } from "@/lib/money";
 import { SubmitButton } from "@/components/submit-button";
 import { trpc } from "@/lib/trpc/react";
 
-// Whole dollars, matching every other figure on this order page (Net,
-// Margin, Customer pays, Balance) — showing cents only here made the same
-// amount read as two different numbers a few pixels apart.
-function money(amount: number, currency: string) {
-  return `${currency} ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-}
+// Same `money()` format as every other figure on the order page (Net,
+// Margin, Customer pays, Balance) — two formats for one amount a few pixels
+// apart read as two different numbers.
 
 /**
  * Paying from the shared agency wallet moves real money immediately and
@@ -65,47 +63,39 @@ export function PayFromWalletForm({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <div className="flex justify-end">
-        <DialogTrigger render={<Button size="sm" />}>
-          Pay {money(amount, currency)} from agency balance
-        </DialogTrigger>
-      </div>
+      <DialogTrigger render={<Button size="lg" className="w-full tabular-nums" />}>
+        Pay {money(amount, currency)}
+      </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Confirm payment</DialogTitle>
         </DialogHeader>
 
-        <dl className="divide-y divide-border rounded-lg border border-border text-sm">
-          <div className="flex items-center justify-between px-3 py-2.5">
-            <dt className="text-muted-foreground">Amount</dt>
-            <dd className="font-heading text-lg font-bold tabular-nums">{money(amount, currency)}</dd>
-          </div>
-          <div className="flex items-center justify-between px-3 py-2.5">
+        <dl className="space-y-2 text-sm">
+          <div className="flex items-baseline justify-between gap-3">
             <dt className="text-muted-foreground">Agency balance now</dt>
             <dd className="tabular-nums">{money(available, currency)}</dd>
           </div>
-          <div className="flex items-center justify-between bg-secondary/40 px-3 py-2.5">
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-muted-foreground">Amount</dt>
+            <dd className="tabular-nums">− {money(amount, currency)}</dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2">
             <dt className="font-medium">Balance after</dt>
-            <dd className="font-heading text-lg font-bold tabular-nums text-primary">
+            <dd className="font-heading text-base font-semibold tabular-nums text-primary">
               {money(remaining, currency)}
             </dd>
           </div>
         </dl>
 
-        {error ? (
-          <Alert variant="destructive">
-            <AlertCircle />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        ) : null}
-
-        <form action={handleSubmit} className="flex justify-end gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <SubmitButton size="sm" pendingText="Paying…">
-            Confirm payment
-          </SubmitButton>
+        <form action={handleSubmit} className="space-y-4">
+          <FieldError>{error}</FieldError>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <SubmitButton pendingText="Paying…">Confirm payment</SubmitButton>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { CalendarCog, Ban, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -62,11 +63,14 @@ export function BookingRequestDialog({
   kind,
   currency,
   disabled,
+  size = "sm",
 }: {
   orderId: string;
   kind: Kind;
   currency: string;
   disabled?: boolean;
+  /** Trigger size; "default" when it sits among page-header actions. */
+  size?: "sm" | "default";
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -76,6 +80,7 @@ export function BookingRequestDialog({
   const openRequest = trpc.bookings.openRequest.useMutation({
     onSuccess: () => {
       setOpen(false);
+      toast.success("Request sent.");
       router.refresh();
     },
   });
@@ -96,14 +101,8 @@ export function BookingRequestDialog({
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-1.5"
-        disabled={disabled}
-        onClick={() => setOpen(true)}
-      >
-        <Icon className="size-3.5" /> {copy.trigger}
+      <Button variant="outline" size={size} disabled={disabled} onClick={() => setOpen(true)}>
+        <Icon data-icon="inline-start" aria-hidden="true" /> {copy.trigger}
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -112,47 +111,50 @@ export function BookingRequestDialog({
             <DialogTitle>{copy.title}</DialogTitle>
           </DialogHeader>
 
-          <form action={handleSubmit} className="space-y-4">
-            {openRequest.error ? (
-              <Alert variant="destructive">
-                <AlertDescription>{openRequest.error.message}</AlertDescription>
-              </Alert>
-            ) : null}
-
-            <div className="space-y-2">
-              <Label htmlFor={`${kind}-reason`}>Details</Label>
-              <Textarea
-                id={`${kind}-reason`}
-                name="reason"
-                rows={4}
-                required
-                minLength={10}
-                placeholder={copy.placeholder}
-              />
-            </div>
-
-            {copy.showAmount ? (
-              <div className="space-y-2">
-                <Label htmlFor={`${kind}-amount`}>
-                  Amount claimed ({currency}) — optional
-                </Label>
-                <Input
-                  id={`${kind}-amount`}
-                  name="requestedAmount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Leave blank and we'll calculate what's due"
+          <form action={handleSubmit} className="space-y-5">
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor={`${kind}-reason`}>Details</FieldLabel>
+                <Textarea
+                  id={`${kind}-reason`}
+                  name="reason"
+                  rows={4}
+                  required
+                  minLength={10}
+                  placeholder={copy.placeholder}
                 />
-              </div>
-            ) : null}
+              </Field>
 
-            <div className="flex justify-end gap-2">
+              {copy.showAmount ? (
+                <Field>
+                  <FieldLabel htmlFor={`${kind}-amount`}>Amount claimed (optional)</FieldLabel>
+                  <InputGroup>
+                    <InputGroupAddon>
+                      <InputGroupText>{currency}</InputGroupText>
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      id={`${kind}-amount`}
+                      name="requestedAmount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      className="tabular-nums"
+                      placeholder="Leave blank and we'll calculate what's due"
+                    />
+                  </InputGroup>
+                </Field>
+              ) : null}
+
+              <FieldError>{openRequest.error?.message}</FieldError>
+            </FieldGroup>
+
+            <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
               <SubmitButton pendingText="Sending…">Send request</SubmitButton>
-            </div>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

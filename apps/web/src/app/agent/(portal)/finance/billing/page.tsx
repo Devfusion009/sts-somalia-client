@@ -1,17 +1,21 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { BadgeMinus, BadgePlus, Download, FileClock, FileText } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyInvoices, getAgencyWalletNotes, getAgencyStatement } from "@/modules/agencies/queries";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { FilterChips } from "@/components/dashboard/filter-chips";
+import { money } from "@/lib/money";
 import { parsePage } from "@/lib/pagination";
 import { Pager } from "@/components/dashboard/pager";
+import { groupByMonth, MonthRow, SignedMoney } from "../ledger-ui";
 import { WalletNotesTable } from "./wallet-notes-table";
 
 export const metadata: Metadata = { title: "Billing" };
@@ -25,12 +29,7 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-const INVOICE_STATUS_STYLES: Record<string, string> = {
-  issued: "bg-primary/10 text-primary",
-  paid: "bg-primary/10 text-primary",
-  draft: "bg-muted text-muted-foreground",
-  void: "bg-destructive/10 text-destructive",
-};
+const INVOICE_STATUS_OVERRIDES = { issued: "info", void: "destructive" } as const;
 
 const TX_LABELS: Record<string, string> = {
   deposit: "Deposit",
@@ -40,10 +39,6 @@ const TX_LABELS: Record<string, string> = {
   credit_note: "Credit note",
   debit_note: "Debit note",
 };
-
-function money(amount: number) {
-  return `USD ${amount.toFixed(2)}`;
-}
 
 export default async function AgentBillingPage({
   searchParams,
@@ -78,148 +73,145 @@ export default async function AgentBillingPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-heading text-2xl font-bold">Billing</h1>
-        {tab === "statement" ? (
-          <Button variant="outline" size="sm" className="gap-1.5" render={<a href="/agent/finance/billing/export" />}>
-            <Download className="size-3.5" /> Export CSV
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Billing"
+        actions={
+          tab === "statement" ? (
+            <Button variant="outline" nativeButton={false} render={<a href="/agent/finance/billing/export" />}>
+              <Download data-icon="inline-start" aria-hidden="true" /> Export CSV
+            </Button>
+          ) : null
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {TABS.map((t) => (
-          <Link
-            key={t.key}
-            href={`/agent/finance/billing?tab=${t.key}`}
-            className={cn(
-              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              t.key === tab
-                ? "border-transparent bg-primary text-primary-foreground"
-                : "border-border text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </div>
+      <FilterChips
+        label="Billing documents"
+        active={tab}
+        items={TABS.map((t) => ({ key: t.key, label: t.label, href: `/agent/finance/billing?tab=${t.key}` }))}
+      />
 
       {tab === "invoices" ? (
         <Card className="overflow-hidden py-0">
           {invoices.length === 0 ? (
-            <CardContent className="flex flex-col items-center gap-2 py-14 text-center">
-              <FileText className="size-8 text-muted-foreground" />
-              <p className="font-medium">No invoices yet</p>
-            </CardContent>
+            <Empty>
+              <EmptyMedia variant="icon">
+                <FileText />
+              </EmptyMedia>
+              <EmptyTitle>No invoices</EmptyTitle>
+            </Empty>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice #</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Issued</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Download</TableHead>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead>Order</TableHead>
+                  <TableHead>Issued</TableHead>
+                  <TableHead numeric>Total</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-0">
+                    <span className="sr-only">Download</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invoices.map((invoice) => (
+                  <TableRow key={invoice.id}>
+                    <TableCell className="font-mono text-xs font-medium">{invoice.invoice_number}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {invoice.order?.order_number ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {invoice.issued_at ? format(new Date(invoice.issued_at), "d MMM yyyy") : "—"}
+                    </TableCell>
+                    <TableCell numeric className="font-medium">
+                      {money(Number(invoice.total), invoice.currency)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={statusBadgeVariant(invoice.status, INVOICE_STATUS_OVERRIDES)} className="capitalize">
+                        {invoice.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={`Download ${invoice.invoice_number} PDF`}
+                        title="Download PDF"
+                        nativeButton={false}
+                        render={<a href={`/api/invoices/${invoice.order?.id}`} target="_blank" rel="noopener noreferrer" />}
+                      >
+                        <Download aria-hidden="true" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoices.map((invoice) => (
-                    <TableRow key={invoice.id}>
-                      <TableCell className="font-mono text-xs font-medium">{invoice.invoice_number}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {invoice.order?.order_number ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {invoice.issued_at ? format(new Date(invoice.issued_at), "d MMM yyyy") : "—"}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {invoice.currency} {Number(invoice.total).toFixed(2)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={cn("border-transparent capitalize", INVOICE_STATUS_STYLES[invoice.status] ?? "")}>
-                          {invoice.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1"
-                          render={
-                            <a href={`/api/invoices/${invoice.order?.id}`} target="_blank" rel="noopener noreferrer" />
-                          }
-                        >
-                          <Download className="size-3.5" /> PDF
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </Card>
       ) : null}
 
       {tab === "credit-notes" ? (
-        <WalletNotesTable notes={notes} emptyIcon={BadgePlus} emptyTitle="No credit notes yet" />
+        <WalletNotesTable notes={notes} emptyIcon={BadgePlus} emptyTitle="No credit notes" />
       ) : null}
 
       {tab === "debit-notes" ? (
-        <WalletNotesTable notes={notes} emptyIcon={BadgeMinus} emptyTitle="No debit notes yet" />
+        <WalletNotesTable notes={notes} emptyIcon={BadgeMinus} emptyTitle="No debit notes" />
       ) : null}
 
       {tab === "statement" ? (
         <Card className="overflow-hidden py-0">
           {transactions.length === 0 ? (
-            <CardContent className="flex flex-col items-center gap-2 py-14 text-center">
-              <FileClock className="size-8 text-muted-foreground" />
-              <p className="font-medium">No activity yet</p>
-            </CardContent>
+            <Empty>
+              <EmptyMedia variant="icon">
+                <FileClock />
+              </EmptyMedia>
+              <EmptyTitle>No activity</EmptyTitle>
+            </Empty>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead>Note</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(tx.created_at), "d MMM yyyy, HH:mm")}
-                      </TableCell>
-                      <TableCell>{TX_LABELS[tx.type] ?? tx.type}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {tx.document_number ?? tx.order?.order_number ?? "—"}
-                      </TableCell>
-                      <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground" title={tx.note ?? ""}>
-                        {tx.note ?? "—"}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          "text-right font-semibold",
-                          Number(tx.amount) < 0 ? "text-destructive" : "text-primary"
-                        )}
-                      >
-                        {Number(tx.amount) < 0 ? "−" : "+"} {money(Math.abs(Number(tx.amount)))}
-                      </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">
-                        {money(Number(tx.balance_after))}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead>Note</TableHead>
+                  <TableHead numeric>Amount</TableHead>
+                  <TableHead numeric>Balance</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {groupByMonth(transactions, (tx) => tx.created_at).map((month) => (
+                  <Fragment key={month.key}>
+                    <MonthRow label={month.label} colSpan={6} />
+                    {month.rows.map((tx) => {
+                      const balance = Number(tx.balance_after);
+                      return (
+                        <TableRow key={tx.id}>
+                          <TableCell className="text-muted-foreground">
+                            {format(new Date(tx.created_at), "d MMM, HH:mm")}
+                          </TableCell>
+                          <TableCell className="font-medium">{TX_LABELS[tx.type] ?? tx.type}</TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            {tx.document_number ?? tx.order?.order_number ?? "—"}
+                          </TableCell>
+                          <TableCell className="max-w-[220px] truncate text-muted-foreground" title={tx.note ?? ""}>
+                            {tx.note ?? "—"}
+                          </TableCell>
+                          <TableCell numeric>
+                            <SignedMoney amount={Number(tx.amount)} />
+                          </TableCell>
+                          <TableCell numeric className="text-muted-foreground">
+                            {balance < 0 ? "−" : ""}
+                            {money(Math.abs(balance), "USD")}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </Fragment>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </Card>
       ) : null}

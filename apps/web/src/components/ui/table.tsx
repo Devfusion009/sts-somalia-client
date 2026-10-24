@@ -4,11 +4,18 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function Table({
+  className,
+  containerClassName,
+  ...props
+}: React.ComponentProps<"table"> & {
+  /** Classes for the scroll wrapper, e.g. `max-h-[60vh]` with a sticky header. */
+  containerClassName?: string
+}) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className={cn("relative w-full overflow-x-auto", containerClassName)}
     >
       <table
         data-slot="table"
@@ -19,11 +26,23 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   )
 }
 
-function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
+function TableHeader({
+  className,
+  sticky = false,
+  ...props
+}: React.ComponentProps<"thead"> & {
+  /** Pin the header row while the nearest scroll container scrolls. */
+  sticky?: boolean
+}) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("bg-muted/50 [&_tr]:border-b [&_tr]:hover:bg-transparent", className)}
+      data-sticky={sticky || undefined}
+      className={cn(
+        "bg-muted/50 [&_tr]:border-b [&_tr]:hover:bg-transparent",
+        sticky && "sticky top-0 z-10 bg-muted backdrop-blur-sm supports-backdrop-filter:bg-muted/85",
+        className
+      )}
       {...props}
     />
   )
@@ -65,12 +84,20 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   )
 }
 
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+function TableHead({
+  className,
+  numeric = false,
+  ...props
+}: React.ComponentProps<"th"> & {
+  /** Right-align (money, counts, dates in a numeric column). */
+  numeric?: boolean
+}) {
   return (
     <th
       data-slot="table-head"
       className={cn(
         "h-9 px-3 text-left align-middle text-xs font-medium whitespace-nowrap text-muted-foreground first:pl-4 last:pr-4 [&:has([role=checkbox])]:pr-0",
+        numeric && "text-right",
         className
       )}
       {...props}
@@ -78,11 +105,19 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   )
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+function TableCell({
+  className,
+  numeric = false,
+  ...props
+}: React.ComponentProps<"td"> & {
+  /** Right-align (money, counts, dates in a numeric column). */
+  numeric?: boolean
+}) {
   return (
     <td
       data-slot="table-cell"
       className={cn(
+        numeric && "text-right",
         "px-3 py-2.5 align-middle whitespace-nowrap tabular-nums first:pl-4 last:pr-4 [&:has([role=checkbox])]:pr-0",
         className
       )}

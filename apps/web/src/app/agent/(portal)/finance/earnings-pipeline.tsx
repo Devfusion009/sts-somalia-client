@@ -1,18 +1,16 @@
 import { ChevronRight } from "lucide-react";
+import { money } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 type Stage = { label: string; amount: number; tone: "muted" | "review" | "available" | "paid" };
 
 const TONE_STYLES: Record<Stage["tone"], string> = {
   muted: "text-foreground",
-  review: "text-brand-gold",
+  review: "text-[color-mix(in_oklch,var(--brand-gold),black_30%)] dark:text-brand-gold",
   available: "text-primary",
   paid: "text-muted-foreground",
 };
 
-function money(amount: number) {
-  return `USD ${amount.toFixed(2)}`;
-}
 
 /**
  * The four states a booking's commission passes through, laid out in the
@@ -41,23 +39,26 @@ export function EarningsPipeline({
   ];
 
   return (
-    <div className="flex flex-col gap-px overflow-hidden rounded-xl border border-border bg-border sm:flex-row">
+    <ol className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border shadow-xs ring-1 ring-foreground/[0.08] lg:grid-cols-4">
       {stages.map((stage, i) => (
-        <div key={stage.label} className="relative flex flex-1 items-center gap-2 bg-background px-4 py-4">
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">{stage.label}</p>
-            <p className={cn("mt-1 truncate font-heading text-xl font-bold", TONE_STYLES[stage.tone])}>
-              {money(stage.amount)}
-            </p>
-          </div>
+        <li key={stage.label} className="relative min-w-0 bg-card p-4">
+          <p className="truncate text-xs font-medium text-muted-foreground">{stage.label}</p>
+          <p
+            className={cn(
+              "mt-2 truncate font-heading text-xl font-semibold tracking-tight tabular-nums sm:text-2xl",
+              TONE_STYLES[stage.tone]
+            )}
+          >
+            {money(stage.amount, "USD")}
+          </p>
           {i < stages.length - 1 ? (
             <ChevronRight
-              className="absolute -right-2 top-1/2 z-10 hidden size-4 -translate-y-1/2 rounded-full bg-background text-muted-foreground sm:block"
+              className="absolute top-1/2 -right-2 z-10 hidden size-4 -translate-y-1/2 rounded-full bg-card text-muted-foreground ring-1 ring-border lg:block"
               aria-hidden
             />
           ) : null}
-        </div>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }

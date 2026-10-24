@@ -1,6 +1,8 @@
 "use client";
 
 import { Pie, PieChart } from "recharts";
+import { PieChart as PieChartIcon } from "lucide-react";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import {
   ChartContainer,
   ChartTooltip,
@@ -24,9 +26,12 @@ export function BookingsByTypeChart({ data }: { data: { type: string; label: str
 
   if (!hasData) {
     return (
-      <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-        No paid bookings yet.
-      </div>
+      <Empty className="h-72 p-0 md:p-0">
+        <EmptyMedia variant="icon">
+          <PieChartIcon />
+        </EmptyMedia>
+        <EmptyTitle>No paid bookings in this range</EmptyTitle>
+      </Empty>
     );
   }
 

@@ -9,5 +9,5 @@ export default async function AdminVenueBookingPage({ params }: { params: Promis
   const { id, bookingId } = await params;
   const access = await getVenueAccess(id);
   if (!access) notFound();
-  return <VenueBookingDetailView venueId={id} bookingId={bookingId} base={`/admin/events/${id}`} access={access} />;
+  return <VenueBookingDetailView venueId={id} bookingId={bookingId} base={`/admin/events/${id}`} access={access} titleAs="h2" />;
 }

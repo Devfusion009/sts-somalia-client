@@ -3,38 +3,34 @@ import { venueCapacity } from "@sts/shared-types";
 import { getVenueAccess } from "@/modules/events/venue-access";
 import { getDeskVenue } from "@/modules/events/venue-manager-queries";
 import { VenueDashboardView } from "@/modules/events/views/venue-dashboard-view";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { priceUnitLabel, venueMoney } from "@/modules/events/components/amenities";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata = { title: "Dashboard" };
-
-const VENUE_STATUS_BADGE: Record<string, string> = {
-  published: "bg-primary/10 text-primary",
-  draft: "bg-muted text-muted-foreground",
-  pending_review: "bg-brand-gold/15 text-brand-gold",
-  suspended: "bg-destructive/10 text-destructive",
-};
 
 export default async function VenueManagerDashboard({ params }: { params: Promise<{ venueId: string }> }) {
   const { venueId } = await params;
   const [access, venue] = await Promise.all([getVenueAccess(venueId), getDeskVenue(venueId)]);
   if (!access || !venue) notFound();
   const capacity = venueCapacity(venue);
+  const meta = [
+    venue.city,
+    capacity ? `up to ${capacity} guests` : null,
+    Number(venue.base_price) > 0 ? `${venueMoney(venue.currency, venue.base_price)} ${priceUnitLabel(venue.price_unit)}` : "Price on request",
+  ].filter(Boolean);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div>
-        <div className="flex items-center gap-2.5">
-          <h1 className="font-heading text-2xl font-semibold">{venue.name}</h1>
-          <Badge className={cn("border-transparent capitalize", VENUE_STATUS_BADGE[venue.status] ?? "bg-muted text-muted-foreground")}>
+      <PageHeader
+        title={venue.name}
+        status={
+          <Badge variant={statusBadgeVariant(venue.status)} className="capitalize">
             {venue.status.replace(/_/g, " ")}
           </Badge>
-        </div>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {venue.city}
-          {capacity ? ` · up to ${capacity} guests` : ""}
-        </p>
-      </div>
+        }
+        meta={<span className="tabular-nums">{meta.join(" · ")}</span>}
+      />
       <VenueDashboardView venue={venue} base={`/manager/venues/${venueId}`} access={access} />
     </div>
   );

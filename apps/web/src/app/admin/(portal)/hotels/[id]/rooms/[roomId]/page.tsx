@@ -7,13 +7,15 @@ import { getHotelAvailability } from "@/modules/hotels/availability";
 import { getNightRates } from "@/modules/hotels/rates";
 import { createClient } from "@/lib/supabase/server";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GalleryManager } from "@/components/admin/gallery-manager";
 import { RoomNightsTable } from "@/modules/hotels/components/room-nights-table";
 import { uploadRoomImages, removeRoomImage, setRoomCoverImage } from "@/modules/admin/property-gallery-actions";
 import { InventoryRangeForm, ClearInventoryForm } from "./inventory-form";
+import { money } from "@/lib/money";
 
 export default async function AdminRoomInventoryPage({
   params,
@@ -31,35 +33,55 @@ export default async function AdminRoomInventoryPage({
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <BackLink href={`/admin/hotels/${id}`} label={room.hotel?.name ?? "Hotel"} className="mb-3" />
-        <div className="flex flex-wrap items-center gap-2.5">
-          <h1 className="font-heading text-2xl font-semibold">{room.name}</h1>
-          {room.total_units === null ? (
-            <Badge variant="outline" className="text-muted-foreground">Count not set</Badge>
-          ) : (
-            <Badge variant="secondary">{room.total_units} rooms</Badge>
-          )}
-        </div>
+      <div className="space-y-5">
+        <BackLink href={`/admin/hotels/${id}`} label={room.hotel?.name ?? "Hotel"} />
+        <header className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{room.name}</h1>
+            <Badge variant={statusBadgeVariant(room.status)} className="capitalize">
+              {room.status.replace(/_/g, " ")}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {[room.hotel?.name, room.bed_type, room.floor ? `Floor ${room.floor}` : null].filter(Boolean).join(" · ")}
+          </p>
+        </header>
+        <StatRail>
+          <StatRailItem
+            label="Rooms"
+            value={room.total_units ?? "Not set"}
+            tone={room.total_units === null ? "warn" : undefined}
+          />
+          <StatRailItem label="Sleeps" value={room.max_occupancy} />
+          <StatRailItem
+            label="Base rate"
+            value={
+              room.base_price > 0
+                ? money(room.base_price, room.currency)
+                : "On request"
+            }
+          />
+          <StatRailItem label="Photos" value={images.length} />
+        </StatRail>
       </div>
 
       {room.total_units === null ? (
-        <Alert>
+        <Alert variant="warning">
           <AlertCircle />
-          <AlertDescription className="flex flex-wrap items-center gap-2">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
             <span>Room count not set.</span>
-            <Button size="sm" variant="outline" className="h-7 gap-1.5" render={<Link href={`/admin/hotels/${id}`} />}>
-              <Pencil className="size-3.5" /> Edit room
+            <Button size="sm" variant="outline" render={<Link href={`/admin/hotels/${id}`} />}>
+              <Pencil aria-hidden="true" /> Edit room
             </Button>
           </AlertDescription>
         </Alert>
       ) : null}
 
       <Card className="overflow-hidden py-0">
-        <CardHeader className="border-b border-border !py-4">
+        <CardHeader className="border-b border-border pt-4 pb-3">
           <CardTitle className="text-base">Next 60 nights</CardTitle>
         </CardHeader>
-        <div className="overflow-x-auto">
+        <div>
           <RoomNightsTable nights={nights} currency={room.currency} rates={rates} />
         </div>
       </Card>

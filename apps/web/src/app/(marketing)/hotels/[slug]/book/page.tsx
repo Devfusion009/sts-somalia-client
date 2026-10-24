@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
-import Link from "next/link";
-import { BedDouble, Building2, ChevronRight, Home, MapPin, Ruler, ShieldCheck, Star, Users } from "lucide-react";
+import { BedDouble, Building2, Check, MapPin, Ruler, Star, Users } from "lucide-react";
+import { MarketingBreadcrumb } from "@/components/marketing/marketing-breadcrumb";
 import { getHotelBySlug } from "@/modules/hotels/queries";
 import { getStayQuote } from "@/modules/hotels/booking-actions";
 import { hotelImageUrls, amenityLabel } from "@/modules/hotels/images";
@@ -47,15 +47,15 @@ export default async function HotelBookingReviewPage({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h2 className="truncate font-heading text-lg font-bold">{hotel.name}</h2>
             {hotel.star_rating ? (
-              <span className="flex shrink-0" aria-label={`${hotel.star_rating} star hotel`}>
+              <span className="flex shrink-0" role="img" aria-label={`${hotel.star_rating} star hotel`}>
                 {Array.from({ length: hotel.star_rating }).map((_, i) => (
-                  <Star key={i} className="size-3.5 fill-brand-gold text-brand-gold" />
+                  <Star key={i} className="size-3.5 fill-brand-gold text-brand-gold" aria-hidden />
                 ))}
               </span>
             ) : null}
           </div>
           <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-            <MapPin className="size-3.5 shrink-0" />
+            <MapPin className="size-3.5 shrink-0" aria-hidden />
             <span className="truncate">
               {hotel.address_line ? `${hotel.address_line}, ` : ""}
               {hotel.city}, {hotel.country_code}
@@ -85,16 +85,16 @@ export default async function HotelBookingReviewPage({
           {room.name_so ? <p className="-mt-1.5 text-sm text-muted-foreground">{room.name_so}</p> : null}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
-              <Users className="size-3.5" /> Up to {room.max_occupancy} guests
+              <Users className="size-3.5" aria-hidden /> Up to {room.max_occupancy} guests
             </span>
             {room.bed_type ? (
               <span className="flex items-center gap-1">
-                <BedDouble className="size-3.5" /> {room.bed_type}
+                <BedDouble className="size-3.5" aria-hidden /> {room.bed_type}
               </span>
             ) : null}
             {room.size_sqm ? (
               <span className="flex items-center gap-1">
-                <Ruler className="size-3.5" /> {room.size_sqm} m²
+                <Ruler className="size-3.5" aria-hidden /> {room.size_sqm} m²
               </span>
             ) : null}
           </div>
@@ -103,7 +103,7 @@ export default async function HotelBookingReviewPage({
             <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
               {roomAmenities.slice(0, 8).map((a) => (
                 <span key={a} className="flex items-center gap-1.5 text-xs text-foreground">
-                  <ShieldCheck className="size-3.5 text-primary" />
+                  <Check className="size-3.5 text-primary" aria-hidden />
                   {amenityLabel(a)}
                 </span>
               ))}
@@ -116,19 +116,16 @@ export default async function HotelBookingReviewPage({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
-      <nav className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Link href="/" className="flex items-center gap-1 hover:text-foreground">
-          <Home className="size-3.5" /> Home
-        </Link>
-        <ChevronRight className="size-3" />
-        <Link href={`/hotels/${slug}`} className="hover:text-foreground">
-          {hotel.name}
-        </Link>
-        <ChevronRight className="size-3" />
-        <span className="font-medium text-foreground">Review your booking</span>
-      </nav>
+      <MarketingBreadcrumb
+        className="mb-4"
+        items={[
+          { label: "Hotels", href: "/hotels" },
+          { label: hotel.name, href: `/hotels/${slug}` },
+          { label: "Review your booking" },
+        ]}
+      />
 
-      <h1 className="font-heading text-2xl font-bold tracking-tight lg:text-3xl">Review your booking</h1>
+      <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">Review your booking</h1>
 
       <div className="mt-6">
         <BookingReviewForm

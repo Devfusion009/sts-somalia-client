@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, ShieldCheck, EyeOff } from "lucide-react";
+import { CheckCircle2, Circle, EyeOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -22,37 +22,35 @@ export function OnboardingStatusBanner({ checklist }: { checklist: ChecklistItem
   const percent = Math.round((doneCount / checklist.length) * 100);
 
   return (
-    <Card className="border-brand-gold/40 bg-brand-gold/5 shadow-sm">
-      <CardContent className="space-y-4 py-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-gold/15 text-brand-gold">
-              <ShieldCheck className="size-4.5" />
+    <Card>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div className="flex items-baseline gap-2">
+            <p className="font-heading text-sm font-semibold">Onboarding</p>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {doneCount} of {checklist.length}
             </span>
-            <div>
-              <p className="text-sm font-semibold">Onboarding</p>
-              <p className="text-xs text-muted-foreground">
-                {doneCount} of {checklist.length} steps done
-              </p>
-            </div>
           </div>
-          <Badge variant="secondary" className="gap-1.5 border-transparent bg-brand-gold/15 text-brand-gold">
-            <EyeOff className="size-3.5" /> Not visible to customers yet
+          <Badge variant="warning" className="gap-1.5">
+            <EyeOff aria-hidden="true" /> Not visible to customers yet
           </Badge>
         </div>
-        <Progress value={percent} />
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        <Progress value={percent} aria-label={`Onboarding ${doneCount} of ${checklist.length} done`} />
+        <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           {checklist.map((item) => (
-            <div key={item.key} className="flex items-center gap-2 text-sm">
+            <li key={item.key} className="flex items-center gap-2 text-sm">
               {item.done ? (
-                <CheckCircle2 className="size-4 shrink-0 text-primary" />
+                <CheckCircle2 className="size-4 shrink-0 text-primary" aria-hidden="true" />
               ) : (
-                <Circle className="size-4 shrink-0 text-muted-foreground" />
+                <Circle className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               )}
-              <span className={cn(item.done ? "text-muted-foreground line-through" : "text-foreground")}>{item.label}</span>
-            </div>
+              <span className={cn(item.done ? "text-muted-foreground line-through" : "text-foreground")}>
+                {item.label}
+                <span className="sr-only">{item.done ? " (done)" : " (to do)"}</span>
+              </span>
+            </li>
           ))}
-        </div>
+        </ul>
       </CardContent>
     </Card>
   );

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedVenue, getVenueForManager, hasVenuePermission } from "@/modules/events/venue-manager-queries";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { ManagerVenueProfileForm } from "./profile-form";
 
 export const metadata = { title: "Venue Profile" };
@@ -17,9 +18,9 @@ export default async function ManagerVenueProfilePage({ params }: { params: Prom
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="font-heading text-2xl font-semibold">Venue Profile</h1>
+      <PageHeader title="Venue profile" />
       <Card>
-        <CardContent className="p-6">
+        <CardContent>
           <ManagerVenueProfileForm
             venue={{
               id: venue.id,

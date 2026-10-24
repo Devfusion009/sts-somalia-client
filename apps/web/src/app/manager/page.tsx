@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Hotel, ChevronRight, PartyPopper } from "lucide-react";
+import { Building2, Hotel, ChevronRight, PartyPopper } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotels } from "@/modules/hotels/manager-queries";
 import { getMyManagedVenues } from "@/modules/events/venue-manager-queries";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 
 /**
  * Portal entry for hotel and venue managers. One assignment — the common
@@ -35,40 +35,48 @@ export default async function ManagerEntryPage() {
 
   if (properties.length === 0) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
-        <Card>
-          <CardContent className="space-y-3 p-6 text-center">
-            <p className="font-medium">No property assignment found</p>
-            <Button render={<Link href="/account" />}>Go to My Account</Button>
-          </CardContent>
-        </Card>
-      </div>
+      <main className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
+        <Empty className="border border-border bg-card">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Building2 />
+            </EmptyMedia>
+            <EmptyTitle>No property assigned</EmptyTitle>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button render={<Link href="/account" />}>My account</Button>
+          </EmptyContent>
+        </Empty>
+      </main>
     );
   }
 
   if (properties.length === 1) redirect(properties[0].href);
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center gap-3 px-4 py-10">
-      <h1 className="font-heading text-xl font-semibold">Choose a property</h1>
-      {properties.map((p) => (
-        <Link
-          key={p.key}
-          href={p.href}
-          className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent"
-        >
-          <span className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <p.icon className="size-5" />
-            </span>
-            <span>
-              <span className="block text-sm font-medium">{p.name}</span>
-              <span className="block text-xs text-muted-foreground">{p.place}</span>
-            </span>
-          </span>
-          <ChevronRight className="size-4 text-muted-foreground" />
-        </Link>
-      ))}
-    </div>
+    <main className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center gap-4 px-4 py-10">
+      <h1 className="font-heading text-2xl font-semibold tracking-tight">Choose a property</h1>
+      <ul className="divide-y divide-border overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
+        {properties.map((p) => (
+          <li key={p.key}>
+            <Link
+              href={p.href}
+              className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset"
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                  <p.icon aria-hidden="true" className="size-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">{p.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{p.place}</span>
+                </span>
+              </span>
+              <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </main>
   );
 }

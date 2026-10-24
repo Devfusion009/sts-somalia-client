@@ -18,7 +18,8 @@ function toneOf(night: RoomNight): Tone {
 
 const CELL: Record<Tone, string> = {
   open: "bg-primary/[0.06] text-foreground hover:bg-primary/[0.12]",
-  limited: "bg-brand-gold/15 text-brand-gold hover:bg-brand-gold/25",
+  limited:
+    "bg-brand-gold/15 text-[color-mix(in_oklch,var(--brand-gold),black_45%)] hover:bg-brand-gold/25 dark:text-brand-gold",
   full: "bg-destructive/10 text-destructive hover:bg-destructive/15",
   unset: "bg-muted/50 text-muted-foreground hover:bg-muted",
 };
@@ -94,16 +95,13 @@ export function AvailabilityBoard({
           <Button
             variant="outline"
             size="icon"
-            className="size-8"
             aria-label="Previous nights"
             render={<Link href={rangeHref(prev)} scroll={false} />}
           >
-            <ChevronLeft className="size-4" />
+            <ChevronLeft />
           </Button>
           <Button
             variant="outline"
-            size="sm"
-            className="h-8"
             disabled={from === today}
             render={<Link href={rangeHref(today)} scroll={false} />}
           >
@@ -112,26 +110,25 @@ export function AvailabilityBoard({
           <Button
             variant="outline"
             size="icon"
-            className="size-8"
             aria-label="Next nights"
             render={<Link href={rangeHref(next)} scroll={false} />}
           >
-            <ChevronRight className="size-4" />
+            <ChevronRight />
           </Button>
         </div>
       </div>
 
       {rooms.length === 0 ? (
-        <p className="py-12 text-center text-sm text-muted-foreground">No rooms yet.</p>
+        <p className="py-12 text-center text-sm text-muted-foreground">No rooms</p>
       ) : (
         <>
           <dl className="grid grid-cols-2 gap-px border-b border-border bg-border sm:grid-cols-4">
             {stats.map((s) => (
               <div key={s.label} className="bg-secondary/40 px-4 py-2.5">
-                <dt className="text-[11px] font-medium text-muted-foreground uppercase">{s.label}</dt>
+                <dt className="text-xs text-muted-foreground">{s.label}</dt>
                 <dd className="mt-0.5 flex items-baseline gap-1.5">
                   <span className="font-heading text-lg font-semibold tabular-nums">{s.value}</span>
-                  {s.meta ? <span className="text-xs text-muted-foreground">{s.meta}</span> : null}
+                  {s.meta ? <span className="text-xs text-muted-foreground tabular-nums">{s.meta}</span> : null}
                 </dd>
               </div>
             ))}
@@ -141,7 +138,7 @@ export function AvailabilityBoard({
             <table className="w-full border-separate border-spacing-0 text-xs">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-10 min-w-44 border-r border-b border-border bg-card px-4 py-2 text-left text-[11px] font-medium text-muted-foreground uppercase">
+                  <th className="sticky left-0 z-10 min-w-44 border-r border-b border-border bg-card px-4 py-2 text-left text-xs font-medium text-muted-foreground">
                     Room
                   </th>
                   {rooms[0].nights.map((n, i) => {
@@ -159,10 +156,10 @@ export function AvailabilityBoard({
                           monthStart && i > 0 && "border-l"
                         )}
                       >
-                        <span className="block h-3.5 text-[10px] font-semibold text-primary uppercase">
+                        <span className="block h-3.5 text-[11px] font-semibold text-primary">
                           {isToday ? "Today" : monthStart ? format(date, "MMM") : ""}
                         </span>
-                        <span className={cn("block text-[10px] uppercase", isToday ? "text-primary" : "text-muted-foreground")}>
+                        <span className={cn("block text-[11px]", isToday ? "text-primary" : "text-muted-foreground")}>
                           {format(date, "EEE")}
                         </span>
                         <span
@@ -190,14 +187,17 @@ export function AvailabilityBoard({
                     <tr key={room.roomId} className="group/row">
                       <td className="sticky left-0 z-10 border-r border-b border-border bg-card px-4 py-2 group-last/row:border-b-0">
                         {href ? (
-                          <Link href={href} className="block truncate text-sm font-medium hover:text-primary">
+                          <Link
+                            href={href}
+                            className="block truncate rounded-sm text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                          >
                             {room.roomName}
                           </Link>
                         ) : (
                           <span className="block truncate text-sm font-medium">{room.roomName}</span>
                         )}
                         {room.totalUnits === null ? (
-                          <Badge variant="outline" className="mt-1 text-[10px] text-muted-foreground">
+                          <Badge variant="warning" className="mt-1">
                             Count not set
                           </Badge>
                         ) : (
@@ -233,7 +233,7 @@ export function AvailabilityBoard({
                             {night.booked > 0 && cap > 0 ? (
                               <span className="absolute inset-x-1 bottom-1 flex h-1 overflow-hidden rounded-full bg-foreground/10">
                                 <span className="h-full bg-primary" style={{ width: `${agencyW}%` }} />
-                                <span className="h-full bg-sky-500" style={{ width: `${customerW}%` }} />
+                                <span className="h-full bg-chart-3" style={{ width: `${customerW}%` }} />
                               </span>
                             ) : null}
                           </>
@@ -287,16 +287,16 @@ export function AvailabilityBoard({
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
             {LEGEND.map((item) => (
               <span key={item.label} className="flex items-center gap-1.5">
-                <span className={cn("size-2.5 rounded-sm", item.className)} />
+                <span className={cn("size-2.5 rounded-sm", item.className)} aria-hidden="true" />
                 {item.label}
               </span>
             ))}
             <span className="ml-auto flex items-center gap-4">
               <span className="flex items-center gap-1.5">
-                <span className="h-1 w-4 rounded-full bg-primary" /> Agency
+                <span className="h-1 w-4 rounded-full bg-primary" aria-hidden="true" /> Agency
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-1 w-4 rounded-full bg-sky-500" /> Customer
+                <span className="h-1 w-4 rounded-full bg-chart-3" aria-hidden="true" /> Customer
               </span>
             </span>
           </div>

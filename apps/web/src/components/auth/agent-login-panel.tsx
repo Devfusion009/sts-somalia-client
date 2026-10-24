@@ -5,32 +5,27 @@ import { ArrowRight, Headset, Plane, BedDouble, FileCheck2, MoonStar, ShieldChec
 const SERVICES = [
   {
     href: "/flights",
-    label: "Flight Booking",
-    caption: "Search and book flights for your clients",
+    label: "Flights",
     icon: Plane,
   },
   {
     href: "/hotels",
-    label: "Hotel Booking",
-    caption: "Find and book hotels worldwide",
+    label: "Hotels",
     icon: BedDouble,
   },
   {
     href: "/visa",
-    label: "Visa Management",
-    caption: "Apply and track visa applications",
+    label: "Visas",
     icon: FileCheck2,
   },
   {
     href: "/umrah",
-    label: "Umrah Packages",
-    caption: "Book Umrah packages for your customers",
+    label: "Umrah",
     icon: MoonStar,
   },
   {
     href: "/agent/bookings",
-    label: "My Bookings",
-    caption: "View and manage your bookings",
+    label: "My bookings",
     icon: Users,
   },
 ];
@@ -68,20 +63,20 @@ export function AgentLoginBrandPanel() {
 
         <div className="relative z-10 flex items-start justify-between p-6 xl:p-8">
           <span className="inline-flex items-center gap-2 text-xs font-medium text-white">
-            <ShieldCheck className="size-4 text-sidebar-primary" />
+            <ShieldCheck aria-hidden className="size-4 text-sidebar-primary" />
             ISO 9001:2015 Certified Travel Agency
           </span>
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-white">
-            <Headset className="size-4" />
-            24/7 Support
+            <Headset aria-hidden className="size-4" />
+            24/7 support
           </span>
         </div>
 
         <div className="relative z-10 max-w-md px-6 xl:px-8">
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-balance text-white xl:text-[2.5rem] xl:leading-[1.1]">
+          <h2 className="font-heading text-3xl font-bold tracking-tight text-balance text-white xl:text-[2.5rem] xl:leading-[1.1]">
             Travel with <span className="text-sidebar-primary">confidence</span>, discover with{" "}
             <span className="text-brand-accent">Scout</span>.
-          </h1>
+          </h2>
           <p className="mt-4 text-sm leading-relaxed text-white/85">
             One desk for flights, hotels, visas, and Umrah — agency pricing, real-time tracking, and
             a team that handles the paperwork.
@@ -96,16 +91,16 @@ export function AgentLoginBrandPanel() {
             <Link
               key={service.href}
               href={service.href}
-              className="group flex flex-col items-start gap-2.5 rounded-2xl bg-card p-4 shadow-lg ring-1 ring-border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl"
+              className="group flex items-center gap-3 rounded-2xl bg-card p-4 shadow-lg ring-1 ring-border outline-none transition-shadow duration-200 hover:shadow-xl focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                <service.icon className="size-5" />
+                <service.icon aria-hidden className="size-5" />
               </span>
-              <div>
-                <p className="text-sm font-bold">{service.label}</p>
-                <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{service.caption}</p>
-              </div>
-              <ArrowRight className="size-3.5 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
+              <span className="min-w-0 flex-1 text-sm font-bold">{service.label}</span>
+              <ArrowRight
+                aria-hidden
+                className="size-3.5 shrink-0 text-primary opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+              />
             </Link>
           ))}
         </div>

@@ -4,7 +4,6 @@ import {
   FlightTakeoffIcon,
   MosqueIcon,
   BedIcon,
-  BoltIcon,
   WorkspacePremiumIcon,
   PaymentsIcon,
   VerifiedIcon,
@@ -88,8 +87,7 @@ export function HeroDealCard({
               </span>
               {KIND_LABEL[deal.kind]}
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand-accent px-2.5 py-1 text-[11px] font-bold text-brand-accent-foreground">
-              <BoltIcon sx={{ fontSize: 13 }} />
+            <span className="inline-flex items-center rounded-full bg-brand-accent px-2.5 py-1 text-[11px] font-bold text-brand-accent-foreground">
               {deal.tag}
             </span>
           </div>

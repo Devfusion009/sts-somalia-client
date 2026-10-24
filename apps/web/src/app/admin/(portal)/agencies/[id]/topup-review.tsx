@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
@@ -26,35 +26,45 @@ export function TopupReview({ agencyId, requestId }: { agencyId: string; request
           <input type="hidden" name="agencyId" value={agencyId} />
           <input type="hidden" name="requestId" value={requestId} />
           <input type="hidden" name="decision" value="approved" />
-          <SubmitButton size="sm" className="gap-1" pendingText="Crediting…">
-            <CheckCircle2 className="size-3.5" /> Money received
+          <SubmitButton size="sm" pendingText="Crediting…">
+            <Check data-icon="inline-start" /> Received
           </SubmitButton>
         </form>
         <Button
           type="button"
           size="sm"
           variant={rejecting ? "destructive" : "outline"}
-          className="gap-1"
+          aria-expanded={rejecting}
           onClick={() => setRejecting((v) => !v)}
         >
-          <XCircle className="size-3.5" /> Not received
+          <X data-icon="inline-start" /> Not received
         </Button>
       </div>
 
-      {error ? <p className="text-right text-xs text-destructive">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="text-right text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
 
       {rejecting ? (
         <form action={rejectAction} className="space-y-1.5">
           <input type="hidden" name="agencyId" value={agencyId} />
           <input type="hidden" name="requestId" value={requestId} />
           <input type="hidden" name="decision" value="rejected" />
-          <Textarea name="note" placeholder="What the agency should check (shown to them)" rows={2} required />
+          <Textarea
+            name="note"
+            placeholder="What the agency should check (shown to them)"
+            rows={2}
+            required
+            aria-label="Reason"
+          />
           <div className="flex justify-end gap-1.5">
             <Button type="button" size="sm" variant="ghost" onClick={() => setRejecting(false)}>
               Cancel
             </Button>
             <SubmitButton size="sm" variant="destructive" pendingText="Saving…">
-              Confirm
+              Reject top-up
             </SubmitButton>
           </div>
         </form>

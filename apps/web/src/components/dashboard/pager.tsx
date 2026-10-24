@@ -22,7 +22,7 @@ export function Pager({
   const to = Math.min(total, page * pageSize);
 
   return (
-    <div className="flex items-center justify-between text-sm text-muted-foreground">
+    <nav aria-label="Pagination" className="flex items-center justify-between text-sm text-muted-foreground">
       <span className="tabular-nums">
         {from}–{to} of {total}
       </span>
@@ -46,6 +46,6 @@ export function Pager({
           <ChevronRight className="size-4" />
         </Button>
       </div>
-    </div>
+    </nav>
   );
 }

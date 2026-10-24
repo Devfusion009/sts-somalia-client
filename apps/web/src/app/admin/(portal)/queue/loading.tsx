@@ -7,7 +7,7 @@ import {
 export default function OrderQueueLoading() {
   return (
     <LoadingShell label="Order queue">
-      <Title title="Order Queue" badge className="text-xl" />
+      <Title title="Order Queue" badge />
       <RequestCards rows={5} />
     </LoadingShell>
   );

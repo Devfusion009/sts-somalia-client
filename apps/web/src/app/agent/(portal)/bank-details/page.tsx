@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Info, Landmark } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency } from "@/modules/agencies/queries";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageHeader } from "@/components/ui/page-header";
 import { BankDetailsForm } from "./bank-details-form";
 
 export const metadata: Metadata = { title: "Bank Details" };
@@ -16,24 +16,24 @@ export default async function AgentBankDetailsPage() {
   const { agency, roleInAgency } = membership;
   const canManage = roleInAgency === "owner" || roleInAgency === "admin";
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Bank Details</h1>
-      </div>
+  const details: { label: string; value: string | null; mono?: boolean }[] = [
+    { label: "Bank name", value: agency.bank_name },
+    { label: "Account holder name", value: agency.bank_account_name },
+    { label: "Branch", value: agency.bank_branch },
+    { label: "SWIFT/BIC code", value: agency.bank_swift_code, mono: true },
+    { label: "Account number", value: agency.bank_account_number, mono: true },
+  ];
 
-      {!canManage ? (
-        <Alert>
-          <Info />
-          <AlertDescription>Only the agency owner or an admin can edit bank details. You have read-only access.</AlertDescription>
-        </Alert>
-      ) : null}
+  return (
+    <div className="max-w-3xl space-y-6">
+      <PageHeader
+        title="Bank details"
+        status={!canManage ? <Badge variant="neutral">Read only</Badge> : null}
+      />
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Landmark className="size-4 text-primary" /> Payout account
-          </CardTitle>
+          <CardTitle>Payout account</CardTitle>
         </CardHeader>
         <CardContent>
           {canManage ? (
@@ -45,27 +45,15 @@ export default async function AgentBankDetailsPage() {
               bankSwiftCode={agency.bank_swift_code}
             />
           ) : (
-            <dl className="grid gap-4 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-muted-foreground">Bank name</dt>
-                <dd className="font-medium">{agency.bank_name ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Account holder name</dt>
-                <dd className="font-medium">{agency.bank_account_name ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Branch</dt>
-                <dd className="font-medium">{agency.bank_branch ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">SWIFT/BIC code</dt>
-                <dd className="font-medium">{agency.bank_swift_code ?? "—"}</dd>
-              </div>
-              <div className="sm:col-span-2">
-                <dt className="text-muted-foreground">Account number</dt>
-                <dd className="font-medium">{agency.bank_account_number ?? "—"}</dd>
-              </div>
+            <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+              {details.map((item) => (
+                <div key={item.label} className="min-w-0">
+                  <dt className="text-xs text-muted-foreground">{item.label}</dt>
+                  <dd className={item.mono ? "mt-0.5 font-mono font-medium break-all" : "mt-0.5 font-medium break-words"}>
+                    {item.value ?? "—"}
+                  </dd>
+                </div>
+              ))}
             </dl>
           )}
         </CardContent>

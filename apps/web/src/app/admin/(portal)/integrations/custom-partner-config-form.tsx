@@ -1,11 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
-import { Settings2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
 import { saveCustomPartnerConfig } from "@/modules/admin/integrations/actions";
@@ -29,27 +27,18 @@ export function CustomPartnerConfigForm({ config }: { config: Record<string, unk
   const [state, formAction] = useActionState(saveCustomPartnerConfig, null);
 
   return (
-    <form action={formAction} className="space-y-4 border-t pt-4">
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <Settings2 className="size-3.5" />
-        Request shape
-      </div>
+    <form action={formAction} className="max-w-3xl space-y-6 border-t pt-5">
+      <h4 className="font-heading text-sm font-semibold">Request shape</h4>
 
-      {state?.error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <div className="max-w-3xl space-y-4 rounded-lg border bg-muted/30 p-4">
-        <p className="text-xs font-medium text-muted-foreground">Submit</p>
+      <FieldSet>
+        <FieldLegend variant="label">Submit</FieldLegend>
         <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
-          <div className="space-y-1.5">
-            <Label htmlFor="submitUrl">Submit URL</Label>
+          <Field>
+            <FieldLabel htmlFor="submitUrl">Submit URL</FieldLabel>
             <Input id="submitUrl" name="submitUrl" placeholder="https://api.partner.com/visa/applications" defaultValue={cfg.submit?.url} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="submitMethod">Method</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="submitMethod">Method</FieldLabel>
             <Select name="submitMethod" defaultValue={cfg.submit?.method ?? "POST"}>
               <SelectTrigger id="submitMethod" className="w-full">
                 <SelectValue />
@@ -59,10 +48,10 @@ export function CustomPartnerConfigForm({ config }: { config: Record<string, unk
                 <SelectItem value="PUT">PUT</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </Field>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="submitBodyTemplate">Request body template</Label>
+        <Field>
+          <FieldLabel htmlFor="submitBodyTemplate">Request body template</FieldLabel>
           <Textarea
             id="submitBodyTemplate"
             name="submitBodyTemplate"
@@ -71,33 +60,33 @@ export function CustomPartnerConfigForm({ config }: { config: Record<string, unk
             placeholder={'{\n  "name": "{{traveler.full_name}}",\n  "passport": "{{traveler.passport_number}}",\n  "destination": "{{visaType.destinationCountryCode}}"\n}'}
             defaultValue={cfg.submit?.bodyTemplate ? JSON.stringify(cfg.submit.bodyTemplate, null, 2) : ""}
           />
-        </div>
+        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="submitRefPath">Reference path</Label>
+          <Field>
+            <FieldLabel htmlFor="submitRefPath">Reference path</FieldLabel>
             <Input id="submitRefPath" name="submitRefPath" placeholder="data.id" defaultValue={cfg.submit?.refPath} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="submitStatusPath">Status path</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="submitStatusPath">Status path</FieldLabel>
             <Input id="submitStatusPath" name="submitStatusPath" placeholder="data.status (optional)" defaultValue={cfg.submit?.statusPath} />
-          </div>
+          </Field>
         </div>
-      </div>
+      </FieldSet>
 
-      <div className="max-w-3xl space-y-4 rounded-lg border bg-muted/30 p-4">
-        <p className="text-xs font-medium text-muted-foreground">Status sync</p>
+      <FieldSet>
+        <FieldLegend variant="label">Status sync</FieldLegend>
         <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
-          <div className="space-y-1.5">
-            <Label htmlFor="syncUrlTemplate">Status URL</Label>
+          <Field>
+            <FieldLabel htmlFor="syncUrlTemplate">Status URL</FieldLabel>
             <Input
               id="syncUrlTemplate"
               name="syncUrlTemplate"
               placeholder="https://api.partner.com/visa/applications/{{ref}} (optional)"
               defaultValue={cfg.sync?.urlTemplate}
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="syncMethod">Method</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="syncMethod">Method</FieldLabel>
             <Select name="syncMethod" defaultValue={cfg.sync?.method ?? "GET"}>
               <SelectTrigger id="syncMethod" className="w-full">
                 <SelectValue />
@@ -107,30 +96,30 @@ export function CustomPartnerConfigForm({ config }: { config: Record<string, unk
                 <SelectItem value="POST">POST</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </Field>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="syncStatusPath">Status path</Label>
+        <Field>
+          <FieldLabel htmlFor="syncStatusPath">Status path</FieldLabel>
           <Input id="syncStatusPath" name="syncStatusPath" placeholder="data.status" defaultValue={cfg.sync?.statusPath} />
-        </div>
-      </div>
+        </Field>
+      </FieldSet>
 
-      <div className="max-w-3xl space-y-4 rounded-lg border bg-muted/30 p-4">
-        <p className="text-xs font-medium text-muted-foreground">Webhook fields</p>
+      <FieldSet>
+        <FieldLegend variant="label">Webhook fields</FieldLegend>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="webhookRefField">Reference field</Label>
+          <Field>
+            <FieldLabel htmlFor="webhookRefField">Reference field</FieldLabel>
             <Input id="webhookRefField" name="webhookRefField" placeholder="partner_ref" defaultValue={cfg.webhook?.refField} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="webhookStatusField">Status field</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="webhookStatusField">Status field</FieldLabel>
             <Input id="webhookStatusField" name="webhookStatusField" placeholder="status" defaultValue={cfg.webhook?.statusField} />
-          </div>
+          </Field>
         </div>
-      </div>
+      </FieldSet>
 
-      <div className="max-w-3xl space-y-1.5 rounded-lg border bg-muted/30 p-4">
-        <Label htmlFor="statusMap">Status map</Label>
+      <Field>
+        <FieldLabel htmlFor="statusMap">Status map</FieldLabel>
         <Textarea
           id="statusMap"
           name="statusMap"
@@ -139,11 +128,18 @@ export function CustomPartnerConfigForm({ config }: { config: Record<string, unk
           placeholder={'{\n  "received": "in_review",\n  "approved": "approved",\n  "rejected": "rejected",\n  "completed": "issued"\n}'}
           defaultValue={cfg.statusMap ? JSON.stringify(cfg.statusMap, null, 2) : ""}
         />
-      </div>
+      </Field>
 
-      <SubmitButton size="sm" pendingText="Saving…">
-        Save request shape
-      </SubmitButton>
+      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+        {state?.error ? (
+          <p role="alert" className="mr-auto text-sm text-destructive">
+            {state.error}
+          </p>
+        ) : null}
+        <SubmitButton size="sm" pendingText="Saving…">
+          Save request shape
+        </SubmitButton>
+      </div>
     </form>
   );
 }

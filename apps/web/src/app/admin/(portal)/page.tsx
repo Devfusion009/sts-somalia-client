@@ -1,10 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, parseISO } from "date-fns";
 import {
   Users,
   ShoppingCart,
-  DollarSign,
   ClipboardCheck,
   Building2,
   Plane,
@@ -14,7 +13,6 @@ import {
   Download,
   ArrowUpRight,
   ArrowDownRight,
-  BellRing,
   Send,
   Eye,
   AlertCircle,
@@ -33,7 +31,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   getDashboardStats,
   getRevenueTrendRanged,
@@ -78,19 +78,14 @@ const ROLE_CHART_LABELS: Record<AppRole, string> = {
 };
 
 /**
- * Per-vertical accent, reused for both the stat cards and the row icons in
- * the lists below so a hotel always reads teal, a flight always violet, etc.
- * Tints are the /10 of an existing chart token — no new colors introduced.
+ * Row icon tints. Neutral by default; color is reserved for a stage that
+ * carries meaning (done, stopped, waiting on the customer).
  */
 const TONES = {
+  neutral: "bg-muted text-muted-foreground",
   teal: "bg-primary/10 text-primary",
-  orange: "bg-brand-accent/10 text-brand-accent",
-  blue: "bg-chart-3/10 text-chart-3",
-  violet: "bg-chart-4/10 text-chart-4",
-  gold: "bg-brand-gold/10 text-brand-gold",
+  gold: "bg-brand-gold/15 text-[color-mix(in_oklch,var(--brand-gold),black_35%)] dark:text-brand-gold",
   red: "bg-destructive/10 text-destructive",
-  // Same visual language as VisaStatusBadge's own ready_for_processing tint.
-  cyan: "bg-chart-2/10 text-chart-2",
 } as const;
 
 type Tone = keyof typeof TONES;
@@ -106,14 +101,6 @@ const ITEM_TYPE_ICON: Record<string, LucideIcon> = {
   visa: FileText,
   umrah: Landmark,
   hall: PartyPopper,
-};
-
-const ITEM_TYPE_TONE: Record<string, Tone> = {
-  hotel: "teal",
-  flight: "violet",
-  visa: "blue",
-  umrah: "gold",
-  hall: "orange",
 };
 
 /** Pipeline stage → the Applications queue that lists it. */
@@ -155,16 +142,29 @@ const VISA_STAGE_ICON: Record<string, LucideIcon> = {
 };
 
 const VISA_STAGE_TONE: Record<string, Tone> = {
-  submitted: "blue",
-  in_review: "violet",
-  additional_info_required: "orange",
-  ready_for_processing: "cyan",
-  processing: "gold",
+  submitted: "neutral",
+  in_review: "neutral",
+  additional_info_required: "gold",
+  ready_for_processing: "neutral",
+  processing: "neutral",
   approved: "teal",
   issued: "teal",
   rejected: "red",
   cancelled: "red",
 };
+
+/** `in_review` → `in review`; the Badge capitalizes. */
+function humanize(value: string) {
+  return value.replaceAll("_", " ");
+}
+
+function money(amount: number, currency = "USD") {
+  return `${currency} ${Math.round(amount).toLocaleString("en-US")}`;
+}
+
+function shortDate(value: string) {
+  return format(parseISO(value), "MMM d, yyyy");
+}
 
 /** Soft lift so white cards separate from the tinted page background. */
 const CARD = "shadow-sm shadow-foreground/5";
@@ -196,10 +196,7 @@ export default async function AdminDashboardPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="font-heading text-2xl font-bold tracking-tight">Admin Dashboard</h1>
-        <DateRangePicker currentKey={range.key} />
-      </div>
+      <PageHeader title="Dashboard" actions={<DateRangePicker currentKey={range.key} />} />
 
       <Suspense fallback={<StatRowSkeleton />}>
         <StatsSection statsP={statsP} trendsP={trendsP} />
@@ -244,8 +241,6 @@ async function StatsSection({
     <>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard
-          icon={Users}
-          tone="blue"
           label="Total users"
           value={stats.totalUsers}
           change={percentChange(statTrends.users.current, statTrends.users.previous)}
@@ -253,8 +248,6 @@ async function StatsSection({
           href="/admin/users"
         />
         <StatCard
-          icon={ShoppingCart}
-          tone="orange"
           label="Total orders"
           value={stats.totalOrders}
           change={percentChange(statTrends.orders.current, statTrends.orders.previous)}
@@ -262,17 +255,13 @@ async function StatsSection({
           href="/admin/orders"
         />
         <StatCard
-          icon={DollarSign}
-          tone="teal"
           label="Paid revenue"
-          value={`$${stats.revenue.toFixed(0)}`}
+          value={money(stats.revenue)}
           change={percentChange(statTrends.revenue.current, statTrends.revenue.previous)}
           series={statTrends.revenue.series}
           href="/admin/orders?filter=paid"
         />
         <StatCard
-          icon={ClipboardCheck}
-          tone="violet"
           label="Pending applications"
           value={stats.pendingApplications}
           href="/admin/applications?status=pending"
@@ -282,20 +271,16 @@ async function StatsSection({
       {stats.pendingApplications > 0 ? (
         <Card className={cn(CARD, "bg-primary/5 ring-primary/20")}>
           <CardContent className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <BellRing className="size-4" />
+            <p className="text-sm font-medium">
+              <span className="tabular-nums">{stats.pendingApplications}</span> application
+              {stats.pendingApplications > 1 ? "s" : ""} pending review
+              <span className="block font-normal text-muted-foreground tabular-nums sm:inline">
+                <span className="hidden sm:inline"> · </span>
+                {stats.pendingAgency} agency, {stats.pendingPartner} partner, {stats.pendingVenue} venue, {stats.pendingAffiliate} affiliate
               </span>
-              <p className="text-sm font-medium">
-                {stats.pendingApplications} application{stats.pendingApplications > 1 ? "s" : ""} waiting for review
-                <span className="font-normal text-muted-foreground">
-                  {" "}
-                  · {stats.pendingAgency} agency, {stats.pendingPartner} partner, {stats.pendingVenue} venue, {stats.pendingAffiliate} affiliate
-                </span>
-              </p>
-            </div>
-            <Button size="sm" className="shrink-0" render={<Link href="/admin/applications" />}>
-              Review now
+            </p>
+            <Button className="shrink-0 max-sm:w-full" render={<Link href="/admin/applications" />}>
+              Review
             </Button>
           </CardContent>
         </Card>
@@ -395,19 +380,18 @@ async function OrdersSection({
           </CardHeader>
           <CardContent className="space-y-0.5">
             {recentOrders.length === 0 ? (
-              <EmptyRow>No orders yet.</EmptyRow>
+              <EmptyRow icon={ShoppingCart}>No orders</EmptyRow>
             ) : (
               recentOrders.map((order) => {
                 const firstType = order.order_items[0]?.item_type;
-                const Icon = firstType ? ITEM_TYPE_ICON[firstType] : ShoppingCart;
-                const tone = (firstType && ITEM_TYPE_TONE[firstType]) || "teal";
+                const Icon = (firstType && ITEM_TYPE_ICON[firstType]) || ShoppingCart;
                 return (
                   <div
                     key={order.id}
                     className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60"
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <IconChip icon={Icon} tone={tone} />
+                      <IconChip icon={Icon} />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{order.customer?.full_name ?? "—"}</p>
                         <p className="truncate text-xs text-muted-foreground">
@@ -417,10 +401,10 @@ async function OrdersSection({
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <span className="text-sm font-semibold tabular-nums">
-                        {order.currency} {Number(order.total).toFixed(0)}
+                        {money(Number(order.total), order.currency)}
                       </span>
-                      <Badge variant="secondary" className="capitalize">
-                        {order.status.replace("_", " ")}
+                      <Badge variant={statusBadgeVariant(order.status)} className="capitalize">
+                        {humanize(order.status)}
                       </Badge>
                     </div>
                   </div>
@@ -436,7 +420,7 @@ async function OrdersSection({
           </CardHeader>
           <CardContent className="space-y-0.5">
             {topHotels.length === 0 ? (
-              <EmptyRow>No confirmed bookings yet.</EmptyRow>
+              <EmptyRow icon={Building2}>No confirmed hotel bookings</EmptyRow>
             ) : (
               topHotels.map((hotel) => (
                 <div
@@ -444,15 +428,15 @@ async function OrdersSection({
                   className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60"
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <IconChip icon={Building2} tone="teal" />
+                    <IconChip icon={Building2} />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{hotel.name}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {hotel.city} · {hotel.bookings} booking{hotel.bookings > 1 ? "s" : ""}
+                        {hotel.city} · <span className="tabular-nums">{hotel.bookings}</span> booking{hotel.bookings > 1 ? "s" : ""}
                       </p>
                     </div>
                   </div>
-                  <span className="shrink-0 text-sm font-semibold tabular-nums">${hotel.revenue.toFixed(0)}</span>
+                  <span className="shrink-0 text-sm font-semibold tabular-nums">{money(hotel.revenue)}</span>
                 </div>
               ))
             )}
@@ -480,7 +464,7 @@ async function LeaderboardSection({
         </CardHeader>
         <CardContent className="space-y-0.5">
           {leaderboard.length === 0 ? (
-            <EmptyRow>No agency bookings in this range yet.</EmptyRow>
+            <EmptyRow icon={Users}>No agency bookings in this range</EmptyRow>
           ) : (
             leaderboard.map((agency, i) => (
               <div
@@ -493,20 +477,16 @@ async function LeaderboardSection({
                   <span
                     className={cn(
                       "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums",
-                      i === 0
-                        ? "bg-brand-gold/15 text-brand-gold"
-                        : i < 3
-                          ? "bg-primary/10 text-primary"
-                          : "bg-muted text-muted-foreground"
+                      i < 3 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
                     )}
                   >
                     {i + 1}
                   </span>
                   <p className="truncate text-sm font-medium">{agency.name}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-4 text-sm">
-                  <span className="text-muted-foreground tabular-nums">{agency.orders} orders</span>
-                  <span className="font-semibold tabular-nums">${agency.revenue.toFixed(0)}</span>
+                <div className="flex shrink-0 flex-col items-end gap-0.5 text-sm sm:flex-row sm:items-center sm:gap-4">
+                  <span className="text-xs text-muted-foreground tabular-nums sm:text-sm">{agency.orders} orders</span>
+                  <span className="font-semibold tabular-nums">{money(agency.revenue)}</span>
                 </div>
               </div>
             ))
@@ -534,9 +514,9 @@ async function VisaSection({
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className={cn(CARD, "lg:col-span-3")}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex flex-wrap items-center gap-2">
               Visa pipeline
-              <Badge variant="secondary">
+              <Badge variant="neutral" className="tabular-nums">
                 {visaActive} active · {visaStats.total} total
               </Badge>
             </CardTitle>
@@ -551,7 +531,7 @@ async function VisaSection({
               <Link
                 key={status}
                 href={`/admin/visa?queue=${VISA_STAGE_QUEUE[status] ?? "all"}`}
-                className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60"
+                className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors outline-none hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <IconChip icon={VISA_STAGE_ICON[status]} tone={VISA_STAGE_TONE[status]} />
@@ -560,7 +540,7 @@ async function VisaSection({
                 <span className="shrink-0 text-sm font-semibold tabular-nums">{visaStats.byStatus[status]}</span>
               </Link>
             ))}
-            {visaStats.total === 0 ? <EmptyRow>No visa applications yet.</EmptyRow> : null}
+            {visaStats.total === 0 ? <EmptyRow icon={FileText}>No visa applications</EmptyRow> : null}
           </CardContent>
         </Card>
 
@@ -575,7 +555,7 @@ async function VisaSection({
           </CardHeader>
           <CardContent className="space-y-0.5">
             {upcomingHalls.length === 0 ? (
-              <EmptyRow>No upcoming hall bookings.</EmptyRow>
+              <EmptyRow icon={PartyPopper}>No upcoming hall bookings</EmptyRow>
             ) : (
               upcomingHalls.map((booking) => (
                 <div
@@ -583,22 +563,20 @@ async function VisaSection({
                   className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60"
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <IconChip icon={PartyPopper} tone="orange" />
+                    <IconChip icon={PartyPopper} />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium capitalize">
-                        {booking.event_type.replace("_", " ")} · {booking.venue?.name ?? "—"}
+                        {humanize(booking.event_type)} · {booking.venue?.name ?? "—"}
                       </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {new Date(booking.start_date).toLocaleDateString()}
-                        {booking.end_date !== booking.start_date
-                          ? ` → ${new Date(booking.end_date).toLocaleDateString()}`
-                          : ""}
+                      <p className="truncate text-xs text-muted-foreground tabular-nums">
+                        {shortDate(booking.start_date)}
+                        {booking.end_date !== booking.start_date ? ` – ${shortDate(booking.end_date)}` : ""}
                         {booking.expected_guests ? ` · ${booking.expected_guests} guests` : ""}
                       </p>
                     </div>
                   </div>
-                  <Badge variant="secondary" className="shrink-0 capitalize">
-                    {booking.status}
+                  <Badge variant={statusBadgeVariant(booking.status)} className="shrink-0 capitalize">
+                    {humanize(booking.status)}
                   </Badge>
                 </div>
               ))
@@ -628,13 +606,20 @@ async function RolesSection({ statsP }: { statsP: ReturnType<typeof getDashboard
   );
 }
 
-function EmptyRow({ children }: { children: React.ReactNode }) {
-  return <p className="py-8 text-center text-sm text-muted-foreground">{children}</p>;
+function EmptyRow({ icon: Icon, children }: { icon: LucideIcon; children: React.ReactNode }) {
+  return (
+    <Empty>
+      <EmptyMedia variant="icon">
+        <Icon />
+      </EmptyMedia>
+      <EmptyTitle>{children}</EmptyTitle>
+    </Empty>
+  );
 }
 
-function IconChip({ icon: Icon, tone }: { icon: LucideIcon; tone: Tone }) {
+function IconChip({ icon: Icon, tone = "neutral" }: { icon: LucideIcon; tone?: Tone }) {
   return (
-    <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", TONES[tone])}>
+    <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", TONES[tone])} aria-hidden="true">
       <Icon className="size-4" />
     </span>
   );
@@ -642,12 +627,16 @@ function IconChip({ icon: Icon, tone }: { icon: LucideIcon; tone: Tone }) {
 
 function ExportLink({ href }: { href: string }) {
   return (
-    <a
-      href={href}
-      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+    <Button
+      variant="outline"
+      size="icon-sm"
+      aria-label="Export CSV"
+      title="Export CSV"
+      nativeButton={false}
+      render={<a href={href} />}
     >
-      <Download className="size-3.5" /> Export CSV
-    </a>
+      <Download aria-hidden="true" />
+    </Button>
   );
 }
 
@@ -669,16 +658,12 @@ function DeltaPill({ change }: { change: number }) {
 }
 
 function StatCard({
-  icon: Icon,
   label,
   value,
   change,
   series,
   href,
 }: {
-  icon: LucideIcon;
-  /** Retained for callers; the card no longer paints a tinted icon tile. */
-  tone?: Tone;
   label: string;
   value: string | number;
   change?: number | null;
@@ -691,15 +676,18 @@ function StatCard({
     <Card className={cn(CARD, "h-full", href && "transition-shadow group-hover:shadow-md")}>
       <CardContent className="flex flex-1 flex-col justify-between gap-3">
         <div className="flex items-center justify-between gap-2">
-          <p className="flex min-w-0 items-center gap-1.5 text-xs leading-tight font-medium text-muted-foreground">
-            <Icon className="size-3.5 shrink-0" />
-            <span className="truncate">{label}</span>
-          </p>
+          <p className="min-w-0 truncate text-xs leading-tight font-medium text-muted-foreground">{label}</p>
           {change !== null && change !== undefined ? <DeltaPill change={change} /> : null}
         </div>
         <div className="flex items-end justify-between gap-2">
-          <p className="font-heading text-[26px] leading-none font-semibold tracking-tight tabular-nums">{value}</p>
-          {series && series.length > 1 ? <Sparkline data={series} positive={positive} /> : null}
+          <p className="min-w-0 truncate font-heading text-xl leading-none font-semibold tracking-tight tabular-nums sm:text-[26px]">
+            {value}
+          </p>
+          {series && series.length > 1 ? (
+            <span className="hidden shrink-0 sm:block">
+              <Sparkline data={series} positive={positive} />
+            </span>
+          ) : null}
         </div>
       </CardContent>
     </Card>

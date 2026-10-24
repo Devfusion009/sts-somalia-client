@@ -1,7 +1,6 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { Loader2 } from "lucide-react";
 import { Button, type buttonVariants } from "@/components/ui/button";
 import type { VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
@@ -11,24 +10,18 @@ type SubmitButtonProps = ComponentProps<typeof Button> &
     pendingText?: string;
   };
 
+/** Submit button that reads its form's pending state: spinner + pendingText while the action runs. */
 export function SubmitButton({
   children,
   pendingText = "Please wait…",
-  disabled,
+  loading,
   ...props
 }: SubmitButtonProps) {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" disabled={pending || disabled} {...props}>
-      {pending ? (
-        <>
-          <Loader2 className="animate-spin" />
-          {pendingText}
-        </>
-      ) : (
-        children
-      )}
+    <Button type="submit" loading={pending || loading} {...props}>
+      {pending ? pendingText : children}
     </Button>
   );
 }

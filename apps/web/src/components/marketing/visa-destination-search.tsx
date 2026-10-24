@@ -73,8 +73,8 @@ export function VisaDestinationSearch({
       }}
       className="relative mt-8 max-w-lg"
     >
-      <div className="flex items-center gap-1.5 rounded-full bg-white p-1.5 pl-5 shadow-2xl">
-        <MapPin className="size-4 shrink-0 text-neutral-400" />
+      <div className="flex items-center gap-1.5 rounded-full bg-white p-1.5 pl-5 shadow-2xl ring-primary/40 focus-within:ring-3">
+        <MapPin className="size-4 shrink-0 text-neutral-500" aria-hidden />
         <input
           ref={inputRef}
           type="text"
@@ -95,14 +95,14 @@ export function VisaDestinationSearch({
           onFocus={() => setOpen(true)}
           onBlur={() => setOpen(false)}
           onKeyDown={onKeyDown}
-          className="h-11 min-w-0 flex-1 bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
+          className="h-11 min-w-0 flex-1 bg-transparent text-base text-neutral-900 outline-none placeholder:text-neutral-500 sm:text-sm"
         />
         <button
           type="submit"
           aria-label="Search"
-          className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-gold text-neutral-900 transition-colors hover:bg-brand-gold/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
         >
-          <ArrowRight className="size-4.5" />
+          <ArrowRight className="size-4.5" aria-hidden />
         </button>
       </div>
 
@@ -130,10 +130,10 @@ export function VisaDestinationSearch({
                   i === active ? "bg-primary/10" : "hover:bg-neutral-50"
                 )}
               >
-                <span className="text-xl leading-none">{option.flag}</span>
+                <span className="text-xl leading-none" aria-hidden>{option.flag}</span>
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold">{option.name}</span>
                 <span className="shrink-0 text-xs font-medium text-neutral-500 tabular-nums">
-                  From {option.currency} {option.fromPrice.toFixed(0)}
+                  From {option.currency} {option.fromPrice.toLocaleString("en-US", { maximumFractionDigits: 0 })}
                 </span>
               </li>
             ))

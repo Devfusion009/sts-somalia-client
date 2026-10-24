@@ -1,28 +1,23 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { CalendarCheck, Plus } from "lucide-react";
 import type { HotelAccess } from "@/modules/hotels/hotel-access";
 import { getPartnerBookings } from "@/modules/hotels/partner-queries";
 import { markBookingPaid } from "@/modules/hotels/reservation-actions";
 import { PAYMENT_METHOD_LABEL, type OfflinePaymentMethod } from "@/modules/hotels/reservation-types";
 import { hotelGuestNames } from "@/modules/orders/format";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
+import { FilterChips } from "@/components/dashboard/filter-chips";
+import { dateSpan, money } from "@/lib/money";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BookingMoveActions } from "@/modules/hotels/components/booking-move-actions";
 import type { ActionState } from "@/lib/auth/actions";
 import { todayIso } from "@/modules/hotels/availability";
-import { cn } from "@/lib/utils";
 
-const STATUS_BADGE: Record<string, string> = {
-  pending: "bg-brand-gold/15 text-brand-gold",
-  waitlisted: "bg-brand-gold/15 text-brand-gold",
-  confirmed: "bg-primary/10 text-primary",
-  completed: "bg-primary/10 text-primary",
-  cancelled: "bg-destructive/10 text-destructive",
-  refunded: "bg-destructive/10 text-destructive",
-  no_show: "bg-muted text-muted-foreground",
-};
+const STATUS_OVERRIDES = { no_show: "neutral" } as const;
 
 type BookingRow = Awaited<ReturnType<typeof getPartnerBookings>>[number];
 
@@ -45,50 +40,58 @@ function BookingsTable({
 }) {
   return (
     <Card className="overflow-hidden py-0">
-      <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Guest</TableHead>
               <TableHead>Room</TableHead>
               <TableHead>Dates</TableHead>
-              <TableHead>Rooms</TableHead>
-              <TableHead>Price</TableHead>
+              <TableHead numeric>Rooms</TableHead>
+              <TableHead numeric>Price</TableHead>
               <TableHead>Payment</TableHead>
               <TableHead>Status</TableHead>
-              {canManage ? <TableHead className="text-right">Action</TableHead> : null}
+              {canManage ? (
+                <TableHead numeric>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              ) : null}
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((b) => (
               <TableRow key={b.id}>
                 <TableCell className="font-medium">
-                  <Link href={`${base}/bookings/${b.id}`} className="hover:text-primary hover:underline">
+                  <Link
+                    href={`${base}/bookings/${b.id}`}
+                    className="rounded-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
                     {hotelGuestNames(b.guest_details)[0] ?? "Guest"}
                   </Link>
                 </TableCell>
                 <TableCell>
-                  {b.hotel_rooms?.name}
-                  {b.channel === "b2b" ? (
-                    <span className="ml-1.5 text-xs text-muted-foreground">Agency</span>
-                  ) : b.source === "offline" ? (
-                    <span className="ml-1.5 text-xs text-muted-foreground">Offline</span>
-                  ) : null}
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {b.hotel_rooms?.name}
+                    {b.channel === "b2b" ? (
+                      <Badge variant="info">Agency</Badge>
+                    ) : b.source === "offline" ? (
+                      <Badge variant="neutral">Offline</Badge>
+                    ) : null}
+                  </span>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {b.check_in} → {b.check_out}
+                <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
+                  {dateSpan(b.check_in, b.check_out)}
                 </TableCell>
-                <TableCell>{b.num_rooms}</TableCell>
-                <TableCell>
-                  {b.currency} {Number(b.total_price).toFixed(0)}
+                <TableCell numeric>{b.num_rooms}</TableCell>
+                <TableCell numeric className="whitespace-nowrap">
+                  {money(b.total_price, b.currency)}
                 </TableCell>
                 <TableCell>
                   {b.source !== "offline" || !b.payment_method ? (
                     <span className="text-sm text-muted-foreground">Online</span>
                   ) : b.paid_at ? (
-                    <span className="text-sm">
+                    <span className="flex items-center gap-1.5 text-sm">
                       {PAYMENT_METHOD_LABEL[b.payment_method as OfflinePaymentMethod]}
-                      <span className="ml-1.5 text-xs font-medium text-primary">Paid</span>
+                      <Badge variant="success">Paid</Badge>
                     </span>
                   ) : (
                     <span className="flex items-center gap-2 text-sm">
@@ -102,20 +105,18 @@ function BookingsTable({
                           </Button>
                         </form>
                       ) : (
-                        <span className="text-xs font-medium text-brand-gold">Unpaid</span>
+                        <Badge variant="warning">Unpaid</Badge>
                       )}
                     </span>
                   )}
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    className={`border-transparent capitalize ${STATUS_BADGE[b.status] ?? "bg-muted text-muted-foreground"}`}
-                  >
+                  <Badge variant={statusBadgeVariant(b.status, STATUS_OVERRIDES)} className="capitalize">
                     {b.status.replace(/_/g, " ")}
                   </Badge>
                 </TableCell>
                 {canManage ? (
-                  <TableCell className="text-right">
+                  <TableCell numeric>
                     <BookingMoveActions
                       bookingId={b.id}
                       status={b.status}
@@ -130,7 +131,6 @@ function BookingsTable({
             ))}
           </TableBody>
         </Table>
-      </div>
     </Card>
   );
 }
@@ -175,36 +175,37 @@ export async function BookingsView({
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-heading text-2xl font-semibold">Bookings</h1>
-        {canManage && allowNewBooking ? (
-          <Button className="gap-1.5" render={<Link href={`${base}/bookings/new`} />}>
-            <Plus className="size-4" /> Book now
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Bookings"
+        actions={
+          canManage && allowNewBooking ? (
+            <Button render={<Link href={`${base}/bookings/new`} />}>
+              <Plus aria-hidden="true" /> Book now
+            </Button>
+          ) : null
+        }
+      />
 
-      <nav className="flex flex-wrap gap-2" aria-label="Booking views">
-        {VIEWS.map((v) => (
-          <Link
-            key={v.key}
-            href={v.key === "all" ? `${base}/bookings` : `${base}/bookings?view=${v.key}`}
-            className={cn(
-              "flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors",
-              v.key === view.key
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {v.label}
-            <span className="text-xs tabular-nums opacity-80">{counts.get(v.key)}</span>
-          </Link>
-        ))}
-      </nav>
+      <FilterChips
+        label="Booking views"
+        active={view.key}
+        showZero
+        items={VIEWS.map((v) => ({
+          key: v.key,
+          label: v.label,
+          href: v.key === "all" ? `${base}/bookings` : `${base}/bookings?view=${v.key}`,
+          count: counts.get(v.key) ?? 0,
+        }))}
+      />
 
       {scoped.length === 0 ? (
         <Card>
-          <CardContent className="py-16 text-center text-sm text-muted-foreground">No bookings.</CardContent>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <CalendarCheck />
+            </EmptyMedia>
+            <EmptyTitle>{bookings.length === 0 ? "No bookings" : "No bookings in this view"}</EmptyTitle>
+          </Empty>
         </Card>
       ) : (
         <>
