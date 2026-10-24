@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { adminReviewDocument } from "@/modules/visa/admin-actions";
@@ -39,16 +39,24 @@ export function DocumentReviewControls({
           <input type="hidden" name="documentId" value={documentId} />
           <input type="hidden" name="applicationId" value={applicationId} />
           <input type="hidden" name="decision" value="accept" />
-          <Button size="sm" variant="ghost" type="submit" className="gap-1">
-            <Check className="size-3.5 text-primary" /> Accept
-          </Button>
+          <SubmitButton
+            size="icon-sm"
+            variant="outline"
+            aria-label="Accept document"
+            title="Accept"
+            pendingText=""
+          >
+            <Check className="text-primary" />
+          </SubmitButton>
         </form>
       ) : null}
 
       {reviewStatus !== "rejected" ? (
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button size="sm" variant="ghost" className="gap-1" />}>
-            <X className="size-3.5 text-destructive" /> Reject
+          <DialogTrigger
+            render={<Button size="icon-sm" variant="outline" aria-label="Reject document" title="Reject" />}
+          >
+            <X className="text-destructive" />
           </DialogTrigger>
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
@@ -58,8 +66,8 @@ export function DocumentReviewControls({
               <input type="hidden" name="documentId" value={documentId} />
               <input type="hidden" name="applicationId" value={applicationId} />
               <input type="hidden" name="decision" value="reject" />
-              <div className="space-y-2">
-                <Label htmlFor={`reason-${documentId}`}>Reason</Label>
+              <Field>
+                <FieldLabel htmlFor={`reason-${documentId}`}>Reason</FieldLabel>
                 <Textarea
                   id={`reason-${documentId}`}
                   name="reason"
@@ -67,16 +75,18 @@ export function DocumentReviewControls({
                   required
                   placeholder="Passport photo page is cut off"
                 />
-              </div>
+              </Field>
               {rejectState?.error ? (
-                <p className="text-xs text-destructive">{rejectState.error}</p>
+                <p role="alert" className="text-sm text-destructive">
+                  {rejectState.error}
+                </p>
               ) : null}
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                   Cancel
                 </Button>
-                <SubmitButton size="sm" pendingText="Rejecting…">
-                  Reject
+                <SubmitButton variant="destructive" pendingText="Rejecting…">
+                  Reject document
                 </SubmitButton>
               </div>
             </form>
@@ -85,7 +95,9 @@ export function DocumentReviewControls({
       ) : null}
 
       {acceptState?.error ? (
-        <p className="text-xs text-destructive">{acceptState.error}</p>
+        <p role="alert" className="text-xs text-destructive">
+          {acceptState.error}
+        </p>
       ) : null}
     </div>
   );

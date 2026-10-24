@@ -34,14 +34,7 @@ export default async function AdminVenueListingPage({ params }: { params: Promis
             />
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Reviews</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PropertyReviews venueId={venue.id} reviews={venue.property_reviews} />
-          </CardContent>
-        </Card>
+        <PropertyReviews title="Reviews" venueId={venue.id} reviews={venue.property_reviews} />
       </div>
       <Card>
         <CardContent>

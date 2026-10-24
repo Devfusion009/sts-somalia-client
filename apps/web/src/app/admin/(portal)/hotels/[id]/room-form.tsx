@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { ActionState } from "@/lib/auth/actions";
 import { Plus, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -81,17 +81,15 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant={room ? "outline" : "default"} size="sm" />}>
-        {room ? (
-          <>
-            <Pencil /> Edit
-          </>
-        ) : (
-          <>
-            <Plus /> Add room
-          </>
-        )}
-      </DialogTrigger>
+      {room ? (
+        <DialogTrigger render={<Button variant="ghost" size="icon" aria-label={`Edit ${room.name}`} />}>
+          <Pencil />
+        </DialogTrigger>
+      ) : (
+        <DialogTrigger render={<Button size="sm" />}>
+          <Plus aria-hidden="true" /> Add room
+        </DialogTrigger>
+      )}
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{room ? "Edit room" : "Add room"}</DialogTitle>
@@ -106,32 +104,32 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
             </Alert>
           ) : null}
 
-          <div className="space-y-2">
-            <Label htmlFor="room-name">Room type</Label>
+          <Field>
+            <FieldLabel htmlFor="room-name">Room type</FieldLabel>
             <input type="hidden" name="name" value={name} />
             <RoomTypeCombobox id="room-name" value={name} onValueChange={setName} types={roomTypes} />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="room-name-so">Room type (Somali)</Label>
+          <Field>
+            <FieldLabel htmlFor="room-name-so">Room type (Somali)</FieldLabel>
             <Input id="room-name-so" name="nameSo" defaultValue={room?.name_so ?? ""} />
-          </div>
+          </Field>
 
           {!room ? <RoomPhotosField id="room-photos" /> : null}
 
-          <div className="space-y-2">
-            <Label htmlFor="room-description">Description</Label>
+          <Field>
+            <FieldLabel htmlFor="room-description">Description</FieldLabel>
             <Textarea id="room-description" name="description" rows={2} defaultValue={room?.description ?? ""} />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="room-description-so">Description (Somali)</Label>
+          <Field>
+            <FieldLabel htmlFor="room-description-so">Description (Somali)</FieldLabel>
             <Textarea id="room-description-so" name="descriptionSo" rows={2} defaultValue={room?.description_so ?? ""} />
-          </div>
+          </Field>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="totalUnits">Rooms of this type</Label>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Field>
+              <FieldLabel htmlFor="totalUnits">Rooms of this type</FieldLabel>
               <Input
                 id="totalUnits"
                 name="totalUnits"
@@ -141,13 +139,13 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
                 defaultValue={room?.total_units ?? ""}
                 required
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="maxOccupancy">Max occupancy</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="maxOccupancy">Max occupancy</FieldLabel>
               <Input id="maxOccupancy" name="maxOccupancy" type="number" min={1} defaultValue={room?.max_occupancy ?? 2} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bedType">Bed type</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="bedType">Bed type</FieldLabel>
               <Select name="bedType" defaultValue={room?.bed_type ?? ""}>
                 <SelectTrigger id="bedType" className="w-full">
                   <SelectValue placeholder="Not specified" />
@@ -160,23 +158,23 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="floor">Floor</Label>
+            <Field>
+              <FieldLabel htmlFor="floor">Floor</FieldLabel>
               <RoomFloorField id="floor" defaultValue={room?.floor ?? null} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sizeSqm">Room size</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="sizeSqm">Room size</FieldLabel>
               <RoomSizeField id="sizeSqm" defaultSqm={room?.size_sqm ?? null} />
-            </div>
+            </Field>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="basePrice">Price / night</Label>
+          <div className="grid grid-cols-[1fr_6rem] gap-4">
+            <Field>
+              <FieldLabel htmlFor="basePrice">Price / night</FieldLabel>
               <Input
                 id="basePrice"
                 name="basePrice"
@@ -184,24 +182,25 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
                 min="0.01"
                 step="0.01"
                 defaultValue={room?.base_price || ""}
+                className="tabular-nums"
                 required
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
-              <Input id="currency" name="currency" maxLength={3} defaultValue={room?.currency ?? "USD"} required />
-            </div>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="currency">Currency</FieldLabel>
+              <Input id="currency" name="currency" maxLength={3} className="uppercase" defaultValue={room?.currency ?? "USD"} required />
+            </Field>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="room-amenities">Room features</Label>
+          <Field>
+            <FieldLabel htmlFor="room-amenities">Room features</FieldLabel>
             <input type="hidden" name="amenities" value={JSON.stringify(amenities)} />
             <RoomAmenitiesField id="room-amenities" value={amenities} onValueChange={setAmenities} />
-          </div>
+          </Field>
 
           {room ? (
-            <div className="space-y-2">
-              <Label>Photos</Label>
+            <Field>
+              <FieldLabel>Photos</FieldLabel>
               <GalleryManager
                 id={room.id}
                 paths={Array.isArray(room.images) ? room.images.filter((p): p is string => typeof p === "string") : []}
@@ -210,12 +209,12 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
                 removeAction={removeRoomImage}
                 setCoverAction={setRoomCoverImage}
               />
-            </div>
+            </Field>
           ) : null}
 
           {room ? (
-            <div className="space-y-2">
-              <Label htmlFor="room-status">Status</Label>
+            <Field>
+              <FieldLabel htmlFor="room-status">Status</FieldLabel>
               <Select name="status" defaultValue={room.status}>
                 <SelectTrigger id="room-status" className="w-full">
                   <SelectValue />
@@ -227,7 +226,7 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
                   <SelectItem value="suspended">Suspended</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           ) : (
             // Admin-authored rooms go straight to published — the same
             // authority that could publish it a moment later on the Status
@@ -237,7 +236,12 @@ export function RoomDialog({ hotelId, room, roomTypes }: { hotelId: string; room
             <input type="hidden" name="status" value="published" />
           )}
 
-          <SubmitButton pendingText="Saving…">{room ? "Save changes" : "Add room"}</SubmitButton>
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <SubmitButton pendingText="Saving…">{room ? "Save changes" : "Add room"}</SubmitButton>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

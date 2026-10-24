@@ -2,12 +2,14 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { CheckCircle2, XCircle, ExternalLink, Loader2, Trash2, KeyRound } from "lucide-react";
+import { CheckCircle2, XCircle, ExternalLink, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/password-input";
 import { Label } from "@/components/ui/label";
+import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
@@ -40,22 +42,10 @@ import { CustomPartnerConfigForm } from "./custom-partner-config-form";
  */
 type Phase = "live" | "configured" | "absent";
 
-const PHASE_STYLE: Record<Phase, { label: string; pill: string; dot: string }> = {
-  live: {
-    label: "Live",
-    pill: "border-primary/30 bg-primary/5 text-primary",
-    dot: "bg-primary",
-  },
-  configured: {
-    label: "Inactive",
-    pill: "border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-500",
-    dot: "bg-amber-500",
-  },
-  absent: {
-    label: "Not connected",
-    pill: "border-border bg-muted/50 text-muted-foreground",
-    dot: "bg-muted-foreground/50",
-  },
+const PHASE_STYLE: Record<Phase, { label: string; variant: BadgeVariant }> = {
+  live: { label: "Live", variant: "success" },
+  configured: { label: "Inactive", variant: "warning" },
+  absent: { label: "Not connected", variant: "neutral" },
 };
 
 export function IntegrationCard({ status }: { status: IntegrationStatus }) {
@@ -63,6 +53,7 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
   const [saveState, saveAction] = useActionState(saveIntegrationCredentials, null);
   const [isActive, setIsActive] = useState(status.isActive);
   const [pending, startTransition] = useTransition();
+  const [testing, startTest] = useTransition();
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(
     status.lastTestOk === null ? null : { ok: status.lastTestOk, message: status.lastTestMessage ?? "" }
   );
@@ -78,7 +69,7 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
   }
 
   function runTest() {
-    startTransition(async () => {
+    startTest(async () => {
       const result = await testIntegrationConnection(provider.key);
       setTestResult(result);
     });
@@ -93,27 +84,31 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
   }
 
   return (
-    <Card className={phase === "live" ? "border-primary/30" : undefined}>
-      <CardContent className="space-y-5 p-5">
+    <Card className={cn(phase === "live" && "ring-primary/30")}>
+      <CardContent className="space-y-5">
         {/* Identity + state. The toggle sits with the status pill rather than
             floating alone, so "what is this doing right now" reads as one unit. */}
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-heading text-base font-semibold">{provider.name}</h3>
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${phaseStyle.pill}`}
-              >
-                <span className={`size-1.5 rounded-full ${phaseStyle.dot}`} />
-                {phaseStyle.label}
-              </span>
-              <Badge variant="outline" className="font-normal text-muted-foreground">
+              <Badge variant={phaseStyle.variant}>{phaseStyle.label}</Badge>
+              <Badge variant="outline" className="text-muted-foreground">
                 {provider.selfServe ? "Self-serve" : "Requires approval"}
               </Badge>
             </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-2.5">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`${provider.name} docs and signup`}
+              title="Docs & signup"
+              render={<a href={provider.docsUrl} target="_blank" rel="noreferrer" />}
+            >
+              <ExternalLink />
+            </Button>
             <Label htmlFor={`active-${provider.key}`} className="text-sm font-medium">
               Active
             </Label>
@@ -134,20 +129,20 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
 
         {testResult ? (
           <div
-            className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-              testResult.ok
-                ? "border-primary/30 bg-primary/5 text-primary"
-                : "border-destructive/30 bg-destructive/5 text-destructive"
-            }`}
+            role="status"
+            className={cn(
+              "flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-sm",
+              testResult.ok ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
+            )}
           >
             {testResult.ok ? (
-              <CheckCircle2 className="size-4 shrink-0" />
+              <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
             ) : (
-              <XCircle className="size-4 shrink-0" />
+              <XCircle className="size-4 shrink-0" aria-hidden="true" />
             )}
-            <span className="min-w-0">{testResult.message}</span>
+            <span className="min-w-0 break-words">{testResult.message}</span>
             {status.lastTestedAt ? (
-              <span className="ml-auto shrink-0 text-xs opacity-70">
+              <span className="ml-auto shrink-0 text-xs opacity-80">
                 {formatDistanceToNow(new Date(status.lastTestedAt), { addSuffix: true })}
               </span>
             ) : null}
@@ -156,83 +151,80 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
 
         <form action={saveAction} className="space-y-4">
           <input type="hidden" name="providerKey" value={provider.key} />
-          {saveState?.error ? (
-            <Alert variant="destructive">
-              <AlertDescription>{saveState.error}</AlertDescription>
-            </Alert>
-          ) : null}
-
-          {/* Capped, not full-bleed: a single-field provider in a full-width
-              panel reads as a mostly-empty box on a wide admin viewport. */}
-          <div className="max-w-3xl rounded-lg border bg-muted/30 p-4">
-            <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <KeyRound className="size-3.5" />
+          <FieldSet className="max-w-3xl gap-3">
+            <FieldLegend variant="label" className="flex items-center gap-2">
               Credentials
-              {status.hasCredentials ? (
-                <span className="text-primary">· saved &amp; encrypted</span>
-              ) : null}
-            </div>
+              {status.hasCredentials ? <Badge variant="success">Saved</Badge> : null}
+            </FieldLegend>
             <div className="grid gap-4 sm:grid-cols-2">
               {provider.credentialFields.map((field) => (
-                <div key={field.key} className="space-y-1.5">
-                  <Label htmlFor={`${provider.key}-${field.key}`} className="text-sm">
+                <Field key={field.key}>
+                  <FieldLabel htmlFor={`${provider.key}-${field.key}`} className="font-normal text-muted-foreground">
                     {field.label}
-                  </Label>
+                  </FieldLabel>
                   <PasswordInput
                     id={`${provider.key}-${field.key}`}
                     name={field.key}
                     placeholder={status.hasCredentials ? "Saved — enter to replace" : field.placeholder}
                     autoComplete="off"
                   />
-                </div>
+                </Field>
               ))}
             </div>
-          </div>
+          </FieldSet>
 
-          <div className="flex flex-wrap items-center gap-2 border-t pt-4">
-            <SubmitButton size="sm" pendingText="Saving…">
-              {status.hasCredentials ? "Replace credentials" : "Save credentials"}
-            </SubmitButton>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              disabled={!status.hasCredentials || pending}
-              onClick={runTest}
-            >
-              {pending ? <Loader2 className="size-3.5 animate-spin" /> : null} Test connection
-            </Button>
+          {saveState?.error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {saveState.error}
+            </p>
+          ) : null}
+
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
             {status.hasCredentials ? (
               <AlertDialog>
                 <AlertDialogTrigger
-                  render={<Button type="button" size="sm" variant="ghost" className="gap-1.5 text-destructive" />}
+                  render={
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      className="mr-auto text-destructive hover:text-destructive"
+                      aria-label={`Remove ${provider.name} credentials`}
+                      title="Remove credentials"
+                    />
+                  }
                 >
-                  <Trash2 className="size-3.5" /> Remove
+                  <Trash2 />
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Remove {provider.name} credentials?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This deactivates the integration and permanently deletes the stored API
-                      credentials. You&apos;ll need to re-enter them to use {provider.name} again.
+                      The integration is deactivated and the stored credentials are deleted.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={removeCredentials}>Remove</AlertDialogAction>
+                    <AlertDialogAction variant="destructive" onClick={removeCredentials}>
+                      Remove
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
             ) : null}
-            <a
-              href={provider.docsUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              loading={testing}
+              disabled={!status.hasCredentials || pending}
+              onClick={runTest}
             >
-              Docs &amp; signup <ExternalLink className="size-3" />
-            </a>
+              Test connection
+            </Button>
+            <SubmitButton size="sm" pendingText="Saving…">
+              {status.hasCredentials ? "Replace credentials" : "Save credentials"}
+            </SubmitButton>
           </div>
         </form>
 

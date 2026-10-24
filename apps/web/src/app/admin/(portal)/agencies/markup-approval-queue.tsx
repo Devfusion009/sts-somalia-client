@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, SearchX } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { markupLabel, scopeLabel } from "@/modules/agencies/markup-labels";
 import { MarkupChange, ScopeBadge } from "@/modules/agencies/components/markup-change";
 import { MarkupRequestReview } from "./markup-request-review";
@@ -65,24 +66,32 @@ export function MarkupApprovalQueue({ items }: { items: MarkupQueueItem[] }) {
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b border-border !py-3">
         <CardTitle className="flex items-center gap-2 text-base">
           Markup approvals
-          <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">{items.length}</Badge>
+          <Badge variant="warning" className="tabular-nums">
+            {items.length}
+          </Badge>
         </CardTitle>
-        <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+        <InputGroup className="w-full sm:w-64 max-sm:h-10">
+          <InputGroupAddon>
+            <Search aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search agency, service, requester"
-            className="h-9 pl-8"
+            placeholder="Agency, service, requester"
             aria-label="Search markup requests"
           />
-        </div>
+        </InputGroup>
       </CardHeader>
 
       <div className="max-h-[28rem] overflow-y-auto [scrollbar-gutter:stable]">
         {groups.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">No matches.</p>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <SearchX />
+            </EmptyMedia>
+            <EmptyTitle>No matching requests</EmptyTitle>
+          </Empty>
         ) : (
           <ul className="divide-y divide-border">
             {groups.map(([agencyId, requests]) => (
@@ -90,19 +99,23 @@ export function MarkupApprovalQueue({ items }: { items: MarkupQueueItem[] }) {
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/admin/agencies/${agencyId}#markups`}
-                    className="font-heading text-base font-semibold text-primary hover:underline"
+                    className="rounded-sm font-heading text-sm font-semibold outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
                     {requests[0].agencyName}
                   </Link>
-                  {requests.length > 1 ? <Badge variant="secondary">{requests.length} changes</Badge> : null}
+                  {requests.length > 1 ? (
+                    <Badge variant="neutral" className="tabular-nums">
+                      {requests.length} changes
+                    </Badge>
+                  ) : null}
                 </div>
                 <ul className="mt-1 divide-y divide-border/60">
                   {requests.map((request) => (
                     <li key={request.id} className="flex flex-wrap items-center justify-between gap-4 py-3">
-                      <div className="flex min-w-0 flex-wrap items-center gap-6">
-                        <div className="min-w-48 space-y-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3">
+                        <div className="min-w-0 space-y-1 sm:min-w-48">
                           <ScopeBadge itemType={request.itemType} />
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground tabular-nums">
                             {request.requester} · {request.requestedAtLabel}
                           </p>
                         </div>
@@ -112,7 +125,7 @@ export function MarkupApprovalQueue({ items }: { items: MarkupQueueItem[] }) {
                           request={{ action: request.action, markup_type: request.markupType, value: request.value }}
                         />
                       </div>
-                      <div className="min-w-56">
+                      <div className="w-full sm:w-auto sm:min-w-56">
                         <MarkupRequestReview requestId={request.id} agencyId={agencyId} />
                       </div>
                     </li>

@@ -25,7 +25,7 @@ export default function AdminEntryLoading() {
           <div className="animate-progress-sweep h-full w-1/4 rounded-full bg-primary" />
         </div>
 
-        <p className="mt-5 font-mono text-[11px] tracking-[0.22em] text-muted-foreground/70 uppercase">
+        <p className="mt-5 text-xs text-muted-foreground">
           Loading admin console
         </p>
       </div>

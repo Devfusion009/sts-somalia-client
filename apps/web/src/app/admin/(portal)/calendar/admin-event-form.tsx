@@ -6,7 +6,6 @@ import { AlertCircle, Plus, Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -14,16 +13,15 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { saveAdminCalendarEvent } from "@/modules/admin/calendar-event-actions";
 import type { AdminCalendarEvent } from "@/modules/admin/calendar-events";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
-const selectClass =
-  "border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
-
+// Native select so the value posts with the form; styled to match Input.
 const REMINDER_LABELS: Record<number, string> = {
   0: "No reminder",
   5: "5 minutes before",
@@ -40,8 +38,19 @@ function toTimeInput(iso: string) {
   return new Date(iso).toTimeString().slice(0, 5);
 }
 
-/** Same dialog handles create (no `event` prop) and edit (event passed) — mirrors UmrahPackageForm's one-component-both-modes shape. */
-export function AdminEventForm({ event, prefillDate }: { event?: AdminCalendarEvent; prefillDate?: string }) {
+/**
+ * Same dialog handles create (no `event` prop) and edit (event passed) — mirrors UmrahPackageForm's one-component-both-modes shape.
+ * `compact` renders the create trigger as a small outline button (inside the day dialog).
+ */
+export function AdminEventForm({
+  event,
+  prefillDate,
+  compact,
+}: {
+  event?: AdminCalendarEvent;
+  prefillDate?: string;
+  compact?: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(saveAdminCalendarEvent, null);
@@ -58,14 +67,20 @@ export function AdminEventForm({ event, prefillDate }: { event?: AdminCalendarEv
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size={event ? "sm" : "default"} variant={event ? "outline" : "default"} className="gap-1.5" />}>
+      <DialogTrigger
+        render={
+          event ? (
+            <Button size="icon" variant="outline" aria-label={`Edit ${event.title}`} />
+          ) : (
+            <Button size={compact ? "sm" : "default"} variant={compact ? "outline" : "default"} />
+          )
+        }
+      >
         {event ? (
-          <>
-            <Pencil className="size-3.5" /> Edit
-          </>
+          <Pencil aria-hidden="true" />
         ) : (
           <>
-            <Plus className="size-4" /> Create event
+            <Plus aria-hidden="true" /> {compact ? "Add" : "Create event"}
           </>
         )}
       </DialogTrigger>
@@ -74,10 +89,9 @@ export function AdminEventForm({ event, prefillDate }: { event?: AdminCalendarEv
           {event ? <input type="hidden" name="id" value={event.id} /> : null}
           <DialogHeader>
             <DialogTitle>{event ? "Edit event" : "Create event"}</DialogTitle>
-            <DialogDescription>Your own schedule — meetings, tasks, anything with a time.</DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <FieldGroup className="gap-4 py-4">
             {state?.error ? (
               <Alert variant="destructive">
                 <AlertCircle />
@@ -85,14 +99,14 @@ export function AdminEventForm({ event, prefillDate }: { event?: AdminCalendarEv
               </Alert>
             ) : null}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="title">Title</Label>
+            <Field>
+              <FieldLabel htmlFor="title">Title</FieldLabel>
               <Input id="title" name="title" defaultValue={event?.title} placeholder="Agency owner meeting" required />
-            </div>
+            </Field>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="date">Date</Label>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
+              <Field>
+                <FieldLabel htmlFor="date">Date</FieldLabel>
                 <Input
                   id="date"
                   name="date"
@@ -100,34 +114,34 @@ export function AdminEventForm({ event, prefillDate }: { event?: AdminCalendarEv
                   defaultValue={event ? toDateInput(event.start_at) : prefillDate}
                   required
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="startTime">Start</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="startTime">Start</FieldLabel>
                 <Input id="startTime" name="startTime" type="time" defaultValue={event ? toTimeInput(event.start_at) : "09:00"} required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="endTime">End</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="endTime">End</FieldLabel>
                 <Input id="endTime" name="endTime" type="time" defaultValue={event ? toTimeInput(event.end_at) : "09:30"} required />
-              </div>
+              </Field>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="location">Location (optional)</Label>
+            <Field>
+              <FieldLabel htmlFor="location">Location (optional)</FieldLabel>
               <Input id="location" name="location" defaultValue={event?.location ?? ""} placeholder="STS office, Mogadishu" />
-            </div>
+            </Field>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="description">Description (optional)</Label>
+            <Field>
+              <FieldLabel htmlFor="description">Description (optional)</FieldLabel>
               <Textarea id="description" name="description" rows={2} defaultValue={event?.description ?? ""} />
-            </div>
+            </Field>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="reminderMinutes">Notification</Label>
+            <Field>
+              <FieldLabel htmlFor="reminderMinutes">Notification</FieldLabel>
               <select
                 id="reminderMinutes"
                 name="reminderMinutes"
                 defaultValue={event?.reminder_minutes_before ?? 5}
-                className={selectClass}
+                className={NATIVE_SELECT_CLASS}
               >
                 {Object.entries(REMINDER_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -135,8 +149,8 @@ export function AdminEventForm({ event, prefillDate }: { event?: AdminCalendarEv
                   </option>
                 ))}
               </select>
-            </div>
-          </div>
+            </Field>
+          </FieldGroup>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

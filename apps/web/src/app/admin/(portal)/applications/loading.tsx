@@ -1,23 +1,27 @@
-import {
-  Chips,
-  DataTable,
-  LoadingShell,
-  Pager,
-  PillCell,
-  SearchBar,
-  StatTiles,
-  Title,
-} from "@/components/dashboard/admin-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Chips, DataTable, LoadingShell, PillCell, Title } from "@/components/dashboard/admin-skeletons";
 
 export default function ApplicationsLoading() {
   return (
     <LoadingShell label="applications">
-      <Title title="Partner Applications" />
-      <StatTiles className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" labels={["All Applications","Travel Agent","Hotel Partner","Affiliate","Event Venue Partner"]} />
-      <Chips size="sm" counts labels={["All","Pending","Under review","More info requested","Approved","Rejected"]} />
-      <SearchBar placeholder="Search applications" selects={1} />
-      <DataTable headers={["Application ID","Partner","Type","Contact","Submitted","Status","Actions"]} rows={8} cell={{ 5: PillCell }} />
-      <Pager />
+      <Title title="Partner applications" />
+      <div className="space-y-3">
+        <Chips counts labels={["All types", "Hotel partner", "Venue partner", "Affiliate", "Travel agency"]} />
+        <Chips counts labels={["Any status", "Pending", "Under review", "Awaiting applicant", "Approved", "Rejected"]} />
+      </div>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <Skeleton className="h-8 w-full rounded-lg sm:w-72" />
+          <Skeleton className="h-8 w-80 max-w-full rounded-lg" />
+          <Skeleton className="h-8 w-16 rounded-lg" />
+        </div>
+        <Skeleton className="h-8 w-40 rounded-lg" />
+      </div>
+      <DataTable
+        headers={["Reference", "Partner", "Type", "Contact", "Submitted", "Status", ""]}
+        rows={8}
+        cell={{ 5: PillCell }}
+      />
     </LoadingShell>
   );
 }

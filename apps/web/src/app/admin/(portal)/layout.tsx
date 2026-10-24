@@ -219,13 +219,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
             <ShieldAlert className="size-6" />
           </div>
-          <div className="space-y-1.5">
-            <h1 className="font-heading text-xl font-bold">Two-factor authentication required</h1>
-            <p className="text-sm text-muted-foreground">
-              The admin console requires an enrolled authenticator app before you can continue.
-              Set one up below — this only takes a minute.
-            </p>
-          </div>
+          <h1 className="font-heading text-xl font-semibold tracking-tight">Two-factor authentication required</h1>
           <div className="text-left">
             <MfaSettings factors={[]} />
           </div>

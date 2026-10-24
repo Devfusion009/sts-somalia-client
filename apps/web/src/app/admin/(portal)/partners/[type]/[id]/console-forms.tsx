@@ -2,11 +2,11 @@
 
 import { useActionState, useState } from "react";
 import { BellRing, KeyRound, UserPlus, Trash2 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -28,22 +28,39 @@ import {
 } from "@/modules/admin/partner-account-actions";
 import { trpc } from "@/lib/trpc/react";
 import type { AccountMember, PartnerAccountType } from "@/modules/admin/partner-account-shared";
+import { cn } from "@/lib/utils";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
-const selectClass =
-  "border-input h-9 rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+const selectClass = cn(NATIVE_SELECT_CLASS, "w-auto");
 
-function ErrorAlert({ state }: { state: ActionState }) {
-  if (!state?.error) return null;
+/** Result line on the left, actions right-aligned. */
+function FormFooter({
+  error,
+  success,
+  children,
+}: {
+  error?: string | null;
+  success?: string | null;
+  children: React.ReactNode;
+}) {
   return (
-    <Alert variant="destructive">
-      <AlertDescription>{state.error}</AlertDescription>
-    </Alert>
+    <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+      {error ? (
+        <p role="alert" className="mr-auto text-sm text-destructive">
+          {error}
+        </p>
+      ) : success ? (
+        <p role="status" className="mr-auto text-sm text-primary">
+          {success}
+        </p>
+      ) : null}
+      {children}
+    </div>
   );
 }
 
-function SavedHint({ state }: { state: ActionState }) {
-  if (!state || state.error) return null;
-  return <p className="text-xs text-primary">Saved.</p>;
+function savedText(state: ActionState, text = "Saved.") {
+  return state && !state.error ? text : null;
 }
 
 export function CommercialTermsForm({
@@ -57,25 +74,30 @@ export function CommercialTermsForm({
 }) {
   const [state, formAction] = useActionState(savePartnerCommercialTerms, null);
   return (
-    <form action={formAction} className="space-y-4">
-      <input type="hidden" name="accountId" value={accountId} />
-      <ErrorAlert state={state} />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="commissionRate">Platform commission %</Label>
-          <Input
-            id="commissionRate"
-            name="commissionRate"
-            type="number"
-            min="0"
-            max="100"
-            step="0.5"
-            defaultValue={commissionRate}
-            required
-          />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="paymentTerms">Payment terms</Label>
+    <form action={formAction}>
+      <FieldGroup>
+        <input type="hidden" name="accountId" value={accountId} />
+        <Field className="sm:max-w-56">
+          <FieldLabel htmlFor="commissionRate">Platform commission</FieldLabel>
+          <InputGroup className="max-sm:h-10">
+            <InputGroupInput
+              id="commissionRate"
+              name="commissionRate"
+              type="number"
+              min="0"
+              max="100"
+              step="0.5"
+              defaultValue={commissionRate}
+              required
+              className="tabular-nums"
+            />
+            <InputGroupAddon align="inline-end">
+              <InputGroupText>%</InputGroupText>
+            </InputGroupAddon>
+          </InputGroup>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="paymentTerms">Payment terms</FieldLabel>
           <Textarea
             id="paymentTerms"
             name="paymentTerms"
@@ -83,12 +105,11 @@ export function CommercialTermsForm({
             defaultValue={paymentTerms ?? ""}
             placeholder="e.g. Net 15 from stay completion, payouts monthly via bank transfer"
           />
-        </div>
-      </div>
-      <div className="flex items-center gap-3">
-        <SubmitButton pendingText="Saving…">Save commercial terms</SubmitButton>
-        <SavedHint state={state} />
-      </div>
+        </Field>
+        <FormFooter error={state?.error} success={savedText(state)}>
+          <SubmitButton pendingText="Saving…">Save terms</SubmitButton>
+        </FormFooter>
+      </FieldGroup>
     </form>
   );
 }
@@ -96,19 +117,18 @@ export function CommercialTermsForm({
 export function AccountNotesForm({ accountId, initialNotes }: { accountId: string; initialNotes: string | null }) {
   const [state, formAction] = useActionState(savePartnerAccountNotes, null);
   return (
-    <form action={formAction} className="space-y-3">
+    <form action={formAction} className="space-y-4">
       <input type="hidden" name="accountId" value={accountId} />
-      <ErrorAlert state={state} />
       <Textarea
         name="internalNotes"
         rows={6}
         defaultValue={initialNotes ?? ""}
-        placeholder="Admin-only notes about this partner — never visible to them."
+        aria-label="Internal notes"
+        placeholder="Admin-only notes (never visible to the partner)"
       />
-      <div className="flex items-center gap-3">
+      <FormFooter error={state?.error} success={savedText(state)}>
         <SubmitButton pendingText="Saving…">Save notes</SubmitButton>
-        <SavedHint state={state} />
-      </div>
+      </FormFooter>
     </form>
   );
 }
@@ -149,43 +169,48 @@ export function AffiliateCommissionPayoutForm({ accountId, affiliateId }: { acco
   }
 
   return (
-    <form action={handleSubmit} className="space-y-3">
-      {recordPayout.error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{recordPayout.error.message}</AlertDescription>
-        </Alert>
-      ) : null}
-      <div className="space-y-1.5">
-        <Label htmlFor="payoutAmount">Amount (USD)</Label>
-        <Input id="payoutAmount" name="amount" type="number" step="0.01" min="0.01" placeholder="250" required />
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="payoutMethod">Method</Label>
-          <Input id="payoutMethod" name="method" placeholder="Bank transfer" />
+    <form action={handleSubmit}>
+      <FieldGroup>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Field>
+            <FieldLabel htmlFor="payoutAmount">Amount</FieldLabel>
+            <InputGroup className="max-sm:h-10">
+              <InputGroupInput
+                id="payoutAmount"
+                name="amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                placeholder="250"
+                required
+                className="tabular-nums"
+              />
+              <InputGroupAddon align="inline-end">
+                <InputGroupText>USD</InputGroupText>
+              </InputGroupAddon>
+            </InputGroup>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="payoutMethod">Method</FieldLabel>
+            <Input id="payoutMethod" name="method" placeholder="Bank transfer" />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="payoutReference">Reference</FieldLabel>
+            <Input id="payoutReference" name="reference" placeholder="TXN-20260814-1" />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="periodStart">Period start</FieldLabel>
+            <Input id="periodStart" name="periodStart" type="date" />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="periodEnd">Period end</FieldLabel>
+            <Input id="periodEnd" name="periodEnd" type="date" />
+          </Field>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="payoutReference">Reference</Label>
-          <Input id="payoutReference" name="reference" placeholder="TXN-20260814-1" />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="periodStart">Period start (optional)</Label>
-          <Input id="periodStart" name="periodStart" type="date" />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="periodEnd">Period end (optional)</Label>
-          <Input id="periodEnd" name="periodEnd" type="date" />
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Marks approved conversions in this period (or all approved conversions, if left blank) as paid.
-      </p>
-      <div className="flex items-center gap-3">
-        <SubmitButton pendingText="Recording…">Record payout</SubmitButton>
-        {recordPayout.isSuccess ? <p className="text-xs text-primary">Saved.</p> : null}
-      </div>
+        <FormFooter error={recordPayout.error?.message} success={recordPayout.isSuccess ? "Payout recorded." : null}>
+          <SubmitButton pendingText="Recording…">Record payout</SubmitButton>
+        </FormFooter>
+      </FieldGroup>
     </form>
   );
 }
@@ -193,17 +218,21 @@ export function AffiliateCommissionPayoutForm({ accountId, affiliateId }: { acco
 export function SendReminderButton({ accountId }: { accountId: string }) {
   const [state, formAction] = useActionState(sendOnboardingReminder, null);
   return (
-    <form action={formAction} className="flex flex-col items-start gap-1.5">
+    <form action={formAction} className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5">
       <input type="hidden" name="accountId" value={accountId} />
-      <SubmitButton variant="outline" size="sm" pendingText="Sending…" className="gap-1.5">
-        <BellRing className="size-3.5" /> Send reminder
-      </SubmitButton>
-      {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
-      {state && !state.error ? (
-        <p className="text-xs text-primary">
-          Reminder sent{state.emailSent === false ? " (in-app only — email not configured)" : ""}.
+      {state?.error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {state.error}
         </p>
       ) : null}
+      {state && !state.error ? (
+        <p role="status" className="text-xs text-primary">
+          {state.emailSent === false ? "Reminder sent in-app." : "Reminder sent."}
+        </p>
+      ) : null}
+      <SubmitButton variant="outline" size="sm" pendingText="Sending…">
+        <BellRing data-icon="inline-start" /> Send reminder
+      </SubmitButton>
     </form>
   );
 }
@@ -228,20 +257,13 @@ export function AddMemberForm({ accountId, type }: { accountId: string; type: Ex
   return (
     <form action={formAction} className="space-y-3">
       <input type="hidden" name="accountId" value={accountId} />
-      <ErrorAlert state={state} />
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="min-w-56 flex-1 space-y-1.5">
-          <Label htmlFor="member-email">Invite by email</Label>
-          <Input
-            id="member-email"
-            name="email"
-            type="email"
-            placeholder="Existing STS account email"
-            required
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="member-role">Role</Label>
+      <div className="flex flex-wrap items-end gap-3">
+        <Field className="min-w-0 flex-1 basis-56">
+          <FieldLabel htmlFor="member-email">Email</FieldLabel>
+          <Input id="member-email" name="email" type="email" placeholder="Existing STS account email" required />
+        </Field>
+        <Field className="w-auto">
+          <FieldLabel htmlFor="member-role">Role</FieldLabel>
           <select id="member-role" name="role" className={selectClass} defaultValue={ROLE_OPTIONS[type][0].value}>
             {ROLE_OPTIONS[type].map((r) => (
               <option key={r.value} value={r.value}>
@@ -249,12 +271,20 @@ export function AddMemberForm({ accountId, type }: { accountId: string; type: Ex
               </option>
             ))}
           </select>
-        </div>
-        <SubmitButton pendingText="Adding…" className="gap-1.5">
-          <UserPlus className="size-3.5" /> Add
+        </Field>
+        <SubmitButton pendingText="Adding…">
+          <UserPlus data-icon="inline-start" /> Add member
         </SubmitButton>
       </div>
-      {state && !state.error ? <p className="text-xs text-primary">Member added.</p> : null}
+      {state?.error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {state.error}
+        </p>
+      ) : state ? (
+        <p role="status" className="text-sm text-primary">
+          Member added.
+        </p>
+      ) : null}
     </form>
   );
 }
@@ -272,8 +302,8 @@ function ResetPasswordButton({ accountId, member }: { accountId: string; member:
 
   return (
     <>
-      <Button size="icon" variant="outline" className="size-8" onClick={() => setOpen(true)} aria-label="Reset password">
-        <KeyRound className="size-3.5" />
+      <Button size="icon-sm" variant="ghost" onClick={() => setOpen(true)} aria-label="Reset password" title="Reset password">
+        <KeyRound />
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
@@ -281,12 +311,9 @@ function ResetPasswordButton({ accountId, member }: { accountId: string; member:
             <>
               <AlertDialogHeader>
                 <AlertDialogTitle>New password set</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Shown once — copy it now and share it with {member.profile?.full_name ?? member.profile?.email}{" "}
-                  out of band. It won&apos;t be shown again.
-                </AlertDialogDescription>
+                <AlertDialogDescription>Shown once. Copy it now.</AlertDialogDescription>
               </AlertDialogHeader>
-              <p className="my-2 rounded-md border border-border bg-muted px-3 py-2 font-mono text-sm select-all">
+              <p className="my-4 rounded-lg bg-muted px-3 py-2 font-mono text-sm break-all select-all">
                 {state.newPassword}
               </p>
               <AlertDialogFooter>
@@ -299,12 +326,13 @@ function ResetPasswordButton({ accountId, member }: { accountId: string; member:
               <input type="hidden" name="memberId" value={member.id} />
               <AlertDialogHeader>
                 <AlertDialogTitle>Reset {member.profile?.full_name ?? member.profile?.email}&apos;s password?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Their current password stops working immediately. A new one is generated and shown once for you
-                  to relay to them.
-                </AlertDialogDescription>
+                <AlertDialogDescription>Their current password stops working immediately.</AlertDialogDescription>
               </AlertDialogHeader>
-              {state?.error ? <p className="my-2 text-xs text-destructive">{state.error}</p> : null}
+              {state?.error ? (
+                <p role="alert" className="my-3 text-sm text-destructive">
+                  {state.error}
+                </p>
+              ) : null}
               <AlertDialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                   Cancel
@@ -339,27 +367,27 @@ export function MemberRowControls({
   }
 
   if (member.status !== "active") {
-    return <span className="text-xs text-muted-foreground">—</span>;
+    return null;
   }
 
   if (member.role === "owner") {
     return (
-      <div className="flex items-center justify-end gap-2">
-        <span className="text-xs text-muted-foreground">Account owner</span>
+      <div className="flex items-center justify-end gap-1">
         <ResetPasswordButton accountId={accountId} member={member} />
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-end gap-2">
-      <form action={roleAction}>
+    <div className="flex items-center justify-end gap-1">
+      <form action={roleAction} className="mr-1">
         <input type="hidden" name="accountId" value={accountId} />
         <input type="hidden" name="memberId" value={member.id} />
         <select
           name="role"
+          aria-label="Role"
           defaultValue={member.role}
-          className={`${selectClass} h-8 text-xs`}
+          className={selectClass}
           onChange={(e) => e.currentTarget.form?.requestSubmit()}
         >
           {ROLE_OPTIONS[type].map((r) => (
@@ -371,15 +399,20 @@ export function MemberRowControls({
       </form>
       <ResetPasswordButton accountId={accountId} member={member} />
       <Button
-        size="icon"
-        variant="outline"
-        className="size-8 text-destructive hover:text-destructive"
+        size="icon-sm"
+        variant="ghost"
+        className="text-destructive hover:text-destructive"
         onClick={() => setConfirmRemove(true)}
         aria-label="Remove member"
+        title="Remove member"
       >
-        <Trash2 className="size-3.5" />
+        <Trash2 />
       </Button>
-      {roleState?.error ? <span className="text-xs text-destructive">{roleState.error}</span> : null}
+      {roleState?.error ? (
+        <span role="alert" className="text-xs text-destructive">
+          {roleState.error}
+        </span>
+      ) : null}
 
       <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
         <AlertDialogContent>
@@ -388,11 +421,13 @@ export function MemberRowControls({
             <input type="hidden" name="memberId" value={member.id} />
             <AlertDialogHeader>
               <AlertDialogTitle>Remove {member.profile?.full_name ?? member.profile?.email}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                They immediately lose access to this partner&apos;s portal.
-              </AlertDialogDescription>
+              <AlertDialogDescription>They lose portal access immediately.</AlertDialogDescription>
             </AlertDialogHeader>
-            {removeState?.error ? <p className="my-2 text-xs text-destructive">{removeState.error}</p> : null}
+            {removeState?.error ? (
+              <p role="alert" className="my-3 text-sm text-destructive">
+                {removeState.error}
+              </p>
+            ) : null}
             <AlertDialogFooter>
               <Button type="button" variant="outline" onClick={() => setConfirmRemove(false)}>
                 Cancel

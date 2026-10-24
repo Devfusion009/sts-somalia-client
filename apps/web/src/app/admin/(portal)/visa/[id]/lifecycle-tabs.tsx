@@ -1,8 +1,8 @@
-import { ExternalLink } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { CalendarClock, ExternalLink, Gavel, Send, BookUser, type LucideIcon } from "lucide-react";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import { getProvider } from "@/lib/provider-catalog";
 import type { VisaCase } from "@/modules/visa/case-queries";
 import { formatInZone } from "@/modules/visa/time";
@@ -34,27 +34,46 @@ import { SectionHeading, formatDay, formatWhen } from "./case-ui";
 
 const OPEN_STAGES = ["in_review", "additional_info_required", "ready_for_processing", "processing"];
 
-function Pill({ tone, children }: { tone: "good" | "bad" | "warn" | "muted" | "info"; children: React.ReactNode }) {
+type Tone = "good" | "bad" | "warn" | "muted" | "info";
+
+const TONE_VARIANT: Record<Tone, BadgeVariant> = {
+  good: "success",
+  bad: "destructive",
+  warn: "warning",
+  info: "info",
+  muted: "neutral",
+};
+
+function Pill({ tone, children }: { tone: Tone; children: React.ReactNode }) {
   return (
-    <Badge
-      className={cn(
-        "border-transparent font-medium",
-        tone === "good" && "bg-primary/10 text-primary",
-        tone === "bad" && "bg-destructive/10 text-destructive",
-        tone === "warn" && "bg-brand-gold/15 text-brand-gold",
-        tone === "info" && "bg-chart-3/10 text-chart-3",
-        tone === "muted" && "bg-muted text-muted-foreground"
-      )}
-    >
+    <Badge variant={TONE_VARIANT[tone] ?? "neutral"}>
       {children}
     </Badge>
   );
 }
 
+function EmptyCard({ title, icon: Icon }: { title: string; icon: LucideIcon }) {
+  return (
+    <Card>
+      <Empty>
+        <EmptyMedia variant="icon">
+          <Icon />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+      </Empty>
+    </Card>
+  );
+}
+
 function DocLink({ id, label }: { id: string; label: string }) {
   return (
-    <Button variant="link" size="sm" className="h-auto gap-1 p-0" render={<a href={`/api/visa/documents/${id}`} target="_blank" rel="noopener noreferrer" />}>
-      {label} <ExternalLink className="size-3" />
+    <Button
+      variant="link"
+      size="sm"
+      className="h-auto gap-1 p-0"
+      render={<a href={`/api/visa/documents/${id}`} target="_blank" rel="noopener noreferrer" />}
+    >
+      {label} <ExternalLink className="size-3" aria-hidden="true" />
     </Button>
   );
 }
@@ -63,9 +82,9 @@ function Facts({ rows }: { rows: Array<[string, React.ReactNode]> }) {
   return (
     <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
       {rows.map(([label, value]) => (
-        <div key={label}>
+        <div key={label} className="min-w-0">
           <dt className="text-xs text-muted-foreground">{label}</dt>
-          <dd className="font-medium break-words">{value ?? "—"}</dd>
+          <dd className="mt-0.5 font-medium break-words">{value ?? "—"}</dd>
         </div>
       ))}
     </dl>
@@ -75,7 +94,7 @@ function Facts({ rows }: { rows: Array<[string, React.ReactNode]> }) {
 // ---------------------------------------------------------------------------
 // Appointments
 // ---------------------------------------------------------------------------
-const APPT_TONE: Record<string, "good" | "bad" | "warn" | "muted" | "info"> = {
+const APPT_TONE: Record<string, Tone> = {
   booked: "info",
   attended: "good",
   no_show: "bad",
@@ -124,7 +143,7 @@ export function AppointmentsTab({ data, canManage }: { data: VisaCase; canManage
                         <Pill tone="info">{formatInZone(a.scheduled_at, tz)}</Pill>
                         {a.biometrics_required ? <Pill tone="muted">Biometrics</Pill> : null}
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm break-words text-muted-foreground">
                         {a.centre?.name}, {a.centre?.city}
                         {a.confirmation_number ? ` · ${a.confirmation_number}` : ""}
                         {a.member_id ? ` · ${memberName.get(a.member_id) ?? ""}` : ""}
@@ -159,7 +178,12 @@ export function AppointmentsTab({ data, canManage }: { data: VisaCase; canManage
         <CardContent className="space-y-3">
           <SectionHeading>History</SectionHeading>
           {past.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No past appointments.</p>
+            <Empty>
+              <EmptyMedia variant="icon">
+                <CalendarClock />
+              </EmptyMedia>
+              <EmptyTitle>No past appointments</EmptyTitle>
+            </Empty>
           ) : (
             <ol className="divide-y divide-border">
               {past.map((a) => (
@@ -171,7 +195,7 @@ export function AppointmentsTab({ data, canManage }: { data: VisaCase; canManage
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {a.centre?.name}
-                      {a.biometrics_completed ? " · biometrics taken" : ""}
+                      {a.biometrics_completed ? " · Biometrics taken" : ""}
                       {a.status_reason ? ` · ${a.status_reason}` : ""}
                     </p>
                   </div>
@@ -282,13 +306,7 @@ export function SubmissionTab({
           </Card>
         ) : null}
 
-        {!job && !ready ? (
-          <Card>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Not submitted.</p>
-            </CardContent>
-          </Card>
-        ) : null}
+        {!job && !ready ? <EmptyCard title="Not submitted" icon={Send} /> : null}
       </div>
 
       <div className="space-y-4">
@@ -312,13 +330,15 @@ export function SubmissionTab({
                         {j.route === "partner" ? getProvider(j.provider_key ?? "")?.name ?? j.provider_key : j.lodged_with}
                         {j.lodgement_reference ?? j.partner_ref ? ` · ${j.lodgement_reference ?? j.partner_ref}` : ""}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground tabular-nums">
                         {formatWhen(j.created_at)}
                         {j.returned_reason ?? j.failure_reason ? ` · ${j.returned_reason ?? j.failure_reason}` : ""}
                       </p>
                     </div>
                     <Pill tone={j.status === "failed" ? "bad" : "muted"}>
-                      {j.centre_status === "returned_for_correction" ? "Returned" : j.status}
+                      <span className="capitalize">
+                        {j.centre_status === "returned_for_correction" ? "Returned" : j.status.replace(/_/g, " ")}
+                      </span>
                     </Pill>
                   </li>
                 ))}
@@ -388,11 +408,7 @@ export function DecisionTab({
             </CardContent>
           </Card>
         ) : app.status !== "processing" ? (
-          <Card>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">No decision yet.</p>
-            </CardContent>
-          </Card>
+          <EmptyCard title="No decision" icon={Gavel} />
         ) : null}
       </div>
 
@@ -419,7 +435,7 @@ export function DecisionTab({
                         {d.outcome === "approved" ? "Approved" : "Refused"} · {d.authority}
                         {d.authority_reference ? ` · ${d.authority_reference}` : ""}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground tabular-nums">
                         {d.recorder?.full_name ?? d.source} · {formatWhen(d.recorded_at)}
                       </p>
                     </div>
@@ -438,7 +454,7 @@ export function DecisionTab({
 // ---------------------------------------------------------------------------
 // Passports
 // ---------------------------------------------------------------------------
-const PASSPORT_TONE: Record<string, "good" | "bad" | "warn" | "muted" | "info"> = {
+const PASSPORT_TONE: Record<string, Tone> = {
   with_applicant: "muted",
   with_sts: "info",
   with_centre: "info",
@@ -460,13 +476,7 @@ export function PassportTab({ data, canManage }: { data: VisaCase; canManage: bo
   }
 
   if (data.passports.length === 0) {
-    return (
-      <Card>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">No passports held for this case.</p>
-        </CardContent>
-      </Card>
-    );
+    return <EmptyCard title="No passports held" icon={BookUser} />;
   }
 
   return (

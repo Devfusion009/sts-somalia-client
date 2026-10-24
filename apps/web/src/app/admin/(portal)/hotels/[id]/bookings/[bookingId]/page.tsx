@@ -13,7 +13,7 @@ export default async function AdminHotelBookingPage({ params }: { params: Promis
   if (!access) return null;
   return (
     <div className="space-y-6">
-      <HotelSectionHeader id={id} active="bookings" />
+      <HotelSectionHeader id={id} active="bookings" back={false} />
       <BookingDetailView
         hotelId={id}
         bookingId={bookingId}

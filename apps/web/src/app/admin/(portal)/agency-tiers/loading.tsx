@@ -1,14 +1,10 @@
-import {
-  DataTable,
-  LoadingShell,
-  Title,
-} from "@/components/dashboard/admin-skeletons";
+import { DataTable, LoadingShell, Title } from "@/components/dashboard/admin-skeletons";
 
 export default function AgencyTiersLoading() {
   return (
     <LoadingShell label="agency tiers">
-      <Title title="Agency Tiers" actions={["w-32"]} />
-      <DataTable headers={["Tier","Default Commission","Default Credit Limit","Sort","Agencies","Manage"]} rows={4} />
+      <Title title="Agency tiers" badge actions={["w-28"]} />
+      <DataTable headers={["Tier", "Commission", "Credit limit", "Sort", "Agencies", ""]} rows={4} />
     </LoadingShell>
   );
 }

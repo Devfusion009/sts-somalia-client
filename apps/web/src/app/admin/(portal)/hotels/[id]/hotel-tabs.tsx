@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPendingBookingCount } from "@/modules/hotels/manager-queries";
 import { getOpenRequestCount } from "@/modules/hotels/refund-queries";
 import { BackLink } from "@/components/back-link";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export type HotelTabKey = "overview" | "bookings" | "rates" | "refunds" | "guests" | "reports";
@@ -30,7 +31,7 @@ export async function HotelTabs({ id, active }: { id: string; active: HotelTabKe
           href={`/admin/hotels/${id}${tab.path}`}
           aria-current={tab.key === active ? "page" : undefined}
           className={cn(
-            "flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+            "flex shrink-0 items-center gap-1.5 rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:py-3",
             tab.key === active
               ? "border-primary text-foreground"
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -38,9 +39,9 @@ export async function HotelTabs({ id, active }: { id: string; active: HotelTabKe
         >
           {tab.label}
           {badge[tab.key] ? (
-            <span className="rounded-full bg-brand-gold/15 px-1.5 text-xs font-semibold text-brand-gold tabular-nums">
+            <Badge variant="warning" className="h-4.5 px-1.5 tabular-nums" aria-label={`${badge[tab.key]} waiting`}>
               {badge[tab.key]}
-            </span>
+            </Badge>
           ) : null}
         </Link>
       ))}
@@ -48,8 +49,11 @@ export async function HotelTabs({ id, active }: { id: string; active: HotelTabKe
   );
 }
 
-/** Header for every admin hotel section page except the overview, which has its own. */
-export async function HotelSectionHeader({ id, active }: { id: string; active: HotelTabKey }) {
+/**
+ * Header for every admin hotel section page except the overview, which has its own.
+ * `back={false}` on detail pages whose view brings its own back link, so a page has one way back.
+ */
+export async function HotelSectionHeader({ id, active, back = true }: { id: string; active: HotelTabKey; back?: boolean }) {
   const supabase = await createClient();
   const { data: hotel } = await supabase.from("hotels").select("id, name, city").eq("id", id).maybeSingle();
   if (!hotel) notFound();
@@ -57,10 +61,10 @@ export async function HotelSectionHeader({ id, active }: { id: string; active: H
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <BackLink href={`/admin/hotels/${id}`} label={hotel.name} />
-        <div>
-          <p className="font-heading text-lg font-semibold leading-tight">{hotel.name}</p>
-          <p className="text-sm text-muted-foreground">{hotel.city}</p>
+        {back ? <BackLink href={`/admin/hotels/${id}`} label={hotel.name} /> : null}
+        <div className="min-w-0">
+          <p className="truncate font-heading text-base leading-tight font-semibold">{hotel.name}</p>
+          <p className="truncate text-sm text-muted-foreground">{hotel.city}</p>
         </div>
       </div>
       <HotelTabs id={id} active={active} />

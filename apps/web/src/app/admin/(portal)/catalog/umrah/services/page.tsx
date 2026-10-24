@@ -1,7 +1,7 @@
-import { MapPin, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { getUmrahServicesAdmin } from "@/modules/umrah/custom-queries";
 import {
   PRICE_UNIT_LABELS,
@@ -14,12 +14,6 @@ import { NewServiceForm, EditServiceForm, type AdminService } from "./service-fo
 
 export const metadata = { title: "Private Umrah Services | Admin Console" };
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = {
-  published: "default",
-  draft: "secondary",
-  suspended: "destructive",
-};
-
 /**
  * The price list behind the private Umrah builder. Every row here is one
  * option a customer can tick, and its price and unit are what the running
@@ -30,13 +24,20 @@ export default async function AdminUmrahServicesPage() {
   const services = (await getUmrahServicesAdmin()) as AdminService[];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <BackLink href="/admin/catalog/umrah" label="Umrah catalog" className="mb-3" />
-          <h1 className="font-heading text-2xl font-semibold">Private Umrah services</h1>
-        </div>
-        <NewServiceForm />
+    <div className="space-y-8">
+      <div className="space-y-5">
+        <BackLink href="/admin/catalog/umrah" label="Umrah catalog" />
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h1 className="font-heading text-2xl font-semibold tracking-tight">Private Umrah services</h1>
+            <Badge variant="neutral" className="tabular-nums">
+              {services.length}
+            </Badge>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <NewServiceForm />
+          </div>
+        </header>
       </div>
 
       {UMRAH_CATEGORIES.map((category) => {
@@ -44,48 +45,34 @@ export default async function AdminUmrahServicesPage() {
         return (
           <section key={category.value} className="space-y-3">
             <div className="flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-secondary text-primary">
-                <category.icon className="size-4" />
-              </span>
-              <div className="flex items-center gap-2">
-                <h2 className="font-heading text-base font-semibold">{category.label}</h2>
-                <Badge variant="outline">{category.selection === "single" ? "Pick one" : "Pick any"}</Badge>
-              </div>
+              <h2 className="font-heading text-base font-semibold">{category.label}</h2>
+              <Badge variant="outline">{category.selection === "single" ? "Pick one" : "Pick any"}</Badge>
             </div>
 
-            {rows.length === 0 ? (
-              <Card className="p-6 text-sm text-muted-foreground">
-                No options yet.
-              </Card>
-            ) : (
-              <div className="space-y-2">
-                {rows.map((service) => (
-                  <Card key={service.id} className="p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
+            <Card className="gap-0 py-0">
+              {rows.length === 0 ? (
+                <p className="px-4 py-5 text-sm text-muted-foreground">No options</p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {rows.map((service) => (
+                    <li key={service.id} className="flex items-start justify-between gap-3 px-4 py-3.5">
                       <div className="min-w-0 flex-1">
                         <p className="flex flex-wrap items-center gap-2 font-medium">
                           {service.name}
-                          <Badge variant={STATUS_VARIANT[service.status] ?? "secondary"}>
-                            {service.status}
+                          <Badge variant={statusBadgeVariant(service.status)} className="capitalize">
+                            {service.status.replace(/_/g, " ")}
                           </Badge>
-                          <Badge variant="secondary">
+                          <Badge variant="neutral">
                             {service.tier ? UMRAH_TIER_LABELS[service.tier] : "All standards"}
                           </Badge>
-                          {service.is_default ? (
-                            <Badge className="border-transparent bg-primary/10 text-primary">
-                              Pre-selected
-                            </Badge>
-                          ) : null}
+                          {service.is_default ? <Badge variant="info">Pre-selected</Badge> : null}
                         </p>
                         {service.description ? (
-                          <p className="mt-0.5 text-sm text-muted-foreground">
-                            {service.description}
-                          </p>
+                          <p className="mt-0.5 text-sm text-muted-foreground">{service.description}</p>
                         ) : null}
-                        <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground tabular-nums">
                           <span className="font-semibold text-foreground">
-                            {formatMoney(service.price, service.currency)}{" "}
-                            {PRICE_UNIT_LABELS[service.price_unit]}
+                            {formatMoney(service.price, service.currency)} {PRICE_UNIT_LABELS[service.price_unit]}
                           </span>
                           {[...service.sharing_prices]
                             .sort((a, b) => a.sharing - b.sharing)
@@ -99,25 +86,22 @@ export default async function AdminUmrahServicesPage() {
                             ))}
                           {service.star_rating ? (
                             <span className="flex items-center gap-1">
-                              <Star className="size-3 fill-brand-gold text-brand-gold" />
+                              <Star className="size-3 fill-brand-gold text-brand-gold" aria-hidden="true" />
                               {service.star_rating}-star
                             </span>
                           ) : null}
                           {service.distance_to_haram_m !== null ? (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="size-3" /> {service.distance_to_haram_m}m from the
-                              Haram
-                            </span>
+                            <span>{service.distance_to_haram_m}m from the Haram</span>
                           ) : null}
-                          <span>sort {service.sort_order}</span>
+                          <span>Order {service.sort_order}</span>
                         </p>
                       </div>
                       <EditServiceForm service={service} />
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
           </section>
         );
       })}

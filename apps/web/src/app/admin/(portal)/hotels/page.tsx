@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Search } from "lucide-react";
+import { Building2, ChevronRight, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { PageHeader } from "@/components/ui/page-header";
 import { Pager } from "@/components/dashboard/pager";
 import { parsePage } from "@/lib/pagination";
 import {
@@ -19,15 +21,9 @@ import { getHotelsAdmin, getHotelPartnersForSelect } from "@/modules/admin/queri
 import { HotelForm } from "./hotel-form";
 import { OnboardPartnerDialog } from "./onboard-partner-dialog";
 import { cn } from "@/lib/utils";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 export const metadata: Metadata = { title: "Hotels" };
-
-const HOTEL_STATUS_STYLES: Record<string, string> = {
-  published: "bg-primary/10 text-primary",
-  draft: "bg-muted text-muted-foreground",
-  pending_review: "bg-brand-gold/15 text-brand-gold",
-  suspended: "bg-destructive/10 text-destructive",
-};
 
 const STATUS_OPTIONS = [
   { value: "published", label: "Published" },
@@ -35,6 +31,8 @@ const STATUS_OPTIONS = [
   { value: "pending_review", label: "Pending review" },
   { value: "suspended", label: "Suspended" },
 ] as const;
+
+const selectClass = cn(NATIVE_SELECT_CLASS, "w-auto");
 
 export default async function AdminHotelsPage({
   searchParams,
@@ -58,27 +56,29 @@ export default async function AdminHotelsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold">Hotels</h1>
-        </div>
-        <div className="flex gap-2">
-          <OnboardPartnerDialog />
-          <HotelForm partners={partners} />
-        </div>
-      </div>
+      <PageHeader
+        title="Hotels"
+        status={
+          <Badge variant="neutral" className="tabular-nums">
+            {total.toLocaleString("en-US")}
+          </Badge>
+        }
+        actions={
+          <>
+            <OnboardPartnerDialog />
+            <HotelForm partners={partners} />
+          </>
+        }
+      />
 
-      <form action="/admin/hotels" className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input name="q" defaultValue={sp.q} placeholder="Hotel or city" className="h-8 w-64 pl-8" aria-label="Search" />
-        </div>
-        <select
-          name="status"
-          defaultValue={status ?? ""}
-          aria-label="Status"
-          className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm dark:bg-input/30"
-        >
+      <form action="/admin/hotels" role="search" className="flex flex-wrap items-center gap-2">
+        <InputGroup className="w-full sm:w-64 max-sm:h-10">
+          <InputGroupAddon>
+            <Search aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput name="q" type="search" defaultValue={sp.q} placeholder="Hotel or city" aria-label="Search hotels" />
+        </InputGroup>
+        <select name="status" defaultValue={status ?? ""} aria-label="Status" className={selectClass}>
           <option value="">Any status</option>
           {STATUS_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -86,66 +86,70 @@ export default async function AdminHotelsPage({
             </option>
           ))}
         </select>
-        <Button type="submit" size="sm" variant="outline">
+        <Button type="submit" variant="outline" className="max-sm:h-10">
           Apply
         </Button>
       </form>
 
       <Card className="overflow-hidden py-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Hotel</TableHead>
-              <TableHead>City</TableHead>
-              <TableHead>Stars</TableHead>
-              <TableHead>Rooms</TableHead>
-              <TableHead>Owner</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {hotels.length === 0 ? (
+        {hotels.length === 0 ? (
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Building2 />
+            </EmptyMedia>
+            <EmptyTitle>{sp.q || status ? "No hotels match these filters" : "No hotels"}</EmptyTitle>
+          </Empty>
+        ) : (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                  {sp.q || status ? "No hotels match." : "No hotels yet — add your first property."}
-                </TableCell>
+                <TableHead>Hotel</TableHead>
+                <TableHead>City</TableHead>
+                <TableHead numeric>Stars</TableHead>
+                <TableHead numeric>Rooms</TableHead>
+                <TableHead>Owner</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead numeric>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
-            ) : (
-              hotels.map((hotel) => (
+            </TableHeader>
+            <TableBody>
+              {hotels.map((hotel) => (
                 <TableRow key={hotel.id}>
                   <TableCell>
-                    <Link href={`/admin/hotels/${hotel.id}`} className="font-medium hover:underline">
+                    <Link
+                      href={`/admin/hotels/${hotel.id}`}
+                      className="rounded-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
                       {hotel.name}
                     </Link>
                     <p className="text-xs text-muted-foreground capitalize">{hotel.booking_mode} booking</p>
                   </TableCell>
                   <TableCell>{hotel.city}</TableCell>
-                  <TableCell>{hotel.star_rating ? `${hotel.star_rating}★` : "—"}</TableCell>
-                  <TableCell>{hotel.hotel_rooms?.[0]?.count ?? 0}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {hotel.partner?.name ?? "STS (direct)"}
-                  </TableCell>
+                  <TableCell numeric>{hotel.star_rating ? `${hotel.star_rating}★` : "—"}</TableCell>
+                  <TableCell numeric>{hotel.hotel_rooms?.[0]?.count ?? 0}</TableCell>
+                  <TableCell className="text-muted-foreground">{hotel.partner?.name ?? "STS (direct)"}</TableCell>
                   <TableCell>
-                    <Badge
-                      className={cn(
-                        "border-transparent capitalize",
-                        HOTEL_STATUS_STYLES[hotel.status] ?? "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {hotel.status.replace("_", " ")}
+                    <Badge variant={statusBadgeVariant(hotel.status)} className="capitalize">
+                      {hotel.status.replace(/_/g, " ")}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Button size="sm" variant="outline" className="gap-1.5" render={<Link href={`/admin/hotels/${hotel.id}`} />}>
-                      Manage <ArrowRight className="size-3.5" />
+                  <TableCell numeric>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={`Manage ${hotel.name}`}
+                      render={<Link href={`/admin/hotels/${hotel.id}`} />}
+                    >
+                      <ChevronRight />
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
 
       <Pager page={page} total={total} hrefFor={hrefFor} />

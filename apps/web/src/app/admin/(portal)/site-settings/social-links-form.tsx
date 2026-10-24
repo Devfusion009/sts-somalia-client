@@ -1,15 +1,14 @@
 "use client";
 
 import { useActionState } from "react";
-import { CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
 import { SOCIAL_ICONS } from "@/components/ui/social-icons";
 import { SOCIAL_PLATFORMS, SOCIAL_PLATFORM_ORDER, type SocialLink } from "@/lib/social-platforms";
 import { saveSocialLinks } from "@/modules/admin/site-settings/actions";
+import { SettingsFooter } from "./form-footer";
 
 export function SocialLinksForm({ links }: { links: SocialLink[] }) {
   const [state, action] = useActionState(saveSocialLinks, null);
@@ -17,22 +16,17 @@ export function SocialLinksForm({ links }: { links: SocialLink[] }) {
 
   return (
     <Card>
-      <CardContent className="p-5">
+      <CardContent>
         <form action={action} className="space-y-5">
-          {state?.error ? (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          ) : null}
           <div className="grid gap-4 lg:grid-cols-2">
             {SOCIAL_PLATFORM_ORDER.map((platform) => {
               const Icon = SOCIAL_ICONS[platform];
               const meta = SOCIAL_PLATFORMS[platform];
               return (
-                <div key={platform} className="space-y-1.5">
-                  <Label htmlFor={`social-${platform}`} className="flex items-center gap-2 text-sm">
-                    <Icon sx={{ fontSize: 16 }} /> {meta.label}
-                  </Label>
+                <Field key={platform}>
+                  <FieldLabel htmlFor={`social-${platform}`} className="flex items-center gap-2">
+                    <Icon sx={{ fontSize: 16 }} aria-hidden="true" /> {meta.label}
+                  </FieldLabel>
                   <Input
                     id={`social-${platform}`}
                     name={platform}
@@ -42,20 +36,15 @@ export function SocialLinksForm({ links }: { links: SocialLink[] }) {
                     placeholder={meta.placeholder}
                     autoComplete="off"
                   />
-                </div>
+                </Field>
               );
             })}
           </div>
-          <div className="flex items-center gap-3 border-t pt-4">
+          <SettingsFooter state={state}>
             <SubmitButton size="sm" pendingText="Saving…">
               Save links
             </SubmitButton>
-            {state && !state.error ? (
-              <span className="flex items-center gap-1.5 text-sm text-primary">
-                <CheckCircle2 className="size-4" /> Saved.
-              </span>
-            ) : null}
-          </div>
+          </SettingsFooter>
         </form>
       </CardContent>
     </Card>

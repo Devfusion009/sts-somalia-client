@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ function sanitizeKey(input: string) {
  * of a raw uncontrolled DOM value that would.
  */
 export function DocumentSlotsField({ name, initialRows }: { name: string; initialRows: DocumentSlotRow[] }) {
+  const uid = useId();
   const [rows, setRows] = useState<DocumentSlotRow[]>(initialRows);
 
   function update(i: number, patch: Partial<DocumentSlotRow>) {
@@ -33,11 +34,11 @@ export function DocumentSlotsField({ name, initialRows }: { name: string; initia
     <div className="space-y-3">
       <input type="hidden" name={name} value={JSON.stringify(rows)} />
       {rows.map((row, i) => (
-        <div key={i} className="space-y-2 rounded-lg border border-border p-3">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+        <div key={i} className="space-y-3 rounded-lg bg-muted/40 p-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_auto_auto]">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Key</Label>
-              <Input
+              <Label htmlFor={`${uid}-key-${i}`} className="text-xs text-muted-foreground">Key</Label>
+              <Input id={`${uid}-key-${i}`}
                 value={row.key}
                 placeholder="passport_bio"
                 className="font-mono text-xs"
@@ -45,13 +46,13 @@ export function DocumentSlotsField({ name, initialRows }: { name: string; initia
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Label</Label>
-              <Input value={row.label} placeholder="Passport Bio Page" onChange={(e) => update(i, { label: e.target.value })} />
+              <Label htmlFor={`${uid}-label-${i}`} className="text-xs text-muted-foreground">Label</Label>
+              <Input id={`${uid}-label-${i}`} value={row.label} placeholder="Passport Bio Page" onChange={(e) => update(i, { label: e.target.value })} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Required</Label>
+              <Label className="text-xs text-muted-foreground" aria-hidden="true">Required</Label>
               <Select value={row.required} onValueChange={(v) => update(i, { required: v as DocumentSlotRow["required"] })}>
-                <SelectTrigger className="w-28">
+                <SelectTrigger className="w-full sm:w-28" aria-label="Required">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -61,21 +62,21 @@ export function DocumentSlotsField({ name, initialRows }: { name: string; initia
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Max MB</Label>
-              <Input
+              <Label htmlFor={`${uid}-max-mb-${i}`} className="text-xs text-muted-foreground">Max MB</Label>
+              <Input id={`${uid}-max-mb-${i}`}
                 type="number"
                 min={0}
                 value={row.max_mb}
                 placeholder="5"
-                className="w-20"
+                className="w-full tabular-nums sm:w-20"
                 onChange={(e) => update(i, { max_mb: e.target.value })}
               />
             </div>
           </div>
           <div className="flex items-end gap-2">
             <div className="flex-1 space-y-1">
-              <Label className="text-xs text-muted-foreground">Description (optional)</Label>
-              <Input
+              <Label htmlFor={`${uid}-description-optional-${i}`} className="text-xs text-muted-foreground">Description</Label>
+              <Input id={`${uid}-description-optional-${i}`}
                 value={row.description}
                 placeholder="Color copy of passport bio page"
                 onChange={(e) => update(i, { description: e.target.value })}
@@ -85,20 +86,19 @@ export function DocumentSlotsField({ name, initialRows }: { name: string; initia
               title="Remove this document slot?"
               confirmLabel="Remove"
               aria-label="Remove document slot"
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className="shrink-0"
+              className="shrink-0 text-muted-foreground hover:text-destructive"
               onConfirm={() => setRows(rows.filter((_, idx) => idx !== i))}
             >
-              <Trash2 className="size-3.5" />
+              <Trash2 />
             </ConfirmButton>
           </div>
         </div>
       ))}
-      <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setRows([...rows, { ...EMPTY_DOCUMENT_SLOT_ROW }])}>
-        <Plus className="size-3.5" /> Add document
+      <Button type="button" variant="outline" size="sm" onClick={() => setRows([...rows, { ...EMPTY_DOCUMENT_SLOT_ROW }])}>
+        <Plus aria-hidden="true" /> Add document
       </Button>
-      <p className="text-xs text-muted-foreground">These become the upload boxes in the customer wizard.</p>
     </div>
   );
 }

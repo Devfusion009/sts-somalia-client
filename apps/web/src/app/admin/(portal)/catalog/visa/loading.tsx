@@ -8,8 +8,8 @@ import {
 export default function VisaCatalogLoading() {
   return (
     <LoadingShell label="visa catalog">
-      <Title title="Visa Catalog" actions={["w-44","w-36"]} />
-      <DataTable headers={["Destination","Name","Price","Status","Actions"]} rows={8} cell={{ 3: PillCell }} />
+      <Title title="Visa Catalog" badge actions={["w-44", "w-32"]} />
+      <DataTable headers={["Destination", "Name", "Price", "Status", ""]} rows={8} cell={{ 3: PillCell }} />
     </LoadingShell>
   );
 }

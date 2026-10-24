@@ -15,7 +15,7 @@ import {
   Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
@@ -55,14 +55,14 @@ function TabAction({ action }: { action: VisaAction }) {
   const variant = action.tone === "primary" ? "default" : "outline";
   if (action.disabledReason) {
     return (
-      <Button variant={variant} disabled title={action.disabledReason} className="gap-1.5">
-        <Icon className="size-4" /> {action.label}
+      <Button variant={variant} disabled title={action.disabledReason}>
+        <Icon data-icon="inline-start" /> {action.label}
       </Button>
     );
   }
   return (
-    <Button variant={variant} className="gap-1.5" render={<Link href={`?tab=${action.tab}`} scroll={false} />}>
-      <Icon className="size-4" /> {action.label}
+    <Button variant={variant} render={<Link href={`?tab=${action.tab}`} scroll={false} />}>
+      <Icon data-icon="inline-start" /> {action.label}
     </Button>
   );
 }
@@ -77,11 +77,14 @@ function StageButton({ action, applicationId, run }: { action: VisaAction; appli
         pendingText="Working…"
         disabled={Boolean(action.disabledReason)}
         title={action.disabledReason}
-        className="gap-1.5"
       >
-        <Icon className="size-4" /> {action.label}
+        <Icon data-icon="inline-start" /> {action.label}
       </SubmitButton>
-      {state?.error ? <p className="basis-full text-xs text-destructive">{state.error}</p> : null}
+      {state?.error ? (
+        <p role="alert" className="basis-full text-xs text-destructive">
+          {state.error}
+        </p>
+      ) : null}
     </form>
   );
 }
@@ -100,7 +103,7 @@ function CancelCase({ applicationId }: { applicationId: string }) {
       <AlertDialogTrigger
         render={<Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label="Cancel case" title="Cancel case" />}
       >
-        <Ban className="size-4" />
+        <Ban />
       </AlertDialogTrigger>
       <AlertDialogContent>
         <form action={formAction} className="space-y-4">
@@ -108,11 +111,15 @@ function CancelCase({ applicationId }: { applicationId: string }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel this case?</AlertDialogTitle>
           </AlertDialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor="cancel-reason">Reason</Label>
+          <Field>
+            <FieldLabel htmlFor="cancel-reason">Reason</FieldLabel>
             <Textarea id="cancel-reason" name="reason" rows={3} minLength={5} required />
-          </div>
-          {state?.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
+          </Field>
+          {state?.error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {state.error}
+            </p>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel>Keep open</AlertDialogCancel>
             <SubmitButton variant="destructive" pendingText="Cancelling…">
@@ -142,7 +149,7 @@ export function CaseActions({ applicationId, actions }: { applicationId: string;
             return <StageButton key={action.key} action={action} applicationId={applicationId} run={adminResumeCase} />;
           case "request_document":
             return action.disabledReason ? (
-              <Button key={action.key} variant="outline" size="sm" disabled title={action.disabledReason}>
+              <Button key={action.key} variant="outline" disabled title={action.disabledReason}>
                 Request document
               </Button>
             ) : (

@@ -7,9 +7,11 @@ import {
 
 export default function SecurityLoading() {
   return (
-    <LoadingShell label="security">
-      <Title title="Security" className="font-bold" />
-      <Section title="Two-Factor Authentication"><Skeleton className="h-24 w-full" /></Section>
+    <LoadingShell label="security" className="max-w-2xl">
+      <Title title="Security" />
+      <Section title="Two-factor authentication">
+        <Skeleton className="h-8 w-48 rounded-lg max-sm:h-10" />
+      </Section>
     </LoadingShell>
   );
 }

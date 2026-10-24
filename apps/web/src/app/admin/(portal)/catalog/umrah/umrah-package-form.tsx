@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -45,17 +45,15 @@ export function UmrahPackageForm({ pkg }: { pkg?: UmrahPackage }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size={pkg ? "sm" : "default"} variant={pkg ? "outline" : "default"} />}>
-        {pkg ? (
-          <>
-            <Pencil /> Edit
-          </>
-        ) : (
-          <>
-            <Plus /> Add package
-          </>
-        )}
-      </DialogTrigger>
+      {pkg ? (
+        <DialogTrigger render={<Button size="icon" variant="ghost" aria-label={`Edit ${pkg.name}`} title="Edit" />}>
+          <Pencil />
+        </DialogTrigger>
+      ) : (
+        <DialogTrigger render={<Button />}>
+          <Plus aria-hidden="true" /> Add package
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-lg">
         <form action={formAction}>
           {pkg ? <input type="hidden" name="id" value={pkg.id} /> : null}
@@ -63,53 +61,68 @@ export function UmrahPackageForm({ pkg }: { pkg?: UmrahPackage }) {
             <DialogTitle>{pkg ? "Edit Umrah package" : "Add Umrah package"}</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <FieldGroup className="gap-4 py-4">
             {state?.error ? (
               <Alert variant="destructive">
                 <AlertDescription>{state.error}</AlertDescription>
               </Alert>
             ) : null}
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
+            <Field>
+              <FieldLabel htmlFor="name">Name</FieldLabel>
               <Input id="name" name="name" defaultValue={pkg?.name} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="description">Description</FieldLabel>
               <Textarea id="description" name="description" defaultValue={pkg?.description ?? ""} rows={2} />
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="durationDays">Duration (days)</Label>
+            </Field>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <Field>
+                <FieldLabel htmlFor="durationDays">Duration (days)</FieldLabel>
                 <Input id="durationDays" name="durationDays" type="number" min={1} defaultValue={pkg?.duration_days} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="basePrice">Base price</Label>
-                <Input id="basePrice" name="basePrice" type="number" min={0} step="0.01" defaultValue={pkg?.base_price} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="currency">Currency</Label>
-                <Input id="currency" name="currency" maxLength={3} defaultValue={pkg?.currency ?? "USD"} required />
-              </div>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="basePrice">Base price</FieldLabel>
+                <Input
+                  id="basePrice"
+                  name="basePrice"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  defaultValue={pkg?.base_price}
+                  className="tabular-nums"
+                  required
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="currency">Currency</FieldLabel>
+                <Input id="currency" name="currency" maxLength={3} className="uppercase" defaultValue={pkg?.currency ?? "USD"} required />
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label>Includes</Label>
+            <Field>
+              <FieldLabel>Includes</FieldLabel>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {UMRAH_INCLUDE_OPTIONS.map((option) => {
                   const checked = ((pkg?.includes as string[] | null) ?? []).includes(option.value);
                   return (
                     <label
                       key={option.value}
-                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm has-checked:border-primary has-checked:bg-primary/5"
+                      className="flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:bg-muted/50 has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
                     >
-                      <input type="checkbox" name="includes" value={option.value} defaultChecked={checked} />
+                      <input
+                        type="checkbox"
+                        name="includes"
+                        value={option.value}
+                        defaultChecked={checked}
+                        className="size-4 accent-primary"
+                      />
                       {option.shortLabel}
                     </label>
                   );
                 })}
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="status">Status</FieldLabel>
               <Select name="status" defaultValue={pkg?.status ?? "draft"}>
                 <SelectTrigger id="status" className="w-full">
                   <SelectValue />
@@ -121,14 +134,14 @@ export function UmrahPackageForm({ pkg }: { pkg?: UmrahPackage }) {
                   <SelectItem value="suspended">Suspended</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          </div>
+            </Field>
+          </FieldGroup>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <SubmitButton pendingText="Saving…">{pkg ? "Save changes" : "Create"}</SubmitButton>
+            <SubmitButton pendingText="Saving…">{pkg ? "Save changes" : "Create package"}</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

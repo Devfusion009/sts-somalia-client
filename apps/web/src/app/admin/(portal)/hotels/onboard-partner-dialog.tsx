@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
 import { onboardHotelPartner } from "@/modules/admin/actions";
@@ -31,7 +31,7 @@ export function OnboardPartnerDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" className="gap-1.5" />}>
-        <UserPlus className="size-4" /> Onboard a partner
+        <UserPlus aria-hidden="true" /> Onboard partner
       </DialogTrigger>
       <DialogContent>
         <form action={formAction}>
@@ -39,39 +39,48 @@ export function OnboardPartnerDialog() {
             <DialogTitle>Onboard a hotel partner</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <FieldGroup className="gap-4 py-4">
             {state?.error ? (
               <Alert variant="destructive">
                 <AlertDescription>{state.error}</AlertDescription>
               </Alert>
             ) : null}
 
-            <div className="space-y-2">
-              <Label htmlFor="partnerName">Business name</Label>
+            <Field>
+              <FieldLabel htmlFor="partnerName">Business name</FieldLabel>
               <Input id="partnerName" name="partnerName" placeholder="e.g. Liido Beach Resort Group" required />
-            </div>
+            </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="ownerEmail">Owner&apos;s STS account email</Label>
+            <Field>
+              <FieldLabel htmlFor="ownerEmail">Owner&apos;s STS account email</FieldLabel>
               <Input id="ownerEmail" name="ownerEmail" type="email" placeholder="Existing STS account" required />
-            </div>
+            </Field>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="contactPhone">Contact phone</Label>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_8rem]">
+              <Field>
+                <FieldLabel htmlFor="contactPhone">Contact phone</FieldLabel>
                 <Input id="contactPhone" name="contactPhone" type="tel" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="countryCode">Country code</Label>
-                <Input id="countryCode" name="countryCode" maxLength={2} defaultValue="SO" />
-              </div>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="countryCode">Country code</FieldLabel>
+                <Input id="countryCode" name="countryCode" maxLength={2} className="uppercase" defaultValue="SO" />
+              </Field>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="commissionRate">Commission rate (%)</Label>
-              <Input id="commissionRate" name="commissionRate" type="number" min={0} max={100} step="0.1" defaultValue={0} />
-            </div>
-          </div>
+            <Field className="sm:max-w-48">
+              <FieldLabel htmlFor="commissionRate">Commission rate (%)</FieldLabel>
+              <Input
+                id="commissionRate"
+                name="commissionRate"
+                type="number"
+                min={0}
+                max={100}
+                step="0.1"
+                defaultValue={0}
+                className="tabular-nums"
+              />
+            </Field>
+          </FieldGroup>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

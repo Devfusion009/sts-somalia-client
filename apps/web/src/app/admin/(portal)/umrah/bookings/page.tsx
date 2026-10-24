@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ChevronRight, Landmark } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
+import { FilterChips } from "@/components/dashboard/filter-chips";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   getUmrahBookingsAdmin,
@@ -13,15 +16,16 @@ import {
 import { Pager } from "@/components/dashboard/pager";
 import { parsePage } from "@/lib/pagination";
 import { formatMoney } from "@/modules/umrah/pricing";
-import { cn } from "@/lib/utils";
 import {
   ORDER_STATUS_LABELS,
   UMRAH_STAGES,
   UMRAH_STAGE_LABELS,
-  isPaidOrderStatus,
   isUmrahStage,
+  orderStatusVariant,
 } from "./stages";
 import { StageBadge, formatDay } from "./shared";
+import { cn } from "@/lib/utils";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 export const metadata: Metadata = { title: "Umrah Bookings" };
 
@@ -34,8 +38,7 @@ const PAYMENT_FILTERS: { value: UmrahPaymentFilter; label: string }[] = [
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const selectClass =
-  "border-input h-8 rounded-md border bg-transparent px-2.5 text-xs shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+const selectClass = cn(NATIVE_SELECT_CLASS, "w-auto max-w-full max-sm:w-full");
 
 export default async function AdminUmrahBookingsPage({
   searchParams,
@@ -63,26 +66,27 @@ export default async function AdminUmrahBookingsPage({
     return `/admin/umrah/bookings${qs ? `?${qs}` : ""}`;
   };
 
-  const chip = (active: boolean) =>
-    cn(
-      "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-      active ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/50"
-    );
+  const filtered = Boolean(stage || departureId || packageId || payment);
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-semibold">Umrah Bookings</h1>
+      <PageHeader
+        title="Umrah Bookings"
+        status={
+          <Badge variant="neutral" className="tabular-nums">
+            {total.toLocaleString("en-US")}
+          </Badge>
+        }
+      />
 
-      <div className="flex flex-wrap gap-2">
-        <Link href={hrefWith({ stage: undefined })} className={chip(!stage)}>
-          All
-        </Link>
-        {UMRAH_STAGES.map((s) => (
-          <Link key={s} href={hrefWith({ stage: s })} className={chip(stage === s)}>
-            {UMRAH_STAGE_LABELS[s]}
-          </Link>
-        ))}
-      </div>
+      <FilterChips
+        label="Filter by stage"
+        active={stage ?? "all"}
+        items={[
+          { key: "all", label: "All", href: hrefWith({ stage: undefined }) },
+          ...UMRAH_STAGES.map((s) => ({ key: s, label: UMRAH_STAGE_LABELS[s], href: hrefWith({ stage: s }) })),
+        ]}
+      />
 
       <form method="get" action="/admin/umrah/bookings" className="flex flex-wrap items-center gap-2">
         {stage ? <input type="hidden" name="stage" value={stage} /> : null}
@@ -110,43 +114,53 @@ export default async function AdminUmrahBookingsPage({
             </option>
           ))}
         </select>
-        <Button type="submit" size="sm" variant="outline" className="h-8">
-          Filter
+        <Button type="submit" variant="outline">
+          Apply
         </Button>
       </form>
 
       <Card className="overflow-hidden py-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Reference</TableHead>
-              <TableHead>Booking</TableHead>
-              <TableHead>Departure</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Pilgrims</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead>Payment</TableHead>
-              <TableHead>Stage</TableHead>
-              <TableHead className="text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {bookings.length === 0 ? (
+        {bookings.length === 0 ? (
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Landmark />
+            </EmptyMedia>
+            <EmptyTitle>{filtered ? "No bookings match these filters" : "No Umrah bookings"}</EmptyTitle>
+          </Empty>
+        ) : (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
-                  No matching bookings.
-                </TableCell>
+                <TableHead>Reference</TableHead>
+                <TableHead>Booking</TableHead>
+                <TableHead>Departure</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead numeric>Pilgrims</TableHead>
+                <TableHead numeric>Total</TableHead>
+                <TableHead>Payment</TableHead>
+                <TableHead>Stage</TableHead>
+                <TableHead numeric>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
-            ) : (
-              bookings.map((b) => {
+            </TableHeader>
+            <TableBody>
+              {bookings.map((b) => {
                 const departureDate = b.departure?.departure_date ?? b.custom_request?.departure_date ?? null;
                 const orderStatus = b.order?.status ?? null;
                 return (
                   <TableRow key={b.id}>
-                    <TableCell className="font-mono text-xs">{b.order?.order_number ?? "—"}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <Link
+                        href={`/admin/umrah/bookings/${b.id}`}
+                        className="rounded-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        {b.order?.order_number ?? "—"}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="capitalize">
+                        <Badge variant="neutral" className="capitalize">
                           {b.booking_kind}
                         </Badge>
                         <span className="font-medium">
@@ -156,27 +170,20 @@ export default async function AdminUmrahBookingsPage({
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell>{formatDay(departureDate)}</TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">{formatDay(departureDate)}</TableCell>
                     <TableCell>
                       <p className="font-medium">{b.guest?.full_name ?? b.customer?.full_name ?? "—"}</p>
                       <p className="text-xs text-muted-foreground">
                         {b.guest ? `Booked by ${b.agency?.name ?? b.customer?.full_name ?? "agent"}` : (b.customer?.email ?? "")}
                       </p>
                     </TableCell>
-                    <TableCell>{b.num_pilgrims}</TableCell>
-                    <TableCell className="tabular-nums">{formatMoney(b.total_price, b.currency)}</TableCell>
+                    <TableCell numeric>{b.num_pilgrims}</TableCell>
+                    <TableCell numeric className="whitespace-nowrap">
+                      {formatMoney(b.total_price, b.currency)}
+                    </TableCell>
                     <TableCell>
                       {orderStatus ? (
-                        <Badge
-                          className={cn(
-                            "border-transparent",
-                            isPaidOrderStatus(orderStatus)
-                              ? "bg-primary/10 text-primary"
-                              : orderStatus === "cancelled" || orderStatus === "refunded"
-                                ? "bg-destructive/10 text-destructive"
-                                : "bg-brand-gold/15 text-brand-gold"
-                          )}
-                        >
+                        <Badge variant={orderStatusVariant(orderStatus)}>
                           {ORDER_STATUS_LABELS[orderStatus] ?? orderStatus}
                         </Badge>
                       ) : (
@@ -186,23 +193,23 @@ export default async function AdminUmrahBookingsPage({
                     <TableCell>
                       <StageBadge stage={b.fulfillment_stage} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell numeric>
                       <Button
                         size="icon"
-                        variant="outline"
-                        className="size-8"
+                        variant="ghost"
                         aria-label="Open booking"
+                        title="Open"
                         render={<Link href={`/admin/umrah/bookings/${b.id}`} />}
                       >
-                        <ArrowRight className="size-3.5" />
+                        <ChevronRight />
                       </Button>
                     </TableCell>
                   </TableRow>
                 );
-              })
-            )}
-          </TableBody>
-        </Table>
+              })}
+            </TableBody>
+          </Table>
+        )}
       </Card>
       <Pager page={page} total={total} hrefFor={(n) => `${hrefWith({})}${hrefWith({}).includes("?") ? "&" : "?"}page=${n}`} />
     </div>

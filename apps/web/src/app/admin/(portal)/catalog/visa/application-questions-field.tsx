@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ function sanitizeKey(input: string) {
  * pattern as DocumentSlotsField, for the same React-19-field-reset reason.
  */
 export function ApplicationQuestionsField({ name, initialRows }: { name: string; initialRows: ApplicationQuestionRow[] }) {
+  const uid = useId();
   const [rows, setRows] = useState<ApplicationQuestionRow[]>(initialRows);
 
   function update(i: number, patch: Partial<ApplicationQuestionRow>) {
@@ -30,11 +31,11 @@ export function ApplicationQuestionsField({ name, initialRows }: { name: string;
     <div className="space-y-3">
       <input type="hidden" name={name} value={JSON.stringify(rows)} />
       {rows.map((row, i) => (
-        <div key={i} className="space-y-2 rounded-lg border border-border p-3">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+        <div key={i} className="space-y-3 rounded-lg bg-muted/40 p-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_auto_auto]">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Key</Label>
-              <Input
+              <Label htmlFor={`${uid}-key-${i}`} className="text-xs text-muted-foreground">Key</Label>
+              <Input id={`${uid}-key-${i}`}
                 value={row.key}
                 placeholder="previous_visa_refusal"
                 className="font-mono text-xs"
@@ -42,17 +43,17 @@ export function ApplicationQuestionsField({ name, initialRows }: { name: string;
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Question</Label>
-              <Input
+              <Label htmlFor={`${uid}-question-${i}`} className="text-xs text-muted-foreground">Question</Label>
+              <Input id={`${uid}-question-${i}`}
                 value={row.label}
                 placeholder="Have you ever been refused a visa?"
                 onChange={(e) => update(i, { label: e.target.value })}
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Type</Label>
+              <Label className="text-xs text-muted-foreground" aria-hidden="true">Type</Label>
               <Select value={row.type} onValueChange={(v) => update(i, { type: v as ApplicationQuestionRow["type"] })}>
-                <SelectTrigger className="w-28">
+                <SelectTrigger className="w-full sm:w-28" aria-label="Type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -63,9 +64,9 @@ export function ApplicationQuestionsField({ name, initialRows }: { name: string;
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Required</Label>
+              <Label className="text-xs text-muted-foreground" aria-hidden="true">Required</Label>
               <Select value={row.required} onValueChange={(v) => update(i, { required: v as ApplicationQuestionRow["required"] })}>
-                <SelectTrigger className="w-28">
+                <SelectTrigger className="w-full sm:w-28" aria-label="Required">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -78,19 +79,19 @@ export function ApplicationQuestionsField({ name, initialRows }: { name: string;
           {row.type === "select" ? (
             <div className="flex items-end gap-2">
               <div className="flex-1 space-y-1">
-                <Label className="text-xs text-muted-foreground">Options (comma separated)</Label>
-                <Input value={row.options} placeholder="Yes, No, Not applicable" onChange={(e) => update(i, { options: e.target.value })} />
+                <Label htmlFor={`${uid}-options-comma-separated-${i}`} className="text-xs text-muted-foreground">Options</Label>
+                <Input id={`${uid}-options-comma-separated-${i}`} value={row.options} placeholder="Yes, No, Not applicable" onChange={(e) => update(i, { options: e.target.value })} />
               </div>
               <ConfirmButton
                 title="Remove this question?"
                 confirmLabel="Remove"
                 aria-label="Remove question"
-                variant="outline"
+                variant="ghost"
                 size="icon"
-                className="shrink-0"
+                className="shrink-0 text-muted-foreground hover:text-destructive"
                 onConfirm={() => setRows(rows.filter((_, idx) => idx !== i))}
               >
-                <Trash2 className="size-3.5" />
+                <Trash2 />
               </ConfirmButton>
             </div>
           ) : (
@@ -99,23 +100,20 @@ export function ApplicationQuestionsField({ name, initialRows }: { name: string;
                 title="Remove this question?"
                 confirmLabel="Remove"
                 aria-label="Remove question"
-                variant="outline"
+                variant="ghost"
                 size="icon"
-                className="shrink-0"
+                className="shrink-0 text-muted-foreground hover:text-destructive"
                 onConfirm={() => setRows(rows.filter((_, idx) => idx !== i))}
               >
-                <Trash2 className="size-3.5" />
+                <Trash2 />
               </ConfirmButton>
             </div>
           )}
         </div>
       ))}
-      <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setRows([...rows, { ...EMPTY_APPLICATION_QUESTION_ROW }])}>
-        <Plus className="size-3.5" /> Add question
+      <Button type="button" variant="outline" size="sm" onClick={() => setRows([...rows, { ...EMPTY_APPLICATION_QUESTION_ROW }])}>
+        <Plus aria-hidden="true" /> Add question
       </Button>
-      <p className="text-xs text-muted-foreground">
-        Shown to the customer at the end of Travel Information, only for this country&apos;s applications.
-      </p>
     </div>
   );
 }

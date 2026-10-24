@@ -2,7 +2,7 @@
 
 import { useActionState, useRef } from "react";
 import { Flag, Hand } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/submit-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { adminAssignCase, adminClaimCase, adminSetCasePriority } from "@/modules/visa/admin-actions";
@@ -37,9 +37,9 @@ export function CaseAssign({
       {assignedTo !== meId ? (
         <form action={adminClaimCase}>
           <input type="hidden" name="applicationId" value={applicationId} />
-          <Button type="submit" variant="outline" size="sm" className="gap-1.5">
-            <Hand className="size-3.5" /> Claim
-          </Button>
+          <SubmitButton variant="outline" size="sm" pendingText="Claiming…">
+            <Hand data-icon="inline-start" /> Claim
+          </SubmitButton>
         </form>
       ) : null}
 
@@ -52,7 +52,7 @@ export function CaseAssign({
             items={options}
             onValueChange={() => requestAnimationFrame(() => formRef.current?.requestSubmit())}
           >
-            <SelectTrigger size="sm" className="w-48" aria-label="Owner">
+            <SelectTrigger size="sm" className="w-full sm:w-48" aria-label="Owner">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -75,17 +75,21 @@ export function CaseAssign({
             aria-pressed={urgent}
             title={urgent ? "Clear urgent" : "Mark urgent"}
             className={cn(
-              "inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+              "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:h-10",
               urgent
                 ? "border-destructive bg-destructive text-white"
                 : "border-border text-muted-foreground hover:text-foreground"
             )}
           >
-            <Flag className="size-3" /> Urgent
+            <Flag className="size-3" aria-hidden="true" /> Urgent
           </button>
         </form>
       ) : null}
-      {state?.error ? <p className="basis-full text-xs text-destructive">{state.error}</p> : null}
+      {state?.error ? (
+        <p role="alert" className="basis-full text-xs text-destructive">
+          {state.error}
+        </p>
+      ) : null}
     </div>
   );
 }

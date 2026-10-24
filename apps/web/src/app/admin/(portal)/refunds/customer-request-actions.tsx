@@ -4,14 +4,20 @@ import { useActionState, useState } from "react";
 import { Check, Banknote, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SubmitButton } from "@/components/submit-button";
 import { decideCustomerRequest, type AdminRequestState } from "@/modules/bookings/admin-request-actions";
 
 type Decision = "approved" | "rejected" | "completed";
+
+const DONE: Record<Decision, string> = {
+  approved: "Request approved.",
+  rejected: "Request declined.",
+  completed: "Refund marked paid.",
+};
 
 const TITLE: Record<Decision, string> = {
   approved: "Approve request",
@@ -37,7 +43,7 @@ export function CustomerRequestActions({
     const result = await decideCustomerRequest(prev, formData);
     if (result?.error) toast.error(result.error, { position: "top-center" });
     else {
-      toast.success("Saved.", { position: "top-center" });
+      toast.success(DONE[formData.get("decision") as Decision] ?? "Saved.", { position: "top-center" });
       setDecision(null);
     }
     return result;
@@ -51,16 +57,16 @@ export function CustomerRequestActions({
       <div className="flex justify-end gap-2">
         {open ? (
           <>
-            <Button size="sm" className="gap-1" onClick={() => setDecision("approved")}>
-              <Check className="size-3.5" /> Approve
+            <Button size="sm" onClick={() => setDecision("approved")}>
+              <Check aria-hidden="true" /> Approve
             </Button>
-            <Button size="sm" variant="destructive" className="gap-1" onClick={() => setDecision("rejected")}>
-              <X className="size-3.5" /> Decline
+            <Button size="sm" variant="destructive" onClick={() => setDecision("rejected")}>
+              <X aria-hidden="true" /> Decline
             </Button>
           </>
         ) : status === "approved" && refunds ? (
-          <Button size="sm" variant="outline" className="gap-1" onClick={() => setDecision("completed")}>
-            <Banknote className="size-3.5" /> Mark paid
+          <Button size="sm" variant="outline" onClick={() => setDecision("completed")}>
+            <Banknote aria-hidden="true" /> Mark paid
           </Button>
         ) : null}
       </div>
@@ -70,29 +76,40 @@ export function CustomerRequestActions({
           <DialogHeader>
             <DialogTitle>{decision ? TITLE[decision] : ""}</DialogTitle>
           </DialogHeader>
-          <form action={formAction} className="space-y-4">
-            <input type="hidden" name="requestId" value={requestId} />
-            <input type="hidden" name="decision" value={decision ?? ""} />
-            {decision === "approved" && refunds ? (
-              <div className="space-y-1.5">
-                <Label htmlFor={`amt-${requestId}`}>Refund amount ({currency})</Label>
-                <Input id={`amt-${requestId}`} name="amount" type="number" min={0} step="0.01" defaultValue={suggestedAmount} required />
+          <form action={formAction}>
+            <FieldGroup className="gap-4">
+              <input type="hidden" name="requestId" value={requestId} />
+              <input type="hidden" name="decision" value={decision ?? ""} />
+              {decision === "approved" && refunds ? (
+                <Field>
+                  <FieldLabel htmlFor={`amt-${requestId}`}>Refund amount ({currency})</FieldLabel>
+                  <Input
+                    id={`amt-${requestId}`}
+                    name="amount"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    defaultValue={suggestedAmount}
+                    required
+                    className="tabular-nums"
+                  />
+                </Field>
+              ) : null}
+              {decision !== "completed" ? (
+                <Field>
+                  <FieldLabel htmlFor={`note-${requestId}`}>Note to customer</FieldLabel>
+                  <Textarea id={`note-${requestId}`} name="note" rows={3} maxLength={500} />
+                </Field>
+              ) : null}
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setDecision(null)}>
+                  Cancel
+                </Button>
+                <SubmitButton variant={decision === "rejected" ? "destructive" : "default"} pendingText="Saving…">
+                  Confirm
+                </SubmitButton>
               </div>
-            ) : null}
-            {decision !== "completed" ? (
-              <div className="space-y-1.5">
-                <Label htmlFor={`note-${requestId}`}>Note to customer</Label>
-                <Textarea id={`note-${requestId}`} name="note" rows={3} maxLength={500} />
-              </div>
-            ) : null}
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setDecision(null)}>
-                Cancel
-              </Button>
-              <SubmitButton variant={decision === "rejected" ? "destructive" : "default"} pendingText="Saving…">
-                Confirm
-              </SubmitButton>
-            </div>
+            </FieldGroup>
           </form>
         </DialogContent>
       </Dialog>

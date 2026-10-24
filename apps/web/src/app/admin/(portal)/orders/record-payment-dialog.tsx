@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
@@ -54,17 +54,17 @@ export function RecordPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" variant="outline" className="h-7 gap-1" />}>
-        <Wallet className="size-3.5" /> Record payment
+      <DialogTrigger render={<Button size="sm" variant="outline" />}>
+        <Wallet aria-hidden="true" /> Record payment
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <form action={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Record a payment</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="record-amount">Amount ({currency})</Label>
+          <FieldGroup className="gap-4 py-4">
+            <Field>
+              <FieldLabel htmlFor="record-amount">Amount ({currency})</FieldLabel>
               <Input
                 id="record-amount"
                 name="amount"
@@ -74,23 +74,24 @@ export function RecordPaymentDialog({
                 step="0.01"
                 defaultValue={remaining.toFixed(2)}
                 required
+                className="tabular-nums"
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="record-method">How did they pay?</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="record-method">Payment method</FieldLabel>
               <Input id="record-method" name="methodLabel" placeholder="e.g. Cash — head office" required />
-            </div>
+            </Field>
             {error ? (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             ) : null}
-          </div>
+          </FieldGroup>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <SubmitButton pendingText="Recording…">Record payment</SubmitButton>
+            <SubmitButton pendingText="Recording…">Record</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink } from "lucide-react";
+import { CalendarDays, ExternalLink } from "lucide-react";
 import { BackLink } from "@/components/back-link";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,12 +18,7 @@ import { GalleryManager } from "./gallery-manager";
 import { PackageDetailsForm } from "./package-details-form";
 import { HotelsManager, ItineraryManager, PricingManager, AgenciesPicker } from "./package-config-forms";
 
-const STATUS_STYLES: Record<string, string> = {
-  published: "bg-primary/10 text-primary",
-  draft: "bg-muted text-muted-foreground",
-  pending_review: "bg-brand-gold/15 text-brand-gold",
-  suspended: "bg-destructive/10 text-destructive",
-};
+const DEPARTURE_OVERRIDES = { full: "warning" } as const;
 
 function formatDay(value: string) {
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
@@ -45,34 +42,51 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
   const pricing = [...(pkg.umrah_package_pricing ?? [])].sort((a, b) => a.sharing - b.sharing);
   const linkedAgencyIds = (pkg.umrah_package_agencies ?? []).map((a) => a.agency_id);
   const hasRateCard = pricing.length > 0;
+  const seatsLeftTotal = departures.reduce((sum, d) => sum + Math.max(d.total_seats - d.booked_seats - d.offline_seats, 0), 0);
   const knownAirlines = [
     ...new Set(departures.flatMap((d) => [d.outbound_airline, d.return_airline]).filter((a): a is string => !!a)),
   ].sort();
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <BackLink href="/admin/catalog/umrah" label="All packages" className="mb-3" />
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-heading text-2xl font-semibold">{pkg.name}</h1>
-            <Badge className={cn("border-transparent capitalize", STATUS_STYLES[pkg.status])}>
-              {pkg.status.replace("_", " ")}
-            </Badge>
-            {pkg.is_featured ? (
-              <Badge className="border-transparent bg-brand-accent/15 text-brand-accent">Most Popular</Badge>
-            ) : null}
+      <div className="space-y-5">
+        <BackLink href="/admin/catalog/umrah" label="All packages" />
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{pkg.name}</h1>
+              <Badge variant={statusBadgeVariant(pkg.status)} className="capitalize">
+                {pkg.status.replace(/_/g, " ")}
+              </Badge>
+              {pkg.is_featured ? <Badge variant="info">Most popular</Badge> : null}
+            </div>
+            <p className="text-sm text-muted-foreground tabular-nums">
+              {[`${pkg.duration_days} days`, pkg.tier, pkg.origin_iata && pkg.destination_iata ? `${pkg.origin_iata} → ${pkg.destination_iata}` : null]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {pkg.duration_days} days · {pkg.currency} {Number(pkg.base_price).toFixed(0)} starting price
-            {pkg.tier ? ` · ${pkg.tier}` : ""}
-          </p>
-        </div>
-        {pkg.status === "published" ? (
-          <Button variant="outline" className="gap-1.5" render={<Link href={`/umrah/${pkg.slug}`} target="_blank" />}>
-            <ExternalLink className="size-4" /> View public page
-          </Button>
-        ) : null}
+          {pkg.status === "published" ? (
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Open public page"
+                title="Open public page"
+                render={<Link href={`/umrah/${pkg.slug}`} target="_blank" />}
+              >
+                <ExternalLink />
+              </Button>
+            </div>
+          ) : null}
+        </header>
+
+        <StatRail>
+          <StatRailItem label="Starting price" value={formatMoney(Number(pkg.base_price), pkg.currency)} />
+          <StatRailItem label="Departures" value={departures.length} />
+          <StatRailItem label="Seats left" value={seatsLeftTotal} tone={departures.length > 0 && seatsLeftTotal <= 0 ? "destructive" : undefined} />
+          <StatRailItem label="Rate card" value={hasRateCard ? `${pricing.length} rates` : "Not set"} tone={hasRateCard ? undefined : "warn"} />
+        </StatRail>
       </div>
 
       <Card>
@@ -151,33 +165,37 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
       </Card>
 
       <Card className="overflow-hidden pb-0">
-        <CardHeader>
+        <CardHeader className="pb-1">
           <CardTitle className="text-base">Departures</CardTitle>
           <CardAction>
             <DepartureDialog packageId={pkg.id} currency={pkg.currency} hasRateCard={hasRateCard} airlines={knownAirlines} />
           </CardAction>
         </CardHeader>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Departure</TableHead>
-              <TableHead>Return</TableHead>
-              <TableHead>Seats</TableHead>
-              <TableHead>Seats left</TableHead>
-              <TableHead>Flights</TableHead>
-              <TableHead>{hasRateCard ? "Sales close" : "Price override"}</TableHead>
-              <TableHead className="text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {departures.length === 0 ? (
+        {departures.length === 0 ? (
+          <Empty className="border-t border-border">
+            <EmptyMedia variant="icon">
+              <CalendarDays />
+            </EmptyMedia>
+            <EmptyTitle>No departures</EmptyTitle>
+          </Empty>
+        ) : (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                  No departures scheduled yet.
-                </TableCell>
+                <TableHead>Departure</TableHead>
+                <TableHead>Return</TableHead>
+                <TableHead numeric>Seats</TableHead>
+                <TableHead numeric>Left</TableHead>
+                <TableHead>Flights</TableHead>
+                <TableHead>{hasRateCard ? "Sales close" : "Price override"}</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead numeric>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
-            ) : (
-              departures.map((d) => {
+            </TableHeader>
+            <TableBody>
+              {departures.map((d) => {
                 const seatsLeft = d.total_seats - d.booked_seats - d.offline_seats;
                 const flights = [
                   [d.outbound_airline, d.outbound_flight_number].filter(Boolean).join(" "),
@@ -185,16 +203,18 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
                 ].filter(Boolean);
                 return (
                   <TableRow key={d.id}>
-                    <TableCell>{formatDay(d.departure_date)}</TableCell>
-                    <TableCell>{formatDay(d.return_date)}</TableCell>
-                    <TableCell className="tabular-nums">
-                      {d.booked_seats} + {d.offline_seats} offline / {d.total_seats}
+                    <TableCell className="whitespace-nowrap tabular-nums">{formatDay(d.departure_date)}</TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">{formatDay(d.return_date)}</TableCell>
+                    <TableCell numeric className="whitespace-nowrap">
+                      {d.booked_seats}
+                      {d.offline_seats > 0 ? <span className="text-muted-foreground"> + {d.offline_seats} offline</span> : null}
+                      <span className="text-muted-foreground"> / {d.total_seats}</span>
                     </TableCell>
-                    <TableCell className={cn("tabular-nums", seatsLeft <= 0 && "font-medium text-destructive")}>
+                    <TableCell numeric className={cn(seatsLeft <= 0 && "font-medium text-destructive")}>
                       {seatsLeft}
                     </TableCell>
-                    <TableCell>{flights.length ? flights.join(" · ") : "—"}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-muted-foreground">{flights.length ? flights.join(" · ") : "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">
                       {hasRateCard
                         ? d.sales_close_days > 0
                           ? `${d.sales_close_days} days before`
@@ -202,12 +222,14 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
                         : d.price_override !== null
                           ? formatMoney(Number(d.price_override), pkg.currency)
                           : "—"}
-                      {d.status !== "open" ? (
-                        <Badge className="ml-2 border-transparent bg-muted capitalize text-muted-foreground">{d.status}</Badge>
-                      ) : null}
                     </TableCell>
                     <TableCell>
-                      <div className="flex justify-end gap-1.5">
+                      <Badge variant={statusBadgeVariant(d.status, DEPARTURE_OVERRIDES)} className="capitalize">
+                        {d.status.replace(/_/g, " ")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell numeric>
+                      <div className="flex justify-end gap-1">
                         <DepartureDialog
                           packageId={pkg.id}
                           currency={pkg.currency}
@@ -222,10 +244,10 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
                     </TableCell>
                   </TableRow>
                 );
-              })
-            )}
-          </TableBody>
-        </Table>
+              })}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </div>
   );

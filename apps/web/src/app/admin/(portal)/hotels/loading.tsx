@@ -10,9 +10,9 @@ import {
 export default function HotelsLoading() {
   return (
     <LoadingShell label="hotels">
-      <Title title="Hotels" actions={["w-36","w-28"]} />
+      <Title title="Hotels" badge actions={["w-40", "w-28"]} />
       <SearchBar placeholder="Hotel or city" selects={1} />
-      <DataTable headers={["Hotel","City","Stars","Rooms","Owner","Status","Actions"]} rows={10} cell={{ 5: PillCell }} />
+      <DataTable headers={["Hotel", "City", "Stars", "Rooms", "Owner", "Status", ""]} rows={10} cell={{ 5: PillCell, 6: <span className="ml-auto block size-8 rounded-lg" /> }} />
       <Pager />
     </LoadingShell>
   );

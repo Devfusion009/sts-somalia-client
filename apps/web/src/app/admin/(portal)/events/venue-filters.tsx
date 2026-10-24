@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Search, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Search, X } from "lucide-react";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
 const STATUSES = [
@@ -49,45 +50,53 @@ export function VenueFilters({ cities }: { cities: { name: string; count: number
 
   return (
     <div className="space-y-3">
-      <div className="relative max-w-xl">
-        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
+      <InputGroup role="search" className="max-w-xl max-sm:h-10">
+        <InputGroupAddon>
+          <Search aria-hidden="true" />
+        </InputGroupAddon>
+        <InputGroupInput
+          type="search"
           value={text}
           onChange={(e) => onType(e.target.value)}
           placeholder="Search venue or town"
           aria-label="Search venues"
-          className="h-10 pr-9 pl-9"
         />
         {pending ? (
-          <Loader2 className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          <InputGroupAddon align="inline-end">
+            <Spinner />
+          </InputGroupAddon>
         ) : text ? (
-          <button
-            type="button"
-            aria-label="Clear search"
-            onClick={() => onType("")}
-            className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
-          >
-            <X className="size-4" />
-          </button>
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton size="icon-xs" aria-label="Clear search" onClick={() => onType("")}>
+              <X />
+            </InputGroupButton>
+          </InputGroupAddon>
         ) : null}
-      </div>
+      </InputGroup>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-6">
+        <div role="group" aria-label="Status" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
           {STATUSES.map((s) => (
             <Chip key={s.value} active={status === s.value} onClick={() => push({ status: s.value })}>
               {s.label}
             </Chip>
           ))}
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div role="group" aria-label="Town" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
           <Chip active={city === ""} onClick={() => push({ city: "" })}>
             All towns
           </Chip>
           {cities.map((c) => (
             <Chip key={c.name} active={city === c.name} onClick={() => push({ city: c.name })}>
               {c.name}
-              <span className="ml-1.5 text-xs opacity-60">{c.count}</span>
+              <span
+                className={cn(
+                  "rounded-full px-1.5 text-xs tabular-nums",
+                  city === c.name ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground"
+                )}
+              >
+                {c.count}
+              </span>
             </Chip>
           ))}
         </div>
@@ -103,10 +112,10 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "rounded-full border px-3 py-1 text-sm font-medium transition-colors",
+        "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:h-10",
         active
           ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
+          : "border-border bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground"
       )}
     >
       {children}

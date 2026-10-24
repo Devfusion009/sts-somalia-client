@@ -5,6 +5,9 @@ import type { ProviderCategory } from "@/lib/provider-catalog";
 import { holidaysCountryCode } from "@/lib/provider-runtime/holidays";
 import { getBankTransfer } from "@/lib/site-settings";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
 import { IntegrationCard } from "./integration-card";
 import { BankTransferForm } from "./bank-transfer-form";
@@ -65,32 +68,31 @@ function PaymentsTab({ integrations, bank }: { integrations: IntegrationStatus[]
 
 async function BuiltInTab() {
   return (
-    <Card>
-      <CardContent className="space-y-4 p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="font-heading text-base font-semibold">Public Holidays</h2>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary">
-            <span className="size-1.5 rounded-full bg-primary" />
-            Live
-          </span>
+    <Card className="max-w-3xl">
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-base font-semibold">Public holidays</h2>
+            <Badge variant="success">Live</Badge>
+          </div>
+          <Button variant="outline" size="sm" render={<Link href="/admin/calendar" />}>
+            Booking calendar
+          </Button>
         </div>
-        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-          <div className="flex gap-2">
-            <dt className="shrink-0 text-muted-foreground">Civil source</dt>
-            <dd className="font-medium">Nager.Date</dd>
+        <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
+          <div className="min-w-0">
+            <dt className="text-xs text-muted-foreground">Civil source</dt>
+            <dd className="mt-0.5 text-sm font-medium">Nager.Date</dd>
           </div>
-          <div className="flex gap-2">
-            <dt className="shrink-0 text-muted-foreground">Islamic source</dt>
-            <dd className="font-medium">Aladhan</dd>
+          <div className="min-w-0">
+            <dt className="text-xs text-muted-foreground">Islamic source</dt>
+            <dd className="mt-0.5 text-sm font-medium">Aladhan</dd>
           </div>
-          <div className="flex gap-2">
-            <dt className="shrink-0 text-muted-foreground">Country</dt>
-            <dd className="font-medium">{holidaysCountryCode()}</dd>
+          <div className="min-w-0">
+            <dt className="text-xs text-muted-foreground">Country</dt>
+            <dd className="mt-0.5 text-sm font-medium">{holidaysCountryCode()}</dd>
           </div>
         </dl>
-        <Link href="/admin/calendar" className="inline-block text-sm font-medium text-primary hover:underline">
-          Booking Calendar
-        </Link>
       </CardContent>
     </Card>
   );
@@ -104,9 +106,12 @@ export default async function AdminIntegrationsPage({ searchParams }: { searchPa
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-semibold">Integrations</h1>
+      <PageHeader title="Integrations" />
 
-      <nav aria-label="Integration categories" className="-mb-px flex flex-wrap gap-x-1 border-b">
+      <nav
+        aria-label="Integration categories"
+        className="-mx-4 flex gap-x-1 overflow-x-auto border-b px-4 sm:mx-0 sm:flex-wrap sm:px-0"
+      >
         {TABS.map((t) => {
           const inTab = integrations.filter((i) => i.provider.category === t.key);
           const live = liveCount(inTab);
@@ -117,20 +122,15 @@ export default async function AdminIntegrationsPage({ searchParams }: { searchPa
               href={`/admin/integrations?tab=${t.key}`}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
+                "-mb-px flex shrink-0 items-center gap-2 rounded-t-md border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                 active ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
               {t.label}
               {inTab.length > 0 ? (
-                <span
-                  className={cn(
-                    "rounded-full px-1.5 text-xs tabular-nums",
-                    live > 0 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                  )}
-                >
+                <Badge variant={live > 0 ? "success" : "neutral"} className="tabular-nums">
                   {live}/{inTab.length}
-                </span>
+                </Badge>
               ) : null}
             </Link>
           );

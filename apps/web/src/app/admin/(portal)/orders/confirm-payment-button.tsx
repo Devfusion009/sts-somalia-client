@@ -16,11 +16,10 @@ export function ConfirmPaymentButton({ paymentId }: { paymentId: string }) {
     <Button
       size="sm"
       type="button"
-      className="h-7 gap-1"
-      disabled={confirmPayment.isPending}
+      loading={confirmPayment.isPending}
       onClick={() => confirmPayment.mutate({ paymentId })}
     >
-      <BadgeCheck className="size-3.5" />
+      {confirmPayment.isPending ? null : <BadgeCheck aria-hidden="true" />}
       Confirm funds received
     </Button>
   );

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 import { SubmitButton } from "@/components/submit-button";
 import type { ActionState } from "@/lib/auth/actions";
 import { approveApplication, rejectApplication, requestMoreInfo } from "@/modules/admin/application-actions";
@@ -35,9 +35,12 @@ type NotifyState = (ActionState & { emailSent?: boolean }) | null;
 export function ApplicationActions({
   applicationId,
   type,
+  layout = "stack",
 }: {
   applicationId: string;
   type: ApplicationType;
+  /** `inline`: icon-only row for table cells; `stack`: full-width buttons for a side panel. */
+  layout?: "stack" | "inline";
 }) {
   const router = useRouter();
   const [approveState, approveFormAction] = useActionState(approveApplication.bind(null, type), null);
@@ -49,6 +52,7 @@ export function ApplicationActions({
     requestMoreInfo.bind(null, type),
     null
   );
+  const inline = layout === "inline";
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -71,45 +75,70 @@ export function ApplicationActions({
   }, [rejectState, infoState, router]);
 
   return (
-    <div className="flex w-full flex-col gap-2">
-      <div className="flex w-full flex-col gap-2">
-        <Button className="gap-1.5" onClick={() => setApproveOpen(true)}>
-          <Check className="size-4" /> Approve
-        </Button>
-
-        <Button variant="outline" className="gap-1.5" onClick={() => setInfoOpen(true)}>
-          <MessageCircleQuestion className="size-4" /> More info
-        </Button>
-
-        <Button variant="destructive" className="gap-1.5" onClick={() => setRejectOpen(true)}>
-          <X className="size-4" /> Reject
-        </Button>
+    <div className={cn("flex flex-col gap-2", inline ? "items-end" : "w-full")}>
+      <div className={cn("flex gap-2", inline ? "items-center justify-end gap-1" : "w-full flex-col")}>
+        {inline ? (
+          <>
+            <Button size="icon-sm" aria-label="Approve" title="Approve" onClick={() => setApproveOpen(true)}>
+              <Check />
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="outline"
+              aria-label="Request more info"
+              title="Request more info"
+              onClick={() => setInfoOpen(true)}
+            >
+              <MessageCircleQuestion />
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="destructive"
+              aria-label="Reject"
+              title="Reject"
+              onClick={() => setRejectOpen(true)}
+            >
+              <X />
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button onClick={() => setApproveOpen(true)}>
+              <Check data-icon="inline-start" /> Approve
+            </Button>
+            <Button variant="outline" onClick={() => setInfoOpen(true)}>
+              <MessageCircleQuestion data-icon="inline-start" /> Request more info
+            </Button>
+            <Button variant="destructive" onClick={() => setRejectOpen(true)}>
+              <X data-icon="inline-start" /> Reject
+            </Button>
+          </>
+        )}
 
         <AlertDialog open={approveOpen} onOpenChange={setApproveOpen}>
           <AlertDialogContent>
             <form action={approveFormAction}>
               <input type="hidden" name="applicationId" value={applicationId} />
               <AlertDialogHeader>
-                <AlertDialogTitle>Approve &amp; create Partner Account?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This marks the application approved and creates the partner&apos;s ongoing account (starting in
-                  Onboarding). You&apos;ll land in its management console. The applicant is notified.
-                </AlertDialogDescription>
+                <AlertDialogTitle>Approve and create partner account?</AlertDialogTitle>
               </AlertDialogHeader>
               <Textarea
                 name="note"
-                placeholder="Internal note for the account's activity log (optional)"
-                className="my-2"
+                placeholder="Internal note for the activity log (optional)"
+                aria-label="Internal note"
+                className="my-4"
                 rows={3}
               />
               {approveState?.error ? (
-                <p className="mb-2 text-xs text-destructive">{approveState.error}</p>
+                <p role="alert" className="mb-3 text-sm text-destructive">
+                  {approveState.error}
+                </p>
               ) : null}
               <AlertDialogFooter>
                 <Button type="button" variant="outline" onClick={() => setApproveOpen(false)}>
                   Cancel
                 </Button>
-                <SubmitButton pendingText="Approving…">Approve &amp; Create Partner Account</SubmitButton>
+                <SubmitButton pendingText="Approving…">Approve</SubmitButton>
               </AlertDialogFooter>
             </form>
           </AlertDialogContent>
@@ -121,11 +150,15 @@ export function ApplicationActions({
               <input type="hidden" name="applicationId" value={applicationId} />
               <AlertDialogHeader>
                 <AlertDialogTitle>Reject this application?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This reason is shown to the applicant — they can reapply after 30 days.
-                </AlertDialogDescription>
+                <AlertDialogDescription>The applicant can reapply after 30 days.</AlertDialogDescription>
               </AlertDialogHeader>
-              <Textarea name="notes" placeholder="Reason (shown to applicant)" className="my-2" rows={3} />
+              <Textarea
+                name="notes"
+                placeholder="Reason (shown to applicant)"
+                aria-label="Reason"
+                className="my-4"
+                rows={3}
+              />
               <AlertDialogFooter>
                 <Button type="button" variant="outline" onClick={() => setRejectOpen(false)}>
                   Cancel
@@ -144,11 +177,15 @@ export function ApplicationActions({
               <input type="hidden" name="applicationId" value={applicationId} />
               <AlertDialogHeader>
                 <AlertDialogTitle>Request more information</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Tell the applicant what&apos;s missing — they can update and resubmit.
-                </AlertDialogDescription>
               </AlertDialogHeader>
-              <Textarea name="message" placeholder="What do you need from them?" className="my-2" rows={3} required />
+              <Textarea
+                name="message"
+                placeholder="What is missing (shown to applicant)"
+                aria-label="Message"
+                className="my-4"
+                rows={3}
+                required
+              />
               <AlertDialogFooter>
                 <Button type="button" variant="outline" onClick={() => setInfoOpen(false)}>
                   Cancel
@@ -159,25 +196,15 @@ export function ApplicationActions({
           </AlertDialogContent>
         </AlertDialog>
       </div>
-      {approveState?.error ? (
-        <Alert variant="destructive" className="w-full">
-          <AlertDescription>{approveState.error}</AlertDescription>
-        </Alert>
-      ) : null}
-      {rejectState?.error ? (
-        <Alert variant="destructive" className="w-full">
-          <AlertDescription>{rejectState.error}</AlertDescription>
-        </Alert>
-      ) : null}
-      {infoState?.error ? (
-        <Alert variant="destructive" className="w-full">
-          <AlertDescription>{infoState.error}</AlertDescription>
-        </Alert>
+      {approveState?.error || rejectState?.error || infoState?.error ? (
+        <p role="alert" className={cn("text-sm text-destructive", inline && "text-right text-xs")}>
+          {approveState?.error ?? rejectState?.error ?? infoState?.error}
+        </p>
       ) : null}
       {(rejectState?.emailSent === false && !rejectState.error) ||
       (infoState?.emailSent === false && !infoState.error) ? (
-        <p className="text-[10px] text-muted-foreground">
-          Saved — email not sent (notifications not configured yet).
+        <p role="status" className="text-xs text-muted-foreground">
+          Saved. Email not sent.
         </p>
       ) : null}
     </div>

@@ -1,4 +1,6 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Banknote, CheckCheck, Percent, Receipt, Users, Wallet } from "lucide-react";
 import { format } from "date-fns";
 import { BackLink } from "@/components/back-link";
 import { requirePlatformAdmin } from "@/lib/auth/session";
@@ -26,7 +28,12 @@ import { agencyLogoUrl } from "@/modules/agencies/logo";
 import { resolveDateRange, bucketLabel } from "@/lib/date-range";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { SalesTimelineChart } from "@/components/dashboard/lazy-charts";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
+import { StatStrip, StatStripItem } from "@/components/dashboard/filter-chips";
+import { money } from "@/lib/money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -50,15 +57,15 @@ import {
 import { AssignTierForm, LowBalanceThresholdForm } from "./tier-forms";
 import { getAgencyTiers } from "@/modules/agencies/queries";
 
-const STATUS_STYLES: Record<string, string> = {
-  active: "bg-primary/10 text-primary",
-  pending: "bg-brand-gold/15 text-brand-gold",
-  suspended: "bg-destructive/10 text-destructive",
-};
+export const metadata: Metadata = { title: "Agency" };
 
-function money(amount: number) {
-  return `USD ${amount.toFixed(2)}`;
-}
+const usd = (amount: number) => money(amount, "USD");
+
+/** Whole-unit amounts for the performance strip. */
+const whole = (amount: number, currency: string) =>
+  `${currency} ${Math.round(amount).toLocaleString("en-US")}`;
+
+const ENTRY_STATUS = { confirmed: "info", paid_out: "success", reversed: "neutral" } as const;
 
 export default async function AdminAgencyDetailPage({
   params,
@@ -115,6 +122,7 @@ export default async function AdminAgencyDetailPage({
   const decidedMarkupRequests = markupRequests.filter((r) => r.status !== "pending").slice(0, 5);
   const currentMarkupByScope = new Map(markups.map((rule) => [rule.item_type ?? "all", rule]));
   const logoUrl = agencyLogoUrl(agency.logo_path);
+  const meta = [agency.contact_email, agency.contact_phone, agency.website, agency.address].filter(Boolean).join(" · ");
 
   const totalEarned = earnings.totalEarned;
   const entriesHref = (target: number) => {
@@ -128,155 +136,90 @@ export default async function AdminAgencyDetailPage({
     return qs ? `/admin/agencies/${agency.id}?${qs}` : `/admin/agencies/${agency.id}`;
   };
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <BackLink href="/admin/agencies" label="All agencies" className="mb-3" />
-          <div className="flex items-center gap-3">
-            {logoUrl ? (
-              <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logoUrl} alt={`${agency.name} logo`} className="size-full object-contain" />
-              </span>
-            ) : null}
-            <h1 className="font-heading text-2xl font-semibold">{agency.name}</h1>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {[agency.contact_email, agency.contact_phone, agency.website, agency.address]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-          {agency.about ? (
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{agency.about}</p>
+    <div className="space-y-8">
+      <div className="space-y-5">
+        <BackLink href="/admin/agencies" label="All agencies" />
+        <header className="flex min-w-0 items-center gap-4">
+          {logoUrl ? (
+            <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background max-sm:size-12">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logoUrl} alt={`${agency.name} logo`} className="size-full object-contain" />
+            </span>
           ) : null}
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{agency.name}</h1>
+              <Badge variant={statusBadgeVariant(agency.status)} className="capitalize">
+                {agency.status}
+              </Badge>
+              {agency.agency_tiers?.name ? <Badge variant="info">{agency.agency_tiers.name}</Badge> : null}
+            </div>
+            {meta ? <p className="text-sm break-words text-muted-foreground">{meta}</p> : null}
+          </div>
+        </header>
+        {agency.about ? <p className="max-w-3xl text-sm text-muted-foreground">{agency.about}</p> : null}
+
+        <StatRail className="sm:grid-cols-3 lg:grid-cols-6">
+          <StatRailItem
+            label="Wallet balance"
+            value={`${wallet.balance < 0 ? "−" : ""}${usd(Math.abs(wallet.balance))}`}
+            tone={wallet.balance < 0 ? "destructive" : undefined}
+          />
+          <StatRailItem label="Credit limit" value={usd(wallet.creditLimit)} />
+          <StatRailItem label="Available" value={usd(wallet.available)} tone="primary" />
+          <StatRailItem label="Commission" value={`${agency.commission_rate}%`} />
+          <StatRailItem label="Total earned" value={usd(totalEarned)} />
+          <StatRailItem label="Members" value={agency.agency_members.length} />
+        </StatRail>
+      </div>
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-heading text-base font-semibold">Performance</h2>
+          <DateRangePicker currentKey={range.key} />
         </div>
-        <Badge
-          className={cn(
-            "border-transparent capitalize",
-            STATUS_STYLES[agency.status] ?? "bg-muted text-muted-foreground"
-          )}
-        >
-          {agency.status}
-        </Badge>
-      </div>
+        <StatStrip>
+          <StatStripItem label="Tickets cut" value={metrics.bookings.current.toLocaleString("en-US")} />
+          <StatStripItem label="Sales" value={whole(metrics.revenue.current, metrics.revenue.currency)} />
+          <StatStripItem label="Agency earned" value={whole(metrics.earned.current, metrics.revenue.currency)} />
+          <StatStripItem
+            label="Customers"
+            value={customers.total.toLocaleString("en-US")}
+            sub={`${customers.registered} with an STS account`}
+          />
+        </StatStrip>
+        <SalesTimelineChart
+          currency={metrics.revenue.currency}
+          data={metrics.buckets.map((key, i) => ({
+            label: bucketLabel(key, range.granularity),
+            sales: metrics.revenue.series[i] ?? 0,
+            tickets: metrics.bookings.series[i] ?? 0,
+          }))}
+        />
+      </section>
 
-      {/* Snapshot */}
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        {[
-          {
-            label: "Wallet Balance",
-            value: `${wallet.balance < 0 ? "−" : ""}${money(Math.abs(wallet.balance))}`,
-            destructive: wallet.balance < 0,
-          },
-          { label: "Credit Limit", value: money(wallet.creditLimit) },
-          { label: "Available to Spend", value: money(wallet.available) },
-          { label: "Total Earned", value: money(totalEarned) },
-        ].map((stat) => (
-          <Card key={stat.label}>
-            <CardContent className="pt-6">
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
-              <p
-                className={cn(
-                  "mt-1 font-heading text-xl font-bold",
-                  stat.destructive ? "text-destructive" : undefined
-                )}
-              >
-                {stat.value}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Performance */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-heading text-lg font-semibold">Performance</h2>
-        <DateRangePicker currentKey={range.key} />
-      </div>
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        {[
-          { label: "Tickets Cut", value: String(metrics.bookings.current), sub: undefined },
-          {
-            label: "Sales",
-            value: `${metrics.revenue.currency} ${metrics.revenue.current.toFixed(0)}`,
-            sub: undefined,
-          },
-          {
-            label: "Agency Earned",
-            value: `${metrics.revenue.currency} ${metrics.earned.current.toFixed(0)}`,
-            sub: undefined,
-          },
-          {
-            label: "Customers",
-            value: `${customers.total}`,
-            sub: `${customers.registered} with an STS account`,
-          },
-        ].map((stat) => (
-          <Card key={stat.label}>
-            <CardContent className="pt-6">
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
-              <p className="mt-1 font-heading text-xl font-bold">{stat.value}</p>
-              {stat.sub ? <p className="mt-0.5 text-xs text-muted-foreground">{stat.sub}</p> : null}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      <SalesTimelineChart
-        currency={metrics.revenue.currency}
-        data={metrics.buckets.map((key, i) => ({
-          label: bucketLabel(key, range.granularity),
-          sales: metrics.revenue.series[i] ?? 0,
-          tickets: metrics.bookings.series[i] ?? 0,
-        }))}
-      />
-
-      {/* Controls */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Commission Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <section className="space-y-3">
+        <h2 className="font-heading text-base font-semibold">Account controls</h2>
+        <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <ControlCard title="Commission rate">
             <CommissionRateForm agencyId={agency.id} currentRate={Number(agency.commission_rate)} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Credit Limit</CardTitle>
-          </CardHeader>
-          <CardContent>
+          </ControlCard>
+          <ControlCard title="Credit limit">
             <CreditLimitForm agencyId={agency.id} currentLimit={Number(agency.credit_limit)} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Wallet Top-up / Adjustment</CardTitle>
-          </CardHeader>
-          <CardContent>
+          </ControlCard>
+          <ControlCard title="Low-balance alert">
+            <LowBalanceThresholdForm agencyId={agency.id} currentThreshold={Number(agency.low_balance_threshold)} />
+          </ControlCard>
+          <ControlCard title="Wallet adjustment">
             <WalletTransactionForm agencyId={agency.id} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Record Commission Payout</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CommissionPayoutForm agencyId={agency.id} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Issue Credit / Debit Note</CardTitle>
-          </CardHeader>
-          <CardContent>
+          </ControlCard>
+          <ControlCard title="Credit / debit note">
             <IssueNoteForm agencyId={agency.id} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Tier</CardTitle>
-          </CardHeader>
-          <CardContent>
+          </ControlCard>
+          <ControlCard title="Commission payout">
+            <CommissionPayoutForm agencyId={agency.id} />
+          </ControlCard>
+          <ControlCard title="Tier">
             <AssignTierForm
               agencyId={agency.id}
               currentTierId={agency.tier_id}
@@ -287,171 +230,163 @@ export default async function AdminAgencyDetailPage({
                 default_credit_limit: Number(t.default_credit_limit),
               }))}
             />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Low-Balance Alert</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <LowBalanceThresholdForm
-              agencyId={agency.id}
-              currentThreshold={Number(agency.low_balance_threshold)}
-            />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Allowed Products</CardTitle>
-          </CardHeader>
-          <CardContent>
+          </ControlCard>
+          <ControlCard title="Allowed products" className="md:col-span-2 xl:col-span-2">
             <AllowedProductsForm agencyId={agency.id} current={agency.allowed_products} />
-          </CardContent>
-        </Card>
-      </div>
+          </ControlCard>
+        </div>
+      </section>
 
-      {/* Members + markups */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden py-0">
-          <CardHeader className="border-b border-border !py-4">
-            <CardTitle className="text-base">Members</CardTitle>
-          </CardHeader>
-          {agency.agency_members.length === 0 ? (
-            <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              No members.
-            </CardContent>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {agency.agency_members.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell>
-                      <p className="font-medium">{member.profiles?.full_name ?? "—"}</p>
-                      <p className="text-xs text-muted-foreground">{member.profiles?.email}</p>
-                    </TableCell>
-                    <TableCell className="capitalize">{member.role_in_agency}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="capitalize">
-                        {member.status}
-                      </Badge>
-                    </TableCell>
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <Section title="Members" count={agency.agency_members.length}>
+          <Card className="overflow-hidden py-0">
+            {agency.agency_members.length === 0 ? (
+              <Empty>
+                <EmptyMedia variant="icon">
+                  <Users />
+                </EmptyMedia>
+                <EmptyTitle>No members</EmptyTitle>
+              </Empty>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {agency.agency_members.map((member) => (
+                    <TableRow key={member.id}>
+                      <TableCell className="max-w-64">
+                        <p className="truncate font-medium">{member.profiles?.full_name ?? "—"}</p>
+                        <p className="truncate text-xs text-muted-foreground">{member.profiles?.email}</p>
+                      </TableCell>
+                      <TableCell className="capitalize">{member.role_in_agency}</TableCell>
+                      <TableCell>
+                        <Badge variant={statusBadgeVariant(member.status, { removed: "neutral" })} className="capitalize">
+                          {member.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </Section>
 
-        <Card id="markups" className="scroll-mt-6 overflow-hidden py-0">
-          <CardHeader className="border-b border-border !py-4">
-            <CardTitle className="flex items-center gap-2 text-base">
-              Markup Rules
-              {pendingMarkupRequests.length > 0 ? (
-                <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">
-                  {pendingMarkupRequests.length} pending
-                </Badge>
-              ) : null}
-            </CardTitle>
-          </CardHeader>
-          {pendingMarkupRequests.length > 0 ? (
-            <ul className="divide-y divide-border border-b border-border">
-              {pendingMarkupRequests.map((request) => {
-                const current = currentMarkupByScope.get(request.item_type ?? "all");
-                const requester = request.requester as { full_name: string | null; email: string } | null;
-                return (
-                  <li key={request.id} className="space-y-2 px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="space-y-2">
+        <Section
+          id="markups"
+          title="Markup rules"
+          className="scroll-mt-6"
+          badge={
+            pendingMarkupRequests.length > 0 ? (
+              <Badge variant="warning" className="tabular-nums">
+                {pendingMarkupRequests.length} pending
+              </Badge>
+            ) : null
+          }
+        >
+          <Card className="overflow-hidden py-0">
+            {pendingMarkupRequests.length > 0 ? (
+              <ul className="divide-y divide-border border-b border-border bg-brand-gold/5">
+                {pendingMarkupRequests.map((request) => {
+                  const current = currentMarkupByScope.get(request.item_type ?? "all");
+                  const requester = request.requester as { full_name: string | null; email: string } | null;
+                  return (
+                    <li key={request.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                      <div className="min-w-0 space-y-2">
                         <ScopeBadge itemType={request.item_type} />
                         <MarkupChange
                           current={current}
                           fallback={request.item_type === null ? null : currentMarkupByScope.get("all")}
                           request={request}
                         />
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground tabular-nums">
                           {requester?.full_name ?? requester?.email ?? "—"} ·{" "}
-                          {format(new Date(request.requested_at), "dd MMM yyyy, hh:mm a")}
+                          {format(new Date(request.requested_at), "d MMM yyyy, HH:mm")}
                         </p>
                       </div>
-                      <div className="min-w-56">
+                      <div className="w-full sm:w-auto sm:min-w-56">
                         <MarkupRequestReview requestId={request.id} agencyId={agency.id} />
                       </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
-          {markups.length === 0 ? (
-            <CardContent className="py-10 text-center text-sm text-muted-foreground">No markup rules.</CardContent>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Applies to</TableHead>
-                  <TableHead className="text-right">Markup</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {markups.map((rule) => (
-                  <TableRow key={rule.id}>
-                    <TableCell>{scopeLabel(rule.item_type)}</TableCell>
-                    <TableCell className="text-right font-semibold">{markupLabel(rule.markup_type, rule.value)}</TableCell>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+            {markups.length === 0 ? (
+              <Empty>
+                <EmptyMedia variant="icon">
+                  <Percent />
+                </EmptyMedia>
+                <EmptyTitle>No markup rules</EmptyTitle>
+              </Empty>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Applies to</TableHead>
+                    <TableHead numeric>Markup</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-          {decidedMarkupRequests.length > 0 ? (
-            <ul className="divide-y divide-border border-t border-border">
-              {decidedMarkupRequests.map((request) => (
-                <li key={request.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-2.5 text-sm">
-                  <div>
-                    <span className="font-medium">{scopeLabel(request.item_type)}</span>
-                    <span className="mx-1.5 text-muted-foreground">·</span>
-                    {requestedLabel(request)}
-                    {request.review_note ? <p className="text-xs text-muted-foreground">{request.review_note}</p> : null}
-                  </div>
-                  <div className="text-right">
-                    <Badge
-                      className={cn(
-                        "border-transparent capitalize",
-                        request.status === "approved" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
-                      )}
-                    >
-                      {request.status}
-                    </Badge>
-                    {request.reviewed_at ? (
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {format(new Date(request.reviewed_at), "dd MMM yyyy")}
-                      </p>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {markups.map((rule) => (
+                    <TableRow key={rule.id}>
+                      <TableCell>{scopeLabel(rule.item_type)}</TableCell>
+                      <TableCell numeric className="font-medium tabular-nums">
+                        {markupLabel(rule.markup_type, rule.value)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            {decidedMarkupRequests.length > 0 ? (
+              <div className="border-t border-border">
+                <h3 className="px-4 pt-3 text-xs font-medium text-muted-foreground">Recent decisions</h3>
+                <ul className="divide-y divide-border">
+                  {decidedMarkupRequests.map((request) => (
+                    <li key={request.id} className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
+                      <div className="min-w-0">
+                        <span className="font-medium">{scopeLabel(request.item_type)}</span>
+                        <span className="mx-1.5 text-muted-foreground">·</span>
+                        <span className="tabular-nums">{requestedLabel(request)}</span>
+                        {request.review_note ? (
+                          <p className="text-xs break-words text-muted-foreground">{request.review_note}</p>
+                        ) : null}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <Badge variant={statusBadgeVariant(request.status)} className="capitalize">
+                          {request.status}
+                        </Badge>
+                        {request.reviewed_at ? (
+                          <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                            {format(new Date(request.reviewed_at), "d MMM yyyy")}
+                          </p>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </Card>
+        </Section>
       </div>
 
-      {/* Ledgers */}
-      <Card className="overflow-hidden py-0">
-        <CardHeader className="border-b border-border !py-4">
-          <CardTitle className="text-base">Wallet Transactions</CardTitle>
-        </CardHeader>
-        {wallet.transactions.length === 0 ? (
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No wallet activity yet.
-          </CardContent>
-        ) : (
-          <div className="overflow-x-auto">
+      <Section title="Wallet transactions" count={wallet.transactions.length}>
+        <Card className="overflow-hidden py-0">
+          {wallet.transactions.length === 0 ? (
+            <Empty>
+              <EmptyMedia variant="icon">
+                <Wallet />
+              </EmptyMedia>
+              <EmptyTitle>No wallet activity</EmptyTitle>
+            </Empty>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -459,181 +394,184 @@ export default async function AdminAgencyDetailPage({
                   <TableHead>Type</TableHead>
                   <TableHead>Order</TableHead>
                   <TableHead>Note</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Balance After</TableHead>
+                  <TableHead numeric>Amount</TableHead>
+                  <TableHead numeric>Balance after</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {wallet.transactions.map((tx) => (
-                  <TableRow key={tx.id}>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(tx.created_at), "d MMM yyyy, HH:mm")}
-                    </TableCell>
-                    <TableCell className="capitalize">{tx.type.replace(/_/g, " ")}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {tx.order?.order_number ?? "—"}
-                    </TableCell>
-                    <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">
-                      {tx.note ?? "—"}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right font-semibold",
-                        Number(tx.amount) < 0 ? "text-destructive" : "text-primary"
-                      )}
-                    >
-                      {Number(tx.amount) < 0 ? "−" : "+"} {money(Math.abs(Number(tx.amount)))}
-                    </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {money(Number(tx.balance_after))}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {wallet.transactions.map((tx) => {
+                  const amount = Number(tx.amount);
+                  return (
+                    <TableRow key={tx.id}>
+                      <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
+                        {format(new Date(tx.created_at), "d MMM yyyy, HH:mm")}
+                      </TableCell>
+                      <TableCell className="capitalize">{tx.type.replace(/_/g, " ")}</TableCell>
+                      <TableCell className="font-mono text-xs">{tx.order?.order_number ?? "—"}</TableCell>
+                      <TableCell className="max-w-[220px] truncate text-muted-foreground">{tx.note ?? "—"}</TableCell>
+                      <TableCell
+                        numeric
+                        className={cn("font-medium tabular-nums", amount < 0 ? "text-destructive" : "text-primary")}
+                      >
+                        {amount < 0 ? "−" : "+"}
+                        {usd(Math.abs(amount))}
+                      </TableCell>
+                      <TableCell numeric className="text-muted-foreground tabular-nums">
+                        {usd(Number(tx.balance_after))}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
-          </div>
-        )}
-      </Card>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Earnings to review</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {pendingEntries.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">Nothing awaiting review.</p>
-            ) : (
-              <CommissionEntryReview agencyId={agency.id} entries={pendingEntries} />
-            )}
-          </CardContent>
+          )}
         </Card>
+      </Section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Earnings balance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-              <div>
-                <dt className="text-xs text-muted-foreground">Total earned</dt>
-                <dd className="mt-0.5 font-semibold">{money(earnings.totalEarned)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">In review</dt>
-                <dd className="mt-0.5 font-semibold text-brand-gold">{money(earnings.inReview)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Available to withdraw</dt>
-                <dd className="mt-0.5 font-semibold text-primary">{money(earnings.available)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Requested</dt>
-                <dd className="mt-0.5 font-semibold">{money(earnings.requested)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Paid out</dt>
-                <dd className="mt-0.5 font-semibold">{money(earnings.paidOut)}</dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <Section
+          title="Earnings to review"
+          badge={
+            pendingEntries.length > 0 ? (
+              <Badge variant="warning" className="tabular-nums">
+                {pendingEntries.length}
+              </Badge>
+            ) : null
+          }
+        >
+          <Card>
+            <CardContent>
+              {pendingEntries.length === 0 ? (
+                <Empty>
+                  <EmptyMedia variant="icon">
+                    <CheckCheck />
+                  </EmptyMedia>
+                  <EmptyTitle>Nothing to review</EmptyTitle>
+                </Empty>
+              ) : (
+                <CommissionEntryReview agencyId={agency.id} entries={pendingEntries} />
+              )}
+            </CardContent>
+          </Card>
+        </Section>
+
+        <Section title="Earnings balance">
+          <StatRail className="sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+            <StatRailItem label="Total earned" value={usd(earnings.totalEarned)} />
+            <StatRailItem label="In review" value={usd(earnings.inReview)} tone="warn" />
+            <StatRailItem label="Available to withdraw" value={usd(earnings.available)} tone="primary" />
+            <StatRailItem label="Requested" value={usd(earnings.requested)} />
+            <StatRailItem label="Paid out" value={usd(earnings.paidOut)} />
+          </StatRail>
+        </Section>
       </div>
 
-      <Card className="overflow-hidden py-0">
-        <CardHeader className="border-b border-border !py-4">
-          <CardTitle className="text-base">Wallet Top-ups</CardTitle>
-        </CardHeader>
-        {topupRequests.length === 0 ? (
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">No top-ups yet.</CardContent>
-        ) : (
-          <div className="overflow-x-auto">
+      <Section title="Wallet top-ups" count={topupRequests.length}>
+        <Card className="overflow-hidden py-0">
+          {topupRequests.length === 0 ? (
+            <Empty>
+              <EmptyMedia variant="icon">
+                <Wallet />
+              </EmptyMedia>
+              <EmptyTitle>No top-ups</EmptyTitle>
+            </Empty>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Filed</TableHead>
                   <TableHead>Method</TableHead>
                   <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Receipt</TableHead>
+                  <TableHead numeric>Amount</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead numeric>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {topupRequests.map((request) => (
                   <TableRow key={request.id}>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                    <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                       {format(new Date(request.requested_at), "d MMM yyyy")}
                     </TableCell>
-                    <TableCell className="text-sm">
-                      {request.method.replace(/_/g, " ")}
-                      <span className="ml-1.5 text-xs text-muted-foreground">{request.rail}</span>
+                    <TableCell>
+                      <span className="capitalize">{request.method.replace(/_/g, " ")}</span>
+                      <Badge variant="outline" className="ml-1.5 capitalize">
+                        {request.rail}
+                      </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-xs">
                       {request.reference ?? request.provider_ref ?? "—"}
                     </TableCell>
-                    <TableCell className="text-right font-semibold">{money(Number(request.amount))}</TableCell>
-                    <TableCell>
-                      {proofUrls.has(request.id) ? (
-                        <a
-                          href={proofUrls.get(request.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-medium text-primary hover:underline"
-                        >
-                          View
-                        </a>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
+                    <TableCell numeric className="font-medium tabular-nums">
+                      {usd(Number(request.amount))}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="capitalize">
+                      <Badge variant={statusBadgeVariant(request.status, { cancelled: "neutral" })} className="capitalize">
                         {request.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                      {request.status === "pending" && request.rail === "offline" ? (
-                        <TopupReview agencyId={agency.id} requestId={request.id} />
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
+                    <TableCell numeric>
+                      <div className="flex items-start justify-end gap-1.5">
+                        {proofUrls.has(request.id) ? (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="View receipt"
+                            title="View receipt"
+                            render={
+                              <a href={proofUrls.get(request.id)} target="_blank" rel="noopener noreferrer" />
+                            }
+                          >
+                            <Receipt />
+                          </Button>
+                        ) : null}
+                        {request.status === "pending" && request.rail === "offline" ? (
+                          <TopupReview agencyId={agency.id} requestId={request.id} />
+                        ) : null}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
-      </Card>
+          )}
+        </Card>
+      </Section>
 
-      <Card className="overflow-hidden py-0">
-        <CardHeader className="border-b border-border !py-4">
-          <CardTitle className="text-base">Payout Requests</CardTitle>
-        </CardHeader>
-        {payoutRequests.length === 0 ? (
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">No payout requests yet.</CardContent>
-        ) : (
-          <div className="overflow-x-auto">
+      <Section title="Payout requests" count={payoutRequests.length}>
+        <Card className="overflow-hidden py-0">
+          {payoutRequests.length === 0 ? (
+            <Empty>
+              <EmptyMedia variant="icon">
+                <Banknote />
+              </EmptyMedia>
+              <EmptyTitle>No payout requests</EmptyTitle>
+            </Empty>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Requested</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead numeric>Amount</TableHead>
                   <TableHead>Bank</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead numeric>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {payoutRequests.map((request) => (
                   <TableRow key={request.id}>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                       {format(new Date(request.requested_at), "d MMM yyyy")}
                     </TableCell>
-                    <TableCell className="text-right font-semibold">{money(Number(request.amount))}</TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell numeric className="font-medium tabular-nums">
+                      {usd(Number(request.amount))}
+                    </TableCell>
+                    <TableCell>
                       <p>
                         {request.bank_name ?? "—"}
                         {request.bank_branch ? ` · ${request.bank_branch}` : ""}
@@ -644,39 +582,39 @@ export default async function AdminAgencyDetailPage({
                       </p>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="capitalize">
+                      <Badge variant={statusBadgeVariant(request.status)} className="capitalize">
                         {request.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell numeric>
                       <PayoutRequestActions agencyId={agency.id} requestId={request.id} status={request.status} />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
-      </Card>
+          )}
+        </Card>
+      </Section>
 
-      <Card className="overflow-hidden py-0">
-        <CardHeader className="border-b border-border !py-4">
-          <CardTitle className="text-base">Commission Entries</CardTitle>
-        </CardHeader>
-        {commissionEntries.length === 0 ? (
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No settled agency bookings yet.
-          </CardContent>
-        ) : (
-          <div className="overflow-x-auto">
+      <Section title="Commission entries" count={commissionEntryTotal}>
+        <Card className="overflow-hidden py-0">
+          {commissionEntries.length === 0 ? (
+            <Empty>
+              <EmptyMedia variant="icon">
+                <Receipt />
+              </EmptyMedia>
+              <EmptyTitle>No commission entries</EmptyTitle>
+            </Empty>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Order</TableHead>
-                  <TableHead className="text-right">Rate</TableHead>
-                  <TableHead className="text-right">Commission</TableHead>
-                  <TableHead className="text-right">Markup</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead numeric>Rate</TableHead>
+                  <TableHead numeric>Commission</TableHead>
+                  <TableHead numeric>Markup</TableHead>
+                  <TableHead numeric>Total</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -684,25 +622,25 @@ export default async function AdminAgencyDetailPage({
                 {commissionEntries.map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell>
-                      <p className="font-mono text-xs font-medium">
-                        {entry.order?.order_number ?? "—"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="font-mono text-xs font-medium">{entry.order?.order_number ?? "—"}</p>
+                      <p className="text-xs text-muted-foreground tabular-nums">
                         {format(new Date(entry.created_at), "d MMM yyyy")}
                       </p>
                     </TableCell>
-                    <TableCell className="text-right text-sm">{entry.rate_applied}%</TableCell>
-                    <TableCell className="text-right text-sm">
-                      {money(Number(entry.commission_amount))}
+                    <TableCell numeric className="tabular-nums">
+                      {entry.rate_applied}%
                     </TableCell>
-                    <TableCell className="text-right text-sm">
-                      {money(Number(entry.markup_amount))}
+                    <TableCell numeric className="tabular-nums">
+                      {usd(Number(entry.commission_amount))}
                     </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {money(Number(entry.amount))}
+                    <TableCell numeric className="tabular-nums">
+                      {usd(Number(entry.markup_amount))}
+                    </TableCell>
+                    <TableCell numeric className="font-medium tabular-nums">
+                      {usd(Number(entry.amount))}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="capitalize">
+                      <Badge variant={statusBadgeVariant(entry.status, ENTRY_STATUS)} className="capitalize">
                         {entry.status.replace(/_/g, " ")}
                       </Badge>
                     </TableCell>
@@ -710,25 +648,25 @@ export default async function AdminAgencyDetailPage({
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
-        {commissionEntryTotal > ADMIN_PAGE_SIZE ? (
-          <div className="border-t border-border px-4 py-3">
-            <Pager page={entriesPage} total={commissionEntryTotal} hrefFor={entriesHref} />
-          </div>
-        ) : null}
-      </Card>
+          )}
+          {commissionEntryTotal > ADMIN_PAGE_SIZE ? (
+            <div className="border-t border-border px-4 py-3">
+              <Pager page={entriesPage} total={commissionEntryTotal} hrefFor={entriesHref} />
+            </div>
+          ) : null}
+        </Card>
+      </Section>
 
-      <Card className="overflow-hidden py-0">
-        <CardHeader className="border-b border-border !py-4">
-          <CardTitle className="text-base">Commission Payouts</CardTitle>
-        </CardHeader>
-        {payouts.length === 0 ? (
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No payouts recorded yet.
-          </CardContent>
-        ) : (
-          <div className="overflow-x-auto">
+      <Section title="Commission payouts" count={payouts.length}>
+        <Card className="overflow-hidden py-0">
+          {payouts.length === 0 ? (
+            <Empty>
+              <EmptyMedia variant="icon">
+                <Banknote />
+              </EmptyMedia>
+              <EmptyTitle>No payouts</EmptyTitle>
+            </Empty>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -736,30 +674,82 @@ export default async function AdminAgencyDetailPage({
                   <TableHead>Method</TableHead>
                   <TableHead>Reference</TableHead>
                   <TableHead>Period</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead numeric>Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {payouts.map((payout) => (
                   <TableRow key={payout.id}>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                       {format(new Date(payout.paid_at), "d MMM yyyy")}
                     </TableCell>
-                    <TableCell className="text-sm">{payout.method ?? "—"}</TableCell>
+                    <TableCell>{payout.method ?? "—"}</TableCell>
                     <TableCell className="font-mono text-xs">{payout.payout_reference ?? "—"}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                       {payout.period_start && payout.period_end
                         ? `${format(new Date(payout.period_start), "d MMM")} – ${format(new Date(payout.period_end), "d MMM yyyy")}`
                         : "—"}
                     </TableCell>
-                    <TableCell className="text-right font-semibold">{money(Number(payout.amount))}</TableCell>
+                    <TableCell numeric className="font-medium tabular-nums">
+                      {usd(Number(payout.amount))}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
-      </Card>
+          )}
+        </Card>
+      </Section>
     </div>
+  );
+}
+
+function Section({
+  title,
+  count,
+  badge,
+  id,
+  className,
+  children,
+}: {
+  title: string;
+  count?: number;
+  badge?: React.ReactNode;
+  id?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} className={cn("min-w-0 space-y-3", className)}>
+      <div className="flex items-center gap-2">
+        <h2 className="font-heading text-base font-semibold">{title}</h2>
+        {count ? (
+          <Badge variant="neutral" className="tabular-nums">
+            {count}
+          </Badge>
+        ) : null}
+        {badge}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ControlCard({
+  title,
+  className,
+  children,
+}: {
+  title: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle className="text-sm">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   );
 }

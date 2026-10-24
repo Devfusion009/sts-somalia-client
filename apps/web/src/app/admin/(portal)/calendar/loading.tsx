@@ -1,5 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { TopProgressBar } from "@/components/dashboard/skeletons";
+import { Title } from "@/components/dashboard/admin-skeletons";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -16,39 +17,40 @@ export default function CalendarLoading() {
     <div role="status" aria-busy="true" aria-label="Loading calendar" className="space-y-6">
       <TopProgressBar />
 
-      <Skeleton className="h-8 w-56" />
+      <Title title="Booking Calendar" actions={["w-32"]} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Skeleton className="size-10 rounded-lg" />
-          <Skeleton className="h-7 w-44" />
-          <Skeleton className="size-10 rounded-lg" />
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-2">
+            <Skeleton className="size-8 rounded-lg max-sm:size-10" />
+            <Skeleton className="h-6 w-36" />
+            <Skeleton className="size-8 rounded-lg max-sm:size-10" />
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[24, 20, 16, 16, 16, 20].map((w, i) => (
+              <Skeleton key={i} className="h-7 rounded-full max-sm:h-9" style={{ width: `${w * 4}px` }} />
+            ))}
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Skeleton className="h-10 w-32 rounded-lg" />
-          {[24, 20, 16, 16, 16, 20].map((w, i) => (
-            <Skeleton key={i} className="h-7 rounded-full" style={{ width: `${w * 4}px` }} />
-          ))}
-        </div>
-      </div>
 
-      <div className="overflow-x-auto">
-        <div className="grid min-w-[640px] grid-cols-7 gap-px overflow-hidden rounded-t-lg border border-b-0 border-border bg-border text-xs font-medium text-muted-foreground">
-          {WEEKDAYS.map((day) => (
-            <div key={day} className="bg-muted/60 px-2 py-2 text-center">
-              {day}
-            </div>
-          ))}
-        </div>
-        <div className="grid min-w-[640px] grid-cols-7 gap-px overflow-hidden rounded-b-lg border border-border bg-border">
-          {Array.from({ length: 42 }, (_, i) => (
-            <div key={i} className="min-h-[7.5rem] space-y-2 bg-card p-2">
-              <Skeleton className="h-3.5 w-5" />
-              {Array.from({ length: BUSY_CELLS[i] ?? 0 }, (_, bar) => (
-                <Skeleton key={bar} className="h-5 w-full rounded" />
-              ))}
-            </div>
-          ))}
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <div className="grid min-w-[640px] grid-cols-7 gap-px overflow-hidden rounded-t-lg border border-b-0 border-border bg-border text-xs font-medium text-muted-foreground">
+            {WEEKDAYS.map((day) => (
+              <div key={day} className="bg-muted/50 px-2 py-1.5 text-center">
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="grid min-w-[640px] grid-cols-7 gap-px overflow-hidden rounded-b-lg border border-border bg-border">
+            {Array.from({ length: 42 }, (_, i) => (
+              <div key={i} className="min-h-32 space-y-2 bg-background p-1.5">
+                <Skeleton className="h-3.5 w-5" />
+                {Array.from({ length: BUSY_CELLS[i] ?? 0 }, (_, bar) => (
+                  <Skeleton key={bar} className="h-5 w-full rounded" />
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       <span className="sr-only">Loading</span>

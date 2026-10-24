@@ -31,9 +31,9 @@ import {
   Bell,
   Trash2,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { CalendarBookingEvent, CalendarBookingKind } from "@/modules/admin/calendar-queries";
 import type { PublicHoliday } from "@/lib/provider-runtime/holidays";
@@ -41,6 +41,7 @@ import type { AdminCalendarEvent } from "@/modules/admin/calendar-events";
 import { deleteAdminCalendarEvent } from "@/modules/admin/calendar-event-actions";
 import { AdminEventForm } from "./admin-event-form";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { money } from "@/lib/money";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -54,22 +55,18 @@ const KIND_META: Record<
   hall: { label: "Event Hall", icon: PartyPopper, dot: "bg-chart-5", iconColor: "text-chart-5", chip: "bg-chart-5/15 text-chart-5" },
 };
 
-const HOLIDAY_CHIP = "bg-primary text-primary-foreground";
+const HOLIDAY_CHIP = "bg-primary/10 text-primary";
 
 // The one KIND_META color unused by real bookings (chart-2), reserved for
 // admin's own scheduled items — visually distinct from every booking kind
 // and from the holiday chip at a glance.
 const TASK_META = { label: "My schedule", icon: CalendarClock, dot: "bg-chart-2", chip: "bg-chart-2/15 text-chart-2" };
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-brand-gold/15 text-brand-gold",
-  confirmed: "bg-primary/10 text-primary",
-  completed: "bg-primary/10 text-primary",
-  cancelled: "bg-destructive/10 text-destructive",
-  refunded: "bg-destructive/10 text-destructive",
-  no_show: "bg-muted text-muted-foreground",
-  failed: "bg-destructive/10 text-destructive",
-};
+const STATUS_OVERRIDES = { refunded: "destructive", no_show: "neutral" } as const;
+
+const FILTER_CHIP =
+  "flex h-7 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:h-9";
+const FILTER_OFF = "border-border bg-card text-muted-foreground hover:text-foreground";
 
 /**
  * Platform-wide booking calendar for admin — every hotel/flight/Umrah/hall
@@ -147,38 +144,45 @@ export function AdminEventCalendar({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => navigateMonth(subMonths(monthStart, 1))}>
-            <ChevronLeft className="size-4" />
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Previous month"
+            onClick={() => navigateMonth(subMonths(monthStart, 1))}
+          >
+            <ChevronLeft aria-hidden="true" />
           </Button>
-          <span className="min-w-36 text-center font-heading text-lg font-semibold">{format(monthStart, "MMMM yyyy")}</span>
-          <Button variant="outline" size="icon" onClick={() => navigateMonth(addMonths(monthStart, 1))}>
-            <ChevronRight className="size-4" />
+          <h2 className="min-w-36 text-center font-heading text-lg font-semibold tabular-nums" aria-live="polite">
+            {format(monthStart, "MMMM yyyy")}
+          </h2>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Next month"
+            onClick={() => navigateMonth(addMonths(monthStart, 1))}
+          >
+            <ChevronRight aria-hidden="true" />
           </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <AdminEventForm prefillDate={format(new Date(), "yyyy-MM-dd")} />
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Show on calendar">
           <button
             type="button"
+            aria-pressed={showTasks}
             onClick={() => setShowTasks((v) => !v)}
-            className={cn(
-              "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              showTasks ? cn("border-transparent", TASK_META.chip) : "border-border text-muted-foreground opacity-50"
-            )}
+            className={cn(FILTER_CHIP, showTasks ? cn("border-transparent", TASK_META.chip) : FILTER_OFF)}
           >
-            <CalendarClock className="size-3" />
+            <CalendarClock className="size-3" aria-hidden="true" />
             {TASK_META.label}
           </button>
           <button
             type="button"
+            aria-pressed={showHolidays}
             onClick={() => setShowHolidays((v) => !v)}
-            className={cn(
-              "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              showHolidays ? cn("border-transparent", HOLIDAY_CHIP) : "border-border text-muted-foreground opacity-50"
-            )}
+            className={cn(FILTER_CHIP, showHolidays ? cn("border-transparent", HOLIDAY_CHIP) : FILTER_OFF)}
           >
-            <Flag className="size-3" />
+            <Flag className="size-3" aria-hidden="true" />
             Holidays
           </button>
           {(Object.keys(KIND_META) as CalendarBookingKind[]).map((kind) => {
@@ -188,13 +192,11 @@ export function AdminEventCalendar({
               <button
                 key={kind}
                 type="button"
+                aria-pressed={active}
                 onClick={() => toggleKind(kind)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                  active ? cn("border-transparent", meta.chip) : "border-border text-muted-foreground opacity-50"
-                )}
+                className={cn(FILTER_CHIP, active ? cn("border-transparent", meta.chip) : FILTER_OFF)}
               >
-                <span className={cn("size-2 rounded-full", meta.dot)} />
+                <span className={cn("size-2 rounded-full", meta.dot, !active && "opacity-40")} aria-hidden="true" />
                 {meta.label}
               </button>
             );
@@ -234,16 +236,18 @@ export function AdminEventCalendar({
               <button
                 key={day.toISOString()}
                 type="button"
+                tabIndex={hasItems ? 0 : -1}
+                aria-label={format(day, "EEEE, d MMMM yyyy")}
                 onClick={() => (hasItems ? setSelectedDay(day) : undefined)}
                 className={cn(
-                  "flex min-h-32 flex-col gap-1 bg-background p-1.5 text-left transition-colors",
+                  "flex min-h-32 flex-col gap-1 bg-background p-1.5 text-left transition-colors outline-none focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring/50",
                   !inMonth && "bg-muted/30 text-muted-foreground/50",
-                  hasItems && "cursor-pointer hover:bg-accent"
+                  hasItems ? "cursor-pointer hover:bg-muted/50" : "cursor-default"
                 )}
               >
                 <span
                   className={cn(
-                    "text-xs font-medium",
+                    "text-xs font-medium tabular-nums",
                     isSameDay(day, new Date()) &&
                       "flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground"
                   )}
@@ -255,6 +259,7 @@ export function AdminEventCalendar({
                     <span
                       key={h.date + h.name}
                       className={cn("truncate rounded px-1 py-0.5 text-[10px] font-semibold", HOLIDAY_CHIP)}
+                      aria-hidden="true"
                     >
                       {h.localName}
                     </span>
@@ -262,7 +267,8 @@ export function AdminEventCalendar({
                   {shownAdminEvents.map((e) => (
                     <span
                       key={e.id}
-                      className="flex items-center gap-1 truncate text-[10px] font-medium text-foreground"
+                      aria-hidden="true"
+                      className="flex items-center gap-1 truncate text-[10px] font-medium text-foreground tabular-nums"
                     >
                       <span className={cn("size-1.5 shrink-0 rounded-full", TASK_META.dot)} />
                       <span className="truncate">
@@ -278,6 +284,7 @@ export function AdminEventCalendar({
                     return (
                       <span
                         key={`${e.kind}-${e.id}`}
+                        aria-hidden="true"
                         className={cn(
                           "flex min-w-0 flex-col rounded border-l-2 px-1 py-0.5 leading-tight",
                           meta.chip,
@@ -292,7 +299,7 @@ export function AdminEventCalendar({
                           <Icon className="size-2.5 shrink-0" />
                           <span className="truncate">{e.title}</span>
                           {marker ? (
-                            <span className="ml-auto shrink-0 rounded bg-foreground/10 px-1 text-[9px] font-bold uppercase">
+                            <span className="ml-auto shrink-0 rounded bg-foreground/10 px-1 text-[9px] font-semibold">
                               {marker}
                             </span>
                           ) : null}
@@ -303,7 +310,11 @@ export function AdminEventCalendar({
                       </span>
                     );
                   })}
-                  {overflow > 0 ? <span className="text-[10px] text-muted-foreground">+{overflow} more</span> : null}
+                  {overflow > 0 ? (
+                    <span className="text-[10px] text-muted-foreground tabular-nums" aria-hidden="true">
+                      +{overflow} more
+                    </span>
+                  ) : null}
                 </div>
               </button>
             );
@@ -314,25 +325,15 @@ export function AdminEventCalendar({
       <Dialog open={selectedDay !== null} onOpenChange={(open) => !open && setSelectedDay(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <div className="flex items-start justify-between gap-3 pr-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 pr-8">
               <DialogTitle>{selectedDay ? format(selectedDay, "EEEE, d MMMM yyyy") : ""}</DialogTitle>
-              {selectedDay ? <AdminEventForm prefillDate={format(selectedDay, "yyyy-MM-dd")} /> : null}
+              {selectedDay ? <AdminEventForm prefillDate={format(selectedDay, "yyyy-MM-dd")} compact /> : null}
             </div>
-            <DialogDescription>
-              {selectedDayEvents.length} booking{selectedDayEvents.length === 1 ? "" : "s"}
-              {selectedDayAdminEvents.length > 0
-                ? ` · ${selectedDayAdminEvents.length} on your schedule`
-                : ""}
-              {selectedDayHolidays.length > 0
-                ? ` · ${selectedDayHolidays.length} holiday${selectedDayHolidays.length === 1 ? "" : "s"}`
-                : ""}
-              .
-            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             {selectedDayHolidays.map((h) => (
               <div key={h.date + h.name} className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-sm text-primary">
-                <Flag className="size-4 shrink-0" />
+                <Flag className="size-4 shrink-0" aria-hidden="true" />
                 <span className="font-medium">{h.localName}</span>
                 {h.localName !== h.name ? <span className="text-primary/70">({h.name})</span> : null}
               </div>
@@ -341,12 +342,12 @@ export function AdminEventCalendar({
               <div key={e.id} className="rounded-lg border border-border p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", TASK_META.chip)}>
+                    <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", TASK_META.chip)} aria-hidden="true">
                       <CalendarClock className="size-4" />
                     </span>
-                    <div>
-                      <p className="font-medium">{e.title}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="min-w-0">
+                      <p className="font-medium break-words">{e.title}</p>
+                      <p className="text-xs text-muted-foreground tabular-nums">
                         {format(parseISO(e.start_at), "HH:mm")} – {format(parseISO(e.end_at), "HH:mm")}
                       </p>
                     </div>
@@ -361,22 +362,22 @@ export function AdminEventCalendar({
                         aria-label="Delete event"
                         size="icon"
                         variant="outline"
-                        className="size-8 text-destructive hover:text-destructive"
+                        className="text-destructive hover:text-destructive"
                       >
-                        <Trash2 className="size-3.5" />
+                        <Trash2 aria-hidden="true" />
                       </ConfirmButton>
                     </form>
                   </div>
                 </div>
                 {e.location ? (
                   <p className="mt-2 flex items-center gap-1.5 border-t border-border pt-2 text-sm text-muted-foreground">
-                    <MapPin className="size-3.5" /> {e.location}
+                    <MapPin className="size-3.5 shrink-0" aria-hidden="true" /> {e.location}
                   </p>
                 ) : null}
                 {e.description ? <p className="mt-1.5 text-sm text-muted-foreground">{e.description}</p> : null}
                 {e.reminder_minutes_before != null ? (
                   <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Bell className="size-3.5" /> Notify {e.reminder_minutes_before} minute
+                    <Bell className="size-3.5" aria-hidden="true" /> Notify {e.reminder_minutes_before} minute
                     {e.reminder_minutes_before === 1 ? "" : "s"} before
                   </p>
                 ) : null}
@@ -389,42 +390,42 @@ export function AdminEventCalendar({
                 <div key={`${e.kind}-${e.id}`} className="rounded-lg border border-border p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", meta.chip)}>
+                      <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", meta.chip)} aria-hidden="true">
                         <Icon className="size-4" />
                       </span>
-                      <div>
-                        <p className="font-medium">{e.title}</p>
-                        <p className="text-xs text-muted-foreground">
+                      <div className="min-w-0">
+                        <p className="font-medium break-words">{e.title}</p>
+                        <p className="text-xs text-muted-foreground tabular-nums">
                           {format(parseISO(e.startDate), "d MMM")}
                           {e.endDate !== e.startDate ? ` – ${format(parseISO(e.endDate), "d MMM yyyy")}` : ""}
                         </p>
                       </div>
                     </div>
-                    <Badge className={cn("border-transparent capitalize", STATUS_STYLES[e.status] ?? "bg-muted text-muted-foreground")}>
-                      {e.status.replace("_", " ")}
+                    <Badge variant={statusBadgeVariant(e.status, STATUS_OVERRIDES)} className="capitalize">
+                      {e.status.replaceAll("_", " ")}
                     </Badge>
                   </div>
 
                   <div className="mt-3 space-y-1.5 border-t border-border pt-3 text-sm">
                     <p className="font-medium">{e.customerName ?? "Unknown customer"}</p>
                     {e.customerPhone ? (
-                      <a href={`tel:${e.customerPhone}`} className="flex items-center gap-1.5 text-primary hover:underline">
-                        <Phone className="size-3.5" /> {e.customerPhone}
+                      <a href={`tel:${e.customerPhone}`} className="flex w-fit items-center gap-1.5 text-primary hover:underline">
+                        <Phone className="size-3.5" aria-hidden="true" /> {e.customerPhone}
                       </a>
                     ) : null}
                     {e.customerEmail ? (
-                      <a href={`mailto:${e.customerEmail}`} className="flex items-center gap-1.5 text-primary hover:underline">
-                        <Mail className="size-3.5" /> {e.customerEmail}
+                      <a href={`mailto:${e.customerEmail}`} className="flex w-fit items-center gap-1.5 break-all text-primary hover:underline">
+                        <Mail className="size-3.5 shrink-0" aria-hidden="true" /> {e.customerEmail}
                       </a>
                     ) : null}
                     {e.location ? (
                       <p className="flex items-center gap-1.5 text-muted-foreground">
-                        <MapPin className="size-3.5" /> {e.location}
+                        <MapPin className="size-3.5 shrink-0" aria-hidden="true" /> {e.location}
                       </p>
                     ) : null}
                   </div>
 
-                  <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2 border-t border-border pt-3 text-xs">
+                  <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1.5 border-t border-border pt-3 text-xs sm:grid-cols-2">
                     {e.detail.map((d) => (
                       <div key={d.label} className="min-w-0">
                         <dt className="text-muted-foreground">{d.label}</dt>
@@ -433,8 +434,8 @@ export function AdminEventCalendar({
                     ))}
                     <div>
                       <dt className="text-muted-foreground">Price</dt>
-                      <dd className="font-medium">
-                        {e.currency} {e.price.toFixed(2)}
+                      <dd className="font-medium tabular-nums">
+                        {money(e.price, e.currency)}
                       </dd>
                     </div>
                   </dl>

@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CalendarCheck2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { PageHeader } from "@/components/ui/page-header";
+import { FilterChips } from "@/components/dashboard/filter-chips";
 import { countryFlag } from "@/lib/countries";
 import { cn } from "@/lib/utils";
 import { getUpcomingVisaAppointments } from "@/modules/visa/case-queries";
@@ -36,10 +40,13 @@ function Row({ a, canManage }: { a: Appt; canManage: boolean }) {
         {formatInZone(a.scheduled_at, tz).split(", ").at(-1)}
       </time>
       <div className="min-w-0 flex-1">
-        <Link href={`/admin/visa/${a.application_id}?tab=appointments`} className="font-medium hover:text-primary">
+        <Link
+          href={`/admin/visa/${a.application_id}?tab=appointments`}
+          className="rounded-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
           {traveler.full_name ?? "Applicant"}
         </Link>
-        <p className="text-xs text-muted-foreground">
+        <p className="truncate text-xs text-muted-foreground">
           <span className="font-mono">{a.application?.application_ref}</span> ·{" "}
           <span aria-hidden>{countryFlag(a.application?.visa_type?.destination_country_code ?? "")}</span>{" "}
           {a.application?.visa_type?.name}
@@ -49,7 +56,7 @@ function Row({ a, canManage }: { a: Appt; canManage: boolean }) {
         <Badge variant="outline">{APPOINTMENT_TYPE_LABELS[a.appointment_type]}</Badge>
         {a.biometrics_required ? <Badge variant="outline">Biometrics</Badge> : null}
       </div>
-      <p className="w-48 truncate text-sm text-muted-foreground">
+      <p className="w-full truncate text-sm text-muted-foreground sm:w-48">
         {a.centre?.name}
         {a.confirmation_number ? ` · ${a.confirmation_number}` : ""}
       </p>
@@ -82,36 +89,38 @@ export default async function VisaAppointmentsPage({ searchParams }: { searchPar
     days.set(key, [...(days.get(key) ?? []), a]);
   }
 
+  const chips = [{ key: "", label: "All centres", href: "/admin/visa/appointments", count: all.length }].concat(
+    centres.map((c) => ({
+      key: c.id,
+      label: c.name,
+      href: `/admin/visa/appointments?centre=${c.id}`,
+      count: all.filter((a) => a.centre_id === c.id).length,
+    }))
+  );
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-heading text-2xl font-semibold">Visa appointments</h1>
-        {centres.length > 1 ? (
-          <nav aria-label="Centres" className="flex flex-wrap gap-1.5">
-            {[{ id: "", name: "All centres" }, ...centres].map((c) => {
-              const active = (centre ?? "") === c.id;
-              return (
-                <Link
-                  key={c.id || "all"}
-                  href={c.id ? `/admin/visa/appointments?centre=${c.id}` : "/admin/visa/appointments"}
-                  className={cn(
-                    "inline-flex h-7 items-center rounded-full border px-3 text-xs font-medium transition-colors",
-                    active ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {c.name}
-                </Link>
-              );
-            })}
-          </nav>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Visa appointments"
+        status={
+          <Badge variant="neutral" className="tabular-nums">
+            {list.length}
+          </Badge>
+        }
+      />
+
+      {centres.length > 1 ? <FilterChips items={chips} active={centre ?? ""} label="Filter by centre" /> : null}
 
       {overdue.length > 0 ? (
         <section className="space-y-3">
-          <h2 className="font-heading text-base font-semibold text-destructive">Outcome not recorded</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-base font-semibold">Outcome not recorded</h2>
+            <Badge variant="destructive" className="tabular-nums">
+              {overdue.length}
+            </Badge>
+          </div>
           <Card className="py-0">
-            <CardContent className="px-4">
+            <CardContent className="px-4 sm:px-6">
               <ul className="divide-y divide-border">
                 {overdue.map((a) => (
                   <Row key={a.id} a={a} canManage={canManage} />
@@ -124,19 +133,25 @@ export default async function VisaAppointmentsPage({ searchParams }: { searchPar
 
       {days.size === 0 && overdue.length === 0 ? (
         <Card>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">No upcoming appointments.</p>
-          </CardContent>
+          <Empty>
+            <EmptyMedia variant="icon">
+              <CalendarCheck2 />
+            </EmptyMedia>
+            <EmptyTitle>No upcoming appointments</EmptyTitle>
+          </Empty>
         </Card>
       ) : null}
 
       {[...days.entries()].map(([key, items]) => (
         <section key={key} className="space-y-3">
-          <h2 className="font-heading text-base font-semibold">
-            {dayLabel(key)} <span className="font-normal text-muted-foreground tabular-nums">· {items.length}</span>
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-base font-semibold">{dayLabel(key)}</h2>
+            <Badge variant="neutral" className="tabular-nums">
+              {items.length}
+            </Badge>
+          </div>
           <Card className="py-0">
-            <CardContent className="px-4">
+            <CardContent className="px-4 sm:px-6">
               <ul className="divide-y divide-border">
                 {items.map((a) => (
                   <Row key={a.id} a={a} canManage={canManage} />

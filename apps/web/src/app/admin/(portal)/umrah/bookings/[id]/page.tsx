@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Download } from "lucide-react";
 import { BackLink } from "@/components/back-link";
-import { Badge } from "@/components/ui/badge";
+import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 import { getUmrahBookingAdmin } from "@/modules/umrah/fulfillment-admin-queries";
 import { formatMoney } from "@/modules/umrah/pricing";
 import {
@@ -29,26 +30,10 @@ import { PilgrimEditor } from "@/modules/umrah/components/pilgrim-editor";
 import { HotelStayList, ItineraryList, contactLine } from "@/modules/umrah/components/travel-details";
 import { CITY_LABEL } from "@/modules/umrah/itinerary";
 import { HAND_IN_LABEL, REVIEW_STATUS_LABEL, type HandInType } from "@/modules/umrah/readiness";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Umrah Booking" };
 
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex items-baseline gap-1.5">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-semibold text-foreground">{value}</dd>
-    </div>
-  );
-}
-
-function Divider() {
-  return (
-    <span aria-hidden className="text-border">
-      ·
-    </span>
-  );
-}
+const REVIEW_VARIANT = { accepted: "success", rejected: "destructive", pending: "warning" } as const;
 
 function FlightLeg({
   label,
@@ -69,7 +54,7 @@ function FlightLeg({
       <dd className="text-sm font-medium">
         {[airline, flightNumber].filter(Boolean).join(" ") || "—"}
       </dd>
-      <dd className="text-xs text-muted-foreground">
+      <dd className="text-xs text-muted-foreground tabular-nums">
         {formatFlightTime(departsAt)} → {formatFlightTime(arrivesAt)}
       </dd>
     </div>
@@ -113,70 +98,59 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
       ? `${formatDay(booking.custom_request.departure_date)} · ${booking.custom_request.nights_makkah} nights Makkah / ${booking.custom_request.nights_madinah} nights Madinah`
       : null;
 
+  const meta = [
+    reference ? title : null,
+    dates,
+    booking.order?.guest
+      ? `${booking.order.guest.full_name} · booked by ${booking.booker?.full_name ?? booking.customer?.full_name ?? "agent"}`
+      : (booking.customer?.full_name ?? booking.customer?.email ?? "Customer"),
+    booking.customer?.email && booking.customer.full_name ? booking.customer.email : null,
+    booking.customer?.phone ?? null,
+    booking.agency?.name ?? null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <div className="space-y-8">
-      <div className="space-y-4">
-        <div>
-          <BackLink href="/admin/umrah/bookings" label="All Umrah bookings" className="mb-3" />
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight">{reference ?? title}</h1>
-            <Badge variant="secondary" className="capitalize">
-              {booking.booking_kind}
-            </Badge>
-            <StageBadge stage={booking.fulfillment_stage} />
-            {closed ? (
-              <Badge className="border-transparent bg-destructive/10 text-destructive capitalize">{booking.status}</Badge>
-            ) : null}
+      <div className="space-y-5">
+        <BackLink href="/admin/umrah/bookings" label="All Umrah bookings" />
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{reference ?? title}</h1>
+              <Badge variant="neutral" className="capitalize">
+                {booking.booking_kind}
+              </Badge>
+              <StageBadge stage={booking.fulfillment_stage} />
+              {closed ? (
+                <Badge variant={statusBadgeVariant(booking.status)} className="capitalize">
+                  {booking.status}
+                </Badge>
+              ) : null}
+            </div>
+            <p className="text-sm text-muted-foreground tabular-nums">{meta}</p>
           </div>
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-            <span>{title}</span>
-            {dates ? (
-              <>
-                <Divider />
-                <span>{dates}</span>
-              </>
-            ) : null}
-            <Divider />
-            <span>
-              {booking.order?.guest
-                ? `${booking.order.guest.full_name} · booked by ${booking.booker?.full_name ?? booking.customer?.full_name ?? "agent"}`
-                : (booking.customer?.full_name ?? booking.customer?.email ?? "Customer")}
-            </span>
-            {booking.customer?.email && booking.customer.full_name ? (
-              <>
-                <Divider />
-                <span>{booking.customer.email}</span>
-              </>
-            ) : null}
-            {booking.customer?.phone ? (
-              <>
-                <Divider />
-                <span>{booking.customer.phone}</span>
-              </>
-            ) : null}
-            {booking.agency?.name ? (
-              <>
-                <Divider />
-                <span>{booking.agency.name}</span>
-              </>
-            ) : null}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-secondary/40 px-4 py-3">
-          <dl className="flex flex-1 flex-wrap gap-x-8 gap-y-2 text-sm">
-            <Stat label="Pilgrims" value={booking.num_pilgrims} />
-            <Stat label="Total" value={formatMoney(order?.total ?? booking.total_price, booking.currency)} />
-            {order ? <Stat label="Paid" value={formatMoney(order.paid, order.currency)} /> : null}
-            {order && order.balance > 0 ? <Stat label="Balance" value={formatMoney(order.balance, order.currency)} /> : null}
-            {order?.balance_due_at && order.balance > 0 ? <Stat label="Due by" value={formatDay(order.balance_due_at)} /> : null}
-            <Stat label="Payment" value={order ? (ORDER_STATUS_LABELS[order.status] ?? order.status) : "No order"} />
-            {booking.room_sharing ? <Stat label="Room sharing" value={`${booking.room_sharing} per room`} /> : null}
-          </dl>
           {order && order.balance > 0 && ["pending_payment", "held", "partially_paid"].includes(order.status) ? (
-            <RecordPaymentDialog orderId={order.id} remaining={order.balance} currency={order.currency} />
+            <div className="flex shrink-0 items-center gap-2">
+              <RecordPaymentDialog orderId={order.id} remaining={order.balance} currency={order.currency} />
+            </div>
           ) : null}
-        </div>
+        </header>
+
+        <StatRail className="lg:grid-cols-6">
+          <StatRailItem label="Pilgrims" value={booking.num_pilgrims} />
+          <StatRailItem label="Total" value={formatMoney(order?.total ?? booking.total_price, booking.currency)} />
+          <StatRailItem label="Paid" value={order ? formatMoney(order.paid, order.currency) : "—"} />
+          <StatRailItem
+            label="Balance"
+            value={order ? formatMoney(order.balance, order.currency) : "—"}
+            sub={order?.balance_due_at && order.balance > 0 ? `Due ${formatDay(order.balance_due_at)}` : undefined}
+            tone={order && order.balance > 0 ? "warn" : undefined}
+          />
+          <StatRailItem label="Payment" value={order ? (ORDER_STATUS_LABELS[order.status] ?? order.status) : "No order"} />
+          <StatRailItem label="Room sharing" value={booking.room_sharing ? `${booking.room_sharing} per room` : "—"} />
+        </StatRail>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -185,7 +159,6 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-heading text-base font-semibold">Stage</h2>
               <div className="flex items-center gap-2">
-                <StageBadge stage={booking.fulfillment_stage} />
                 {!closed && booking.status !== "completed" && booking.fulfillment_stage !== "completed" ? (
                   <CancelBookingButton bookingId={booking.id} paid={order?.paid ?? 0} currency={booking.currency} />
                 ) : null}
@@ -201,7 +174,7 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
           <CardContent className="space-y-3">
             <h2 className="font-heading text-base font-semibold">Stage history</h2>
             {booking.history.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No stage changes yet.</p>
+              <p className="text-sm text-muted-foreground">No stage changes</p>
             ) : (
               <ol className="divide-y divide-border">
                 {booking.history.map((h) => (
@@ -210,7 +183,7 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
                       <p className="font-medium">{UMRAH_STAGE_LABELS[h.stage]}</p>
                       {h.note ? <p className="text-muted-foreground">{h.note}</p> : null}
                     </div>
-                    <p className="shrink-0 text-xs text-muted-foreground">
+                    <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
                       {h.actor?.full_name ?? h.actor?.email ?? "System"} ·{" "}
                       {new Date(h.created_at).toLocaleString(undefined, {
                         day: "numeric",
@@ -264,16 +237,16 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
           <SegmentDialog bookingId={booking.id} />
         </div>
         {travel && travel.segments.length > 0 ? (
-          <Card className="overflow-hidden py-0">
+          <Card className="gap-0 overflow-hidden py-0">
             <ul className="divide-y divide-border">
               {travel.segments.map((segment) => (
                 <li key={segment.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                  <Badge variant="secondary" className="capitalize">
+                  <Badge variant="neutral" className="capitalize">
                     {segment.kind}
                   </Badge>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{segment.title}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground tabular-nums">
                       {[
                         segment.provider,
                         segment.reference,
@@ -291,7 +264,11 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
               ))}
             </ul>
           </Card>
-        ) : null}
+        ) : (
+          <Card className="py-0">
+            <p className="px-5 py-6 text-sm text-muted-foreground">No travel segments</p>
+          </Card>
+        )}
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -302,7 +279,7 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
               travel && travel.hotels.length > 0 ? (
                 <HotelStayList hotels={travel.hotels} />
               ) : (
-                <p className="px-5 py-6 text-sm text-muted-foreground">No hotels on this package.</p>
+                <p className="px-5 py-6 text-sm text-muted-foreground">No hotels on this package</p>
               )
             ) : booking.serviceLines.length > 0 ? (
               <ul className="divide-y divide-border">
@@ -317,7 +294,7 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
                 ))}
               </ul>
             ) : (
-              <p className="px-5 py-6 text-sm text-muted-foreground">No services.</p>
+              <p className="px-5 py-6 text-sm text-muted-foreground">No services</p>
             )}
           </Card>
         </section>
@@ -326,17 +303,17 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-heading text-base font-semibold">Day by day</h2>
             {itinerary?.warnings.includes("nights_mismatch") ? (
-              <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Hotel nights do not match the dates</Badge>
+              <Badge variant="warning">Hotel nights do not match the dates</Badge>
             ) : null}
             {itinerary?.warnings.includes("days_mismatch") ? (
-              <Badge className="border-transparent bg-brand-gold/15 text-brand-gold">Day plan does not match the duration</Badge>
+              <Badge variant="warning">Day plan does not match the duration</Badge>
             ) : null}
           </div>
           <Card className="overflow-hidden py-0">
             {itinerary ? (
               <ItineraryList itinerary={itinerary} />
             ) : (
-              <p className="px-5 py-6 text-sm text-muted-foreground">No departure date.</p>
+              <p className="px-5 py-6 text-sm text-muted-foreground">No departure date</p>
             )}
             {contact ? <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">{contact}</p> : null}
           </Card>
@@ -347,7 +324,7 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
         <h2 className="font-heading text-base font-semibold">Pilgrims</h2>
         <Card className="overflow-hidden py-0">
           {booking.pilgrims.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-muted-foreground">No pilgrim details yet.</p>
+            <p className="px-5 py-6 text-sm text-muted-foreground">No pilgrim details</p>
           ) : (
             <PilgrimEditor pilgrims={booking.pilgrims} readiness={booking.readiness} editable variant="table" />
           )}
@@ -366,34 +343,24 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
                       {HAND_IN_LABEL[doc.doc_type as HandInType] ?? doc.doc_type}
                       {doc.pilgrim_id ? ` · ${pilgrimName.get(doc.pilgrim_id) ?? "Pilgrim"}` : ""}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground">
+                    <p className="truncate text-xs text-muted-foreground tabular-nums">
                       {[doc.file_size ? formatFileSize(doc.file_size) : null, new Date(doc.created_at).toLocaleDateString(), doc.review_note]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
                   </div>
-                  <Badge
-                    className={cn(
-                      "border-transparent",
-                      doc.review_status === "accepted"
-                        ? "bg-primary/10 text-primary"
-                        : doc.review_status === "rejected"
-                          ? "bg-destructive/10 text-destructive"
-                          : "bg-brand-gold/15 text-brand-gold"
-                    )}
-                  >
+                  <Badge variant={REVIEW_VARIANT[doc.review_status as keyof typeof REVIEW_VARIANT] ?? "warning"}>
                     {REVIEW_STATUS_LABEL[doc.review_status] ?? doc.review_status}
                   </Badge>
                   {doc.url ? (
                     <Button
                       size="icon"
-                      variant="outline"
-                      className="size-8"
+                      variant="ghost"
                       aria-label={`Download ${doc.title}`}
                       nativeButton={false}
                       render={<a href={doc.url} target="_blank" rel="noopener noreferrer" />}
                     >
-                      <Download className="size-3.5" />
+                      <Download />
                     </Button>
                   ) : null}
                   {doc.review_status === "pending" ? <ReviewDocumentButtons documentId={doc.id} /> : null}
@@ -418,14 +385,14 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
           <Card>
             <CardContent>
               {booking.documents.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No documents uploaded.</p>
+                <p className="text-sm text-muted-foreground">No documents</p>
               ) : (
                 <ul className="divide-y divide-border">
                   {booking.documents.map((doc) => (
                     <li key={doc.id} className="flex items-center justify-between gap-3 py-2.5">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{doc.title}</p>
-                        <p className="truncate text-xs text-muted-foreground">
+                        <p className="truncate text-xs text-muted-foreground tabular-nums">
                           {UMRAH_DOC_TYPE_LABELS[doc.doc_type as UmrahDocType] ?? doc.doc_type}
                           {doc.pilgrim_id ? ` · ${pilgrimName.get(doc.pilgrim_id) ?? "Pilgrim"}` : ""}
                           {doc.file_size ? ` · ${formatFileSize(doc.file_size)}` : ""} ·{" "}
@@ -436,13 +403,12 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
                         {doc.url ? (
                           <Button
                             size="icon"
-                            variant="outline"
-                            className="size-8"
+                            variant="ghost"
                             aria-label={`Download ${doc.title}`}
                             nativeButton={false}
                             render={<a href={doc.url} target="_blank" rel="noopener noreferrer" />}
                           >
-                            <Download className="size-3.5" />
+                            <Download />
                           </Button>
                         ) : null}
                         <DeleteDocumentButton documentId={doc.id} title={doc.title} />

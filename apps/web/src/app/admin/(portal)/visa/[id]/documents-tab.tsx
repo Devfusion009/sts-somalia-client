@@ -1,9 +1,10 @@
-import { Check, ExternalLink, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Check, ExternalLink, FileStack, X } from "lucide-react";
+import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/badge";
+import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 import { adminResolveDocumentRequest } from "@/modules/visa/admin-actions";
 import { DocumentStatusBadge } from "@/modules/visa/components/visa-shared";
 import type { VisaCase } from "@/modules/visa/case-queries";
@@ -23,7 +24,7 @@ function ViewButton({ doc }: { doc: Doc }) {
       title="Open"
       render={<a href={`/api/visa/documents/${doc.id}`} target="_blank" rel="noopener noreferrer" />}
     >
-      <ExternalLink className="size-3.5" />
+      <ExternalLink />
     </Button>
   );
 }
@@ -36,26 +37,34 @@ function SlotRow({ slot, applicationId, reviewable }: { slot: Slot; applicationI
     <li className="space-y-2 py-3.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-2 text-sm font-medium">
+          <p className="flex items-center gap-1 text-sm font-medium">
             {slot.label}
-            {slot.required ? <span className="text-destructive" aria-label="required">*</span> : null}
+            {slot.required ? (
+              <span className="text-destructive" aria-label="required">
+                *
+              </span>
+            ) : null}
           </p>
           {current ? (
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="truncate text-xs text-muted-foreground tabular-nums">
               v{current.version} · {current.file_name ?? "file"}
               {formatBytes(current.file_size) ? ` · ${formatBytes(current.file_size)}` : ""} · {formatWhen(current.created_at)}
             </p>
           ) : null}
         </div>
-        {slot.staff ? null : <DocumentStatusBadge status={current ? current.review_status : "missing"} />}
-        {current ? <ViewButton doc={current} /> : null}
-        {current && reviewable && !slot.staff && current.review_status !== "rejected" ? (
-          <DocumentReviewControls
-            documentId={current.id}
-            applicationId={applicationId}
-            reviewStatus={current.review_status}
-          />
-        ) : null}
+        <div className="flex items-center gap-1">
+          {slot.staff ? null : (
+            <DocumentStatusBadge status={current ? current.review_status : "missing"} className="mr-1" />
+          )}
+          {current ? <ViewButton doc={current} /> : null}
+          {current && reviewable && !slot.staff && current.review_status !== "rejected" ? (
+            <DocumentReviewControls
+              documentId={current.id}
+              applicationId={applicationId}
+              reviewStatus={current.review_status}
+            />
+          ) : null}
+        </div>
       </div>
 
       {current?.review_status === "rejected" && current.rejection_reason ? (
@@ -64,14 +73,14 @@ function SlotRow({ slot, applicationId, reviewable }: { slot: Slot; applicationI
 
       {older.length > 0 ? (
         <details className="group text-xs">
-          <summary className="cursor-pointer text-muted-foreground select-none hover:text-foreground">
+          <summary className="w-fit cursor-pointer rounded-sm text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
             {older.length} earlier {older.length === 1 ? "version" : "versions"}
           </summary>
-          <ul className="mt-2 divide-y divide-border rounded-md bg-secondary/40 px-3">
+          <ul className="mt-2 divide-y divide-border rounded-lg bg-secondary/40 px-3">
             {older.map((doc) => (
               <li key={doc.id} className="flex items-center gap-3 py-2">
                 <span className="w-7 font-mono text-muted-foreground">v{doc.version}</span>
-                <span className="min-w-0 flex-1 truncate">
+                <span className="min-w-0 flex-1 truncate tabular-nums">
                   {doc.file_name ?? "file"} · {formatWhen(doc.created_at)}
                   {doc.rejection_reason ? <span className="text-destructive"> · {doc.rejection_reason}</span> : null}
                 </span>
@@ -86,11 +95,10 @@ function SlotRow({ slot, applicationId, reviewable }: { slot: Slot; applicationI
   );
 }
 
-const REQUEST_STYLES: Record<string, string> = {
-  requested: "bg-brand-gold/15 text-brand-gold",
-  uploaded: "bg-chart-3/10 text-chart-3",
-  received: "bg-primary/10 text-primary",
-  waived: "bg-muted text-muted-foreground",
+const REQUEST_VARIANT: Partial<Record<string, BadgeVariant>> = {
+  uploaded: "info",
+  received: "success",
+  waived: "neutral",
 };
 
 export function DocumentsTab({ data, reviewable }: { data: VisaCase; reviewable: boolean }) {
@@ -105,13 +113,22 @@ export function DocumentsTab({ data, reviewable }: { data: VisaCase; reviewable:
           Documents
         </SectionHeading>
         <Card className="py-0">
-          <CardContent className="px-4">
-            <ul className="divide-y divide-border">
-              {slots.map((slot) => (
-                <SlotRow key={slot.key} slot={slot} applicationId={application.id} reviewable={reviewable} />
-              ))}
-            </ul>
-          </CardContent>
+          {slots.length === 0 ? (
+            <Empty>
+              <EmptyMedia variant="icon">
+                <FileStack />
+              </EmptyMedia>
+              <EmptyTitle>No documents</EmptyTitle>
+            </Empty>
+          ) : (
+            <CardContent className="px-4 sm:px-6">
+              <ul className="divide-y divide-border">
+                {slots.map((slot) => (
+                  <SlotRow key={slot.key} slot={slot} applicationId={application.id} reviewable={reviewable} />
+                ))}
+              </ul>
+            </CardContent>
+          )}
         </Card>
       </section>
 
@@ -146,9 +163,9 @@ export function DocumentsTab({ data, reviewable }: { data: VisaCase; reviewable:
                           {request.description ? ` · ${request.description}` : ""}
                         </p>
                       </TableCell>
-                      <TableCell className="text-sm">{formatDay(request.due_date)}</TableCell>
+                      <TableCell className="whitespace-nowrap tabular-nums">{formatDay(request.due_date)}</TableCell>
                       <TableCell>
-                        <Badge className={cn("border-transparent capitalize", REQUEST_STYLES[request.status])}>
+                        <Badge variant={statusBadgeVariant(request.status, REQUEST_VARIANT)} className="capitalize">
                           {request.status}
                         </Badge>
                       </TableCell>
@@ -169,17 +186,23 @@ export function DocumentsTab({ data, reviewable }: { data: VisaCase; reviewable:
                               <input type="hidden" name="requestId" value={request.id} />
                               <input type="hidden" name="applicationId" value={application.id} />
                               <input type="hidden" name="resolution" value="received" />
-                              <Button size="icon-sm" variant="outline" type="submit" aria-label="Mark received" title="Mark received">
-                                <Check className="size-3.5 text-primary" />
-                              </Button>
+                              <SubmitButton
+                                size="icon-sm"
+                                variant="outline"
+                                aria-label="Mark received"
+                                title="Mark received"
+                                pendingText=""
+                              >
+                                <Check className="text-primary" />
+                              </SubmitButton>
                             </form>
                             <form action={adminResolveDocumentRequest}>
                               <input type="hidden" name="requestId" value={request.id} />
                               <input type="hidden" name="applicationId" value={application.id} />
                               <input type="hidden" name="resolution" value="waived" />
-                              <Button size="icon-sm" variant="ghost" type="submit" aria-label="Waive" title="Waive">
-                                <X className="size-3.5" />
-                              </Button>
+                              <SubmitButton size="icon-sm" variant="ghost" aria-label="Waive" title="Waive" pendingText="">
+                                <X />
+                              </SubmitButton>
                             </form>
                           </div>
                         ) : null}

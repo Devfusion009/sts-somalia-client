@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
@@ -19,6 +19,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { useRestoreOnError } from "@/lib/use-restore-on-error";
 import type { ActionState } from "@/lib/auth/actions";
 import { createUmrahDeparture, deleteUmrahDeparture, updateUmrahDeparture } from "@/modules/admin/actions";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 export type DepartureRow = {
   id: string;
@@ -74,10 +75,10 @@ function FlightFields({
 }) {
   return (
     <fieldset className="space-y-3">
-      <legend className="mb-1 text-sm font-semibold">{label}</legend>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor={`${prefix}Airline`}>Airline</Label>
+      <legend className="mb-1 font-heading text-sm font-semibold">{label}</legend>
+      <div className="grid grid-cols-2 gap-4">
+        <Field>
+          <FieldLabel htmlFor={`${prefix}Airline`}>Airline</FieldLabel>
           <Input
             id={`${prefix}Airline`}
             name={`${prefix}Airline`}
@@ -85,34 +86,34 @@ function FlightFields({
             list={airlinesListId}
             defaultValue={departure?.[`${prefix}_airline`] ?? ""}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={`${prefix}FlightNumber`}>Flight number</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`${prefix}FlightNumber`}>Flight number</FieldLabel>
           <Input
             id={`${prefix}FlightNumber`}
             name={`${prefix}FlightNumber`}
             maxLength={20}
             defaultValue={departure?.[`${prefix}_flight_number`] ?? ""}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={`${prefix}DepartsAt`}>Departs</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`${prefix}DepartsAt`}>Departs</FieldLabel>
           <Input
             id={`${prefix}DepartsAt`}
             name={`${prefix}DepartsAt`}
             type="datetime-local"
             defaultValue={toLocalInput(departure?.[`${prefix}_departs_at`] ?? null)}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={`${prefix}ArrivesAt`}>Arrives</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`${prefix}ArrivesAt`}>Arrives</FieldLabel>
           <Input
             id={`${prefix}ArrivesAt`}
             name={`${prefix}ArrivesAt`}
             type="datetime-local"
             defaultValue={toLocalInput(departure?.[`${prefix}_arrives_at`] ?? null)}
           />
-        </div>
+        </Field>
       </div>
     </fieldset>
   );
@@ -143,12 +144,12 @@ export function DepartureDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {departure ? (
-        <DialogTrigger render={<Button size="icon" variant="outline" className="size-8" aria-label="Edit departure" />}>
-          <Pencil className="size-3.5" />
+        <DialogTrigger render={<Button size="icon" variant="ghost" aria-label="Edit departure" title="Edit" />}>
+          <Pencil />
         </DialogTrigger>
       ) : (
         <DialogTrigger render={<Button size="sm" />}>
-          <Plus /> Add departure
+          <Plus aria-hidden="true" /> Add departure
         </DialogTrigger>
       )}
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
@@ -164,9 +165,9 @@ export function DepartureDialog({
             </Alert>
           ) : null}
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="departureDate">Departure date</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <Field>
+              <FieldLabel htmlFor="departureDate">Departure date</FieldLabel>
               <Input
                 id="departureDate"
                 name="departureDate"
@@ -174,39 +175,41 @@ export function DepartureDialog({
                 defaultValue={departure?.departure_date ?? ""}
                 required
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="returnDate">Return date</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="returnDate">Return date</FieldLabel>
               <Input id="returnDate" name="returnDate" type="date" defaultValue={departure?.return_date ?? ""} required />
-            </div>
+            </Field>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="totalSeats">Total seats</Label>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Field>
+              <FieldLabel htmlFor="totalSeats">Total seats</FieldLabel>
               <Input
                 id="totalSeats"
                 name="totalSeats"
                 type="number"
                 min={Math.max(1, departure?.booked_seats ?? 1)}
                 defaultValue={departure?.total_seats ?? 40}
+                className="tabular-nums"
                 required
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="offlineSeats">Sold offline</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="offlineSeats">Sold offline</FieldLabel>
               <Input
                 id="offlineSeats"
                 name="offlineSeats"
                 type="number"
                 min={0}
                 defaultValue={departure?.offline_seats ?? 0}
+                className="tabular-nums"
                 required
               />
-            </div>
+            </Field>
             {hasRateCard ? null : (
-              <div className="space-y-1.5">
-                <Label htmlFor="priceOverride">Price override ({currency})</Label>
+              <Field>
+                <FieldLabel htmlFor="priceOverride">Price override ({currency})</FieldLabel>
                 <Input
                   id="priceOverride"
                   name="priceOverride"
@@ -214,15 +217,16 @@ export function DepartureDialog({
                   min={0}
                   step="0.01"
                   placeholder="Package price"
+                  className="tabular-nums"
                   defaultValue={departure?.price_override ?? ""}
                 />
-              </div>
+              </Field>
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="salesCloseDays">Sales close (days before departure)</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <Field>
+              <FieldLabel htmlFor="salesCloseDays">Sales close (days before)</FieldLabel>
               <Input
                 id="salesCloseDays"
                 name="salesCloseDays"
@@ -232,20 +236,20 @@ export function DepartureDialog({
                 placeholder="0"
                 defaultValue={departure?.sales_close_days ?? 0}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="departureStatus">Sales</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="departureStatus">Sales</FieldLabel>
               <select
                 id="departureStatus"
                 name="status"
                 defaultValue={departure?.status === "closed" ? "closed" : "open"}
                 disabled={departure?.status === "cancelled"}
-                className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className={NATIVE_SELECT_CLASS}
               >
                 <option value="open">Open</option>
                 <option value="closed">Closed</option>
               </select>
-            </div>
+            </Field>
           </div>
 
           <datalist id={airlinesListId}>
@@ -256,8 +260,8 @@ export function DepartureDialog({
           <FlightFields prefix="outbound" label="Outbound flight" departure={departure} airlinesListId={airlinesListId} />
           <FlightFields prefix="return" label="Return flight" departure={departure} airlinesListId={airlinesListId} />
 
-          <div className="space-y-1.5">
-            <Label htmlFor="baggageNote">Baggage</Label>
+          <Field>
+            <FieldLabel htmlFor="baggageNote">Baggage</FieldLabel>
             <Input
               id="baggageNote"
               name="baggageNote"
@@ -265,9 +269,14 @@ export function DepartureDialog({
               placeholder="e.g. 2 × 23kg checked, 7kg cabin"
               defaultValue={departure?.baggage_note ?? ""}
             />
-          </div>
+          </Field>
 
-          <SubmitButton pendingText="Saving…">{departure ? "Save changes" : "Add departure"}</SubmitButton>
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <SubmitButton pendingText="Saving…">{departure ? "Save changes" : "Add departure"}</SubmitButton>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
@@ -283,12 +292,13 @@ export function DeleteDepartureButton({ departureId, label }: { departureId: str
     <>
       <Button
         size="icon"
-        variant="outline"
-        className="size-8"
-        aria-label="Delete departure"
+        variant="ghost"
+        className="text-muted-foreground hover:text-destructive"
+        aria-label={`Delete ${label} departure`}
+        title="Delete"
         onClick={() => setOpen(true)}
       >
-        <Trash2 className="size-3.5" />
+        <Trash2 />
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
@@ -297,7 +307,11 @@ export function DeleteDepartureButton({ departureId, label }: { departureId: str
             <AlertDialogHeader>
               <AlertDialogTitle>Delete the {label} departure?</AlertDialogTitle>
             </AlertDialogHeader>
-            {state?.error ? <p className="my-2 text-xs text-destructive">{state.error}</p> : null}
+            {state?.error ? (
+              <p role="alert" className="my-2 text-xs text-destructive">
+                {state.error}
+              </p>
+            ) : null}
             <AlertDialogFooter className="mt-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel

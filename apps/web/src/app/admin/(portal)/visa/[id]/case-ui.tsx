@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import type { VisaStage } from "@/modules/visa/workflow";
 import { VISA_STAGE_LABELS } from "@/modules/visa/workflow";
 import type { VisaCase } from "@/modules/visa/case-queries";
@@ -24,36 +24,37 @@ export function isCaseTab(value: string | undefined): value is CaseTab {
   return !!value && (CASE_TABS as readonly string[]).includes(value);
 }
 
-const STAGE_STYLES: Record<VisaStage, string> = {
-  draft: "bg-muted text-muted-foreground",
-  submitted: "bg-chart-3/10 text-chart-3",
-  in_review: "bg-brand-gold/15 text-brand-gold",
-  additional_info_required: "bg-brand-accent/10 text-brand-accent",
-  ready_for_processing: "bg-chart-2/10 text-chart-2",
-  processing: "bg-chart-4/10 text-chart-4",
-  approved: "bg-primary/10 text-primary",
-  issued: "bg-primary/10 text-primary",
-  rejected: "bg-destructive/10 text-destructive",
-  cancelled: "bg-muted text-muted-foreground",
+export const STAGE_VARIANT: Record<VisaStage, BadgeVariant> = {
+  draft: "neutral",
+  submitted: "info",
+  in_review: "warning",
+  additional_info_required: "warning",
+  ready_for_processing: "info",
+  processing: "info",
+  approved: "success",
+  issued: "success",
+  rejected: "destructive",
+  cancelled: "neutral",
 };
 
 export function StageBadge({ stage, className }: { stage: VisaStage; className?: string }) {
   return (
-    <Badge className={cn("border-transparent font-semibold", STAGE_STYLES[stage], className)}>
+    <Badge variant={STAGE_VARIANT[stage] ?? "neutral"} className={className}>
       {VISA_STAGE_LABELS[stage]}
     </Badge>
   );
 }
 
+/** One label/value cell of the case header strip (wraps; any number of facts). */
 export function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "danger" | "warn" }) {
   return (
-    <div className="flex items-baseline gap-1.5">
-      <dt className="text-muted-foreground">{label}</dt>
+    <div className="min-w-0">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd
         className={cn(
-          "font-semibold text-foreground",
+          "font-heading text-base font-semibold text-foreground tabular-nums",
           tone === "danger" && "text-destructive",
-          tone === "warn" && "text-brand-gold"
+          tone === "warn" && "text-[color-mix(in_oklch,var(--brand-gold),black_30%)] dark:text-brand-gold"
         )}
       >
         {value}
@@ -66,9 +67,11 @@ export function DetailGrid({ rows }: { rows: Array<[string, string | null | unde
   return (
     <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
       {rows.map(([label, value]) => (
-        <div key={label}>
+        <div key={label} className="min-w-0">
           <dt className="text-xs text-muted-foreground">{label}</dt>
-          <dd className="text-sm font-medium break-words">{value || "—"}</dd>
+          <dd className={cn("mt-0.5 text-sm break-words", value ? "font-medium" : "text-muted-foreground")}>
+            {value || "—"}
+          </dd>
         </div>
       ))}
     </dl>
@@ -85,11 +88,11 @@ export function SectionHeading({ children, action }: { children: React.ReactNode
 }
 
 export function formatWhen(iso: string) {
-  return format(new Date(iso), "dd MMM yyyy, HH:mm");
+  return format(new Date(iso), "d MMM yyyy, HH:mm");
 }
 
 export function formatDay(iso: string | null | undefined) {
-  return iso ? format(new Date(iso), "dd MMM yyyy") : "—";
+  return iso ? format(new Date(iso), "d MMM yyyy") : "—";
 }
 
 export function formatBytes(bytes: number | null | undefined) {
@@ -122,9 +125,7 @@ export function EventList({ events }: { events: CaseEvent[] }) {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {event.customer_visible ? (
-              <Badge variant="outline" className="text-[10px] font-medium">
-                Applicant sees
-              </Badge>
+              <Badge variant="outline">Applicant sees</Badge>
             ) : null}
             <time className="text-xs text-muted-foreground tabular-nums" dateTime={event.created_at}>
               {formatWhen(event.created_at)}
