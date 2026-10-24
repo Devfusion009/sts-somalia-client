@@ -1,43 +1,26 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, Globe2, Headset, PlaneTakeoff, ShieldCheck, Wallet } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/password-input";
-import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
+import { AUTH_CONTROL } from "@/components/auth/auth-frame";
+import { PasswordLabelRow } from "@/components/auth/portal-login-form";
 import { signInAction } from "@/lib/auth/actions";
 import { portalLoginHref } from "@/lib/subdomain";
+import { useRestoreOnError } from "@/lib/use-restore-on-error";
 import { DemoAccountsList, type DemoAccountEntry } from "@/modules/demo/demo-accounts-list";
 
 const AGENT_LOGIN_HREF = portalLoginHref("agent");
 const MANAGER_LOGIN_HREF = portalLoginHref("manager");
 
-const VALUE_PROPS = [
-  {
-    icon: ShieldCheck,
-    title: "Secure by design",
-    description: "Every booking is protected with encrypted payments and verified partners.",
-  },
-  {
-    icon: Headset,
-    title: "Real human support",
-    description: "A Mogadishu-based team is one call away, before and after you travel.",
-  },
-  {
-    icon: Wallet,
-    title: "Transparent pricing",
-    description: "No hidden fees — the price you see at search is the price you pay.",
-  },
-  {
-    icon: Globe2,
-    title: "Local & international",
-    description: "Domestic Somali routes and international journeys, one platform.",
-  },
-];
+const PORTAL_LINK =
+  "inline-flex min-h-11 items-center gap-1 rounded-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 sm:min-h-0";
 
 /**
  * A single plain sign-in — same credentials for every account, personal or
@@ -68,150 +51,100 @@ export function LoginForm({
   demoAccounts?: DemoAccountEntry[];
 }) {
   const [personalState, personalAction] = useActionState(signInAction, null);
+  const formRef = useRef<HTMLFormElement>(null);
+  useRestoreOnError(formRef, personalState);
 
   return (
-    <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl shadow-xl lg:grid-cols-2">
-      <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-primary via-primary to-[color-mix(in_srgb,var(--primary)_60%,black)] p-10 text-primary-foreground lg:flex">
-        {/* Ambient brand-accent glow — warm counterpoint to the cool teal, gives the
-            panel depth instead of a flat fill. */}
-        <div className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-brand-gold/25 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 -left-20 size-80 rounded-full bg-white/10 blur-3xl" />
-
-        {/* Fine dot-grid texture, evoking a world map graticule. */}
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.08]"
-          style={{
-            backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)",
-            backgroundSize: "22px 22px",
-          }}
+    <div className="grid w-full max-w-4xl overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-foreground/[0.08] lg:grid-cols-2">
+      <div className="relative hidden min-h-[36rem] lg:block">
+        <Image
+          src="/about/reception.webp"
+          alt="STS Somalia office reception"
+          fill
+          priority
+          sizes="(min-width: 1024px) 448px, 0px"
+          className="object-cover object-[25%_50%]"
         />
-
-        {/* Dashed flight route connecting two waypoints, plane mid-flight — a
-            quiet travel motif behind the copy, not competing with it. */}
-        <svg
-          className="pointer-events-none absolute inset-0 h-full w-full opacity-25"
-          viewBox="0 0 400 600"
-          preserveAspectRatio="none"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path
-            d="M40 500 C 150 420, 110 300, 230 250 S 360 130 355 55"
-            stroke="white"
-            strokeWidth="1.5"
-            strokeDasharray="2 9"
-            strokeLinecap="round"
-          />
-          <circle cx="40" cy="500" r="4.5" fill="white" />
-          <circle cx="355" cy="55" r="4.5" className="fill-brand-gold" />
-        </svg>
-        <PlaneTakeoff
-          className="pointer-events-none absolute top-[38%] right-[16%] size-8 -rotate-12 text-white/30"
-          aria-hidden="true"
-        />
-
-        <div className="relative z-10">
-          <h2 className="font-heading text-2xl font-semibold">Welcome back to STS Somalia</h2>
-          <p className="mt-2 text-sm text-primary-foreground/80">
-            Flights, hotels, visas, and Umrah packages — booked with confidence.
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 p-10 text-white">
+          <p className="font-heading text-2xl font-semibold tracking-tight text-balance">
+            Flights, hotels, visas and Umrah, booked with one account.
           </p>
+          <p className="mt-2 text-sm text-white/80">Sultan Business Park, Mogadishu</p>
         </div>
-        <ul className="relative z-10 space-y-6">
-          {VALUE_PROPS.map((v) => (
-            <li key={v.title} className="flex items-start gap-3">
-              <span className="ring-1 ring-primary-foreground/15 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-foreground/10 backdrop-blur-sm">
-                <v.icon className="size-4.5" />
-              </span>
-              <div>
-                <p className="font-medium">{v.title}</p>
-                <p className="text-sm text-primary-foreground/70">{v.description}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-        <p className="relative z-10 text-xs text-primary-foreground/60">Scout Travel Solution</p>
       </div>
 
-      <Card className="rounded-none border-0 shadow-none">
-        <CardHeader>
-          <CardTitle className="font-heading text-2xl">Log in</CardTitle>
-          <CardDescription>Welcome back to STS Somalia.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {notice ? (
-            <Alert className="mb-4">
-              <AlertDescription>{notice}</AlertDescription>
-            </Alert>
-          ) : null}
-          <>
-            {personalState?.error ? (
-              <Alert variant="destructive" className="mb-4">
-                <AlertCircle />
-                <AlertDescription>{personalState.error}</AlertDescription>
-              </Alert>
-            ) : null}
-            <form action={personalAction} className="space-y-4">
-              {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" name="email" type="email" autoComplete="email" required />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link href="/forgot-password" className="text-xs text-primary hover:underline">
-                    Forgot password?
-                  </Link>
-                </div>
-                <PasswordInput id="password" name="password" autoComplete="current-password" required />
-              </div>
-              <SubmitButton className="w-full" pendingText="Logging in…">
-                Log in
-              </SubmitButton>
-            </form>
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              Don&apos;t have an account?{" "}
-              <Link href="/signup" className="font-medium text-primary hover:underline">
-                Sign up
-              </Link>
-            </p>
-          </>
-          {demoAccounts ? (
-            <div className="mt-6 border-t border-border pt-5">
-              <DemoAccountsList accounts={demoAccounts} />
-            </div>
-          ) : null}
-          <>
-            {/* A real <a>, not <Link>: the Agent Portal is a separate origin
-                  once subdomains are configured, which a client-side route push
-                  cannot cross. Quiet footnote, not a tab — signing in here
-                  already reaches an approved agent's dashboard via the account
-                  switcher, this is only for people who want to skip straight
-                  there. */}
-            <p className="mt-3 text-center text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">Agent:</span> Signing in as a travel agent?{" "}
-              <a
-                href={AGENT_LOGIN_HREF}
-                className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
-              >
-                Continue to Agent Portal <ArrowRight className="size-3" />
-              </a>
-            </p>
-            {/* A real <a>, not <Link> — same reasoning as the Agent Portal link
-                  above: the Manager Portal is a separate origin once subdomains
-                  are configured, which a client-side route push cannot cross. */}
-            <p className="mt-1.5 text-center text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">Manager:</span> Signing in as a hotel or venue manager?{" "}
-              <a
-                href={MANAGER_LOGIN_HREF}
-                className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
-              >
-                Continue to Manager Portal <ArrowRight className="size-3" />
-              </a>
-            </p>
-          </>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col justify-center px-6 py-8 sm:px-10 sm:py-10">
+        <h1 className="font-heading text-xl font-semibold tracking-tight">Log in</h1>
+
+        {notice ? (
+          <Alert role="status" className="mt-6">
+            <AlertDescription>{notice}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        <form ref={formRef} action={personalAction} className="mt-6">
+          {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="email">Email</FieldLabel>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="username"
+                inputMode="email"
+                spellCheck={false}
+                required
+                className={AUTH_CONTROL}
+              />
+            </Field>
+            <Field>
+              <PasswordLabelRow />
+              <PasswordInput
+                id="password"
+                name="password"
+                autoComplete="current-password"
+                required
+                className={AUTH_CONTROL}
+              />
+            </Field>
+            <FieldError>{personalState?.error}</FieldError>
+            <SubmitButton size="lg" className="w-full" pendingText="Logging in…">
+              Log in
+            </SubmitButton>
+          </FieldGroup>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link href="/signup" className="font-medium text-primary hover:underline">
+            Sign up
+          </Link>
+        </p>
+
+        {demoAccounts ? (
+          <div className="mt-6 border-t border-border pt-6">
+            <DemoAccountsList accounts={demoAccounts} />
+          </div>
+        ) : null}
+
+        {/* Real <a>, not <Link>: each portal is a separate origin once
+            subdomains are configured, which a client-side route push cannot
+            cross. Signing in above already reaches an approved partner's
+            portal via the account switcher; these skip straight there. */}
+        <nav
+          aria-label="Portal sign-in"
+          className="mt-6 flex flex-wrap items-center justify-center gap-x-6 border-t border-border pt-4 text-sm sm:pt-6"
+        >
+          <a href={AGENT_LOGIN_HREF} className={PORTAL_LINK}>
+            Agent portal <ArrowRight aria-hidden className="size-3.5" />
+          </a>
+          <a href={MANAGER_LOGIN_HREF} className={PORTAL_LINK}>
+            Manager portal <ArrowRight aria-hidden className="size-3.5" />
+          </a>
+        </nav>
+      </div>
     </div>
   );
 }

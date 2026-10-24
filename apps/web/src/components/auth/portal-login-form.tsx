@@ -1,24 +1,22 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { AlertCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/password-input";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
 import type { ActionState } from "@/lib/auth/actions";
+import { useRestoreOnError } from "@/lib/use-restore-on-error";
 import { DemoLoginButton } from "@/modules/demo/demo-login-button";
+import { AUTH_CONTROL, AuthCard } from "./auth-frame";
 
 /**
- * Shared form for the dedicated /agent/login and /admin/login pages — same
- * underlying auth logic and field set as the plain customer /login form,
- * just bound to a portal-specific server action (see
- * signInToAgentPortalAction / signInToAdminPortalAction in lib/auth/actions)
- * that validates audience before redirecting. The point of a separate
- * component is a distinct first impression, not a rebuilt auth stack.
+ * Shared form for the dedicated portal sign-in pages (/admin/login,
+ * /manager/login, /partner/login, /affiliate/login, /venue/login) — same
+ * field set as the customer /login form, bound to a portal-specific server
+ * action (see signInToPortalAction in lib/auth/actions) that validates
+ * audience before returning a destination.
  */
 export function PortalLoginForm({
   title,
@@ -33,6 +31,8 @@ export function PortalLoginForm({
   demoAccount?: { email: string; password: string; label: string };
 }) {
   const [state, formAction] = useActionState(action, null);
+  const formRef = useRef<HTMLFormElement>(null);
+  useRestoreOnError(formRef, state);
 
   // A plain window.location assignment, not router.push() or redirect() —
   // deliberate. See the comment on signInToPortalAction in lib/auth/actions:
@@ -51,47 +51,64 @@ export function PortalLoginForm({
   }, [state]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="font-heading text-2xl">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form action={formAction} className="space-y-4">
-          {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
-          {state?.error ? (
-            <Alert variant="destructive">
-              <AlertCircle />
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          ) : null}
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" autoComplete="email" required />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link href="/forgot-password" className="text-xs text-primary hover:underline">
-                Forgot password?
-              </Link>
-            </div>
-            <PasswordInput id="password" name="password" autoComplete="current-password" required />
-          </div>
-          <SubmitButton className="w-full" pendingText="Signing in…">
+    <AuthCard title={title}>
+      <form ref={formRef} action={formAction}>
+        {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="email">Email</FieldLabel>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="username"
+              inputMode="email"
+              spellCheck={false}
+              required
+              className={AUTH_CONTROL}
+            />
+          </Field>
+          <Field>
+            <PasswordLabelRow />
+            <PasswordInput
+              id="password"
+              name="password"
+              autoComplete="current-password"
+              required
+              className={AUTH_CONTROL}
+            />
+          </Field>
+          <FieldError>{state?.error}</FieldError>
+          <SubmitButton size="lg" className="w-full" pendingText="Signing in…">
             Sign in
           </SubmitButton>
-        </form>
-        {demoAccount ? (
-          <div className="mt-5 border-t border-border pt-5">
-            <DemoLoginButton
-              action={action}
-              email={demoAccount.email}
-              password={demoAccount.password}
-              label={demoAccount.label}
-            />
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+        </FieldGroup>
+      </form>
+      {demoAccount ? (
+        <div className="mt-6 border-t border-border pt-6">
+          <DemoLoginButton
+            action={action}
+            email={demoAccount.email}
+            password={demoAccount.password}
+            label={demoAccount.label}
+          />
+        </div>
+      ) : null}
+    </AuthCard>
+  );
+}
+
+/** "Password" label with the forgot-password link on the right. */
+export function PasswordLabelRow() {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <FieldLabel htmlFor="password">Password</FieldLabel>
+      <Link
+        href="/forgot-password"
+        className="rounded-sm text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        Forgot password?
+      </Link>
+    </div>
   );
 }

@@ -1,63 +1,65 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import Link from "next/link";
-import { AlertCircle } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/password-input";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
+import { AUTH_CONTROL, AuthCard } from "@/components/auth/auth-frame";
 import { signUpAction } from "@/lib/auth/actions";
+import { useRestoreOnError } from "@/lib/use-restore-on-error";
 
 export function SignupForm() {
   const [state, formAction] = useActionState(signUpAction, null);
+  const formRef = useRef<HTMLFormElement>(null);
+  useRestoreOnError(formRef, state);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="font-heading text-2xl">Create your account</CardTitle>
-        <CardDescription>Book flights, hotels, visas, and Umrah packages.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form action={formAction} className="space-y-4">
-          {state?.error ? (
-            <Alert variant="destructive">
-              <AlertCircle />
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          ) : null}
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Full name</Label>
-            <Input id="fullName" name="fullName" autoComplete="name" required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" autoComplete="email" required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+    <AuthCard title="Create your account">
+      <form ref={formRef} action={formAction}>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="fullName">Full name</FieldLabel>
+            <Input id="fullName" name="fullName" autoComplete="name" required className={AUTH_CONTROL} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="email">Email</FieldLabel>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              spellCheck={false}
+              required
+              className={AUTH_CONTROL}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="password">Password</FieldLabel>
             <PasswordInput
               id="password"
               name="password"
               autoComplete="new-password"
+              placeholder="At least 8 characters"
               minLength={8}
               required
+              className={AUTH_CONTROL}
             />
-            <p className="text-xs text-muted-foreground">At least 8 characters.</p>
-          </div>
-          <SubmitButton className="w-full" pendingText="Creating account…">
+          </Field>
+          <FieldError>{state?.error}</FieldError>
+          <SubmitButton size="lg" className="w-full" pendingText="Creating account…">
             Create account
           </SubmitButton>
-        </form>
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          Already have an account?{" "}
-          <Link href="/login" className="font-medium text-primary hover:underline">
-            Log in
-          </Link>
-        </p>
-      </CardContent>
-    </Card>
+        </FieldGroup>
+      </form>
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        Already have an account?{" "}
+        <Link href="/login" className="font-medium text-primary hover:underline">
+          Log in
+        </Link>
+      </p>
+    </AuthCard>
   );
 }

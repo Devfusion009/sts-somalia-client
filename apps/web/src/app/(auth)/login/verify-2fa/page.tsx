@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Verify2faForm } from "./verify-2fa-form";
 
-export const metadata: Metadata = { title: "Verify it's you" };
+export const metadata: Metadata = { title: "Two-factor verification" };
 
 export default async function Verify2faPage({
   searchParams,
