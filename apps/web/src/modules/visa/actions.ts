@@ -113,7 +113,8 @@ export async function startVisaApplication(formData: FormData): Promise<void> {
 
   // A nationality chosen on the detail page seeds the field; the quote for it
   // (price, fee, documents) is stamped by visa_applications_draft_integrity.
-  const nationality = formData.get("nationality")?.toString().trim().toUpperCase();
+  const chosen = formData.get("nationality")?.toString().trim().toUpperCase();
+  const nationality = chosen && chosen !== visaType.destination_country_code.toUpperCase() ? chosen : undefined;
 
   const { data: application, error } = await supabase
     .from("visa_applications")
@@ -243,6 +244,11 @@ export async function saveApplicantType(
   return advanceWizard(formData, application.id, 2);
 }
 
+/** A visa for a country a traveller already holds the passport of makes no sense. */
+function isDestinationCountry(application: { visa_type: { destination_country_code: string } | null }, nationality: string) {
+  return application.visa_type?.destination_country_code.toUpperCase() === nationality.toUpperCase();
+}
+
 export async function saveVisaMember(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const applicationId = z.string().uuid().safeParse(formData.get("applicationId"));
   if (!applicationId.success) return { error: "Invalid application." };
@@ -259,6 +265,9 @@ export async function saveVisaMember(_prev: ActionState, formData: FormData): Pr
   const user = await requireUser();
   const { supabase, application } = await getEditableApplication(applicationId.data, user.id);
   if (!application) return { error: "This application can no longer be edited." };
+  if (isDestinationCountry(application, parsed.data.nationality)) {
+    return { error: "Passport nationality can't be the same as the destination country." };
+  }
 
   const memberId = formData.get("memberId")?.toString();
   const row = {
@@ -330,6 +339,9 @@ export async function savePersonalInfo(
   if (!application) return { error: "This application can no longer be edited." };
 
   const d = parsed.data;
+  if (isDestinationCountry(application, d.nationality)) {
+    return { error: "Passport nationality can't be the same as the destination country.", values: formValues(formData) };
+  }
 
   // Saving nationality re-stamps the quote (price, fee, documents) server-side
   // in visa_applications_draft_integrity; nothing re-resolves after submit.
