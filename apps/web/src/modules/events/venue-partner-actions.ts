@@ -7,6 +7,7 @@ import { nextHallBookingMoves } from "@/modules/events/hall-transitions";
 import { todayIso } from "@/modules/hotels/availability";
 import { requireUser } from "@/lib/auth/session";
 import { getMyVenuePartnerId } from "./venue-partner-queries";
+import { invalidateCache } from "@/lib/redis";
 
 export type ActionState = { error: string | null } | null;
 
@@ -80,6 +81,7 @@ export async function createMyVenue(_prev: ActionState, formData: FormData): Pro
     .from("event_venues")
     .insert({ ...venueRow(parsed.data), slug: slugify(parsed.data.name), partner_id: partnerId });
   if (error) return { error: error.message };
+  await invalidateCache("events");
   revalidatePath("/venue/venues");
   return { error: null };
 }
@@ -112,6 +114,7 @@ export async function updateMyVenue(_prev: ActionState, formData: FormData): Pro
     .eq("id", venueId)
     .eq("partner_id", partnerId);
   if (error) return { error: error.message };
+  await invalidateCache("events");
   revalidatePath("/venue/venues");
   return { error: null };
 }

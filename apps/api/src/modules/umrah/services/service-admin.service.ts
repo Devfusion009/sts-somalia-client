@@ -5,6 +5,7 @@ import { ServiceCatalogRepository } from "../repositories/service-catalog.reposi
 import { CustomRequestRepository } from "../repositories/custom-request.repository";
 import { UmrahBookingRepository } from "../repositories/umrah-booking.repository";
 import { UmrahNotifyService } from "./umrah-notify.service";
+import { RedisService } from "../../../infra/redis/redis.service";
 
 const HOTEL_CATEGORIES = new Set(["hotel_makkah", "hotel_madinah"]);
 
@@ -16,7 +17,8 @@ export class ServiceAdminService {
     private readonly requests: CustomRequestRepository,
     private readonly bookings: UmrahBookingRepository,
     private readonly orders: OrdersService,
-    private readonly notify: UmrahNotifyService
+    private readonly notify: UmrahNotifyService,
+    private readonly cache: RedisService
   ) {}
 
   listServices() {
@@ -51,10 +53,13 @@ export class ServiceAdminService {
         price: isHotel ? (d.sharingPrices.find((p) => p.sharing === sharing)?.price ?? null) : null,
       }))
     );
+    await this.cache.invalidate("umrah-services");
   }
 
-  deleteService(serviceId: string) {
-    return this.catalog.delete(serviceId);
+  async deleteService(serviceId: string) {
+    const result = await this.catalog.delete(serviceId);
+    await this.cache.invalidate("umrah-services");
+    return result;
   }
 
   async submittedRequests() {

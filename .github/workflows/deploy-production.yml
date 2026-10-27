@@ -1,0 +1,146 @@
+name: Deploy to production server
+
+# main deploys to AWS (deploy.yml). The production branch deploys to the
+# Mogadishu server: images are built here, pushed to GHCR, and the server only
+# pulls them and restarts the stack. The server is too small to build on.
+#
+# Inert until repository variable PRODUCTION_DEPLOY_ENABLED is "true".
+
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      web_image: ${{ steps.names.outputs.web }}
+      api_image: ${{ steps.names.outputs.api }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: names
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          echo "web=${REGISTRY}/${repo}/web:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "api=${REGISTRY}/${repo}/api:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.web
+          target: runner
+          push: true
+          tags: ${{ steps.names.outputs.web }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_APP_HOST=${{ vars.NEXT_PUBLIC_APP_HOST }}
+
+      - name: Build and push api
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.api
+          target: runner
+          push: true
+          tags: ${{ steps.names.outputs.api }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    env:
+      SSH_TARGET: ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}
+      APP_DIR: /opt/sts
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/prod
+          chmod 600 ~/.ssh/prod
+          # Pinned host key: a changed server key fails the deploy.
+          printf '%s\n' "${{ secrets.PROD_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          printf 'Host prod\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/prod\n  StrictHostKeyChecking yes\n  ServerAliveInterval 30\n' \
+            "${{ secrets.PROD_HOST }}" "${{ secrets.PROD_USER }}" > ~/.ssh/config
+
+      - name: Upload stack files
+        run: scp infra/production/docker-compose.yml infra/production/redis.conf infra/production/Caddyfile.ip infra/production/Caddyfile.domain prod:${APP_DIR}/
+
+      - name: Write env file
+        run: |
+          {
+            printf '%s\n' "${{ secrets.PROD_ENV_FILE }}"
+            echo "WEB_IMAGE=${{ needs.build.outputs.web_image }}"
+            echo "API_IMAGE=${{ needs.build.outputs.api_image }}"
+          } | ssh prod "umask 077 && cat > ${APP_DIR}/.env.next"
+
+      - name: Release
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | ssh prod "docker login ghcr.io -u '$GHCR_USER' --password-stdin"
+          ssh prod 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd /opt/sts
+          [ -f .env ] && cp .env .env.previous || true
+          mv .env.next .env
+          docker compose pull web api
+          docker compose up -d --remove-orphans
+
+          healthy() {
+            for _ in $(seq 1 30); do
+              web=$(docker compose ps --format '{{.Health}}' web)
+              api=$(docker compose ps --format '{{.Health}}' api)
+              [ "$web" = healthy ] && [ "$api" = healthy ] && return 0
+              sleep 5
+            done
+            return 1
+          }
+
+          if healthy; then
+            docker image prune -f >/dev/null
+            echo "Release healthy."
+          else
+            echo "Release unhealthy. Rolling back."
+            docker compose logs --tail 60 web api || true
+            if [ -f .env.previous ]; then
+              cp .env.previous .env
+              docker compose up -d --remove-orphans
+            fi
+            exit 1
+          fi
+          REMOTE

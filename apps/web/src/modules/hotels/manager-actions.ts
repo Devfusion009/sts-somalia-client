@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
 import { getMyManagedHotel, hasPermission } from "./manager-queries";
+import { invalidateCache } from "@/lib/redis";
 
 const profileSchema = z.object({
   hotelId: z.string().uuid(),
@@ -64,6 +65,7 @@ export async function updateHotelProfileAsManager(_prev: ActionState, formData: 
     .eq("id", parsed.data.hotelId);
   if (error) return { error: error.message };
 
+  await invalidateCache("hotels");
   revalidatePath(`/manager/${parsed.data.hotelId}/profile`);
   return { error: null };
 }

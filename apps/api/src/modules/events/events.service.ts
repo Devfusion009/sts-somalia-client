@@ -9,11 +9,14 @@ import type {
   VenueOccupiedRangesInput,
 } from "@sts/shared-types";
 import { OrdersService } from "../orders/orders.service";
+import { RedisService } from "../../infra/redis/redis.service";
 import { notifyPartnerOfBooking } from "../../infra/notify/partner-booking-notify";
 import { VenueRepository } from "./repositories/venue.repository";
 import { HallBookingRepository } from "./repositories/hall-booking.repository";
 import { VenuePartnerRepository } from "./repositories/venue-partner.repository";
 import { toPublicVenue, toPublicVenueDetail } from "./mappers/venue.mapper";
+
+const VENUE_TTL_SECONDS = 120;
 
 /**
  * Customer-facing events rules: browsing published venues and placing a hall
@@ -26,11 +29,22 @@ export class EventsService {
     private readonly venues: VenueRepository,
     private readonly bookings: HallBookingRepository,
     private readonly partners: VenuePartnerRepository,
-    private readonly orders: OrdersService
+    private readonly orders: OrdersService,
+    private readonly cache: RedisService
   ) {}
 
+  /** Published venues are public and the same for every visitor: cached, tag "events". */
+  private publishedVenues(): Promise<PublicVenue[]> {
+    return this.cache.cachedRead(
+      "events:venues:published",
+      VENUE_TTL_SECONDS,
+      async () => (await this.venues.findPublished()).map(toPublicVenue),
+      { tags: ["events"] }
+    );
+  }
+
   async getVenues(filters: VenueFilters = {}): Promise<PublicVenue[]> {
-    let venues = (await this.venues.findPublished()).map(toPublicVenue);
+    let venues = await this.publishedVenues();
     if (filters.city) {
       const needle = filters.city.trim().toLowerCase();
       venues = venues.filter((v) => v.city.toLowerCase().includes(needle));
@@ -43,13 +57,22 @@ export class EventsService {
   }
 
   async getVenueBySlug(slug: string): Promise<PublicVenueDetail | null> {
-    const row = await this.venues.findPublishedBySlug(slug);
-    return row ? toPublicVenueDetail(row as Record<string, unknown>) : null;
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/.test(slug)) return null;
+    return this.cache.cachedRead(
+      `events:venue:${slug}`,
+      VENUE_TTL_SECONDS,
+      async () => {
+        const row = await this.venues.findPublishedBySlug(slug);
+        return row ? toPublicVenueDetail(row as Record<string, unknown>) : null;
+      },
+      // An unknown slug is not stored: names a visitor invents must not fill the cache.
+      { tags: ["events"], cacheIf: (value) => value !== null }
+    );
   }
 
   async getVenueEventTypes(): Promise<string[]> {
     const set = new Set<string>();
-    for (const venue of await this.getVenues()) for (const t of venue.event_types) set.add(t);
+    for (const venue of await this.publishedVenues()) for (const t of venue.event_types) set.add(t);
     return [...set].sort();
   }
 

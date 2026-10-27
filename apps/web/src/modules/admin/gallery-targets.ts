@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import type { GalleryTarget } from "@/modules/admin/property-gallery-actions";
+import { invalidateCache } from "@/lib/redis";
 
 /**
  * Split out of property-gallery-actions.ts: a "use server" file may only
@@ -13,6 +14,7 @@ export const TARGETS: Record<"hotel" | "room" | "venue", GalleryTarget> = {
     bucket: "hotel-images",
     pathPrefix: (id) => `${id}`,
     revalidate: (id) => {
+      void invalidateCache("hotels");
       revalidatePath(`/admin/hotels/${id}`);
       revalidatePath("/admin/hotels");
     },
@@ -21,13 +23,17 @@ export const TARGETS: Record<"hotel" | "room" | "venue", GalleryTarget> = {
     table: "hotel_rooms",
     bucket: "hotel-images",
     pathPrefix: (id) => `rooms/${id}`,
-    revalidate: () => revalidatePath(`/admin/hotels`, "layout"),
+    revalidate: () => {
+      void invalidateCache("hotels");
+      revalidatePath(`/admin/hotels`, "layout");
+    },
   },
   venue: {
     table: "event_venues",
     bucket: "venue-images",
     pathPrefix: (id) => `${id}`,
     revalidate: (id) => {
+      void invalidateCache("events");
       revalidatePath(`/admin/events/${id}`);
       revalidatePath("/admin/events");
     },

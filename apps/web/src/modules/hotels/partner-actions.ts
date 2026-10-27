@@ -12,6 +12,7 @@ import { applyHotelBookingMove } from "@/modules/hotels/booking-status";
 import { commaList, parseLinks, replacePropertyLinks } from "@/modules/hotels/listing-fields";
 import { phoneSchema } from "@/modules/partner-applications/schemas";
 import type { ActionState } from "@/lib/auth/actions";
+import { invalidateCache } from "@/lib/redis";
 
 // Partner-facing forms deliberately exclude 'published': a partner could
 // previously self-publish a hotel/room straight to live, bookable-by-real-
@@ -164,6 +165,7 @@ export async function createHotel(_prevState: ActionState, formData: FormData): 
   if (error || !data) return { error: error?.message ?? "Failed to create hotel." };
   await replacePropertyLinks(supabase, { hotelId: data.id }, parseLinks(parsed.data.links));
 
+  await invalidateCache("hotels");
   revalidatePath("/partner/hotels");
   redirect(`/partner/hotels/${data.id}`);
 }
@@ -204,6 +206,7 @@ export async function updateHotel(_prevState: ActionState, formData: FormData): 
   if (error) return { error: error.message };
   await replacePropertyLinks(supabase, { hotelId }, parseLinks(parsed.data.links));
 
+  await invalidateCache("hotels");
   revalidatePath(`/partner/hotels/${hotelId}`);
   return { error: null };
 }
@@ -305,6 +308,7 @@ export async function createRoom(_prevState: ActionState, formData: FormData): P
 
   await rememberRoomType(supabase, parsed.data.name);
 
+  await invalidateCache("hotels");
   revalidatePath(`/partner/hotels/${hotelId}`);
   return { error: null };
 }
@@ -368,6 +372,7 @@ export async function updateRoom(_prevState: ActionState, formData: FormData): P
   if (error) return { error: error.message };
   await rememberRoomType(supabase, parsed.data.name);
 
+  await invalidateCache("hotels");
   revalidatePath(`/partner/hotels/${hotelId}`);
   return { error: null };
 }

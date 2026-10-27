@@ -7,6 +7,9 @@ import { UmrahBookingRepository } from "../repositories/umrah-booking.repository
 import { CustomRequestRepository } from "../repositories/custom-request.repository";
 import { UmrahSettingsRepository } from "../repositories/umrah-settings.repository";
 import { toPackageCard, toPackageDetail } from "../mappers/package.mapper";
+import { RedisService } from "../../../infra/redis/redis.service";
+
+const CATALOG_TTL_SECONDS = 300;
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -29,7 +32,8 @@ export class UmrahCatalogService {
     private readonly services: ServiceCatalogRepository,
     private readonly bookings: UmrahBookingRepository,
     private readonly requests: CustomRequestRepository,
-    private readonly settings: UmrahSettingsRepository
+    private readonly settings: UmrahSettingsRepository,
+    private readonly cache: RedisService
   ) {}
 
   /** Featured first, then cheapest — the landing band reads as a ladder from the entry package. */
@@ -50,12 +54,20 @@ export class UmrahCatalogService {
     return row ? toPackageDetail(row) : null;
   }
 
+  /** Published add-on services are the same for every visitor: cached, tag "umrah-services". */
   publishedServices(): Promise<UmrahService[]> {
-    return this.services.findPublished();
+    return this.cache.cachedRead("umrah:services:published", CATALOG_TTL_SECONDS, () => this.services.findPublished(), {
+      tags: ["umrah-services"],
+    });
   }
 
   sharingPrices(): Promise<SharingPriceMap> {
-    return this.services.findPublishedSharingPrices();
+    return this.cache.cachedRead(
+      "umrah:services:sharing-prices",
+      CATALOG_TTL_SECONDS,
+      () => this.services.findPublishedSharingPrices(),
+      { tags: ["umrah-services"] }
+    );
   }
 
   operations(): Promise<UmrahOperations> {

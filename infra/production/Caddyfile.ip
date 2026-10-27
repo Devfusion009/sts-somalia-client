@@ -1,0 +1,17 @@
+# No domain yet: plain HTTP on the server IP, portals under /admin, /agent, etc.
+{
+	auto_https off
+}
+
+:80 {
+	encode zstd gzip
+
+	@api path /trpc /trpc/* /payments/* /health/*
+	handle @api {
+		reverse_proxy api:4000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}
