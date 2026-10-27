@@ -395,9 +395,9 @@ export function PortalShell({
           {/* An exit hatch, not a destination — separated from real nav items
               and deliberately muted so it doesn't compete with them. A hotel
               manager's portal isn't a reskinned view of the public site the
-              way the other portals are, so there's no "back to website" to
-              offer here. */}
-          {accent !== "manager" ? (
+              way the other portals are, and the admin console is an internal
+              tool, so neither offers a "back to website". */}
+          {accent !== "manager" && accent !== "admin" ? (
             <SidebarGroup className="mt-auto">
               <SidebarGroupContent>
                 <SidebarMenu>
