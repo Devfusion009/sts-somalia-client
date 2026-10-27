@@ -53,8 +53,6 @@ export const COUNTRY_OPTIONS = Object.entries(COUNTRY_NAMES).sort((a, b) =>
   a[1].localeCompare(b[1])
 );
 
-export const NATIONALITY_DEFAULT = "SO";
-
 /** Common names/abbreviations people search with that the ISO name alone won't match. */
 const COUNTRY_ALIASES: Record<string, string[]> = {
   AE: ["uae", "emirates", "dubai", "abu dhabi"],

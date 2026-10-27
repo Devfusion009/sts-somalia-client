@@ -14,7 +14,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
  */
 export function WhatsAppFloatingButton() {
   return (
-    <div className="fixed bottom-5 right-5 z-50">
+    <div data-floating-whatsapp className="fixed bottom-5 right-5 z-50">
       {/* One outward ripple, not a scattered set — a single deliberate cue
           that this is live and tappable, not decoration. Respects reduced
           motion (no ping when the user has that preference set). */}

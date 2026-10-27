@@ -6,9 +6,70 @@ import { ArrowRight, MapPin } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { matchesDestination, type DestinationOption } from "@/modules/visa/search";
+import {
+  Combobox,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxInputGroup,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxPopup,
+  ComboboxPortal,
+  ComboboxPositioner,
+} from "@/components/ui/combobox";
+import { COUNTRY_OPTIONS, countryFlag, countrySearchText, normalizeSearchTerm } from "@/lib/countries";
 
 const MAX_SUGGESTIONS = 6;
 const RESULTS_ANCHOR = "visa-results";
+
+const COUNTRY_CODES = COUNTRY_OPTIONS.map(([code]) => code);
+const COUNTRY_NAME = Object.fromEntries(COUNTRY_OPTIONS);
+const countryLabel = (code: string) => `${countryFlag(code)} ${COUNTRY_NAME[code]}`;
+
+/** Word-start match, so "ke" finds Kenya before every name that merely contains "ke". */
+function matchesCountry(code: string, query: string) {
+  const q = normalizeSearchTerm(query);
+  if (!q) return true;
+  return countrySearchText(code)
+    .split(/[\s-]+/)
+    .some((word) => word.startsWith(q));
+}
+
+/** The traveller's passport country: decides which visa applies and what it costs. */
+function PassportField({ value, onChange }: { value: string | null; onChange: (code: string | null) => void }) {
+  return (
+    <Combobox
+      items={COUNTRY_CODES}
+      itemToStringLabel={countryLabel}
+      filter={matchesCountry}
+      value={value}
+      onValueChange={(code) => onChange(code ?? null)}
+      autoHighlight
+    >
+      <ComboboxInputGroup className="min-w-0 flex-1 sm:w-44 sm:flex-none">
+        <ComboboxInput
+          aria-label="Passport country"
+          placeholder="Your passport"
+          className="h-11 border-0 bg-transparent px-0 text-base font-medium text-neutral-900 shadow-none placeholder:text-neutral-500 focus-visible:ring-0 sm:text-sm dark:bg-transparent"
+        />
+      </ComboboxInputGroup>
+      <ComboboxPortal>
+        <ComboboxPositioner>
+          <ComboboxPopup>
+            <ComboboxEmpty>No country found.</ComboboxEmpty>
+            <ComboboxList>
+              {(code: string) => (
+                <ComboboxItem key={code} value={code}>
+                  {countryLabel(code)}
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxPopup>
+        </ComboboxPositioner>
+      </ComboboxPortal>
+    </Combobox>
+  );
+}
 
 /**
  * Hero destination search. Suggests destinations that actually have a visa as
@@ -19,14 +80,18 @@ const RESULTS_ANCHOR = "visa-results";
 export function VisaDestinationSearch({
   destinations,
   defaultValue = "",
+  defaultPassport = null,
 }: {
   destinations: DestinationOption[];
   defaultValue?: string;
+  /** Passport country (ISO code) from the URL; no default — the traveller picks it. */
+  defaultPassport?: string | null;
 }) {
   const router = useRouter();
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(defaultValue);
+  const [passport, setPassport] = useState<string | null>(defaultPassport);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
 
@@ -39,7 +104,11 @@ export function VisaDestinationSearch({
     const trimmed = term.trim();
     setOpen(false);
     inputRef.current?.blur();
-    router.push(trimmed ? `/visa?country=${encodeURIComponent(trimmed)}#${RESULTS_ANCHOR}` : `/visa#${RESULTS_ANCHOR}`);
+    const params = new URLSearchParams();
+    if (passport) params.set("from", passport);
+    if (trimmed) params.set("country", trimmed);
+    const query = params.toString();
+    router.push(`/visa${query ? `?${query}` : ""}#${RESULTS_ANCHOR}`);
   }
 
   function choose(option: DestinationOption) {
@@ -71,9 +140,16 @@ export function VisaDestinationSearch({
         if (active >= 0 && suggestions[active]) choose(suggestions[active]);
         else go(value);
       }}
-      className="relative mt-8 max-w-lg"
+      className="relative mt-8 max-w-2xl"
     >
-      <div className="flex items-center gap-1.5 rounded-full bg-white p-1.5 pl-5 shadow-2xl ring-primary/40 focus-within:ring-3">
+      <div className="flex flex-col gap-1 rounded-2xl bg-white p-1.5 shadow-2xl ring-primary/40 focus-within:ring-3 sm:flex-row sm:items-center sm:gap-1.5 sm:rounded-full">
+        <div className="flex items-center gap-2 border-b border-neutral-200 px-3.5 sm:border-r sm:border-b-0 sm:pr-3 sm:pl-4">
+          <span className="text-base leading-none" aria-hidden>
+            {passport ? countryFlag(passport) : "🛂"}
+          </span>
+          <PassportField value={passport} onChange={setPassport} />
+        </div>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 pl-3.5 sm:pl-1">
         <MapPin className="size-4 shrink-0 text-neutral-500" aria-hidden />
         <input
           ref={inputRef}
@@ -104,6 +180,7 @@ export function VisaDestinationSearch({
         >
           <ArrowRight className="size-4.5" aria-hidden />
         </button>
+        </div>
       </div>
 
       {showList ? (

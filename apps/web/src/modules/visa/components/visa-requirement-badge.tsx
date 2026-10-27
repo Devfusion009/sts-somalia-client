@@ -1,6 +1,7 @@
 import { Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { checkVisaRequirement, type VisaRequirementCategory } from "@/lib/provider-runtime/visa-check";
+import { countryName } from "@/lib/countries";
 
 const CATEGORY_CLASS: Record<VisaRequirementCategory, string> = {
   visa_free_access: "bg-primary/10 text-primary",
@@ -12,20 +13,28 @@ const CATEGORY_CLASS: Record<VisaRequirementCategory, string> = {
 };
 
 /**
- * Live "for Somali passport holders" visa-requirement lookup, shown next to
- * a destination's visa product listing when the Zylalabs integration is
- * active in /admin/integrations. Silently renders nothing when the
+ * Live visa-requirement lookup for the traveller's passport country, shown
+ * next to a destination's visa product listing when the Zylalabs integration
+ * is active in /admin/integrations. Silently renders nothing when the
  * integration is off or the destination isn't recognized — this is an
  * informational enrichment, never a blocker for applying.
  */
-export async function VisaRequirementBadge({ destinationCountryName }: { destinationCountryName: string }) {
-  const result = await checkVisaRequirement({ nationality: "Somalia", destinationCountry: destinationCountryName });
+export async function VisaRequirementBadge({
+  destinationCountryName,
+  nationalityCode,
+}: {
+  destinationCountryName: string;
+  /** ISO code of the passport the traveller chose. */
+  nationalityCode: string;
+}) {
+  const nationality = countryName(nationalityCode);
+  const result = await checkVisaRequirement({ nationality, destinationCountry: destinationCountryName });
   if (!result.enabled || result.category === "unknown") return null;
 
   return (
     <Badge variant="outline" className={`gap-1 border-transparent font-normal ${CATEGORY_CLASS[result.category]}`}>
       <Globe className="size-3" />
-      {result.label} for Somali passports
+      {result.label} for {nationality} passports
     </Badge>
   );
 }

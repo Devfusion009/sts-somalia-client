@@ -288,7 +288,7 @@ function MemberDialog({
             <CountrySearchSelect
               id={`member-nat-${member?.id ?? "new"}`}
               name="nationality"
-              defaultValue={member?.nationality ?? "SO"}
+              defaultValue={member?.nationality ?? undefined}
               placeholder="Select nationality"
             />
           </Field>
@@ -542,7 +542,7 @@ export function StepPersonalInfo({
           />
         </Field>
         <Field label="Nationality" htmlFor="nationality" required>
-          <CountrySearchSelect id="nationality" name="nationality" defaultValue={v.nationality ?? t.nationality ?? "SO"} placeholder="Select nationality" />
+          <CountrySearchSelect id="nationality" name="nationality" defaultValue={v.nationality ?? t.nationality ?? undefined} placeholder="Select nationality" />
         </Field>
         <Field label="Passport number" htmlFor="passportNumber" required>
           <Input id="passportNumber" name="passportNumber" defaultValue={v.passportNumber ?? t.passport_number ?? ""} placeholder="Enter passport number" required />

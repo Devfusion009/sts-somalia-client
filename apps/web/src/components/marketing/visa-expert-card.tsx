@@ -34,12 +34,9 @@ export function VisaExpertCard({
       )}
     >
       <div className="relative">
-        <span className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
-          <span className="relative flex size-2" aria-hidden>
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60 motion-reduce:hidden" />
-            <span className="relative inline-flex size-2 rounded-full bg-primary" />
-          </span>
-          Visa desk · 24/7
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
+          <ShieldCheck className="size-3.5 text-primary" aria-hidden />
+          Visa assistance
         </span>
 
         <h2
@@ -51,8 +48,8 @@ export function VisaExpertCard({
           Document review by our visa desk
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Refused before? Our desk checks every document against what the consulate requires before
-          it&apos;s submitted.
+          Our team reviews your application documents against the published requirements before
+          submission.
         </p>
 
         {wide ? <DeskActions message={message} className="mt-6 hidden lg:block" /> : null}
