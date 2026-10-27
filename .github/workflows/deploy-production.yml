@@ -80,6 +80,7 @@ jobs:
     environment: production
     permissions:
       contents: read
+      packages: read
     env:
       SSH_TARGET: ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}
       APP_DIR: /opt/sts
