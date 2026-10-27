@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { BOARD_LABEL, cancellationLabel } from "@/modules/hotels/booking-options";
 import { format } from "date-fns";
 import { CircleDot, LogIn, LogOut, Mail, Phone, StickyNote } from "lucide-react";
 import type { HotelAccess } from "@/modules/hotels/hotel-access";
@@ -222,6 +223,36 @@ export async function BookingDetailView({
                   <Mail className="size-3.5" aria-hidden="true" /> {booking.customerEmail}
                 </a>
               ) : null}
+              {booking.stayDetails.booked_for_other && booking.stayDetails.lead_guest ? (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Staying guest:</span> {booking.stayDetails.lead_guest.name}
+                  {booking.stayDetails.lead_guest.phone ? ` · ${booking.stayDetails.lead_guest.phone}` : ""}
+                </p>
+              ) : null}
+              {booking.stayDetails.arrival_time || booking.stayDetails.purpose ? (
+                <p className="text-sm text-muted-foreground">
+                  {[
+                    booking.stayDetails.arrival_time ? `Arrives ${booking.stayDetails.arrival_time}` : null,
+                    booking.stayDetails.purpose === "business" ? "Business trip" : booking.stayDetails.purpose === "leisure" ? "Leisure trip" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              ) : null}
+              {booking.stayDetails.preferences?.some((p) => Object.keys(p).length > 0) ? (
+                <ul className="space-y-1 text-sm">
+                  {booking.stayDetails.preferences.map((pref, i) =>
+                    Object.keys(pref).length > 0 ? (
+                      <li key={i}>
+                        <span className="text-muted-foreground">
+                          {booking.stayDetails.preferences!.length > 1 ? `Room ${i + 1}: ` : "Preferences: "}
+                        </span>
+                        {Object.values(pref).join(", ")}
+                      </li>
+                    ) : null
+                  )}
+                </ul>
+              ) : null}
               {booking.specialRequests ? (
                 <div className="flex gap-2 rounded-lg bg-secondary/40 px-3 py-2.5 text-sm">
                   <StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-label="Special requests" />
@@ -240,6 +271,26 @@ export async function BookingDetailView({
                 <Detail label="Amount">
                   <span className="tabular-nums">{money(booking.totalPrice, booking.currency)}</span>
                 </Detail>
+                {booking.ratePlan ? (
+                  <Detail label="Rate">
+                    {booking.ratePlan.name} · {BOARD_LABEL[booking.ratePlan.board]}
+                    <span className="block text-xs text-muted-foreground">
+                      {cancellationLabel(booking.ratePlan, booking.checkIn)}
+                    </span>
+                  </Detail>
+                ) : null}
+                {booking.extras.length > 0 ? (
+                  <Detail label="Extras">
+                    <ul className="space-y-0.5">
+                      {booking.extras.map((extra) => (
+                        <li key={extra.id} className="tabular-nums">
+                          {extra.name}
+                          {extra.quantity > 1 ? ` × ${extra.quantity}` : ""} · {money(extra.total, booking.currency)}
+                        </li>
+                      ))}
+                    </ul>
+                  </Detail>
+                ) : null}
                 <Detail label="Method">
                   {isOffline ? (paymentLabel ?? "At check-in") : (booking.onlinePayment?.methodLabel ?? "Online")}
                 </Detail>

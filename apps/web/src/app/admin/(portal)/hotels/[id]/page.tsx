@@ -72,7 +72,6 @@ export default async function AdminHotelDetailPage({
               </div>
               <p className="text-sm text-muted-foreground">
                 {meta}
-                <span className="capitalize"> · {hotel.booking_mode} booking</span>
               </p>
             </div>
           </div>

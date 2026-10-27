@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { BOARD_LABEL, cancellationLabel, readExtrasSnapshot, readRatePlanSnapshot } from "@/modules/hotels/booking-options";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -57,21 +58,19 @@ const REQUEST_KIND_LABEL: Record<string, string> = {
 };
 
 /**
- * Hotels and halls are manual bookings (no supplier APIs in Somalia): a
- * request goes into the staff queue and a human confirms it. These tracks
- * show the customer exactly where their request is — including the
- * waitlisted case, where the dates were full and the request is parked
- * until a slot frees up.
+ * Hotels and halls book directly when there is room and are confirmed by
+ * payment. When the dates were full the booking is waitlisted until STS
+ * confirms or declines it, and only then can it be paid.
  */
 const HOTEL_STAGES: TimelineStage[] = [
-  { key: "requested", label: "Request received", icon: Send },
+  { key: "requested", label: "Booking placed", icon: Send },
   { key: "confirmed", label: "Booking confirmed", icon: Ticket },
   { key: "stay", label: "Your stay", icon: Landmark },
   { key: "completed", label: "Completed", icon: Users },
 ];
 
 const HALL_STAGES: TimelineStage[] = [
-  { key: "requested", label: "Request received", icon: Send },
+  { key: "requested", label: "Booking placed", icon: Send },
   { key: "confirmed", label: "Booking confirmed", icon: Ticket },
   { key: "event", label: "Event day", icon: Landmark },
   { key: "completed", label: "Completed", icon: Users },
@@ -147,6 +146,15 @@ export default async function BookingDetailPage({
     .or("hotel_booking_id.not.is.null,hall_booking_id.not.is.null")
     .limit(1)
     .maybeSingle();
+  const { data: hotelTerms } = quoteItem?.hotel_booking_id
+    ? await supabase
+        .from("hotel_bookings")
+        .select("check_in, rate_plan, extras")
+        .eq("id", quoteItem.hotel_booking_id)
+        .maybeSingle()
+    : { data: null };
+  const bookedRate = hotelTerms ? readRatePlanSnapshot(hotelTerms.rate_plan) : null;
+  const bookedExtras = hotelTerms ? readExtrasSnapshot(hotelTerms.extras) : [];
   const refundQuote = quoteItem?.hotel_booking_id
     ? await getRefundQuote(quoteItem.hotel_booking_id)
     : quoteItem?.hall_booking_id
@@ -218,23 +226,21 @@ export default async function BookingDetailPage({
   const hotelStatus = (hotelItem?.hotel_booking as { status?: string } | null)?.status ?? null;
   const hallItem = order.order_items.find((i) => i.item_type === "hall");
   const hallStatus = (hallItem?.hall_booking as { status?: string } | null)?.status ?? null;
-  // An unpaid order whose hotel/hall request is still undecided can't be paid
-  // yet, so the header names the real step instead of "pending payment".
-  const requestStatus = [hotelStatus, hallStatus].find((s) => s === "pending" || s === "waitlisted");
-  const headerStatus =
-    order.status === "pending_payment" && requestStatus
-      ? requestStatus === "waitlisted"
-        ? "waitlisted"
-        : "awaiting_confirmation"
-      : order.status;
+  // A waitlisted booking can't be paid until STS confirms it, so the header
+  // names that step instead of "pending payment".
+  const waitlisted = hotelStatus === "waitlisted" || hallStatus === "waitlisted";
+  const headerStatus = order.status === "pending_payment" && waitlisted ? "waitlisted" : order.status;
 
   // The one thing the customer has to do next, surfaced above everything
-  // else: pay a confirmed request-first booking, or settle a balance.
+  // else: pay the booking, or settle a balance.
   const payNow =
     awaitingPayment &&
-    (hotelStatus === "confirmed" || hallStatus === "confirmed" || umrahBookingStatus === "confirmed");
+    !waitlisted &&
+    (["pending", "confirmed"].includes(hotelStatus ?? "") ||
+      ["pending", "confirmed"].includes(hallStatus ?? "") ||
+      umrahBookingStatus === "confirmed");
   const nextStep = payNow
-    ? { label: "Confirmed price", amount: Number(order.total), action: "Complete payment" }
+    ? { label: "Amount due", amount: Number(order.total), action: "Pay now" }
     : balanceDue > 0
       ? { label: "Balance due", amount: balanceDue, action: "Pay balance" }
       : null;
@@ -304,16 +310,49 @@ export default async function BookingDetailPage({
                   {hotelStatus === "waitlisted" ? (
                     <Badge variant="warning">Waitlisted</Badge>
                   ) : hotelStatus === "pending" && awaitingPayment ? (
-                    <Badge variant="warning">Requested</Badge>
+                    <Badge variant="warning">Payment due</Badge>
                   ) : null}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <StatusTimeline
                   stages={HOTEL_STAGES}
                   currentIndex={manualBookingStageIndex(hotelStatus).index}
                   outcome={manualBookingStageIndex(hotelStatus).outcome}
                 />
+                {bookedRate || bookedExtras.length > 0 ? (
+                  <dl className="grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-2">
+                    {bookedRate ? (
+                      <div>
+                        <dt className="text-muted-foreground">Rate</dt>
+                        <dd className="font-medium">
+                          {bookedRate.name} · {BOARD_LABEL[bookedRate.board]}
+                          <span
+                            className={cn(
+                              "block text-xs font-normal",
+                              bookedRate.cancellation === "non_refundable" ? "text-muted-foreground" : "text-primary"
+                            )}
+                          >
+                            {cancellationLabel(bookedRate, hotelTerms?.check_in)}
+                          </span>
+                        </dd>
+                      </div>
+                    ) : null}
+                    {bookedExtras.length > 0 ? (
+                      <div>
+                        <dt className="text-muted-foreground">Extras</dt>
+                        <dd className="space-y-0.5">
+                          {bookedExtras.map((extra) => (
+                            <span key={extra.id} className="block tabular-nums">
+                              {extra.name}
+                              {extra.quantity > 1 ? ` × ${extra.quantity}` : ""} · {formatMoney(extra.total, order.currency)}
+                            </span>
+                          ))}
+                        </dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}
@@ -327,7 +366,7 @@ export default async function BookingDetailPage({
                   {hallStatus === "waitlisted" ? (
                     <Badge variant="warning">Waitlisted</Badge>
                   ) : hallStatus === "pending" && awaitingPayment ? (
-                    <Badge variant="warning">Requested</Badge>
+                    <Badge variant="warning">Payment due</Badge>
                   ) : null}
                 </CardTitle>
               </CardHeader>

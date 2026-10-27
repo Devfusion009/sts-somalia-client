@@ -2,12 +2,10 @@ import { createClient } from "@/lib/supabase/server";
 import { eventTypeLabel } from "@sts/shared-types";
 
 /**
- * The manual-booking work queue: every hotel, hall and private-Umrah request
- * that still needs a human decision, newest first. Seating priority (agency
- * over customer) is the database allocator's job and is already decided by
- * the time a row lands here. Somali hotels and event halls have no APIs, and
- * a private Umrah is priced against dates STS has not yet held, so nothing
- * here confirms itself.
+ * Bookings that need a human decision, newest first: hotel and hall
+ * bookings the allocator could not seat (dates full, or displaced by an
+ * agency), and private Umrah requests, which are priced by staff. Bookings
+ * with free capacity never land here; they are paid and confirmed directly.
  */
 export type QueueEntry = {
   kind: "hotel" | "hall" | "umrah";
@@ -82,14 +80,14 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
       .select(
         "id, check_in, check_out, num_rooms, num_adults, status, total_price, currency, created_at, channel, displaced_by, agency:agencies(name), hotel:hotels(name), room:hotel_rooms(name), customer:profiles!hotel_bookings_customer_id_fkey(full_name, email)"
       )
-      .in("status", ["pending", "waitlisted"])
+      .eq("status", "waitlisted")
       .order("created_at", { ascending: false }),
     supabase
       .from("hall_bookings")
       .select(
         "id, event_type, event_name, start_date, end_date, expected_guests, status, price, currency, created_at, displaced_by, agency:agencies(name), venue:event_venues(name), customer:profiles!hall_bookings_customer_id_fkey(full_name, email)"
       )
-      .in("status", ["pending", "waitlisted"])
+      .eq("status", "waitlisted")
       .order("created_at", { ascending: false }),
     // booking_kind = 'private' only: a group booking is taken against a
     // scheduled departure with real seat inventory, so it is already

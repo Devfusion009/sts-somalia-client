@@ -52,12 +52,6 @@ export function HotelCard({ hotel }: { hotel: HotelCardData }) {
             <Globe className="size-3" aria-hidden />
             via {hotel.externalSource}
           </Badge>
-        ) : hotel.bookingMode === "manual" ? (
-          // Not connected to a live API — bookings are requests STS confirms
-          // by hand, and the card must never suggest instant availability.
-          <Badge variant="outline" className="absolute top-3 left-3 border-transparent bg-background/95 text-muted-foreground shadow-sm">
-            Booking on request
-          </Badge>
         ) : null}
       </div>
       <CardContent className="flex flex-1 flex-col gap-2 p-4">

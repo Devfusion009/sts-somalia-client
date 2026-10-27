@@ -64,6 +64,7 @@ export default async function HotelsPage({
     checkIn?: string;
     checkOut?: string;
     guests?: string;
+    occ?: string;
     stars?: string;
     price?: string;
     amenities?: string;
@@ -74,6 +75,7 @@ export default async function HotelsPage({
     checkIn = "",
     checkOut = "",
     guests = "",
+    occ = "",
     stars = "",
     price = "",
     amenities = "",
@@ -120,6 +122,7 @@ export default async function HotelsPage({
   if (checkIn) bookingQuery.set("checkIn", checkIn);
   if (checkOut) bookingQuery.set("checkOut", checkOut);
   if (guests) bookingQuery.set("guests", guests);
+  if (occ) bookingQuery.set("occ", occ);
   const bookingSuffix = bookingQuery.toString() ? `?${bookingQuery.toString()}` : "";
 
   // The hero h1 already names the city, so the results heading is just the count.
@@ -153,7 +156,7 @@ export default async function HotelsPage({
 
           {/* Accent-outlined search bar, as in the reference */}
           <div className="mt-6 rounded-xl border-2 border-brand-accent">
-            <HotelSearchFilters initial={{ city, checkIn, checkOut, guests }} />
+            <HotelSearchFilters initial={{ city, checkIn, checkOut, guests, occ }} />
           </div>
 
           <ul className="mt-4 flex flex-wrap gap-x-7 gap-y-2">

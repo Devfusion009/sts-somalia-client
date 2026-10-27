@@ -26,10 +26,12 @@ export async function GET(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const [expired, completed, reminders] = await Promise.all([
+  const [expired, completed, reminders, staysExpired] = await Promise.all([
     supabase.rpc("_expire_unpaid_umrah_orders", {}),
     supabase.rpc("_complete_finished_umrah_trips"),
     supabase.rpc("_queue_umrah_reminders"),
+    // Unpaid direct hotel and hall bookings release their rooms after 24 hours.
+    supabase.rpc("_expire_unpaid_stay_orders"),
   ]);
 
   for (const reminder of reminders.data ?? []) {
@@ -44,6 +46,7 @@ export async function GET(request: Request) {
     released: expired.data ?? 0,
     completed: completed.data ?? 0,
     reminders: reminders.data?.length ?? 0,
-    errors: [expired.error, completed.error, reminders.error].filter(Boolean).map((e) => e!.message),
+    staysReleased: staysExpired.data ?? 0,
+    errors: [expired.error, completed.error, reminders.error, staysExpired.error].filter(Boolean).map((e) => e!.message),
   });
 }

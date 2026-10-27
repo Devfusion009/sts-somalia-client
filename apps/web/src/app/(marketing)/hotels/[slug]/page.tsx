@@ -16,17 +16,29 @@ import { amenityDisplayLabel, amenityIcon, sortAmenities } from "@/modules/hotel
 import { MediaPlaceholder } from "@/components/media-placeholder";
 import { PropertyLinks } from "@/components/property-links";
 import { PropertyReviews } from "@/components/property-reviews";
-import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { MarketingBreadcrumb } from "@/components/marketing/marketing-breadcrumb";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { todayIso } from "@/modules/hotels/availability";
 import { getStayPrices } from "@/modules/hotels/rates";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { WhatsAppInlineLink } from "@/components/marketing/whatsapp-button";
+import { cn } from "@/lib/utils";
 import { BookingForm } from "./booking-form";
+import { StayDatesPicker } from "@/modules/hotels/components/stay-dates-picker";
+import { OccupancyPicker } from "@/modules/hotels/components/occupancy-picker";
+import { getRatePlans } from "@/modules/hotels/rate-plan-queries";
+import {
+  BOARD_LABEL,
+  cancellationLabel,
+  formatOccupancy,
+  occupancyTotals,
+  parseOccupancy,
+  planStayPrice,
+} from "@/modules/hotels/booking-options";
 import { HotelGallery } from "./hotel-gallery";
 
 export async function generateMetadata({
@@ -54,9 +66,6 @@ function formatMoney(amount: number) {
   return Number.isInteger(cents) ? cents.toFixed(0) : cents.toFixed(2);
 }
 
-/** Scarcity only when it is real: a few rooms left, and fewer than the hotel has. */
-const LOW_STOCK = 3;
-
 /** "14:00:00" from the database → "14:00". */
 function clockTime(value: string | null) {
   return value ? value.slice(0, 5) : null;
@@ -83,9 +92,9 @@ export default async function HotelDetailPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ checkIn?: string; checkOut?: string; guests?: string }>;
+  searchParams: Promise<{ checkIn?: string; checkOut?: string; guests?: string; occ?: string }>;
 }) {
-  const [{ slug }, { checkIn = "", checkOut = "", guests = "" }] = await Promise.all([
+  const [{ slug }, { checkIn = "", checkOut = "", guests = "", occ = "" }] = await Promise.all([
     params,
     searchParams,
   ]);
@@ -96,13 +105,25 @@ export default async function HotelDetailPage({
   const amenities = Array.isArray(hotel.amenities) ? (hotel.amenities as string[]) : [];
   const images = hotelImageUrls(hotel.images);
 
-  // With dates selected, surface remaining capacity for capped nights. Rooms
-  // absent from the map have no caps for the stay — no note shown.
+  // Unpaid direct bookings older than 24 hours stop holding rooms before the
+  // counts below are read, so a missed cron run never shows a room as taken.
+  await createAdminClient().rpc("_expire_unpaid_stay_orders").then(
+    () => null,
+    () => null
+  );
+
+  // With dates selected, every room type shows how many rooms are left.
+  // Rooms absent from the map have no room count set: shown as available.
   const availability = await getRoomAvailability(
     rooms.map((r) => r.id),
     checkIn,
     checkOut
   );
+
+  const occupancy = parseOccupancy(occ, Number.parseInt(guests, 10) || undefined);
+  const occTotals = occupancyTotals(occupancy);
+  const occParam = formatOccupancy(occupancy);
+  const ratePlans = await getRatePlans(hotel.id, { activeOnly: true });
 
   const priced = rooms.filter((r) => r.base_price > 0);
   const currency = priced[0]?.currency ?? "USD";
@@ -240,21 +261,23 @@ export default async function HotelDetailPage({
             </div>
 
             <form
-              action={`/hotels/${slug}`}
+              action={`/hotels/${slug}#rooms`}
               method="get"
-              className="mt-4 grid grid-cols-2 items-end gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_1fr_6rem_auto]"
+              className="mt-4 grid grid-cols-1 items-end gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1.4fr_1fr_auto]"
             >
               <div className="min-w-0 space-y-1.5">
-                <Label htmlFor="stay-checkIn">Check-in</Label>
-                <Input id="stay-checkIn" name="checkIn" type="date" min={todayIso()} defaultValue={checkIn} required />
-              </div>
-              <div className="min-w-0 space-y-1.5">
-                <Label htmlFor="stay-checkOut">Check-out</Label>
-                <Input id="stay-checkOut" name="checkOut" type="date" min={checkIn || todayIso()} defaultValue={checkOut} required />
+                <Label htmlFor="stay-dates">Dates</Label>
+                <StayDatesPicker
+                  id="stay-dates"
+                  hotelId={hotel.id}
+                  currency={currency}
+                  defaultCheckIn={checkIn}
+                  defaultCheckOut={checkOut}
+                />
               </div>
               <div className="min-w-0 space-y-1.5">
                 <Label htmlFor="stay-guests">Guests</Label>
-                <Input id="stay-guests" name="guests" type="number" min={1} max={30} defaultValue={guests || "2"} />
+                <OccupancyPicker id="stay-guests" defaultValue={occupancy} />
               </div>
               <Button type="submit" size="lg">
                 Check availability
@@ -270,12 +293,19 @@ export default async function HotelDetailPage({
                     : [];
                   const unitsLeft = availability.get(room.id);
                   const soldOut = unitsLeft !== undefined && unitsLeft <= 0;
-                  const lowStock =
-                    unitsLeft !== undefined &&
-                    unitsLeft > 0 &&
-                    unitsLeft <= LOW_STOCK &&
-                    (room.total_units === null || unitsLeft < room.total_units);
+                  const enoughRooms = unitsLeft === undefined || unitsLeft >= occTotals.rooms;
+                  const fits = occupancy.every((r) => r.adults + r.children <= room.max_occupancy);
                   const stayTotal = stayPrices.get(room.id)?.total;
+                  const roomStay = stayTotal ?? room.base_price;
+                  const priceNights = stayTotal !== undefined ? nights : 1;
+                  const plans = room.base_price > 0 ? ratePlans : [];
+                  const bookHref = (planId?: string) => {
+                    const params = new URLSearchParams({ roomId: room.id, occ: occParam });
+                    if (checkIn) params.set("checkIn", checkIn);
+                    if (checkOut) params.set("checkOut", checkOut);
+                    if (planId) params.set("plan", planId);
+                    return `/hotels/${slug}/book?${params.toString()}`;
+                  };
                   return (
                     <Card key={room.id} className="overflow-hidden py-0">
                       <CardContent className="flex flex-col gap-0 p-0 sm:flex-row">
@@ -296,7 +326,23 @@ export default async function HotelDetailPage({
                           />
                         )}
                         <div className="flex flex-1 flex-col gap-2 p-5">
-                          <h3 className="font-heading text-lg font-bold">{room.name}</h3>
+                          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                            <h3 className="font-heading text-lg font-bold">{room.name}</h3>
+                            {nights > 0 ? (
+                              <span
+                                className={cn(
+                                  "text-xs font-medium tabular-nums",
+                                  soldOut ? "text-destructive" : "text-primary"
+                                )}
+                              >
+                                {unitsLeft === undefined
+                                  ? "Available"
+                                  : soldOut
+                                    ? "Fully booked"
+                                    : `${unitsLeft} room${unitsLeft === 1 ? "" : "s"} left`}
+                              </span>
+                            ) : null}
+                          </div>
                           {room.name_so ? (
                             <p className="-mt-1.5 text-sm text-muted-foreground">{room.name_so}</p>
                           ) : null}
@@ -334,6 +380,7 @@ export default async function HotelDetailPage({
                             </div>
                           ) : null}
                         </div>
+                        {plans.length > 0 && fits ? null : (
                         <div className="flex items-center justify-between gap-3 border-t border-border p-5 sm:w-48 sm:flex-col sm:items-end sm:justify-center sm:border-t-0 sm:border-l">
                           <p className="sm:text-right">
                             {room.base_price > 0 && stayTotal !== undefined ? (
@@ -357,30 +404,79 @@ export default async function HotelDetailPage({
                                 Price on request
                               </span>
                             )}
-                            {soldOut ? (
-                              <Badge variant="destructive" className="mt-1.5">
-                                Sold out for your dates
-                              </Badge>
-                            ) : lowStock ? (
-                              <Badge variant="warning" className="mt-1.5">
-                                {unitsLeft} left for your dates
-                              </Badge>
-                            ) : null}
                           </p>
-                          {soldOut ? (
-                            <Button size="lg" disabled>
-                              Sold out
+                          {!fits ? (
+                            <Button size="lg" variant="outline" disabled>
+                              Up to {room.max_occupancy} per room
                             </Button>
+                          ) : plans.length > 0 ? null : room.base_price > 0 ? (
+                            <BookingForm href={bookHref()} available={!soldOut && enoughRooms} />
                           ) : (
-                            <BookingForm
-                              hotelSlug={slug}
-                              room={room}
-                              bookingMode={hotel.booking_mode === "instant" ? "instant" : "manual"}
-                              defaults={{ checkIn, checkOut, guests }}
-                            />
+                            <WhatsAppInlineLink
+                              message={`Hello, I would like a price for the ${room.name} at ${hotel.name}.`}
+                              className={buttonVariants({ size: "lg", variant: "outline" })}
+                            >
+                              Ask for price
+                            </WhatsAppInlineLink>
                           )}
                         </div>
+                        )}
                       </CardContent>
+                      {plans.length > 0 && fits ? (
+                        <ul className="divide-y divide-border border-t border-border">
+                          {plans.map((plan) => {
+                            const price = planStayPrice({
+                              roomStay,
+                              rooms: occTotals.rooms,
+                              nights: priceNights,
+                              adults: occTotals.adults,
+                              children: occTotals.children,
+                              plan,
+                            });
+                            return (
+                              <li
+                                key={plan.id}
+                                className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 sm:flex-nowrap"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-heading text-sm font-bold tracking-wide uppercase">
+                                    {BOARD_LABEL[plan.board]}
+                                  </p>
+                                  <p
+                                    className={cn(
+                                      "text-sm",
+                                      plan.cancellation === "non_refundable" ? "text-muted-foreground" : "text-primary"
+                                    )}
+                                  >
+                                    {cancellationLabel(plan, checkIn)}
+                                  </p>
+                                </div>
+                                {plan.discountPercent > 0 ? (
+                                  <Badge variant="info" className="tabular-nums">
+                                    −{plan.discountPercent}%
+                                  </Badge>
+                                ) : null}
+                                <p className="ml-auto text-right">
+                                  {price.discount > 0 ? (
+                                    <span className="block text-xs text-muted-foreground line-through tabular-nums">
+                                      {room.currency} {formatMoney(price.roomsTotal + price.board)}
+                                    </span>
+                                  ) : null}
+                                  <span className="font-heading text-lg font-bold text-primary tabular-nums">
+                                    {room.currency} {formatMoney(price.total)}
+                                  </span>
+                                  <span className="block text-xs text-muted-foreground">
+                                    {stayTotal !== undefined
+                                      ? `${nights} night${nights === 1 ? "" : "s"} · ${occTotals.rooms} room${occTotals.rooms === 1 ? "" : "s"}`
+                                      : "per night"}
+                                  </span>
+                                </p>
+                                <BookingForm href={bookHref(plan.id)} available={!soldOut && enoughRooms} />
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : null}
                     </Card>
                   );
                 })}
@@ -437,11 +533,6 @@ export default async function HotelDetailPage({
                     <Star className="size-4 fill-brand-gold text-brand-gold" aria-hidden />
                     {hotel.star_rating}-star hotel
                   </p>
-                ) : null}
-                {hotel.booking_mode === "manual" ? (
-                  <Badge variant="outline" className="text-muted-foreground">
-                    Booking on request
-                  </Badge>
                 ) : null}
                 <p className="flex items-start gap-2 text-muted-foreground">
                   <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />

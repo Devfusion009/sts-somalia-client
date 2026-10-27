@@ -9,6 +9,7 @@ import { MfaSettings } from "@/modules/auth/components/mfa-settings";
 import { getServerTrpc } from "@/lib/trpc/server";
 import { fireDueEventReminders } from "@/modules/admin/calendar-reminders";
 import { AdminNotificationBell } from "./admin-notification-bell";
+import { NewOrderBanner } from "./new-order-banner";
 import { ShieldAlert } from "lucide-react";
 
 // Reorganized (2026-08-20, per user request) from 7 groups into 6 grouped
@@ -225,7 +226,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         </div>
       ) : (
-        children
+        <>
+          <NewOrderBanner notifications={notifications} />
+          {children}
+        </>
       )}
     </PortalShell>
   );

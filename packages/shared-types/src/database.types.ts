@@ -381,6 +381,7 @@ export type Database = {
         Row: {
           about: string | null
           address: string | null
+          agent_code: string
           allowed_products: Database["public"]["Enums"]["order_item_type"][]
           bank_account_name: string | null
           bank_account_number: string | null
@@ -410,6 +411,7 @@ export type Database = {
         Insert: {
           about?: string | null
           address?: string | null
+          agent_code?: string
           allowed_products?: Database["public"]["Enums"]["order_item_type"][]
           bank_account_name?: string | null
           bank_account_number?: string | null
@@ -439,6 +441,7 @@ export type Database = {
         Update: {
           about?: string | null
           address?: string | null
+          agent_code?: string
           allowed_products?: Database["public"]["Enums"]["order_item_type"][]
           bank_account_name?: string | null
           bank_account_number?: string | null
@@ -846,6 +849,7 @@ export type Database = {
           profile_id: string
           role_in_agency: Database["public"]["Enums"]["agency_role"]
           status: Database["public"]["Enums"]["member_status"]
+          username: string
         }
         Insert: {
           agency_id: string
@@ -854,6 +858,7 @@ export type Database = {
           profile_id: string
           role_in_agency?: Database["public"]["Enums"]["agency_role"]
           status?: Database["public"]["Enums"]["member_status"]
+          username?: string
         }
         Update: {
           agency_id?: string
@@ -862,6 +867,7 @@ export type Database = {
           profile_id?: string
           role_in_agency?: Database["public"]["Enums"]["agency_role"]
           status?: Database["public"]["Enums"]["member_status"]
+          username?: string
         }
         Relationships: [
           {
@@ -2282,6 +2288,7 @@ export type Database = {
           customer_id: string
           displaced_at: string | null
           displaced_by: string | null
+          extras: Json
           guest_details: Json
           hotel_id: string
           id: string
@@ -2292,10 +2299,15 @@ export type Database = {
           payment_method: string | null
           payment_reference: string | null
           priority: number
+          price_breakdown: Json | null
+          rate_plan: Json | null
+          rate_plan_id: string | null
           room_id: string
+          room_occupancy: Json
           source: string
           special_requests: string | null
           status: Database["public"]["Enums"]["booking_status"]
+          stay_details: Json
           total_price: number
           updated_at: string
           _allocate_hotel_booking: string | null
@@ -2314,6 +2326,7 @@ export type Database = {
           customer_id: string
           displaced_at?: string | null
           displaced_by?: string | null
+          extras?: Json
           guest_details?: Json
           hotel_id: string
           id?: string
@@ -2324,9 +2337,14 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string | null
           priority?: number
+          price_breakdown?: Json | null
+          rate_plan?: Json | null
+          rate_plan_id?: string | null
           room_id: string
+          room_occupancy?: Json
           source?: string
           special_requests?: string | null
+          stay_details?: Json
           status?: Database["public"]["Enums"]["booking_status"]
           total_price: number
           updated_at?: string
@@ -2345,6 +2363,7 @@ export type Database = {
           customer_id?: string
           displaced_at?: string | null
           displaced_by?: string | null
+          extras?: Json
           guest_details?: Json
           hotel_id?: string
           id?: string
@@ -2355,9 +2374,14 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string | null
           priority?: number
+          price_breakdown?: Json | null
+          rate_plan?: Json | null
+          rate_plan_id?: string | null
           room_id?: string
+          room_occupancy?: Json
           source?: string
           special_requests?: string | null
+          stay_details?: Json
           status?: Database["public"]["Enums"]["booking_status"]
           total_price?: number
           updated_at?: string
@@ -2403,6 +2427,60 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "hotel_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hotel_extras: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          hotel_id: string
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          sort_order: number
+          unit: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          hotel_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          price: number
+          sort_order?: number
+          unit?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          hotel_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          sort_order?: number
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_extras_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_extras_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
         ]
@@ -2806,6 +2884,69 @@ export type Database = {
           },
         ]
       }
+      hotel_rate_plans: {
+        Row: {
+          board: string
+          board_price_adult: number
+          board_price_child: number
+          cancellation: string
+          created_at: string
+          created_by: string | null
+          discount_percent: number
+          free_cancel_days: number | null
+          hotel_id: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          board?: string
+          board_price_adult?: number
+          board_price_child?: number
+          cancellation?: string
+          created_at?: string
+          created_by?: string | null
+          discount_percent?: number
+          free_cancel_days?: number | null
+          hotel_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          board?: string
+          board_price_adult?: number
+          board_price_child?: number
+          cancellation?: string
+          created_at?: string
+          created_by?: string | null
+          discount_percent?: number
+          free_cancel_days?: number | null
+          hotel_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_rate_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_rate_plans_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_rate_rules: {
         Row: {
           adjustment: string
@@ -3111,32 +3252,76 @@ export type Database = {
       }
       login_events: {
         Row: {
+          city: string | null
+          country: string | null
           created_at: string
+          event: string
           id: string
           ip_address: unknown
           portal: string | null
           profile_id: string
+          session_id: string | null
           user_agent: string | null
         }
         Insert: {
+          city?: string | null
+          country?: string | null
           created_at?: string
+          event?: string
           id?: string
           ip_address?: unknown
           portal?: string | null
           profile_id: string
+          session_id?: string | null
           user_agent?: string | null
         }
         Update: {
+          city?: string | null
+          country?: string | null
           created_at?: string
+          event?: string
           id?: string
           ip_address?: unknown
           portal?: string | null
           profile_id?: string
+          session_id?: string | null
           user_agent?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "login_events_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mfa_recovery_codes: {
+        Row: {
+          code_hash: string
+          created_at: string
+          id: string
+          profile_id: string
+          used_at: string | null
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          id?: string
+          profile_id: string
+          used_at?: string | null
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          id?: string
+          profile_id?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mfa_recovery_codes_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -6836,6 +7021,47 @@ export type Database = {
         Args: { p_package_id?: string }
         Returns: number
       }
+      _expire_unpaid_stay_orders: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      my_auth_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          aal: string
+          active_recently: boolean
+          created_at: string
+          id: string
+          ip: string | null
+          last_active_at: string
+          user_agent: string | null
+        }[]
+      }
+      revoke_my_session: {
+        Args: { p_session_id: string }
+        Returns: boolean
+      }
+      quote_hotel_stay: {
+        Args: {
+          p_adults: number
+          p_check_in: string
+          p_check_out: string
+          p_children: number
+          p_extra_ids?: string[]
+          p_num_rooms: number
+          p_rate_plan_id?: string | null
+          p_room_id: string
+        }
+        Returns: Json
+      }
+      agent_login_email: {
+        Args: { p_agent_code: string; p_username: string }
+        Returns: string
+      }
+      set_agent_username: {
+        Args: { p_member_id: string; p_username: string }
+        Returns: string
+      }
       _queue_umrah_reminders: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -7477,6 +7703,14 @@ export type Database = {
           room_nights: number
           stays: number
           total_spent: number
+        }[]
+      }
+      hotel_price_calendar: {
+        Args: { p_from: string; p_hotel_id: string; p_to: string }
+        Returns: {
+          available: boolean
+          min_rate: number | null
+          night: string
         }[]
       }
       hotel_nightly_rates: {

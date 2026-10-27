@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { trpc } from "@/lib/trpc/react";
 import { cn } from "@/lib/utils";
 import { useBellAlert } from "@/components/portal/use-bell-alert";
+import { newOrderHref } from "./new-order-banner";
 
 type NotificationRow = {
   id: string;
@@ -27,7 +28,7 @@ type NotificationRow = {
  * worse than no link.
  */
 function targetHref(n: NotificationRow): string | null {
-  if (n.type === "new_order") return "/admin/queue";
+  if (n.type === "new_order") return newOrderHref(n) ?? "/admin/orders";
   if (n.type === "payout_request") return "/admin/finance/withdrawals?status=pending";
   if (n.type === "visa_application_submitted" || n.type === "visa_status_changed" || n.type === "visa_case_attention") {
     const applicationId = (n.data as { applicationId?: string } | null)?.applicationId;
@@ -59,8 +60,7 @@ const POLL_MS = 30_000;
  *
  * - When a notification arrives, the bell rings with a red pulse and a
  *   chime plays (useBellAlert), then it stays still. While an unread
- *   `new_order` exists the bell stays red: the manual-booking queue is a
- *   promise to the customer that someone is watching.
+ *   `new_order` exists the bell stays red until staff open or dismiss it.
  * - Light polling: router.refresh() every 30s while the tab is visible.
  *   Notifications are still server-fetched in the layout (no client data
  *   path, no Realtime — neither exists in this codebase); refresh() just
@@ -134,8 +134,8 @@ export function AdminNotificationBell({ notifications }: { notifications: Notifi
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           <p className="text-sm font-semibold">Notifications</p>
           {orderAlert ? (
-            <Link href="/admin/queue" className="rounded-sm text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
-              Open queue
+            <Link href="/admin/orders" className="rounded-sm text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
+              All orders
             </Link>
           ) : null}
         </div>

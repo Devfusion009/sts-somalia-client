@@ -56,9 +56,11 @@ const FILTERS = [
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string; page?: string }>;
+  searchParams: Promise<{ filter?: string; page?: string; order?: string }>;
 }) {
-  const { filter: filterParam, page: pageParam } = await searchParams;
+  const { filter: filterParam, page: pageParam, order: orderParam } = await searchParams;
+  // Opened from a new-order alert: that order is pinned to the top and outlined.
+  const focusId = orderParam && /^[0-9a-f-]{36}$/i.test(orderParam) ? orderParam : null;
   const filter = FILTERS.find((f) => f.key === filterParam)?.key ?? "all";
   const page = parsePage(pageParam);
 
@@ -66,7 +68,11 @@ export default async function AdminOrdersPage({
   // only the page of orders actually shown loads its full booking and payment detail.
   const today = new Date().setHours(0, 0, 0, 0);
   const queue = await getOrderQueue(filter, page, format(today, "yyyy-MM-dd"));
-  const visible = await getOrdersByIds(queue.ids);
+  const [listed, focused] = await Promise.all([
+    getOrdersByIds(queue.ids),
+    focusId ? getOrdersByIds([focusId]) : Promise.resolve([]),
+  ]);
+  const visible = [...focused, ...listed.filter((o) => o.id !== focusId)];
 
   return (
     <div className="space-y-6">
@@ -142,8 +148,10 @@ export default async function AdminOrdersPage({
             return (
               <Card
                 key={order.id}
+                id={`order-${order.id}`}
                 className={cn(
-                  "overflow-hidden py-0",
+                  "scroll-mt-24 overflow-hidden py-0",
+                  order.id === focusId && "ring-2 ring-primary",
                   // A payment waiting on a human is the only reason to look at
                   // this page urgently, so it gets a visible edge rather than
                   // being one badge among many.

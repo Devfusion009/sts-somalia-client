@@ -15,8 +15,8 @@ const formatQueueDate = (iso: string) => format(new Date(`${iso}T00:00:00`), "EE
 export const metadata = { title: "Order Queue" };
 
 /**
- * The manual-booking queue. Somali hotels and event halls have no booking
- * APIs — every request is confirmed by a human. Newest request first.
+ * Requests that need an admin decision: hotel and hall bookings made when
+ * the dates were full, and private Umrah trips. Newest first.
  */
 export default async function OrderQueuePage() {
   await expirePastHallRequests(null);
@@ -106,10 +106,10 @@ export default async function OrderQueuePage() {
                       ) : null}
                       {entry.status === "waitlisted" ? (
                         <Badge variant="warning" className="max-w-full whitespace-normal">
-                          {entry.displaced ? "Waitlisted — displaced by an agency booking" : "Waitlisted — dates full"}
+                          {entry.displaced ? "Displaced by an agency booking" : "Dates full"}
                         </Badge>
                       ) : (
-                        <Badge variant="neutral">New request</Badge>
+                        <Badge variant="neutral">Private trip request</Badge>
                       )}
                     </p>
                     {entry.dates ? (
@@ -152,12 +152,14 @@ export default async function OrderQueuePage() {
                   </p>
                   <div className="flex flex-col items-start gap-2 sm:items-end">
                     <QueueEntryActions kind={entry.kind} bookingId={entry.id} />
-                    <PriceQuoteForm
-                      kind={entry.kind}
-                      bookingId={entry.id}
-                      currentPrice={entry.price}
-                      currency={entry.currency}
-                    />
+                    {entry.kind === "umrah" ? (
+                      <PriceQuoteForm
+                        kind={entry.kind}
+                        bookingId={entry.id}
+                        currentPrice={entry.price}
+                        currency={entry.currency}
+                      />
+                    ) : null}
                   </div>
                 </div>
               </CardContent>
