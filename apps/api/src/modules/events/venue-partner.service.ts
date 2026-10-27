@@ -4,6 +4,7 @@ import type { UpdateMyVenueInput, UpdateVenueBookingStatusInput, VenueUpsertInpu
 import { VenueRepository, type VenueWrite } from "./repositories/venue.repository";
 import { HallBookingRepository } from "./repositories/hall-booking.repository";
 import { VenuePartnerRepository } from "./repositories/venue-partner.repository";
+import { RedisService } from "../../infra/redis/redis.service";
 
 function slugify(input: string) {
   return (
@@ -51,7 +52,8 @@ export class VenuePartnerService {
   constructor(
     private readonly partners: VenuePartnerRepository,
     private readonly venues: VenueRepository,
-    private readonly bookings: HallBookingRepository
+    private readonly bookings: HallBookingRepository,
+    private readonly cache: RedisService
   ) {}
 
   private async requirePartnerId(profileId: string): Promise<string> {
@@ -95,6 +97,7 @@ export class VenuePartnerService {
   async createVenue(profileId: string, input: VenueUpsertInput) {
     const partnerId = await this.requirePartnerId(profileId);
     await this.venues.insertForPartner(partnerId, slugify(input.name), toVenueWrite(input));
+    await this.cache.invalidate("events");
   }
 
   async updateVenue(profileId: string, input: UpdateMyVenueInput) {
@@ -106,6 +109,7 @@ export class VenuePartnerService {
     const row = toVenueWrite(input);
     if (!["draft", "pending_review"].includes(current.status)) delete row.status;
     await this.venues.updateForPartner(partnerId, input.venueId, row);
+    await this.cache.invalidate("events");
   }
 
   async updateBookingStatus(profileId: string, input: UpdateVenueBookingStatusInput) {

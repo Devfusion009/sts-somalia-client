@@ -4,6 +4,7 @@ import { createAnonClient } from "../../infra/supabase/supabase-clients";
 import { OrdersService } from "../orders/orders.service";
 import type { FlightSearchParams, FlightOffersFilter, RequestFlightQuoteInput } from "@sts/shared-types";
 import { searchLiveFlights } from "./duffel-provider";
+import { RedisService } from "../../infra/redis/redis.service";
 
 /**
  * Direct port of apps/web's modules/flights/{queries,actions}.ts. Booking
@@ -15,7 +16,8 @@ import { searchLiveFlights } from "./duffel-provider";
 export class FlightsService {
   constructor(
     private readonly rls: RlsSupabaseService,
-    private readonly orders: OrdersService
+    private readonly orders: OrdersService,
+    private readonly cache: RedisService
   ) {}
 
   /**
@@ -25,8 +27,20 @@ export class FlightsService {
    * which degrades to anon-only when there's no session either).
    */
   async getAirports() {
-    const { data } = await createAnonClient().from("airports").select("iata_code, name, city, country_code").order("city");
-    return data ?? [];
+    // Reference data that changes a few times a year: an hour in Redis.
+    return this.cache.cachedRead(
+      "flights:airports",
+      3600,
+      async () => {
+        const { data, error } = await createAnonClient()
+          .from("airports")
+          .select("iata_code, name, city, country_code")
+          .order("city");
+        if (error) throw error;
+        return data ?? [];
+      },
+      { tags: ["airports"], cacheIf: (value) => Array.isArray(value) && value.length > 0 }
+    );
   }
 
   /**

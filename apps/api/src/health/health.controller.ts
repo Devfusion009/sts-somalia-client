@@ -16,6 +16,12 @@ import type { User } from "@supabase/supabase-js";
 export class HealthController {
   constructor(private readonly rls: RlsSupabaseService) {}
 
+  /** Unauthenticated liveness probe for the Docker healthcheck and deploy gate. */
+  @Get("live")
+  live() {
+    return { status: "ok" };
+  }
+
   @Get("me")
   @UseGuards(SupabaseAuthGuard)
   async me(@CurrentUser() user: User) {
