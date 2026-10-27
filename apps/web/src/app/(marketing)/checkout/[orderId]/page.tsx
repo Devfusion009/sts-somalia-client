@@ -45,8 +45,24 @@ export default async function CheckoutPage({
     return <UnavailableNotice label="Checkout" />;
   }
   if (!order) notFound();
+  // A customer who paid on WaafiPay's page but never came back still has a
+  // processing payment; re-reading its result settles it.
+  const unsettledWaafi = order.payments.filter((p) => p.provider === "waafi" && p.status === "processing");
+  if (unsettledWaafi.length > 0) {
+    await Promise.all(unsettledWaafi.map((p) => trpc.payments.confirmWaafi.mutate({ paymentId: p.id }).catch(() => null)));
+    order = (await trpc.payments.orderForCheckout.query({ orderId })) as unknown as CheckoutOrderRow | null;
+    if (!order) notFound();
+  }
   if (!["pending_payment", "held", "partially_paid"].includes(order.status)) {
     redirect(`/checkout/${orderId}/success`);
+  }
+  // A booking request waiting for an admin decision is not payable yet.
+  if (
+    order.order_items.some(
+      (item) => item.hotel_booking?.status === "waitlisted" || item.hall_booking?.status === "waitlisted"
+    )
+  ) {
+    redirect(`/account/bookings/${orderId}`);
   }
 
   const paidTotal = order.payments

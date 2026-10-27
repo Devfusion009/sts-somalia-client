@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { encryptCredentials, decryptCredentials } from "@/lib/integrations-crypto";
 import { EXCLUSIVE_PROVIDER_GROUPS, getProvider } from "@/lib/provider-catalog";
-import { testRazorpayConnection, testSifaloConnection, testStripeConnection } from "@/lib/provider-runtime/payments-test";
+import { testRazorpayConnection, testSifaloConnection, testStripeConnection, testWaafiConnection } from "@/lib/provider-runtime/payments-test";
 import { testDuffelConnection } from "@/lib/provider-runtime/duffel";
 import { testHotelbedsConnection } from "@/lib/provider-runtime/hotelbeds";
 import { testZylalabsVisaConnection } from "@/lib/provider-runtime/visa-check";
@@ -45,7 +45,13 @@ export async function saveIntegrationCredentials(_prev: ActionState, formData: F
   const credentials: Record<string, string> = {};
   for (const field of provider.credentialFields) {
     const value = String(formData.get(field.key) ?? "").trim();
-    if (!value) return { error: `${field.label} is required.` };
+    if (!value) {
+      if (field.optional) continue;
+      return { error: `${field.label} is required.` };
+    }
+    if (field.options && !field.options.some((option) => option.value === value)) {
+      return { error: `${field.label} is not valid.` };
+    }
     credentials[field.key] = value;
   }
 
@@ -180,7 +186,7 @@ const TEST_FN: Record<
   stripe: (creds) => testStripeConnection(creds.secret_key),
   razorpay: (creds) => testRazorpayConnection(creds.key_id, creds.key_secret),
   sifalo: (creds) => testSifaloConnection(creds.api_user, creds.api_key),
-  waafi: async () => ({ ok: true, message: "Credentials saved. WaafiPay has no read-only check." }),
+  waafi: (creds) => testWaafiConnection(creds),
   edahab: async () => ({ ok: true, message: "Credentials saved. eDahab has no read-only check." }),
   duffel: (creds) => testDuffelConnection(creds.api_key),
   hotelbeds: (creds) => testHotelbedsConnection(creds.api_key, creds.api_secret),

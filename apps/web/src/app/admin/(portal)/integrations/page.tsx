@@ -46,7 +46,7 @@ function ProviderList({ integrations }: { integrations: IntegrationStatus[] }) {
 }
 
 function PaymentsTab({ integrations, bank }: { integrations: IntegrationStatus[]; bank: Awaited<ReturnType<typeof getBankTransfer>> }) {
-  const groups = ["Cards", "Mobile money"];
+  const groups = [...new Set(integrations.map((i) => i.provider.group ?? ""))].filter(Boolean);
   return (
     <div className="space-y-8">
       {groups.map((group) => {

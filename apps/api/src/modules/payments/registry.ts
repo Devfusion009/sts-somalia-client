@@ -9,6 +9,8 @@ export async function getAvailablePaymentMethods(opts?: {
   agencyWallet?: { available: number; currency: string };
 }): Promise<PaymentMethodDef[]> {
   const gateways = await getPaymentGateways();
+  // WaafiPay's hosted page collects the wallet number itself.
+  const waafiHosted = !!gateways.waafi?.hpp;
   const payments = {
     stripe: !!gateways.stripe,
     razorpay: !!gateways.razorpay,
@@ -71,7 +73,7 @@ export async function getAvailablePaymentMethods(opts?: {
         group: "local",
         provider: payments.waafi ? "waafi" : payments.sifalo ? "sifalo" : "test",
         // Sifalo's hosted page collects the wallet number itself.
-        requiresPhone: !!payments.waafi || (!payments.sifalo && payments.testMode),
+        requiresPhone: payments.waafi ? !waafiHosted : !payments.sifalo && payments.testMode,
         simulated: !payments.waafi && !payments.sifalo,
       });
     }

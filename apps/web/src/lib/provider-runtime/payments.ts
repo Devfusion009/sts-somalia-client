@@ -77,7 +77,7 @@ export const getPaymentGateways = cache(async (): Promise<PaymentGateways> => {
     razorpay: razorDb?.key_id && razorDb?.key_secret ? { keyId: razorDb.key_id, keySecret: razorDb.key_secret, webhookSecret: razorDb.webhook_secret ?? null } : null,
     waafi:
       waafi.merchantUid && waafi.apiUserId && waafi.apiKey
-        ? { merchantUid: waafi.merchantUid, apiUserId: waafi.apiUserId, apiKey: waafi.apiKey, apiUrl: env.WAAFI_API_URL ?? "https://api.waafipay.net/asm" }
+        ? { merchantUid: waafi.merchantUid, apiUserId: waafi.apiUserId, apiKey: waafi.apiKey, apiUrl: env.WAAFI_API_URL ?? (waafiDb?.environment === "sandbox" ? "https://sandbox.waafipay.net/asm" : "https://api.waafipay.net/asm") }
         : null,
     edahab:
       edahab.apiKey && edahab.agentCode

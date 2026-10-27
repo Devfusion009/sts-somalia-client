@@ -6,7 +6,7 @@ import { NAV_LINKS, PARTNER_LINKS } from "@/lib/nav-links";
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from "@/lib/marketing-nav";
 
 import { EmailIcon, PhoneInTalkIcon, PlaceIcon } from "@/components/ui/mui-icons";
-import { SOCIAL_ICONS } from "@/components/ui/social-icons";
+import { SocialIcon } from "@/components/ui/social-icons";
 import { SOCIAL_PLATFORMS } from "@/lib/social-platforms";
 import { getSocialLinks } from "@/lib/site-settings";
 const COMPANY_LINKS = [
@@ -120,7 +120,6 @@ export async function SiteFooter() {
             <span className="font-heading text-lg font-bold">Follow us</span>
             <ul className="flex items-center gap-3">
               {socials.map((social) => {
-                const Icon = SOCIAL_ICONS[social.platform];
                 return (
                   <li key={social.platform}>
                     <a
@@ -130,7 +129,7 @@ export async function SiteFooter() {
                       aria-label={SOCIAL_PLATFORMS[social.platform].label}
                       className="grid size-11 place-items-center rounded-full bg-white/10 text-sidebar-foreground transition-all duration-200 hover:scale-110 hover:bg-sidebar-primary hover:text-sidebar-primary-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
                     >
-                      <Icon sx={{ fontSize: 20 }} />
+                      <SocialIcon platform={social.platform} size={20} />
                     </a>
                   </li>
                 );

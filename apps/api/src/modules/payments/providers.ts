@@ -39,7 +39,7 @@ export async function initiateWithProvider(input: InitiationInput): Promise<Init
     case "sifalo":
       return gateways.sifalo ? initiateSifalo(input, gateways.sifalo, gateways.siteUrl) : missing;
     case "waafi":
-      return gateways.waafi ? initiateWaafi(input, gateways.waafi) : missing;
+      return gateways.waafi ? initiateWaafi(input, gateways.waafi, gateways.siteUrl) : missing;
     case "edahab":
       return gateways.edahab ? initiateEdahab(input, gateways.edahab) : missing;
     case "wallet":
@@ -122,7 +122,58 @@ async function initiateRazorpay(input: InitiationInput, gateway: RazorpayGateway
   return { type: "redirect", url: link.short_url, providerRef: link.id };
 }
 
-async function initiateWaafi(input: InitiationInput, gateway: WaafiGateway): Promise<InitiationResult> {
+/**
+ * WaafiPay hosted payment page: the customer pays on WaafiPay's page, then
+ * returns to the success URL, where WaafiService re-reads the result from
+ * WaafiPay before settling. The return URL query is never trusted.
+ */
+async function initiateWaafiHpp(
+  input: InitiationInput,
+  gateway: WaafiGateway & { hpp: NonNullable<WaafiGateway["hpp"]> },
+  siteUrl: string
+): Promise<InitiationResult> {
+  const returnUrl = `${siteUrl}/checkout/${input.orderId}/success?order_id=${input.paymentId}&gateway=waafi`;
+  const res = await fetch(gateway.apiUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      schemaVersion: "1.0",
+      requestId: input.paymentId,
+      timestamp: new Date().toISOString(),
+      channelName: "WEB",
+      serviceName: "HPP_PURCHASE",
+      serviceParams: {
+        merchantUid: gateway.merchantUid,
+        storeId: gateway.hpp.storeId,
+        hppKey: gateway.hpp.hppKey,
+        hppSuccessCallbackUrl: returnUrl,
+        hppFailureCallbackUrl: returnUrl,
+        hppRespDataFormat: 1,
+        paymentMethod: "MWALLET_ACCOUNT",
+        transactionInfo: {
+          referenceId: input.paymentId,
+          invoiceId: input.orderNumber,
+          amount: input.amount.toFixed(2),
+          currency: input.currency,
+          description: input.description,
+        },
+      },
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  const payload = (await res.json().catch(() => ({}))) as {
+    responseCode?: string;
+    responseMsg?: string;
+    params?: { hppUrl?: string; hppRequestId?: string };
+  };
+  if (payload.responseCode !== "2001" || !payload.params?.hppUrl) {
+    return { type: "error", message: "Could not start the payment. Try again or choose another method." };
+  }
+  return { type: "redirect", url: payload.params.hppUrl, providerRef: payload.params.hppRequestId };
+}
+
+async function initiateWaafi(input: InitiationInput, gateway: WaafiGateway, siteUrl: string): Promise<InitiationResult> {
+  if (gateway.hpp) return initiateWaafiHpp(input, { ...gateway, hpp: gateway.hpp }, siteUrl);
   const body = {
     schemaVersion: "1.0",
     requestId: input.paymentId,
