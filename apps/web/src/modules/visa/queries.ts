@@ -1,33 +1,57 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createAnonClient } from "@/lib/supabase/anon";
+import { cachedRead } from "@/lib/redis";
 import { matchesDestination } from "./search";
 
-export async function getVisaTypes(filters: { country?: string; category?: string } = {}) {
-  const supabase = await createClient();
-  let query = supabase
-    .from("visa_types")
-    .select("*")
-    .eq("status", "published")
-    .order("is_featured", { ascending: false })
-    .order("name");
-  if (filters.category) query = query.eq("visa_category", filters.category);
+// The public visa catalog is the same for every visitor, so it is cached in
+// Redis (tag "visa", cleared by the admin visa and nationality-rule actions)
+// and read with the signed-out client. The country filter runs after the
+// read so one cached list serves every search.
+const CATALOG_TTL_SECONDS = 300;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  const { data } = await query;
-  const visaTypes = data ?? [];
+export async function getVisaTypes(filters: { country?: string; category?: string } = {}) {
+  const visaTypes = await cachedRead(
+    `visa:list:${filters.category ?? "all"}`,
+    CATALOG_TTL_SECONDS,
+    async () => {
+      let query = createAnonClient()
+        .from("visa_types")
+        .select("*")
+        .eq("status", "published")
+        .order("is_featured", { ascending: false })
+        .order("name");
+      if (filters.category) query = query.eq("visa_category", filters.category);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    },
+    { tags: ["visa"] }
+  ).catch(() => []);
   if (!filters.country) return visaTypes;
 
   return visaTypes.filter((v) => matchesDestination(v.destination_country_code, filters.country!));
 }
 
 export async function getVisaTypeById(id: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("visa_types")
-    .select("*")
-    .eq("id", id)
-    .eq("status", "published")
-    .maybeSingle();
-  return data;
+  if (!UUID.test(id)) return null;
+  return cachedRead(
+    `visa:type:${id}`,
+    CATALOG_TTL_SECONDS,
+    async () => {
+      const { data, error } = await createAnonClient()
+        .from("visa_types")
+        .select("*")
+        .eq("id", id)
+        .eq("status", "published")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    // An unknown or unpublished id is not stored: ids a visitor invents must not fill the cache.
+    { tags: ["visa"], cacheIf: (value) => value !== null }
+  ).catch(() => null);
 }
 
 /**
@@ -38,12 +62,21 @@ export async function getVisaTypeById(id: string) {
  * quoted price here can never disagree with what the wizard later resolves.
  */
 export async function getResolvedVisaPricing(visaTypeId: string, nationalityCode: string) {
-  const supabase = await createClient();
-  const { data } = await supabase.rpc("resolve_visa_pricing", {
-    p_visa_type_id: visaTypeId,
-    p_nationality_code: nationalityCode,
-  });
-  return data?.[0] ?? null;
+  const nationality = nationalityCode.trim().toUpperCase();
+  if (!UUID.test(visaTypeId) || !/^[A-Z]{2}$/.test(nationality)) return null;
+  return cachedRead(
+    `visa:price:${visaTypeId}:${nationality}`,
+    CATALOG_TTL_SECONDS,
+    async () => {
+      const { data, error } = await createAnonClient().rpc("resolve_visa_pricing", {
+        p_visa_type_id: visaTypeId,
+        p_nationality_code: nationality,
+      });
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
+    { tags: ["visa"], cacheIf: (value) => value !== null }
+  ).catch(() => null);
 }
 
 /** The signed-in user's applications (any status), newest first. */

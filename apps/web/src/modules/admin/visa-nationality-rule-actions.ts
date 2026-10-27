@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
 import { parseDocumentSlotsJson } from "./visa-type-utils";
+import { invalidateCache } from "@/lib/redis";
 
 const ruleSchema = z.object({
   visaTypeId: z.string().uuid(),
@@ -58,6 +59,7 @@ export async function createVisaNationalityRule(_prev: ActionState, formData: Fo
       error: error.code === "23505" ? "A rule for this nationality already exists — edit it instead." : error.message,
     };
   }
+  await invalidateCache("visa");
   revalidatePath(`/admin/catalog/visa/${parsed.data.visaTypeId}/edit`);
   return { error: null };
 }
@@ -75,6 +77,7 @@ export async function updateVisaNationalityRule(_prev: ActionState, formData: Fo
     .update(ruleRow(parsed.data))
     .eq("id", ruleId.data);
   if (error) return { error: error.message };
+  await invalidateCache("visa");
   revalidatePath(`/admin/catalog/visa/${parsed.data.visaTypeId}/edit`);
   return { error: null };
 }
@@ -86,5 +89,6 @@ export async function deleteVisaNationalityRule(formData: FormData): Promise<voi
 
   const supabase = await createClient();
   await supabase.from("visa_nationality_rules").delete().eq("id", ruleId);
+  await invalidateCache("visa");
   revalidatePath(`/admin/catalog/visa/${visaTypeId}/edit`);
 }

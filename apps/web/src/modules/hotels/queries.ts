@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createAnonClient } from "@/lib/supabase/anon";
 import type { HotelCardData } from "@/modules/hotels/components/hotel-card";
 import { hotelImageUrls } from "@/modules/hotels/images";
 import { searchHotelbedsAvailability } from "@/lib/provider-runtime/hotelbeds";
@@ -42,22 +43,53 @@ const CARD_SELECT =
 
 // Marketing pages render this on every load with no filters — a good,
 // simple cache-aside target: published hotels don't change minute to
-// minute, so a short TTL trades a little staleness for cutting repeat
-// Supabase load. searchHotels() below is NOT cached the same way — it
-// blends in live third-party availability tied to specific dates, where
-// stale results mean showing a room that's no longer bookable.
-export async function getFeaturedHotels(limit = 4): Promise<HotelCardData[]> {
-  return cachedRead(`hotels:featured:${limit}`, 300, async () => {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("hotels")
-      .select(CARD_SELECT)
-      .eq("status", "published")
-      .order("created_at", { ascending: false })
-      .limit(limit);
+// minute. Cached under the "hotels" tag, which every admin, partner and
+// manager hotel edit clears; the TTL is the safety net. Read with the
+// signed-out client so the cached list never depends on who asked. Nothing
+// date-dependent is cached: the live third-party blend in searchHotels() and
+// rooms left for a stay stay uncached, since stale there means showing a
+// room that is no longer bookable.
+const HOTEL_TTL_SECONDS = 120;
 
-    return (data ?? []).map(toCardData);
-  });
+export async function getFeaturedHotels(limit = 4): Promise<HotelCardData[]> {
+  return cachedRead(
+    `hotels:featured:${limit}`,
+    HOTEL_TTL_SECONDS,
+    async () => {
+      const { data, error } = await createAnonClient()
+        .from("hotels")
+        .select(CARD_SELECT)
+        .eq("status", "published")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return (data ?? []).map(toCardData);
+    },
+    { tags: ["hotels"] }
+  ).catch(() => []);
+}
+
+/** Published hotels matching a city (all when empty), best rated first. Same for every visitor. */
+async function listPublishedHotels(cityName: string | undefined): Promise<HotelCardData[]> {
+  const needle = cityName?.trim().toLowerCase().slice(0, 60) ?? "";
+  return cachedRead(
+    `hotels:list:${needle || "all"}`,
+    HOTEL_TTL_SECONDS,
+    async () => {
+      let query = createAnonClient().from("hotels").select(CARD_SELECT).eq("status", "published");
+      if (needle) query = query.ilike("city", `%${needle}%`);
+      // nullsFirst: false — Postgres' default for DESC is NULLS FIRST, which
+      // ranks unrated hotels ahead of 5-star ones. Explicit here so a hotel
+      // missing a star rating sorts to the back of the list, not the front.
+      const { data, error } = await query
+        .order("star_rating", { ascending: false, nullsFirst: false })
+        .order("name");
+      if (error) throw error;
+      return (data ?? []).map(toCardData);
+    },
+    // A city nobody has is not stored: typed search terms must not fill the cache.
+    { tags: ["hotels"], cacheIf: (value) => Array.isArray(value) && value.length > 0 }
+  );
 }
 
 export async function searchHotels(filters: {
@@ -66,26 +98,13 @@ export async function searchHotels(filters: {
   checkOut?: string;
   adults?: number;
 }): Promise<HotelCardData[]> {
-  const supabase = await createClient();
-  let query = supabase.from("hotels").select(CARD_SELECT).eq("status", "published");
-
   // The city field carries whatever the autocomplete suggestion read, e.g.
   // "Bosaso, Puntland, Somalia" — hotels.city only ever holds the bare city
   // name, so matching the full string can never hit a row (the needle is
   // longer than the haystack). Match on the city segment alone.
   const cityName = filters.city?.split(",")[0]?.trim();
 
-  if (cityName) {
-    query = query.ilike("city", `%${cityName}%`);
-  }
-
-  // nullsFirst: false — Postgres' default for DESC is NULLS FIRST, which
-  // ranks unrated hotels ahead of 5-star ones. Explicit here so a hotel
-  // missing a star rating sorts to the back of the list, not the front.
-  const { data } = await query
-    .order("star_rating", { ascending: false, nullsFirst: false })
-    .order("name");
-  const internal = (data ?? []).map(toCardData);
+  const internal = await listPublishedHotels(cityName).catch(() => []);
 
   // Blend in live external-supplier availability — only meaningful with a
   // city and stay dates, same as any real hotel search. Failures here never
@@ -117,18 +136,28 @@ export async function searchHotels(filters: {
   return internal;
 }
 
-export async function getHotelBySlug(slug: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("hotels")
-    .select(
-      "id, slug, name, description, description_so, address_line, city, country_code, star_rating, amenities, images, status, booking_mode, phone, contact_email, check_in_time, check_out_time, policies, property_links(label, url, sort_order), property_reviews(id, author_name, rating, body, created_at), hotel_rooms(id, name, name_so, description, description_so, max_occupancy, bed_type, size_sqm, amenities, images, base_price, currency, status, total_units)"
-    )
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
+const SLUG = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 
-  return data;
+/** One published hotel with rooms, links and reviews. Rooms left and dated prices are read live elsewhere. */
+export async function getHotelBySlug(slug: string) {
+  if (!SLUG.test(slug)) return null;
+  return cachedRead(
+    `hotels:slug:${slug}`,
+    HOTEL_TTL_SECONDS,
+    async () => {
+      const { data, error } = await createAnonClient()
+        .from("hotels")
+        .select(
+          "id, slug, name, description, description_so, address_line, city, country_code, star_rating, amenities, images, status, booking_mode, phone, contact_email, check_in_time, check_out_time, policies, property_links(label, url, sort_order), property_reviews(id, author_name, rating, body, created_at), hotel_rooms(id, name, name_so, description, description_so, max_occupancy, bed_type, size_sqm, amenities, images, base_price, currency, status, total_units)"
+        )
+        .eq("slug", slug)
+        .eq("status", "published")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    { tags: ["hotels"], cacheIf: (value) => value !== null }
+  ).catch(() => null);
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

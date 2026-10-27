@@ -20,6 +20,7 @@ import { repriceQuotedOrder } from "@/modules/orders/helpers";
 import { commaList, parseLinks, replacePropertyLinks } from "@/modules/hotels/listing-fields";
 import { sanitizeKey, parseDocumentSlotsJson } from "./visa-type-utils";
 import { COUNTRY_NAMES } from "@/lib/countries";
+import { invalidateCache } from "@/lib/redis";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type ListingStatus = Database["public"]["Enums"]["listing_status"];
@@ -259,6 +260,7 @@ export async function createVisaType(_prev: ActionState, formData: FormData): Pr
   if (error || !created) return { error: error?.message ?? "Could not create the visa type." };
   await saveVisaTypeCentres(supabase, created.id, parsed.data.centreIds);
   const uploadError = await applyVisaCover(supabase, created.id, cover);
+  await invalidateCache("visa");
   revalidatePath("/admin/catalog/visa");
   revalidatePath("/visa");
   // The visa type exists at this point; reopen it so the image can be retried
@@ -280,6 +282,7 @@ export async function updateVisaType(_prev: ActionState, formData: FormData): Pr
   if (error) return { error: error.message };
   await saveVisaTypeCentres(supabase, id, parsed.data.centreIds);
   const uploadError = await applyVisaCover(supabase, id, cover);
+  await invalidateCache("visa");
   if (uploadError) return { error: uploadError };
   revalidatePath("/visa");
   revalidatePath("/admin/catalog/visa");
@@ -504,6 +507,7 @@ export async function createVenue(_prev: ActionState, formData: FormData): Promi
     .single();
   if (error || !venue) return { error: error?.code === "23505" ? "A venue with this name already exists." : "Could not create the venue." };
   await replacePropertyLinks(supabase, { venueId: venue.id }, parseLinks(parsed.data.links));
+  await invalidateCache("events");
   revalidatePath("/admin/events");
   revalidatePath("/events");
   return { error: null };
@@ -519,6 +523,7 @@ export async function updateVenue(_prev: ActionState, formData: FormData): Promi
   const { error } = await supabase.from("event_venues").update(venueRow(parsed.data)).eq("id", id);
   if (error) return { error: "Could not save the venue." };
   await replacePropertyLinks(supabase, { venueId: id }, parseLinks(parsed.data.links));
+  await invalidateCache("events");
   revalidatePath("/admin/events");
   revalidatePath("/events");
   return { error: null };
@@ -722,6 +727,7 @@ export async function adminSetHotelStatus(_prev: ActionState, formData: FormData
   const supabase = await createClient();
   const { error } = await supabase.from("hotels").update({ status }).eq("id", hotelId);
   if (error) return { error: error.message };
+  await invalidateCache("hotels");
   revalidatePath("/admin/hotels");
   revalidatePath(`/admin/hotels/${hotelId}`);
   return { error: null };
@@ -736,6 +742,7 @@ export async function adminSetRoomStatus(_prev: ActionState, formData: FormData)
   const supabase = await createClient();
   const { error } = await supabase.from("hotel_rooms").update({ status }).eq("id", roomId);
   if (error) return { error: error.message };
+  await invalidateCache("hotels");
   revalidatePath("/admin/hotels", "layout");
   return { error: null };
 }
@@ -827,6 +834,7 @@ export async function createHotel(_prev: ActionState, formData: FormData): Promi
     .single();
   if (error || !hotel) return { error: error?.message ?? "Could not create the hotel." };
   await replacePropertyLinks(supabase, { hotelId: hotel.id }, parseLinks(parsed.data.links));
+  await invalidateCache("hotels");
   revalidatePath("/admin/hotels");
   revalidatePath("/hotels");
   return { error: null };
@@ -842,6 +850,7 @@ export async function updateHotel(_prev: ActionState, formData: FormData): Promi
   const { error } = await supabase.from("hotels").update(hotelRow(parsed.data)).eq("id", id);
   if (error) return { error: error.message };
   await replacePropertyLinks(supabase, { hotelId: id }, parseLinks(parsed.data.links));
+  await invalidateCache("hotels");
   revalidatePath("/admin/hotels");
   revalidatePath(`/admin/hotels/${id}`);
   revalidatePath("/hotels");
@@ -948,6 +957,7 @@ export async function createRoom(_prev: ActionState, formData: FormData): Promis
   }
 
   await rememberRoomType(supabase, parsed.data.name);
+  await invalidateCache("hotels");
   revalidatePath(`/admin/hotels/${hotelId}`);
   return { error: null };
 }
@@ -963,6 +973,7 @@ export async function updateRoom(_prev: ActionState, formData: FormData): Promis
   const { error } = await supabase.from("hotel_rooms").update(roomRow(parsed.data)).eq("id", roomId);
   if (error) return { error: error.message };
   await rememberRoomType(supabase, parsed.data.name);
+  await invalidateCache("hotels");
   revalidatePath(`/admin/hotels/${hotelId}`);
   return { error: null };
 }
@@ -1076,6 +1087,7 @@ export async function createPropertyReview(_prev: ActionState, formData: FormDat
   });
   if (error) return { error: error.message };
 
+  await invalidateCache("hotels");
   revalidatePath(hotelId ? `/admin/hotels/${hotelId}` : `/admin/events/${venueId}`);
   return { error: null };
 }
@@ -1088,6 +1100,7 @@ export async function deletePropertyReview(formData: FormData): Promise<void> {
 
   const supabase = await createClient();
   await supabase.from("property_reviews").delete().eq("id", reviewId);
+  await invalidateCache("hotels");
   revalidatePath(hotelId ? `/admin/hotels/${hotelId}` : `/admin/events/${venueId}`);
 }
 

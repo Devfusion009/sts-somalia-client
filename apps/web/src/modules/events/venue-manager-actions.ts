@@ -17,6 +17,7 @@ import type { VenueManagerPermission } from "./venue-manager-permissions";
 import { OFFLINE_PAYMENT_METHODS, hallSlotLabel, type VenueBookingResult } from "./venue-desk-types";
 import { requireVenueAccess, revalidateVenueDesk } from "./venue-access";
 import { nextHallBookingMoves } from "./hall-transitions";
+import { invalidateCache } from "@/lib/redis";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a valid date.");
 const clockTime = z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid time.");
@@ -519,6 +520,7 @@ export async function updateVenueProfileAsManager(_prev: ActionState, formData: 
     .eq("id", parsed.data.venueId);
   if (error) return { error: "The profile could not be saved." };
 
+  await invalidateCache("events");
   revalidatePath(`/manager/venues/${parsed.data.venueId}/profile`);
   revalidatePath("/events", "layout");
   return { error: null };
