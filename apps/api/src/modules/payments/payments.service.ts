@@ -4,6 +4,7 @@ import { RlsSupabaseService } from "../../infra/supabase/rls-supabase.service";
 import { AdminSupabaseService } from "../../infra/supabase/admin-supabase.service";
 import { OrdersService } from "../orders/orders.service";
 import { SifaloService, type SifaloSettlement } from "./sifalo.service";
+import { WaafiService } from "./waafi.service";
 import { getPaymentMethod } from "./registry";
 import { initiateWithProvider } from "./providers";
 import type { InitiationResult, InitiatePaymentInput, RecordPaymentInput } from "@sts/shared-types";
@@ -24,7 +25,8 @@ export class PaymentsService {
     private readonly rls: RlsSupabaseService,
     private readonly admin: AdminSupabaseService,
     private readonly orders: OrdersService,
-    private readonly sifalo: SifaloService
+    private readonly sifalo: SifaloService,
+    private readonly waafi: WaafiService
   ) {}
 
   /** Sum of this order's already-succeeded payments — the source of truth for balance due. */
@@ -49,6 +51,17 @@ export class PaymentsService {
     if (!PAYABLE_ORDER_STATUSES.includes(order.status as (typeof PAYABLE_ORDER_STATUSES)[number])) {
       return { error: "This order is not awaiting payment." };
     }
+
+    const { data: stayItems } = await supabase
+      .from("order_items")
+      .select("hotel_booking:hotel_booking_id (status), hall_booking:hall_booking_id (status)")
+      .eq("order_id", order.id);
+    const waiting = (stayItems ?? []).some((item) => {
+      const hotel = item.hotel_booking as unknown as { status: string } | null;
+      const hall = item.hall_booking as unknown as { status: string } | null;
+      return hotel?.status === "waitlisted" || hall?.status === "waitlisted";
+    });
+    if (waiting) return { error: "This booking is waiting for confirmation." };
 
     const { data: hallItems } = await supabase
       .from("order_items")
@@ -218,6 +231,13 @@ export class PaymentsService {
     const { data: payment } = await this.rls.get().from("payments").select("id, order_id").eq("id", paymentId).maybeSingle();
     if (!payment) return { status: "ignored", orderId: null };
     return { status: await this.sifalo.settle(payment.id, sid), orderId: payment.order_id };
+  }
+
+  /** The customer's browser returns from WaafiPay's hosted page. RLS proves the payment is theirs; WaafiService re-reads the result from WaafiPay. */
+  async confirmWaafiReturn(paymentId: string): Promise<{ status: SifaloSettlement; orderId: string | null }> {
+    const { data: payment } = await this.rls.get().from("payments").select("id, order_id").eq("id", paymentId).maybeSingle();
+    if (!payment) return { status: "ignored", orderId: null };
+    return { status: await this.waafi.settle(payment.id), orderId: payment.order_id };
   }
 
   async cancelPendingPayment(paymentId: string) {

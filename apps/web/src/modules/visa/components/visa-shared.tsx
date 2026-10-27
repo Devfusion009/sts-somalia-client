@@ -24,6 +24,11 @@ export function fmtMoney(amount: number | string, currency: string) {
   })}`;
 }
 
+/** Always two decimals, for fee breakdowns where lines must add up visibly. */
+export function fmtMoneyExact(amount: number | string, currency: string) {
+  return `${currency} ${Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 const STATUS_BADGE_VARIANTS: Partial<Record<string, BadgeVariant>> = {
   additional_info_required: "warning",
   ready_for_processing: "info",

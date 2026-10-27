@@ -6,6 +6,8 @@ import { useState, type FormEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LocationField } from "@/components/location-field";
+import { OccupancyPicker } from "@/modules/hotels/components/occupancy-picker";
+import { formatOccupancy, occupancyTotals, parseOccupancy } from "@/modules/hotels/booking-options";
 
 import { CalendarMonthIcon, PeopleAltIcon, PlaceIcon, SearchIcon } from "@/components/ui/mui-icons";
 const today = new Date().toISOString().slice(0, 10);
@@ -15,6 +17,7 @@ export type HotelSearchValues = {
   checkIn: string;
   checkOut: string;
   guests: string;
+  occ: string;
 };
 
 const CELL = "relative flex-1 px-4 py-2.5 transition-colors focus-within:bg-white/10";
@@ -41,7 +44,12 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
     if (values.city) params.set("city", values.city);
     if (values.checkIn) params.set("checkIn", values.checkIn);
     if (values.checkOut) params.set("checkOut", values.checkOut);
-    if (values.guests) params.set("guests", values.guests);
+    if (values.occ) {
+      params.set("occ", values.occ);
+      params.set("guests", String(occupancyTotals(parseOccupancy(values.occ)).guests));
+    } else if (values.guests) {
+      params.set("guests", values.guests);
+    }
     router.push(`/hotels${params.toString() ? `?${params.toString()}` : ""}`);
   }
 
@@ -107,16 +115,12 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
         <Label htmlFor="guests" className={FIELD_LABEL}>
           <PeopleAltIcon sx={{ fontSize: 14 }} aria-hidden /> Guests
         </Label>
-        <Input
+        <OccupancyPicker
           id="guests"
-          type="number"
-          autoComplete="off"
-          placeholder="2 guests"
-          min={1}
-          max={30}
-          value={values.guests}
-          onChange={(e) => set("guests", e.target.value)}
-          className={FIELD_INPUT}
+          name={null}
+          value={parseOccupancy(values.occ, Number.parseInt(values.guests, 10) || undefined)}
+          onChange={(rooms) => set("occ", formatOccupancy(rooms))}
+          className="h-9 border-0 bg-transparent px-0 text-base font-medium text-white shadow-none hover:border-0 focus-visible:ring-0 sm:text-sm dark:bg-transparent [&_svg]:hidden"
         />
       </div>
 

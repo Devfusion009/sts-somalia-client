@@ -13,7 +13,14 @@ import { env } from "../config/env";
 
 export type StripeGateway = { secretKey: string; webhookSecret: string | null };
 export type RazorpayGateway = { keyId: string; keySecret: string; webhookSecret: string | null };
-export type WaafiGateway = { merchantUid: string; apiUserId: string; apiKey: string; apiUrl: string };
+export type WaafiGateway = {
+  merchantUid: string;
+  apiUserId: string;
+  apiKey: string;
+  apiUrl: string;
+  /** Hosted payment page credentials. Null when only the direct wallet API is configured. */
+  hpp: { storeId: string; hppKey: string } | null;
+};
 export type EdahabGateway = { apiKey: string; agentCode: string; apiUrl: string };
 /** Sifalo Pay: Somali mobile money (EVC Plus, ZAAD, Sahal, eDahab, Premier Wallet) and Visa/Mastercard behind one hosted checkout. */
 export type SifaloGateway = {
@@ -97,6 +104,9 @@ export async function getPaymentGateways(): Promise<PaymentGateways> {
     merchantUid: waafiDb?.merchant_uid ?? config.WAAFI_MERCHANT_UID,
     apiUserId: waafiDb?.api_user_id ?? config.WAAFI_API_USER_ID,
     apiKey: waafiDb?.api_key ?? config.WAAFI_API_KEY,
+    storeId: waafiDb?.store_id,
+    hppKey: waafiDb?.hpp_key,
+    sandbox: waafiDb?.environment === "sandbox",
   };
   const edahab = {
     apiKey: edahabDb?.api_key ?? config.EDAHAB_API_KEY,
@@ -138,7 +148,8 @@ export async function getPaymentGateways(): Promise<PaymentGateways> {
             merchantUid: waafi.merchantUid,
             apiUserId: waafi.apiUserId,
             apiKey: waafi.apiKey,
-            apiUrl: config.WAAFI_API_URL ?? "https://api.waafipay.net/asm",
+            apiUrl: config.WAAFI_API_URL ?? (waafi.sandbox ? "https://sandbox.waafipay.net/asm" : "https://api.waafipay.net/asm"),
+            hpp: waafi.storeId && waafi.hppKey ? { storeId: waafi.storeId, hppKey: waafi.hppKey } : null,
           }
         : null,
     edahab:

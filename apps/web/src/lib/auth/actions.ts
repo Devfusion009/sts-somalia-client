@@ -4,8 +4,11 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { pathPrefixFor, rootOrigin, type PortalSubdomain } from "@/lib/subdomain";
-import { recordLoginEvent } from "@/lib/auth/login-history";
+import { recordLoginEvent, recordSecurityEvent } from "@/lib/auth/login-history";
+import { sessionIdFromAccessToken } from "@/lib/auth/device";
+import { consumeRecoveryCode } from "@/lib/auth/recovery-codes";
 
 /** `orderId` is set by desk bookings so a group submission can collect the orders it created. */
 export type ActionState = {
@@ -32,7 +35,7 @@ export async function signInAction(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { data: signIn, error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
     return { error: "Incorrect email or password." };
   }
@@ -57,7 +60,10 @@ export async function signInAction(
     // CUSTOMER form still appears in login history — that is precisely the
     // event worth being able to see afterwards. Awaited but internally
     // swallowed: it can slow login slightly, never break it.
-    await recordLoginEvent(user.id, profile?.role ?? undefined);
+    await recordLoginEvent(user.id, profile?.role ?? undefined, {
+      sessionId: sessionIdFromAccessToken(signIn.session?.access_token),
+      email: user.email,
+    });
 
     // The customer sign-in box is NOT an entry point to the platform console.
     //
@@ -296,11 +302,24 @@ async function signInToPortalAction(
     return { error: "Incorrect email or password." };
   }
 
+  return finishPortalSignIn(portal, supabase, formData, "Incorrect email or password.");
+}
+
+/**
+ * Everything after a successful password check, shared by the email form and
+ * the agent-code form: audience check, 2FA step-up, destination.
+ */
+async function finishPortalSignIn(
+  portal: PortalKind,
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  formData: FormData,
+  failure: string
+): Promise<ActionState> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return { error: "Incorrect email or password." };
+    return { error: failure };
   }
 
   if (!(await holdsPortalAudience(portal, supabase, user.id))) {
@@ -308,8 +327,14 @@ async function signInToPortalAction(
     // as a silent failure — sign back out before surfacing the error so the
     // account isn't left half-authenticated into a portal it can't use.
     await supabase.auth.signOut();
-    return { error: "Incorrect email or password." };
+    return { error: failure };
   }
+
+  const { data: claims } = await supabase.auth.getClaims();
+  await recordLoginEvent(user.id, portal, {
+    sessionId: typeof claims?.claims.session_id === "string" ? claims.claims.session_id : null,
+    email: user.email,
+  });
 
   const redirectTo = formData.get("redirect_to");
   const finalDestination =
@@ -341,6 +366,62 @@ async function signInToPortalAction(
 }
 
 export const signInToAgentPortalAction = signInToPortalAction.bind(null, "agent");
+
+const agentCodeSchema = z.object({
+  agentCode: z
+    .string()
+    .trim()
+    .min(1, "Enter your agent code.")
+    .transform((v) => v.toUpperCase()),
+  username: z
+    .string()
+    .trim()
+    .min(1, "Enter your username.")
+    .transform((v) => v.toLowerCase()),
+  password: z.string().min(1, "Enter your password."),
+});
+
+const AGENT_SIGN_IN_FAILURE = "Incorrect agent code, username or password.";
+
+/**
+ * /agent/login: agent code + username + password. The pair resolves to the
+ * member's account email on the server (agent_login_email is service-role
+ * only), then the normal password sign-in runs with that email. Every miss
+ * returns the same line, so the form never tells which part was wrong.
+ */
+export async function signInWithAgentCodeAction(
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = agentCodeSchema.safeParse({
+    agentCode: formData.get("agentCode"),
+    username: formData.get("username"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+  const { agentCode, username, password } = parsed.data;
+  if (!/^[A-Z0-9]{3,20}$/.test(agentCode) || !/^[a-z0-9][a-z0-9._-]{2,29}$/.test(username)) {
+    return { error: AGENT_SIGN_IN_FAILURE };
+  }
+
+  const { data: email } = await createAdminClient().rpc("agent_login_email", {
+    p_agent_code: agentCode,
+    p_username: username,
+  });
+  if (!email) {
+    return { error: AGENT_SIGN_IN_FAILURE };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    return { error: AGENT_SIGN_IN_FAILURE };
+  }
+
+  return finishPortalSignIn("agent", supabase, formData, AGENT_SIGN_IN_FAILURE);
+}
 export const signInToAdminPortalAction = signInToPortalAction.bind(null, "admin");
 export const signInToManagerPortalAction = signInToPortalAction.bind(null, "manager");
 export const signInToAffiliatePortalAction = signInToPortalAction.bind(null, "affiliate");
@@ -398,29 +479,69 @@ export async function verifyMfaChallengeAction(
 
   const supabase = await createClient();
   const { data: factorsData } = await supabase.auth.mfa.listFactors();
-  const factor = factorsData?.totp.find((f) => f.status === "verified");
-  if (!factor) {
+  const factors = factorsData?.totp.filter((f) => f.status === "verified") ?? [];
+  if (factors.length === 0) {
     return { error: "No authenticator app is enrolled on this account." };
   }
 
-  const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
-    factorId: factor.id,
-  });
-  if (challengeError || !challenge) {
-    return { error: challengeError?.message ?? "Could not start the verification challenge." };
+  // Each authenticator has its own secret: the code matches exactly one of them.
+  let verified = false;
+  for (const factor of factors) {
+    const { data: challenge } = await supabase.auth.mfa.challenge({ factorId: factor.id });
+    if (!challenge) continue;
+    const { error: verifyError } = await supabase.auth.mfa.verify({
+      factorId: factor.id,
+      challengeId: challenge.id,
+      code: parsed.data.code,
+    });
+    if (!verifyError) {
+      verified = true;
+      break;
+    }
   }
-
-  const { error: verifyError } = await supabase.auth.mfa.verify({
-    factorId: factor.id,
-    challengeId: challenge.id,
-    code: parsed.data.code,
-  });
-  if (verifyError) {
+  if (!verified) {
     return { error: "That code didn't match — check the time on your device and try again." };
   }
 
   const redirectTo = formData.get("redirect_to");
   redirect(typeof redirectTo === "string" && redirectTo ? redirectTo : "/account");
+}
+
+const recoveryCodeSchema = z.object({
+  code: z.string().trim().min(8, "Enter a recovery code.").max(32, "Enter a recovery code."),
+});
+
+/**
+ * Sign-in with a lost authenticator: a one-time recovery code removes the
+ * account's authenticators so the password session can continue, and the
+ * guest lands on the security page to set up two-factor again. The code is
+ * spent even if what follows fails.
+ */
+export async function verifyRecoveryCodeAction(
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = recoveryCodeSchema.safeParse({ code: formData.get("code") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/login");
+  }
+
+  const result = await consumeRecoveryCode(user.id, parsed.data.code);
+  if (!result.ok) {
+    return { error: "That recovery code isn't valid or was already used." };
+  }
+
+  await supabase.auth.refreshSession();
+  await recordSecurityEvent(user.id, "recovery_code_used", { email: user.email });
+  redirect("/account/security");
 }
 
 const emailSchema = z.object({ email: z.string().email("Enter a valid email address.") });

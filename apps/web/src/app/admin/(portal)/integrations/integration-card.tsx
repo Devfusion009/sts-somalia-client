@@ -7,6 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/password-input";
+import { Input } from "@/components/ui/input";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 import { Label } from "@/components/ui/label";
 import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
@@ -162,12 +164,34 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
                   <FieldLabel htmlFor={`${provider.key}-${field.key}`} className="font-normal text-muted-foreground">
                     {field.label}
                   </FieldLabel>
-                  <PasswordInput
-                    id={`${provider.key}-${field.key}`}
-                    name={field.key}
-                    placeholder={status.hasCredentials ? "Saved — enter to replace" : field.placeholder}
-                    autoComplete="off"
-                  />
+                  {field.options ? (
+                    <select
+                      id={`${provider.key}-${field.key}`}
+                      name={field.key}
+                      defaultValue={status.fieldValues[field.key] ?? field.options[0].value}
+                      className={NATIVE_SELECT_CLASS}
+                    >
+                      {field.options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field.plain ? (
+                    <Input
+                      id={`${provider.key}-${field.key}`}
+                      name={field.key}
+                      placeholder={status.hasCredentials ? "Saved — enter to replace" : field.placeholder}
+                      autoComplete="off"
+                    />
+                  ) : (
+                    <PasswordInput
+                      id={`${provider.key}-${field.key}`}
+                      name={field.key}
+                      placeholder={status.hasCredentials ? "Saved — enter to replace" : field.placeholder}
+                      autoComplete="off"
+                    />
+                  )}
                 </Field>
               ))}
             </div>

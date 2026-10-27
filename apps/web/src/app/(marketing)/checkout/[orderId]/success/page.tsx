@@ -19,10 +19,10 @@ export default async function CheckoutSuccessPage({
   searchParams,
 }: {
   params: Promise<{ orderId: string }>;
-  searchParams: Promise<{ order_id?: string; sid?: string }>;
+  searchParams: Promise<{ order_id?: string; sid?: string; gateway?: string }>;
 }) {
   const { orderId } = await params;
-  const { order_id: returnedPaymentId, sid } = await searchParams;
+  const { order_id: returnedPaymentId, sid, gateway } = await searchParams;
   await requireUser();
 
   const trpc = await getServerTrpc();
@@ -31,6 +31,10 @@ export default async function CheckoutSuccessPage({
   // the webhook has not arrived yet.
   if (returnedPaymentId && sid) {
     await trpc.payments.confirmSifalo.mutate({ paymentId: returnedPaymentId, sid }).catch(() => null);
+  }
+  // Back from WaafiPay's hosted page: same rule, the result is re-read from WaafiPay.
+  if (returnedPaymentId && gateway === "waafi") {
+    await trpc.payments.confirmWaafi.mutate({ paymentId: returnedPaymentId }).catch(() => null);
   }
   let order: CheckoutOrderRow | null;
   try {

@@ -261,6 +261,14 @@
   .animate-progress-sweep { animation: progress-sweep 1.3s ease-in-out infinite; }
 }
 
+/* Pages with a mobile booking bar (visa detail) lift the floating WhatsApp
+   button above it, so it never covers the Apply action. */
+@media (max-width: 63.99rem) {
+  body:has([data-mobile-booking-bar]) [data-floating-whatsapp] {
+    bottom: calc(5.75rem + env(safe-area-inset-bottom));
+  }
+}
+
 /* Skeleton shimmer: a soft light band travels across a still base so the
    placeholder reads as "loading" rather than "flickering". Reduced-motion
    users get the static base. */

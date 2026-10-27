@@ -71,6 +71,10 @@ export class EventsService {
     const venue = await this.venues.findPublishedForBooking(input.venueId);
     if (!venue) throw new BadRequestException("This venue is no longer available.");
 
+    if (Number(venue.base_price) <= 0) {
+      throw new BadRequestException("This venue has no price yet. Contact us to book it.");
+    }
+
     const capacity = venueCapacity(venue);
     if (capacity && input.expectedGuests > capacity) {
       throw new BadRequestException(`This venue holds up to ${capacity} guests.`);
@@ -107,6 +111,8 @@ export class EventsService {
       startTime: input.startTime,
       endTime: input.endTime,
     });
+
+    if (price.needsTimes) throw new BadRequestException("Choose a start and end time.");
 
     const booking = await this.bookings.insert({
       venue_id: venue.id,
@@ -155,10 +161,7 @@ export class EventsService {
       hallBookingId: booking.id,
     });
 
-    // Per-person and price-on-request venues, and per-hour bookings sent
-    // without times, are quoted by the venue before anything is paid.
-    const requiresPriceConfirmation =
-      venue.price_unit === "per_person" || Number(venue.base_price) === 0 || price.needsTimes;
-    return { orderId: order.id, requiresPriceConfirmation };
+    // Every venue here has a price, so the booking is paid at checkout.
+    return { orderId: order.id, requiresPriceConfirmation: false };
   }
 }

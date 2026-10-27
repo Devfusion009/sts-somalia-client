@@ -5,7 +5,7 @@ import { Globe, MapPin, Phone, ShieldCheck } from "lucide-react";
 import { AgentLoginForm } from "@/components/auth/agent-login-form";
 import { AgentLoginBrandPanel } from "@/components/auth/agent-login-panel";
 import { AuthFooterLink } from "@/components/auth/auth-frame";
-import { signInToAgentPortalAction } from "@/lib/auth/actions";
+import { signInToAgentPortalAction, signInWithAgentCodeAction } from "@/lib/auth/actions";
 import { DEMO_LOGIN_ENABLED, DEMO_ACCOUNTS } from "@/modules/demo/config";
 import { rootOrigin } from "@/lib/subdomain";
 
@@ -40,7 +40,8 @@ export default async function AgentLoginPage({
 
             <div className="mt-6">
               <AgentLoginForm
-                action={signInToAgentPortalAction}
+                action={signInWithAgentCodeAction}
+                demoAction={signInToAgentPortalAction}
                 redirectTo={redirect_to}
                 demoAccount={DEMO_LOGIN_ENABLED ? DEMO_ACCOUNTS.agent : undefined}
               />

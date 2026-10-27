@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
-import { notifyApplicant } from "@/lib/notifications/application-notify";
+import { notifyApplicant, type AgentLogin } from "@/lib/notifications/application-notify";
 import { docSlotsFor } from "@/modules/partner-applications/config";
 import type { ActionState } from "@/lib/auth/actions";
 import type { ApplicationType } from "@/modules/admin/queries";
@@ -78,9 +78,9 @@ const IN_APP_NOTIFICATION_CONTENT: Record<
   "approved" | "rejected" | "more_info_requested",
   (type: ApplicationType, referenceNumber: string, message?: string | null) => { title: string; body: string }
 > = {
-  approved: (type, ref) => ({
+  approved: (type, ref, message) => ({
     title: "Your partner application was approved",
-    body: `${TYPE_LABEL_FOR_NOTIFY[type]} application ${ref} is approved — open your new portal from Partner Applications.`,
+    body: `${TYPE_LABEL_FOR_NOTIFY[type]} application ${ref} is approved — open your new portal from Partner Applications.${message ? ` ${message}` : ""}`,
   }),
   rejected: (type, ref, message) => ({
     title: "Your partner application wasn't approved",
@@ -212,6 +212,7 @@ export async function approveApplication(
   const info = await loadApplicantInfo(supabase, type, applicationId);
 
   let error: { message: string } | null = null;
+  let agentLogin: AgentLogin | null = null;
 
   if (type === "agency") {
     const { data: appRow } = await supabase
@@ -234,6 +235,19 @@ export async function approveApplication(
     if (!error && result.data && logoPath) {
       await carryOverAgencyLogo(supabase, result.data, logoPath);
     }
+
+    // The agent code and the owner's username are issued by the database
+    // as the agency and its owner membership are created.
+    if (!error && result.data) {
+      const { data: owner } = await supabase
+        .from("agency_members")
+        .select("username, agency:agencies(agent_code)")
+        .eq("agency_id", result.data)
+        .eq("role_in_agency", "owner")
+        .maybeSingle();
+      const agentCode = (owner?.agency as { agent_code: string } | null)?.agent_code;
+      if (owner && agentCode) agentLogin = { agentCode, username: owner.username };
+    }
   } else {
     const result = await supabase.rpc(APPROVE_RPC[type], { application_id: applicationId, p_note: note });
     error = result.error;
@@ -248,6 +262,7 @@ export async function approveApplication(
       applicantPhone: info.phone,
       referenceNumber: info.referenceNumber,
       event: "approved",
+      agentLogin,
     });
     emailSent = result.emailSent;
     await notifyApplicantInApp(supabase, {
@@ -255,6 +270,7 @@ export async function approveApplication(
       type,
       referenceNumber: info.referenceNumber,
       event: "approved",
+      message: agentLogin ? `Agent code ${agentLogin.agentCode}, username ${agentLogin.username}.` : null,
     });
   }
 

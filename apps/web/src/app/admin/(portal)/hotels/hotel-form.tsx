@@ -216,18 +216,6 @@ export function HotelForm({ hotel, partners }: { hotel?: Hotel; partners: Array<
             </Field>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel>Booking mode</FieldLabel>
-                <Select name="bookingMode" defaultValue={hotel?.booking_mode ?? "manual"}>
-                  <SelectTrigger className="w-full" aria-label="Booking mode">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="instant">Instant</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field>
                 <FieldLabel>Status</FieldLabel>
                 <Select name="status" defaultValue={hotel?.status ?? "draft"}>
                   <SelectTrigger className="w-full" aria-label="Status">

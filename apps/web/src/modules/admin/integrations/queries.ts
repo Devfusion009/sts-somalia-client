@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { decryptCredentials } from "@/lib/integrations-crypto";
 import { PROVIDER_CATALOG, type ProviderDefinition } from "@/lib/provider-catalog";
 
 export type IntegrationStatus = {
@@ -11,6 +12,8 @@ export type IntegrationStatus = {
   lastTestMessage: string | null;
   /** Behavioural config (non-secret) — populated only for providers that use it, e.g. "custom". */
   config: Record<string, unknown>;
+  /** Saved values of dropdown fields (e.g. WaafiPay environment). Secrets are never included. */
+  fieldValues: Record<string, string>;
 };
 
 export async function getIntegrationsForAdmin(): Promise<IntegrationStatus[]> {
@@ -23,6 +26,17 @@ export async function getIntegrationsForAdmin(): Promise<IntegrationStatus[]> {
 
   return PROVIDER_CATALOG.map((provider) => {
     const row = rowByKey.get(provider.key);
+    const fieldValues: Record<string, string> = {};
+    if (row?.credentials_encrypted && provider.credentialFields.some((f) => f.options)) {
+      try {
+        const saved = decryptCredentials(row.credentials_encrypted);
+        for (const field of provider.credentialFields) {
+          if (field.options && saved[field.key]) fieldValues[field.key] = saved[field.key];
+        }
+      } catch {
+        // Unreadable credentials show the default option.
+      }
+    }
     return {
       provider,
       isActive: row?.is_active ?? false,
@@ -31,6 +45,7 @@ export async function getIntegrationsForAdmin(): Promise<IntegrationStatus[]> {
       lastTestOk: row?.last_test_ok ?? null,
       lastTestMessage: row?.last_test_message ?? null,
       config: (row?.config as Record<string, unknown>) ?? {},
+      fieldValues,
     };
   });
 }

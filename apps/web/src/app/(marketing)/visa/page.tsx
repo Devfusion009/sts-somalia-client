@@ -68,9 +68,12 @@ const WHY_US = [
 export default async function VisaListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ country?: string }>;
+  searchParams: Promise<{ country?: string; from?: string }>;
 }) {
-  const { country } = await searchParams;
+  const { country, from } = await searchParams;
+  // The traveller's passport country, picked in the hero search. Unknown codes are ignored.
+  const passport = from && /^[A-Za-z]{2}$/.test(from) && countryName(from.toUpperCase()) !== from.toUpperCase() ? from.toUpperCase() : null;
+  const visaHref = (id: string) => (passport ? `/visa/${id}?nationality=${passport}` : `/visa/${id}`);
   const allVisaTypes = await getVisaTypes();
   const destinations = destinationOptions(allVisaTypes);
   const visaTypes = country
@@ -90,7 +93,7 @@ export default async function VisaListPage({
             case to a decision.
           </p>
 
-          <VisaDestinationSearch destinations={destinations} defaultValue={country} />
+          <VisaDestinationSearch destinations={destinations} defaultValue={country} defaultPassport={passport} />
 
           <ul className="mt-7 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-6">
             {TRUST_POINTS.map((point) => (
@@ -114,7 +117,7 @@ export default async function VisaListPage({
                 return (
                   <li key={visa.id}>
                     <Link
-                      href={`/visa/${visa.id}`}
+                      href={visaHref(visa.id)}
                       className="group block rounded-2xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
                     >
                       <div className="relative flex aspect-4/3 items-center justify-center overflow-hidden rounded-2xl bg-secondary">
@@ -184,7 +187,7 @@ export default async function VisaListPage({
                         </p>
                         <h3 className="font-heading text-base font-bold">
                           <Link
-                            href={`/visa/${visa.id}`}
+                            href={visaHref(visa.id)}
                             className="rounded-sm hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                           >
                             {visa.name}
@@ -213,7 +216,12 @@ export default async function VisaListPage({
                           </div>
                         </dl>
                         <div className="mt-2.5">
-                          <VisaRequirementBadge destinationCountryName={countryName(visa.destination_country_code)} />
+                          {passport ? (
+                            <VisaRequirementBadge
+                              destinationCountryName={countryName(visa.destination_country_code)}
+                              nationalityCode={passport}
+                            />
+                          ) : null}
                         </div>
                       </div>
                       <div className="flex items-end justify-between gap-3 border-t border-border pt-4 sm:block sm:shrink-0 sm:border-0 sm:pt-0 sm:text-right">
@@ -223,7 +231,7 @@ export default async function VisaListPage({
                             {fmtMoney(visa.price, visa.currency)}
                           </span>
                         </p>
-                        <Button className="gap-1 sm:mt-2" render={<Link href={`/visa/${visa.id}`} />}>
+                        <Button className="gap-1 sm:mt-2" render={<Link href={visaHref(visa.id)} />}>
                           Apply <ArrowRight className="size-3.5" aria-hidden />
                           <span className="sr-only">for {visa.name}</span>
                         </Button>

@@ -124,7 +124,6 @@ export default async function AdminHotelsPage({
                     >
                       {hotel.name}
                     </Link>
-                    <p className="text-xs text-muted-foreground capitalize">{hotel.booking_mode} booking</p>
                   </TableCell>
                   <TableCell>{hotel.city}</TableCell>
                   <TableCell numeric>{hotel.star_rating ? `${hotel.star_rating}★` : "—"}</TableCell>

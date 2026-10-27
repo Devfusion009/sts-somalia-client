@@ -5,6 +5,9 @@ import { getIntegrations } from "@/lib/integrations";
 
 export type ApplicationType = "agency" | "hotel_partner" | "affiliate" | "venue_partner";
 
+/** Agent Portal sign-in details issued on an agency approval. */
+export type AgentLogin = { agentCode: string; username: string };
+
 const PORTAL_LABEL: Record<ApplicationType, string> = {
   agency: "Agent Portal",
   hotel_partner: "Hotel Partner Portal",
@@ -50,6 +53,7 @@ export async function notifyApplicant(params: {
   referenceNumber: string;
   event: "approved" | "rejected" | "more_info_requested" | "submitted";
   message?: string | null;
+  agentLogin?: AgentLogin | null;
 }): Promise<{ emailSent: boolean; whatsappSent: boolean }> {
   const { subject, html, whatsapp } = buildContent(params);
 
@@ -69,6 +73,7 @@ function buildContent(params: {
   referenceNumber: string;
   event: "approved" | "rejected" | "more_info_requested" | "submitted";
   message?: string | null;
+  agentLogin?: AgentLogin | null;
 }): { subject: string; html: string; whatsapp: string } {
   const label = PORTAL_LABEL[params.type];
   const href = siteUrl(PORTAL_HREF[params.type]);
@@ -85,6 +90,23 @@ function buildContent(params: {
         whatsapp: `STS Somalia: Your application ${params.referenceNumber} has been received and is under review.`,
       };
     case "approved":
+      if (params.agentLogin) {
+        const loginHref = siteUrl("/agent/login");
+        const { agentCode, username } = params.agentLogin;
+        return {
+          subject: `You're approved — your STS agent code is ${agentCode}`,
+          html: emailShell(
+            "You're approved!",
+            `<p>Your application (${params.referenceNumber}) has been approved. Sign in to the ${label} with these details and your STS account password.</p>
+             <table style="margin:16px 0;border-collapse:collapse;font-size:15px;">
+               <tr><td style="padding:4px 16px 4px 0;color:#6b7280;">Agent code</td><td style="padding:4px 0;font-family:monospace;font-weight:700;">${agentCode}</td></tr>
+               <tr><td style="padding:4px 16px 4px 0;color:#6b7280;">Username</td><td style="padding:4px 0;font-family:monospace;font-weight:700;">${username}</td></tr>
+             </table>
+             <p><a href="${loginHref}" style="background:#00947c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;">Sign in to the ${label}</a></p>`
+          ),
+          whatsapp: `STS Somalia: Your application ${params.referenceNumber} has been approved. Agent code: ${agentCode}. Username: ${username}. Password: your STS account password. Sign in: ${loginHref}`,
+        };
+      }
       return {
         subject: `You're approved — welcome to STS Somalia`,
         html: emailShell(

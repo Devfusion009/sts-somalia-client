@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { SubmitButton } from "@/components/submit-button";
+import { buttonVariants } from "@/components/ui/button";
+import { WhatsAppInlineLink } from "@/components/marketing/whatsapp-button";
 import { trpc } from "@/lib/trpc/react";
 import { computeHallPrice, createHallBookingSchema } from "@sts/shared-types";
 import { eventTypeLabel, venueMoney } from "./amenities";
@@ -46,6 +48,7 @@ function parseBookingForm(formData: FormData) {
 
 export function HallBookingForm({
   venueId,
+  venueName,
   currency,
   basePrice,
   priceUnit,
@@ -55,6 +58,7 @@ export function HallBookingForm({
   action,
 }: {
   venueId: string;
+  venueName: string;
   currency: string;
   basePrice: number;
   priceUnit: string;
@@ -72,13 +76,9 @@ export function HallBookingForm({
 
     try {
       const result = await createBooking.mutateAsync(parsed.data);
-      // Per-person and price-on-request venues confirm the final price
-      // before the booking completes — the request lands in the admin
-      // queue and the customer pays from their booking page once the price
-      // is confirmed. Fixed-price venues go straight to checkout. Desk
-      // submissions always land on the desk order page instead, since a
-      // browser redirect into the agent portal from here would land on the
-      // wrong host.
+      // Every priced booking goes straight to checkout. Desk submissions
+      // land on the desk order page instead, since a browser redirect into
+      // the agent portal from here would land on the wrong host.
       const isDesk = formData.get("desk") === "1";
       const destination = isDesk
         ? `/agent/book/order/${result.orderId}`
@@ -112,10 +112,8 @@ export function HallBookingForm({
   }, [state, router]);
 
   const options = eventTypes.length > 0 ? eventTypes : ["wedding", "conference", "other"];
-  const perPerson = priceUnit === "per_person";
-  // Per-person and price-on-request venues confirm the final price before the
-  // booking completes — the request is sent without payment.
-  const isRequestFirst = perPerson || basePrice === 0;
+  // A venue without a price is not bookable online.
+  const isRequestFirst = basePrice === 0;
   // Single source of truth for the price shown here and the price charged —
   // apps/api's booking write calls this same function.
   const price = computeHallPrice({
@@ -247,27 +245,11 @@ export function HallBookingForm({
 
       <Separator />
 
-      {/* Per-person and price-on-request venues estimate/confirm before the
-          booking completes, so the request goes in WITHOUT payment.
-          Fixed-price venues keep the pay-now flow. */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
           <div className="min-w-0">
             {isRequestFirst ? (
-              price.onRequest ? (
-                <p className="font-heading text-lg font-semibold">Price on request</p>
-              ) : (
-                <>
-                  <p className="text-sm text-muted-foreground tabular-nums">
-                    {venueMoney(currency, price.unitPrice)} ×{" "}
-                    {formatUnitQuantity(price.quantity, price.unitNoun)}
-                  </p>
-                  <p className="font-heading text-xl font-bold tabular-nums text-primary">
-                    {venueMoney(currency, price.total)}
-                    <span className="ml-1 text-xs font-normal text-muted-foreground">estimated</span>
-                  </p>
-                </>
-              )
+              <p className="font-heading text-lg font-semibold">Price on request</p>
             ) : (
               <>
                 {!price.needsTimes ? (
@@ -287,9 +269,12 @@ export function HallBookingForm({
             )}
           </div>
           {isRequestFirst ? (
-            <SubmitButton pendingText="Sending request…" size="lg" className="max-sm:w-full">
-              Request booking <ArrowRight data-icon="inline-end" aria-hidden="true" />
-            </SubmitButton>
+            <WhatsAppInlineLink
+              message={`Hello, I would like a price for ${venueName}.`}
+              className={buttonVariants({ size: "lg", variant: "outline", className: "max-sm:w-full" })}
+            >
+              Ask for price
+            </WhatsAppInlineLink>
           ) : (
             <SubmitButton
               pendingText="Reserving…"

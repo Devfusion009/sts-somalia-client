@@ -80,6 +80,8 @@ export type PartnerAccountDetail = {
   };
   entity: {
     name: string;
+    /** Agency accounts only: the Agent Portal sign-in code. */
+    agentCode?: string;
     contactEmail: string | null;
     contactPhone: string | null;
     entityStatus: string;
@@ -279,7 +281,7 @@ export async function getPartnerAccount(accountId: string): Promise<PartnerAccou
       supabase
         .from("agencies")
         .select(
-          "name, contact_email, contact_phone, status, commission_rate, commission_rate_set_at, credit_balance, credit_limit, tier:agency_tiers(name)"
+          "name, agent_code, contact_email, contact_phone, status, commission_rate, commission_rate_set_at, credit_balance, credit_limit, tier:agency_tiers(name)"
         )
         .eq("id", acc.entity_id)
         .maybeSingle(),
@@ -297,6 +299,7 @@ export async function getPartnerAccount(accountId: string): Promise<PartnerAccou
     if (!agency) return null;
     entity = {
       name: agency.name,
+      agentCode: agency.agent_code,
       contactEmail: agency.contact_email,
       contactPhone: agency.contact_phone,
       entityStatus: agency.status,

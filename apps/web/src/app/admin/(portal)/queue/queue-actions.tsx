@@ -4,12 +4,7 @@ import { useActionState } from "react";
 import { Check, X } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { SubmitButton } from "@/components/submit-button";
-import {
-  updateHotelBookingStatus,
-  updateHallBookingStatus,
-  updateHotelBookingPrice,
-  updateHallBookingPrice,
-} from "@/modules/admin/actions";
+import { updateHotelBookingStatus, updateHallBookingStatus } from "@/modules/admin/actions";
 import {
   updateUmrahBookingStatus,
   updateUmrahRequestPrice,
@@ -44,11 +39,6 @@ const STATUS_ACTIONS = {
   umrah: updateUmrahBookingStatus,
 } as const;
 
-const PRICE_ACTIONS = {
-  hotel: updateHotelBookingPrice,
-  hall: updateHallBookingPrice,
-  umrah: updateUmrahRequestPrice,
-} as const;
 
 /**
  * Confirm / Decline for one queue entry. Confirming a waitlisted hotel
@@ -102,23 +92,20 @@ export function QueueEntryActions({ kind, bookingId }: { kind: QueueKind; bookin
 }
 
 /**
- * Manual requests carry an ESTIMATE (per-person halls) or no price at all
- * (price-on-request rooms). This is where staff set the real quote — it
- * updates the booking AND the customer's unpaid order, so what they pay
- * after confirmation is exactly what was quoted here.
+ * A private Umrah trip has no list price: staff set it here, and it updates
+ * the booking and the customer's unpaid order together.
  */
 export function PriceQuoteForm({
-  kind,
   bookingId,
   currentPrice,
   currency,
 }: {
-  kind: QueueKind;
+  kind: "umrah";
   bookingId: string;
   currentPrice: number;
   currency: string;
 }) {
-  const action = PRICE_ACTIONS[kind];
+  const action = updateUmrahRequestPrice;
   const [state, formAction] = useActionState(
     withToast(action, (fd) => `Price set to ${money(Number(fd.get("price")), currency)}.`),
     null

@@ -784,7 +784,7 @@ function hotelInput(formData: FormData) {
     policies: formData.get("policies") || undefined,
     amenities: formData.get("amenities") || undefined,
     links: formData.get("links") || undefined,
-    bookingMode: formData.get("bookingMode") ?? "manual",
+    bookingMode: "instant",
     status: formData.get("status"),
     partnerId: (() => {
       const v = formData.get("partnerId");

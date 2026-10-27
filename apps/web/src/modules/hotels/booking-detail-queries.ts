@@ -1,4 +1,11 @@
 import "server-only";
+import {
+  readExtrasSnapshot,
+  readRatePlanSnapshot,
+  readStayDetails,
+  type BookedExtra,
+  type StayDetails,
+} from "@/modules/hotels/booking-options";
 import { createClient } from "@/lib/supabase/server";
 
 export type BookingEventKind =
@@ -40,6 +47,9 @@ export type BookingDetail = {
   customerName: string | null;
   customerEmail: string | null;
   specialRequests: string | null;
+  ratePlan: ReturnType<typeof readRatePlanSnapshot>;
+  extras: BookedExtra[];
+  stayDetails: StayDetails;
   totalPrice: number;
   currency: string;
   createdAt: string;
@@ -89,6 +99,7 @@ export async function getBookingDetail(hotelId: string, bookingId: string): Prom
     .select(
       `id, hotel_id, room_id, check_in, check_out, num_rooms, num_adults, num_children, status, channel, source,
        payment_method, payment_reference, paid_at, total_price, currency, created_at, special_requests, guest_details,
+       rate_plan, extras, stay_details,
        checked_in_at, checked_out_at,
        hotel:hotels(name),
        room:hotel_rooms(id, name),
@@ -143,6 +154,9 @@ export async function getBookingDetail(hotelId: string, bookingId: string): Prom
     customerName: booking.customer?.full_name ?? null,
     customerEmail: booking.customer?.email ?? null,
     specialRequests: booking.special_requests,
+    ratePlan: readRatePlanSnapshot(booking.rate_plan),
+    extras: readExtrasSnapshot(booking.extras),
+    stayDetails: readStayDetails(booking.stay_details),
     totalPrice: Number(booking.total_price),
     currency: booking.currency,
     createdAt: booking.created_at,

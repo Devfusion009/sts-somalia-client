@@ -4,9 +4,10 @@ import { BedDouble, Building2, Check, MapPin, Ruler, Star, Users } from "lucide-
 import { MarketingBreadcrumb } from "@/components/marketing/marketing-breadcrumb";
 import { getHotelBySlug } from "@/modules/hotels/queries";
 import { getStayQuote } from "@/modules/hotels/booking-actions";
+import { getHotelExtras, getRatePlans } from "@/modules/hotels/rate-plan-queries";
+import { parseOccupancy } from "@/modules/hotels/booking-options";
 import { hotelImageUrls, amenityLabel } from "@/modules/hotels/images";
 import { MediaPlaceholder } from "@/components/media-placeholder";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { AgencyBookingSlot, viewerAgencyId } from "@/modules/agencies/components/agency-booking-slot";
 import { BookingReviewForm } from "./booking-review-form";
@@ -18,18 +19,29 @@ export default async function HotelBookingReviewPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ roomId?: string; checkIn?: string; checkOut?: string; guests?: string; rooms?: string }>;
+  searchParams: Promise<{ roomId?: string; checkIn?: string; checkOut?: string; guests?: string; occ?: string; plan?: string }>;
 }) {
-  const [{ slug }, { roomId, checkIn, checkOut, guests, rooms }] = await Promise.all([params, searchParams]);
+  const [{ slug }, { roomId, checkIn, checkOut, guests, occ, plan }] = await Promise.all([params, searchParams]);
   const [hotel, viewerAgency] = await Promise.all([getHotelBySlug(slug), viewerAgencyId()]);
   if (!hotel) notFound();
 
   const room = hotel.hotel_rooms.find((r) => r.id === roomId && r.status === "published");
   if (!room) redirect(`/hotels/${slug}`);
 
-  const stayQuote = checkIn && checkOut ? await getStayQuote(room.id, checkIn, checkOut) : null;
+  const [ratePlans, extras] = await Promise.all([
+    getRatePlans(hotel.id, { activeOnly: true }),
+    getHotelExtras(hotel.id, { activeOnly: true }),
+  ]);
+  const occupancy = parseOccupancy(occ, Number.parseInt(guests ?? "", 10) || undefined).map((r) => {
+    const adults = Math.max(1, Math.min(r.adults, room.max_occupancy));
+    return { adults, children: Math.max(0, Math.min(r.children, room.max_occupancy - adults)) };
+  });
+  const ratePlanId = ratePlans.find((p) => p.id === plan)?.id ?? ratePlans[0]?.id;
+  const stayQuote =
+    checkIn && checkOut
+      ? await getStayQuote({ roomId: room.id, checkIn, checkOut, rooms: occupancy, ratePlanId })
+      : null;
 
-  const bookingMode = hotel.booking_mode === "instant" ? "instant" : "manual";
   const hotelImage = hotelImageUrls(hotel.images)[0];
   const roomImages = hotelImageUrls(room.images);
   const roomAmenities = Array.isArray(room.amenities) ? (room.amenities as string[]) : [];
@@ -61,11 +73,6 @@ export default async function HotelBookingReviewPage({
               {hotel.city}, {hotel.country_code}
             </span>
           </p>
-          {bookingMode === "manual" ? (
-            <Badge variant="outline" className="mt-2 text-muted-foreground">
-              Booking on request
-            </Badge>
-          ) : null}
         </div>
       </CardContent>
     </Card>
@@ -131,14 +138,13 @@ export default async function HotelBookingReviewPage({
         <BookingReviewForm
           hotelId={hotel.id}
           room={room}
-          bookingMode={bookingMode}
-          defaults={{ checkIn, checkOut, guests, numRooms: rooms }}
+          ratePlans={ratePlans}
+          extras={extras}
+          defaults={{ checkIn, checkOut, rooms: occupancy, ratePlanId }}
           hotelSummary={hotelSummary}
           roomSummary={roomSummary}
           bookedForSlot={viewerAgency ? <AgencyBookingSlot /> : null}
-          initialUnitsLeft={stayQuote?.unitsLeft ?? null}
-          initialPricePerRoom={stayQuote?.pricePerRoom ?? null}
-          initialNightly={stayQuote?.nights ?? []}
+          initialQuote={stayQuote}
         />
       </div>
     </div>

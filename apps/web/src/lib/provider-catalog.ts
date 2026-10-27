@@ -4,6 +4,12 @@ export type ProviderCredentialField = {
   key: string;
   label: string;
   placeholder?: string;
+  /** Rendered as a dropdown; the saved value is always one of these. */
+  options?: { value: string; label: string }[];
+  /** Identifiers (not secrets) render as plain text instead of a masked field. */
+  plain?: boolean;
+  /** May be left blank on save. */
+  optional?: boolean;
 };
 
 export type ProviderDefinition = {
@@ -76,16 +82,26 @@ export const PROVIDER_CATALOG: ProviderDefinition[] = [
   {
     key: "waafi",
     category: "payments",
-    group: "Mobile money",
+    group: "WaafiPay",
     name: "WaafiPay",
-    description: "EVC Plus, ZAAD and Sahal mobile money.",
+    description: "EVC Plus, ZAAD and Sahal mobile money, through WaafiPay's hosted payment page or a direct wallet push.",
     selfServe: false,
     docsUrl: "https://docs.waafipay.com/",
     signupUrl: "https://waafipay.com/",
     credentialFields: [
-      { key: "merchant_uid", label: "Merchant UID" },
-      { key: "api_user_id", label: "API user ID" },
-      { key: "api_key", label: "API key" },
+      {
+        key: "environment",
+        label: "Environment",
+        options: [
+          { value: "production", label: "Production" },
+          { value: "sandbox", label: "Sandbox" },
+        ],
+      },
+      { key: "merchant_uid", label: "Merchant UID", placeholder: "M0000000", plain: true },
+      { key: "api_user_id", label: "API user ID", plain: true },
+      { key: "api_key", label: "API key", placeholder: "API-..." },
+      { key: "store_id", label: "Store ID", plain: true, optional: true },
+      { key: "hpp_key", label: "HPP key", placeholder: "HPP-...", optional: true },
     ],
   },
   {

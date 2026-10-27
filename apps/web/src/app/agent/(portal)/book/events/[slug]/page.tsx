@@ -60,6 +60,7 @@ export default async function AgentVenueBookingPage({
           <CardContent>
             <HallBookingForm
               venueId={venue.id}
+              venueName={venue.name}
               currency={venue.currency}
               basePrice={price}
               priceUnit={venue.price_unit}

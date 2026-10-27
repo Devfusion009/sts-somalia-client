@@ -149,6 +149,9 @@ export default async function AdminAgencyDetailPage({
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{agency.name}</h1>
+              <Badge variant="outline" className="font-mono" title="Agent code">
+                {agency.agent_code}
+              </Badge>
               <Badge variant={statusBadgeVariant(agency.status)} className="capitalize">
                 {agency.status}
               </Badge>
@@ -261,7 +264,9 @@ export default async function AdminAgencyDetailPage({
                     <TableRow key={member.id}>
                       <TableCell className="max-w-64">
                         <p className="truncate font-medium">{member.profiles?.full_name ?? "—"}</p>
-                        <p className="truncate text-xs text-muted-foreground">{member.profiles?.email}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          <span className="font-mono text-foreground">{member.username}</span> · {member.profiles?.email}
+                        </p>
                       </TableCell>
                       <TableCell className="capitalize">{member.role_in_agency}</TableCell>
                       <TableCell>

@@ -15,6 +15,17 @@ import {
 import { resolveBookedForCustomer } from "@/modules/agencies/booked-for";
 import { todayIso } from "@/modules/hotels/availability";
 import { notifyPartnerOfBooking } from "@/lib/notifications/partner-booking-notify";
+import {
+  ARRIVAL_TIME_OPTIONS,
+  ROOM_PREFERENCES,
+  occupancyTotals,
+  parseOccupancy,
+  readExtrasSnapshot,
+  type BookedExtra,
+  type RoomOccupancy,
+  type RoomPreferenceKey,
+  type StayDetails,
+} from "@/modules/hotels/booking-options";
 
 const MAX_NIGHTS = 60;
 
@@ -24,19 +35,68 @@ function nightsBetween(checkIn: string, checkOut: string) {
   );
 }
 
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+export type QuoteBreakdown = {
+  currency: string;
+  nights: number;
+  rooms: number;
+  roomStay: number;
+  roomsTotal: number;
+  discount: number;
+  boardTotal: number;
+  extras: BookedExtra[];
+  extrasTotal: number;
+  total: number;
+};
+
 /**
- * What one room costs for the whole stay: each night's per-date rate when the
- * hotel set one, else a matching rate rule, else the base rate. The booking, the review page and the
- * order all price from this, so the figure shown is the figure charged.
+ * The stay's price from quote_hotel_stay(): nightly rates (per-date rate,
+ * else rate rule, else base) x rooms, the rate plan's discount and meal
+ * supplement, and the chosen extras. The database charges this same figure.
  */
-async function stayPricePerRoom(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  room: { id: string; base_price: number },
-  checkIn: string,
-  checkOut: string,
-) {
-  const prices = await getStayPrices(supabase, [room], checkIn, checkOut);
-  return prices.get(room.id)?.total ?? room.base_price * nightsBetween(checkIn, checkOut);
+async function quoteStay(
+  supabase: Supabase,
+  args: {
+    roomId: string;
+    checkIn: string;
+    checkOut: string;
+    numRooms: number;
+    adults: number;
+    children: number;
+    ratePlanId: string | null;
+    extraIds: string[];
+  }
+): Promise<{ breakdown: QuoteBreakdown; raw: unknown } | { error: string }> {
+  const { data, error } = await supabase.rpc("quote_hotel_stay", {
+    p_room_id: args.roomId,
+    p_check_in: args.checkIn,
+    p_check_out: args.checkOut,
+    p_num_rooms: args.numRooms,
+    p_adults: args.adults,
+    p_children: args.children,
+    p_rate_plan_id: args.ratePlanId,
+    p_extra_ids: args.extraIds,
+  });
+  if (error || !data || typeof data !== "object") {
+    return { error: error?.message ?? "Could not price this stay." };
+  }
+  const q = data as Record<string, unknown>;
+  return {
+    raw: data,
+    breakdown: {
+      currency: String(q.currency ?? "USD"),
+      nights: Number(q.nights ?? 0),
+      rooms: Number(q.rooms ?? 1),
+      roomStay: Number(q.room_stay ?? 0),
+      roomsTotal: Number(q.rooms_total ?? 0),
+      discount: Number(q.discount ?? 0),
+      boardTotal: Number(q.board_total ?? 0),
+      extras: readExtrasSnapshot(q.extras),
+      extrasTotal: Number(q.extras_total ?? 0),
+      total: Number(q.total ?? 0),
+    },
+  };
 }
 
 export type ActionState = {
@@ -77,7 +137,27 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
     return { error: parsed.error.issues[0].message };
   }
 
-  const { roomId, hotelId, checkIn, checkOut, numRooms, numAdults, numChildren, specialRequests } = parsed.data;
+  const { roomId, hotelId, checkIn, checkOut, specialRequests } = parsed.data;
+
+  // Per-room occupancy ("2-1,2-0") from the booking page; the agent desk form
+  // still posts plain totals.
+  const occRaw = formData.get("occ")?.toString() ?? "";
+  const occupancy: RoomOccupancy[] = occRaw ? parseOccupancy(occRaw) : [];
+  const totals = occupancy.length > 0
+    ? occupancyTotals(occupancy)
+    : { rooms: parsed.data.numRooms, adults: parsed.data.numAdults, children: parsed.data.numChildren };
+  const numRooms = totals.rooms;
+  const numAdults = totals.adults;
+  const numChildren = totals.children;
+
+  const ratePlanRaw = formData.get("ratePlanId")?.toString() || null;
+  const ratePlanId = ratePlanRaw && z.string().uuid().safeParse(ratePlanRaw).success ? ratePlanRaw : null;
+  const extraIds = formData
+    .getAll("extraIds")
+    .map(String)
+    .filter((id) => z.string().uuid().safeParse(id).success)
+    .slice(0, 20);
+  const stayDetails = readStayDetailsForm(formData, numRooms);
 
   const guestNamesRaw = formData.get("guestNames")?.toString() ?? "";
   const guestDetails = guestNamesRaw
@@ -92,7 +172,7 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
 
   const { data: room, error: roomError } = await supabase
     .from("hotel_rooms")
-    .select("id, hotel_id, base_price, currency, status, max_occupancy, hotel:hotels(booking_mode)")
+    .select("id, hotel_id, base_price, currency, status, max_occupancy")
     .eq("id", roomId)
     .eq("hotel_id", hotelId)
     .eq("status", "published")
@@ -106,9 +186,23 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
   if (numAdults + numChildren > room.max_occupancy * numRooms) {
     return { error: `This room holds up to ${room.max_occupancy} guests per room.` };
   }
-  const isManualHotel = (room.hotel as { booking_mode?: string } | null)?.booking_mode !== "instant";
+  if (occupancy.some((r) => r.adults + r.children > room.max_occupancy)) {
+    return { error: `This room holds up to ${room.max_occupancy} guests per room.` };
+  }
+  if (room.base_price <= 0) return { error: "This room has no price yet. Contact us to book it." };
 
-  const totalPrice = (await stayPricePerRoom(supabase, room, checkIn, checkOut)) * numRooms;
+  const quote = await quoteStay(supabase, {
+    roomId: room.id,
+    checkIn,
+    checkOut,
+    numRooms,
+    adults: numAdults,
+    children: numChildren,
+    ratePlanId,
+    extraIds,
+  });
+  if ("error" in quote) return { error: quote.error };
+  const totalPrice = quote.breakdown.total;
 
   const agencyId = await getActiveAgencyId(supabase, profile.id);
   const access = await assertAgencyCanBookProduct(supabase, agencyId, "hotel");
@@ -132,12 +226,19 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
     guest_details: guestDetails.length > 0 || !profile.full_name ? guestDetails : [{ full_name: profile.full_name }],
     total_price: totalPrice,
     currency: room.currency,
+    // The database re-prices a customer's or agency's booking with the same
+    // quote_hotel_stay() call; staff bookings keep this figure.
+    rate_plan_id: ratePlanId,
+    extras: extraIds.map((id) => ({ id })),
+    room_occupancy: occupancy,
+    stay_details: stayDetails,
+    price_breakdown: quote.raw as never,
   };
 
-  // The database allocator is the final gate: it seats the request when the
-  // nights have capacity, seats an agency request ahead of unconfirmed
-  // customer requests when they don't, and otherwise refuses the insert with
-  // the rooms actually left — so no order exists for a stay nobody can host.
+  // The database allocator is the final gate: it seats the booking when the
+  // nights have capacity (status 'pending', payable now), seats an agency
+  // request ahead of unpaid customer bookings when they don't, and otherwise
+  // keeps a customer's booking as 'waitlisted' for an admin decision.
   const { data: booking, error: bookingError } = await supabase
     .from("hotel_bookings")
     .insert(bookingRow)
@@ -161,7 +262,7 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
       agencyCustomerId,
       currency: room.currency,
       itemType: "hotel",
-      price: totalPrice,
+      price: Number(booking.total_price),
       hotelBookingId: booking.id,
       hold,
     });
@@ -195,10 +296,9 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
     return { error: null, destination: deskOrderPath(order.id), orderId: order.id };
   }
 
-  // Manual-booking hotels (no live API): the booking is a REQUEST until STS
-  // checks with the hotel and confirms it. Payment only happens after
-  // confirmation, from the customer's booking page — never at request time.
-  if (isManualHotel && !hold) {
+  // No rooms free: the booking waits in the admin Order Queue, and payment
+  // opens from the booking page once an admin confirms it.
+  if (booking.status === "waitlisted") {
     redirect(`/account/bookings/${order.id}?requested=1`);
   }
 
@@ -210,24 +310,38 @@ export type StayQuote = {
   pricePerRoom: number;
   /** One room's rate for each night of the stay, so the guest sees how the total is built. */
   nights: Array<{ night: string; rate: number }>;
+  /** The full price for the chosen occupancy, rate plan and extras; null when the stay can't be priced. */
+  breakdown: QuoteBreakdown | null;
+  error?: string;
+};
+
+export type StayQuoteInput = {
+  roomId: string;
+  checkIn: string;
+  checkOut: string;
+  rooms?: RoomOccupancy[];
+  ratePlanId?: string | null;
+  extraIds?: string[];
 };
 
 /**
- * Rooms left and the per-room price for a stay, for the booking form to
- * refresh as the dates change. unitsLeft is null when the hotel hasn't set a
- * room count. Both come from public reads, the same ones the hotel page uses.
+ * Rooms left and the stay's price, for the booking page to refresh as the
+ * guest changes dates, guests, rate or extras. unitsLeft is null when the
+ * hotel hasn't set a room count. All public reads.
  */
-export async function getStayQuote(
-  roomId: string,
-  checkIn: string,
-  checkOut: string,
-): Promise<StayQuote | null> {
-  const ids = z.string().uuid().safeParse(roomId);
+export async function getStayQuote(input: StayQuoteInput): Promise<StayQuote | null> {
+  const ids = z.string().uuid().safeParse(input.roomId);
   const dates = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+  const { checkIn, checkOut } = input;
   if (!ids.success || !dates.safeParse(checkIn).success || !dates.safeParse(checkOut).success || checkOut <= checkIn) {
     return null;
   }
   if (nightsBetween(checkIn, checkOut) > MAX_NIGHTS) return null;
+
+  const rooms = input.rooms && input.rooms.length > 0 ? parseOccupancy(input.rooms.map((r) => `${r.adults}-${r.children}`).join(",")) : [{ adults: 2, children: 0 }];
+  const totals = occupancyTotals(rooms);
+  const ratePlanId = input.ratePlanId && z.string().uuid().safeParse(input.ratePlanId).success ? input.ratePlanId : null;
+  const extraIds = (input.extraIds ?? []).filter((id) => z.string().uuid().safeParse(id).success).slice(0, 20);
 
   const supabase = await createClient();
   const [{ data: room }, { data: left }] = await Promise.all([
@@ -236,10 +350,52 @@ export async function getStayQuote(
   ]);
   if (!room) return null;
   const row = left?.[0];
-  const price = (await getStayPrices(supabase, [room], checkIn, checkOut)).get(room.id);
+  const [price, quote] = await Promise.all([
+    getStayPrices(supabase, [room], checkIn, checkOut),
+    quoteStay(supabase, {
+      roomId: room.id,
+      checkIn,
+      checkOut,
+      numRooms: totals.rooms,
+      adults: totals.adults,
+      children: totals.children,
+      ratePlanId,
+      extraIds,
+    }),
+  ]);
+  const stay = price.get(room.id);
   return {
     unitsLeft: row ? Math.max(0, row.units_left) : null,
-    pricePerRoom: price?.total ?? room.base_price * nightsBetween(checkIn, checkOut),
-    nights: price?.nights.map((n) => ({ night: n.night, rate: n.rate })) ?? [],
+    pricePerRoom: stay?.total ?? room.base_price * nightsBetween(checkIn, checkOut),
+    nights: stay?.nights.map((n) => ({ night: n.night, rate: n.rate })) ?? [],
+    breakdown: "error" in quote ? null : quote.breakdown,
+    ...("error" in quote ? { error: quote.error } : {}),
   };
+}
+
+/** Arrival time, trip purpose, lead guest and per-room preferences from the booking page. */
+function readStayDetailsForm(formData: FormData, numRooms: number): StayDetails {
+  const details: StayDetails = {};
+  const arrival = formData.get("arrivalTime")?.toString() ?? "";
+  if ((ARRIVAL_TIME_OPTIONS as readonly string[]).includes(arrival)) details.arrival_time = arrival;
+  const purpose = formData.get("purpose")?.toString();
+  if (purpose === "leisure" || purpose === "business") details.purpose = purpose;
+  if (formData.get("bookedForOther") === "on") {
+    const name = formData.get("leadName")?.toString().trim().slice(0, 120) ?? "";
+    const phone = formData.get("leadPhone")?.toString().trim().slice(0, 30) ?? "";
+    if (name) {
+      details.booked_for_other = true;
+      details.lead_guest = { name, ...(phone ? { phone } : {}) };
+    }
+  }
+  const preferences = Array.from({ length: Math.min(numRooms, 20) }, (_, i) => {
+    const pref: Partial<Record<RoomPreferenceKey, string>> = {};
+    for (const key of Object.keys(ROOM_PREFERENCES) as RoomPreferenceKey[]) {
+      const value = formData.get(`pref-${i}-${key}`)?.toString() ?? "";
+      if ((ROOM_PREFERENCES[key].options as readonly string[]).includes(value)) pref[key] = value;
+    }
+    return pref;
+  });
+  if (preferences.some((p) => Object.keys(p).length > 0)) details.preferences = preferences;
+  return details;
 }
