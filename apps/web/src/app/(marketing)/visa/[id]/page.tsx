@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { FileText } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import { MarketingBreadcrumb } from "@/components/marketing/marketing-breadcrumb";
 import { getVisaTypeById, getResolvedVisaPricing } from "@/modules/visa/queries";
 import { parseDocumentSlots } from "@/modules/visa/schemas";
@@ -9,6 +9,8 @@ import { countryName } from "@/lib/countries";
 import { fmtMoneyExact, processingText } from "@/modules/visa/components/visa-shared";
 import { VisaExpertCard } from "@/components/marketing/visa-expert-card";
 import { VisaOverview } from "@/modules/visa/components/detail/visa-overview";
+import { DocumentArt, STEP_ART, VisaArtDefs } from "@/modules/visa/components/detail/visa-art";
+import { visaCardImage } from "@/modules/visa/images";
 import {
   MobileBookingBar,
   VisaBookingSummary,
@@ -72,12 +74,15 @@ export default async function VisaDetailPage({
 }) {
   const { id } = await params;
   const { nationality: rawNationality } = await searchParams;
-  const nationality =
+  const chosenNationality =
     rawNationality && /^[A-Za-z]{2}$/.test(rawNationality) && countryName(rawNationality.toUpperCase()) !== rawNationality.toUpperCase()
       ? rawNationality.toUpperCase()
       : null;
   const visa = await getVisaTypeById(id);
   if (!visa) notFound();
+  // A passport from the destination country itself is never valid; ignore it.
+  const nationality =
+    chosenNationality && chosenNationality !== visa.destination_country_code.toUpperCase() ? chosenNationality : null;
 
   // A chosen passport prices the page through resolve_visa_pricing, the same
   // function the application freezes its quote from, so this preview never
@@ -115,6 +120,7 @@ export default async function VisaDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <VisaArtDefs />
       <MarketingBreadcrumb className="mb-5" items={[{ label: "Visa", href: "/visa" }, { label: destination }]} />
 
       <VisaOverview
@@ -123,11 +129,17 @@ export default async function VisaDetailPage({
         destinationCode={destinationCode}
         nationality={nationality}
         requirementsId={REQUIREMENTS_ID}
+        coverImage={visaCardImage(visa)}
         metrics={[
-          { label: "Processing time", value: processingText(visa) },
-          { label: "Validity", value: visa.validity_days ? `${visa.validity_days} days` : "Varies" },
-          { label: "Max stay", value: visa.stay_days ? `${visa.stay_days} days` : "Varies" },
-          { label: nationality ? "Price for you" : "Starting price", value: fmtMoneyExact(total, visa.currency), live: true },
+          { key: "processing", label: "Processing time", value: processingText(visa) },
+          { key: "validity", label: "Validity", value: visa.validity_days ? `${visa.validity_days} days` : "Varies" },
+          { key: "stay", label: "Max stay", value: visa.stay_days ? `${visa.stay_days} days` : "Varies" },
+          {
+            key: "price",
+            label: nationality ? "Price for you" : "Starting price",
+            value: fmtMoneyExact(total, visa.currency),
+            live: true,
+          },
         ]}
       />
 
@@ -149,23 +161,27 @@ export default async function VisaDetailPage({
             {slots.length === 0 ? (
               <p className="mt-4 text-sm text-muted-foreground">Confirmed by our visa desk after you apply.</p>
             ) : (
-              <ul className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <ul className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
                 {slots.map((slot) => (
-                  <li key={slot.key} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary" aria-hidden>
-                      <FileText className="size-4.5" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                  <li
+                    key={slot.key}
+                    className="flex gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs transition-shadow hover:shadow-md"
+                  >
+                    <div className="relative h-28 w-36 shrink-0 overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklch,var(--primary),white_82%),color-mix(in_oklch,var(--primary),white_92%)_55%,color-mix(in_oklch,var(--brand-gold),white_85%))] ring-1 ring-primary/15 max-sm:h-24 max-sm:w-28">
+                      <DocumentArt label={slot.label} />
+                    </div>
+                    <div className="min-w-0 py-0.5">
+                      <h3 className="flex flex-wrap items-center gap-2 text-base font-bold">
                         {slot.label}
-                        <Badge variant={slot.required ? "secondary" : "outline"} className="font-medium">
+                        <Badge variant={slot.required ? "success" : "neutral"} className="font-medium">
                           {slot.required ? "Required" : "Optional"}
                         </Badge>
-                      </p>
+                      </h3>
                       {slot.description ? (
                         <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{slot.description}</p>
                       ) : null}
-                      <p className="mt-1.5 text-xs text-muted-foreground">
+                      <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                        <Check className="size-3.5 text-primary" aria-hidden />
                         PDF, JPG or PNG{slot.max_mb ? `, up to ${slot.max_mb} MB` : ""}
                       </p>
                     </div>
@@ -179,22 +195,39 @@ export default async function VisaDetailPage({
             <h2 id="visa-how" className="font-heading text-2xl font-bold tracking-tight sm:text-[1.75rem]">
               How it works
             </h2>
-            <ol className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {HOW_IT_WORKS.map((item, i) => (
-                <li key={item.title} className="flex flex-col rounded-xl border border-border bg-card p-5">
-                  <span
-                    className="flex size-9 items-center justify-center rounded-full bg-primary font-heading text-sm font-bold text-primary-foreground tabular-nums"
-                    aria-hidden
+            <ol className="relative mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {HOW_IT_WORKS.map((item, i) => {
+                const Art = STEP_ART[i];
+                return (
+                  <li
+                    key={item.title}
+                    className="relative flex flex-col rounded-2xl border border-border bg-card p-3 pb-5 text-left shadow-xs"
                   >
-                    {i + 1}
-                  </span>
-                  <h3 className="mt-4 text-base font-bold">
-                    <span className="sr-only">Step {i + 1}: </span>
-                    {item.title}
-                  </h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{item.text}</p>
-                </li>
-              ))}
+                    <div className="relative h-36 w-full overflow-hidden rounded-xl bg-[radial-gradient(circle_at_50%_15%,color-mix(in_oklch,var(--primary),white_80%),color-mix(in_oklch,var(--primary),white_93%)_60%,color-mix(in_oklch,var(--brand-gold),white_88%))] ring-1 ring-primary/10">
+                      <Art className="p-2" />
+                      <span
+                        className="absolute top-2.5 left-2.5 grid size-8 place-items-center rounded-full bg-primary font-heading text-sm font-bold text-primary-foreground tabular-nums shadow-sm ring-4 ring-white/70"
+                        aria-hidden
+                      >
+                        {i + 1}
+                      </span>
+                    </div>
+                    <h3 className="mt-4 px-2 text-base font-bold">
+                      <span className="sr-only">Step {i + 1}: </span>
+                      {item.title}
+                    </h3>
+                    <p className="mt-1.5 px-2 text-sm leading-relaxed text-muted-foreground">{item.text}</p>
+                    {i < HOW_IT_WORKS.length - 1 ? (
+                      <span
+                        aria-hidden
+                        className="absolute top-[4.5rem] -right-[1.15rem] z-10 hidden size-7 place-items-center rounded-full border border-border bg-card text-primary shadow-sm xl:grid"
+                      >
+                        <ChevronRight className="size-4" strokeWidth={2.5} />
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ol>
           </section>
 

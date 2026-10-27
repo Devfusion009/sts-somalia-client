@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, MapPin } from "lucide-react";
+import { AlertCircle, ArrowRight, MapPin } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { matchesDestination, type DestinationOption } from "@/modules/visa/search";
@@ -17,7 +17,7 @@ import {
   ComboboxPortal,
   ComboboxPositioner,
 } from "@/components/ui/combobox";
-import { COUNTRY_OPTIONS, countryFlag, countrySearchText, normalizeSearchTerm } from "@/lib/countries";
+import { COUNTRY_OPTIONS, countryFlag, countryName, countrySearchText, normalizeSearchTerm } from "@/lib/countries";
 
 const MAX_SUGGESTIONS = 6;
 const RESULTS_ANCHOR = "visa-results";
@@ -92,16 +92,33 @@ export function VisaDestinationSearch({
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(defaultValue);
   const [passport, setPassport] = useState<string | null>(defaultPassport);
+  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
 
+  // The passport's own country is never a destination for that traveller.
   const suggestions = useMemo(
-    () => (value.trim() ? destinations.filter((d) => matchesDestination(d.code, value)) : destinations).slice(0, MAX_SUGGESTIONS),
-    [destinations, value]
+    () =>
+      (value.trim() ? destinations.filter((d) => matchesDestination(d.code, value)) : destinations)
+        .filter((d) => d.code !== passport)
+        .slice(0, MAX_SUGGESTIONS),
+    [destinations, value, passport]
   );
+
+  function sameCountry(term: string, code: string | null) {
+    if (!code) return false;
+    const needle = term.trim().toLowerCase();
+    return needle !== "" && (needle === code.toLowerCase() || needle === countryName(code).toLowerCase());
+  }
 
   function go(term: string) {
     const trimmed = term.trim();
+    if (sameCountry(trimmed, passport)) {
+      setError(`Your passport and destination can't both be ${countryName(passport!)}.`);
+      setOpen(false);
+      return;
+    }
+    setError(null);
     setOpen(false);
     inputRef.current?.blur();
     const params = new URLSearchParams();
@@ -147,7 +164,13 @@ export function VisaDestinationSearch({
           <span className="text-base leading-none" aria-hidden>
             {passport ? countryFlag(passport) : "🛂"}
           </span>
-          <PassportField value={passport} onChange={setPassport} />
+          <PassportField
+            value={passport}
+            onChange={(code) => {
+              setPassport(code);
+              setError(sameCountry(value, code) ? `Your passport and destination can't both be ${countryName(code!)}.` : null);
+            }}
+          />
         </div>
         <div className="flex min-w-0 flex-1 items-center gap-1.5 pl-3.5 sm:pl-1">
         <MapPin className="size-4 shrink-0 text-neutral-500" aria-hidden />
@@ -163,10 +186,13 @@ export function VisaDestinationSearch({
           autoComplete="off"
           placeholder="Where are you going? UAE, Türkiye, Kenya…"
           value={value}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${listId}-error` : undefined}
           onChange={(e) => {
             setValue(e.target.value);
             setActive(-1);
             setOpen(true);
+            if (error) setError(sameCountry(e.target.value, passport) ? error : null);
           }}
           onFocus={() => setOpen(true)}
           onBlur={() => setOpen(false)}
@@ -182,6 +208,16 @@ export function VisaDestinationSearch({
         </button>
         </div>
       </div>
+
+      {error ? (
+        <p
+          id={`${listId}-error`}
+          role="alert"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-sm font-medium text-destructive shadow-lg"
+        >
+          <AlertCircle className="size-4 shrink-0" aria-hidden /> {error}
+        </p>
+      ) : null}
 
       {showList ? (
         <ul
