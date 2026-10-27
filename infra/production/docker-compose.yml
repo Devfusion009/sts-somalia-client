@@ -32,7 +32,7 @@ services:
     environment:
       NODE_ENV: production
       # Heap cap at about 75% of the container limit so V8 collects before the OOM killer acts.
-      NODE_OPTIONS: --max-old-space-size=960
+      NODE_OPTIONS: --max-old-space-size=1200
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     expose: ["3000"]
     networks: [edge, backend]
@@ -46,7 +46,7 @@ services:
       start_period: 30s
     deploy:
       resources:
-        limits: { memory: 1280m, cpus: "1.0" }
+        limits: { memory: 1600m }
 
   api:
     image: ${API_IMAGE}
@@ -55,7 +55,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: "4000"
-      NODE_OPTIONS: --max-old-space-size=576
+      NODE_OPTIONS: --max-old-space-size=675
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     expose: ["4000"]
     networks: [edge, backend]
@@ -69,7 +69,7 @@ services:
       start_period: 20s
     deploy:
       resources:
-        limits: { memory: 768m, cpus: "0.75" }
+        limits: { memory: 900m }
 
   redis:
     image: redis:7.4-alpine
@@ -87,7 +87,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     deploy:
       resources:
-        limits: { memory: 320m, cpus: "0.25" }
+        limits: { memory: 384m, cpus: "0.25" }
 
 networks:
   edge: {}
