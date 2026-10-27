@@ -12,6 +12,7 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/package.json
+COPY apps/api/package.json apps/api/package.json
 COPY packages/shared-types/package.json packages/shared-types/package.json
 RUN npm ci
 # npm workspaces hoists what it can to the root node_modules and leaves the
@@ -19,7 +20,7 @@ RUN npm ci
 # hardcode a guess about (verified locally: apps/web ended up with none,
 # apps/api kept one). Guarantee both COPY sources below always exist so the
 # later stages don't fail depending on npm's hoisting decision this week.
-RUN mkdir -p apps/web/node_modules
+RUN mkdir -p apps/web/node_modules apps/api/node_modules
 
 FROM node:22-alpine AS dev
 WORKDIR /app
@@ -39,8 +40,10 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY package.json package-lock.json ./
 COPY packages/shared-types ./packages/shared-types
+COPY apps/api ./apps/api
 COPY apps/web ./apps/web
 
 # See the pre-split Dockerfile for why these are build ARGs, not runtime
@@ -56,8 +59,9 @@ ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
     NEXT_PUBLIC_APP_HOST=$NEXT_PUBLIC_APP_HOST \
     NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-# @sts/shared-types resolves to its compiled dist/, which is not committed.
-RUN npm run build -w @sts/shared-types && npm run build -w web
+# apps/web type-checks against api/dist (AppRouter, CheckoutOrderRow) and
+# @sts/shared-types/dist; neither is committed. The api build compiles both.
+RUN npm run build -w api && npm run build -w web
 
 FROM node:22-alpine AS runner
 WORKDIR /app
