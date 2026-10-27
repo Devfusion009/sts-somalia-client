@@ -125,6 +125,11 @@ export default async function PartnerAccountConsolePage({
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{entity.name}</h1>
+              {entity.agentCode ? (
+                <Badge variant="outline" className="font-mono" title="Agent code">
+                  {entity.agentCode}
+                </Badge>
+              ) : null}
               <Badge variant={ACCOUNT_STATUS_VARIANT[account.status]} className="capitalize">
                 {account.status}
               </Badge>

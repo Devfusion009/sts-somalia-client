@@ -114,7 +114,9 @@ export default async function AdminAgenciesPage() {
                           </Badge>
                         ) : null}
                       </div>
-                      <p className="truncate text-xs text-muted-foreground">{agency.contact_email}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        <span className="font-mono text-foreground">{agency.agent_code}</span> · {agency.contact_email}
+                      </p>
                     </TableCell>
                     <TableCell>
                       <Badge variant={statusBadgeVariant(agency.status)} className="capitalize">

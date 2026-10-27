@@ -80,7 +80,9 @@ export default async function AgentTeamPage() {
                       </Avatar>
                       <div className="min-w-0">
                         <p className="truncate font-medium">{member.profiles?.full_name ?? "—"}</p>
-                        <p className="truncate text-xs text-muted-foreground">{member.profiles?.email}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          <span className="font-mono text-foreground">{member.username}</span> · {member.profiles?.email}
+                        </p>
                       </div>
                     </div>
                   </TableCell>

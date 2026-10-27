@@ -119,7 +119,7 @@ export const getMyAgency = cache(async (profileId: string) => {
   const { data: membership } = await supabase
     .from("agency_members")
     .select(
-      "agency_id, role_in_agency, agencies(id, name, legal_name, registration_number, status, commission_rate, commission_rate_set_at, contact_email, contact_phone, country_code, credit_balance, credit_limit, logo_path, bank_name, bank_account_name, bank_account_number, bank_branch, bank_swift_code, about, website, address)"
+      "id, agency_id, role_in_agency, username, agencies(id, agent_code, name, legal_name, registration_number, status, commission_rate, commission_rate_set_at, contact_email, contact_phone, country_code, credit_balance, credit_limit, logo_path, bank_name, bank_account_name, bank_account_number, bank_branch, bank_swift_code, about, website, address)"
     )
     .eq("profile_id", profileId)
     .eq("status", "active")
@@ -130,6 +130,8 @@ export const getMyAgency = cache(async (profileId: string) => {
   return {
     agency: membership.agencies,
     roleInAgency: membership.role_in_agency,
+    memberId: membership.id,
+    username: membership.username,
   };
 });
 
@@ -605,7 +607,7 @@ export async function getAgencyForAdmin(agencyId: string) {
   const { data } = await supabase
     .from("agencies")
     .select(
-      "*, agency_members(id, role_in_agency, status, profiles(full_name, email)), agency_tiers(id, name, default_commission_rate, default_credit_limit)"
+      "*, agency_members(id, role_in_agency, status, username, profiles(full_name, email)), agency_tiers(id, name, default_commission_rate, default_credit_limit)"
     )
     .eq("id", agencyId)
     .maybeSingle();
@@ -717,7 +719,7 @@ export async function getAgencyTeam(agencyId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("agency_members")
-    .select("id, role_in_agency, status, created_at, profiles(full_name, email)")
+    .select("id, role_in_agency, status, created_at, username, profiles(full_name, email)")
     .eq("agency_id", agencyId)
     .eq("status", "active")
     .order("created_at");

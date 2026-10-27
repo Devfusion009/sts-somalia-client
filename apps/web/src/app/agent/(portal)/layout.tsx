@@ -133,7 +133,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
       contexts={contexts}
       isPlatformAdmin={profile.is_platform_admin}
       accent="agent"
-      accountCode={profile.agent_code}
+      accountCode={`${membership.agency.agent_code} · ${membership.username}`}
       brandLogoUrl={agencyLogoUrl(membership.agency.logo_path)}
       headerExtra={<AgentNotificationBell notifications={notifications} />}
     >
