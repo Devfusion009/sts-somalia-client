@@ -14,16 +14,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 const FALLBACK_TEASERS = [
   {
     name: "Economy Umrah",
+    image: "/marketing/umrah-tiers/economy-v1.webp",
+    imageAlt: "Illustration of the Prophet’s Mosque courtyard in Madinah",
     blurb: "Flights, shared rooms near the Haram, visa and ground transport.",
     badge: null,
   },
   {
     name: "Standard Umrah",
+    image: "/marketing/umrah-tiers/standard-v1.webp",
+    imageAlt: "Illustration of the Grand Mosque in Makkah at twilight",
     blurb: "Closer hotels, guided ziyarah in Makkah and Madinah, and meals arranged for the group.",
     badge: "Popular",
   },
   {
     name: "VIP Umrah",
+    image: "/marketing/umrah-tiers/vip-v1.webp",
+    imageAlt: "Illustrative lounge overlooking Makkah at sunset",
     blurb: "Five-star hotels steps from the Haram, private transfers and a dedicated guide throughout.",
     badge: null,
   },
@@ -71,8 +77,8 @@ export async function FeaturedPackages() {
                 >
                   <div className="relative h-40 w-full overflow-hidden">
                     <Image
-                      src="/marketing/madinah.webp"
-                      alt=""
+                      src={teaser.image}
+                      alt={teaser.imageAlt}
                       fill
                       sizes="(max-width: 640px) 100vw, 33vw"
                       className="object-cover transition-transform duration-500 group-hover:scale-105"

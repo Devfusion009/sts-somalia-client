@@ -4,26 +4,18 @@ import Image from "next/image";
 import {
   ArrowRight,
   BadgeCheck,
-  BedDouble,
   Building2,
   CalendarDays,
   CircleCheck,
   CircleDollarSign,
-  CreditCard,
   HeartHandshake,
   Headset,
   Lock,
-  MessageCircle,
   PackageCheck,
-  PackageSearch,
   Plane,
   Settings2,
   ShieldCheck,
-  Sparkles,
-  Stamp,
   Tag,
-  TrainFront,
-  UserRoundPlus,
   Users,
   UsersRound,
 } from "lucide-react";
@@ -32,6 +24,7 @@ import { SectionHeading } from "@/components/marketing/section-heading";
 import { PackageCard } from "@/modules/umrah/components/package-card";
 import { getFeaturedPackages } from "@/modules/umrah/queries";
 import { UMRAH_TIERS } from "@/modules/umrah/services";
+import { UmrahBookingJourney, UmrahServiceGallery, UmrahFlowComparison } from "@/components/marketing/umrah-visual-sections";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -120,55 +113,6 @@ const TRUST_STRIP = [
   { icon: BadgeCheck, label: "ISO 9001:2015 certified" },
   { icon: Lock, label: "EVC Plus, bank transfer or card" },
   { icon: Headset, label: "24/7 support in Somali" },
-];
-
-const BUILDABLE = [
-  { icon: BedDouble, label: "Makkah hotel" },
-  { icon: BedDouble, label: "Madinah hotel" },
-  { icon: Plane, label: "Flights" },
-  { icon: Stamp, label: "Umrah visa" },
-  { icon: Users, label: "Ground transport" },
-  { icon: TrainFront, label: "Makkah ↔ Madinah" },
-  { icon: Sparkles, label: "Extra services" },
-];
-
-const COMPARISON: { label: string; group: string; private: string }[] = [
-  { label: "Who designs the trip", group: "STS designs it in advance", private: "You build it yourself" },
-  { label: "Price", group: "Fixed price per person", private: "Calculated from what you choose" },
-  { label: "Travel dates", group: "Set departure dates", private: "Any dates you like" },
-  { label: "Hotels", group: "Chosen for the package", private: "You pick each city's hotel" },
-  { label: "Services", group: "All included as listed", private: "Add or leave out any service" },
-  { label: "Who you travel with", group: "A group, with a guide", private: "Just your own party" },
-  { label: "Best for", group: "First-time and value-focused pilgrims", private: "Families, couples and specific needs" },
-];
-
-/** The five steps every booking goes through, whichever flow a pilgrim picks. */
-const BOOKING_STEPS = [
-  {
-    icon: PackageSearch,
-    title: "Choose your package",
-    description: "Pick a group package or build your own trip — set dates, hotel tier and pilgrim count.",
-  },
-  {
-    icon: UserRoundPlus,
-    title: "Add pilgrim details",
-    description: "Enter each traveller's name and passport details exactly as they'll appear on the visa.",
-  },
-  {
-    icon: CreditCard,
-    title: "Pay a deposit or in full",
-    description: "A 50% deposit holds your booking. Card, mobile money, bank transfer or agency wallet.",
-  },
-  {
-    icon: Stamp,
-    title: "Visa & travel confirmation",
-    description: "Track visa processing through to travel-ready on your booking's timeline.",
-  },
-  {
-    icon: MessageCircle,
-    title: "Stay in touch",
-    description: "WhatsApp and account notifications keep you updated at every stage, up to departure.",
-  },
 ];
 
 export default async function UmrahPage() {
@@ -311,126 +255,9 @@ export default async function UmrahPage() {
         </div>
       </section>
 
-      {/* The same five steps regardless of which flow a pilgrim picked. */}
-      <section className="border-t border-border bg-secondary/20 py-16 sm:py-20 lg:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionHeading
-            title="How your booking works"
-            lead="Five steps from choosing a package to boarding your flight."
-          />
-
-          <ol className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {BOOKING_STEPS.map((step, i) => (
-              <li
-                key={step.title}
-                className="flex gap-4 rounded-2xl border border-border bg-card p-5 shadow-xs lg:flex-col lg:gap-0 lg:pt-6"
-              >
-                <span
-                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-sm font-bold text-primary-foreground tabular-nums"
-                  aria-hidden
-                >
-                  {i + 1}
-                </span>
-                <div className="min-w-0">
-                  <h3 className="font-heading text-base font-semibold lg:mt-4">
-                    <span className="sr-only">Step {i + 1}: </span>
-                    {step.title}
-                  </h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                    {step.description}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* What a private trip is made of — the client's service list, verbatim. */}
-      <section className="border-y border-border bg-secondary/30 py-12 sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <h2 className="font-heading text-xl font-bold tracking-tight sm:text-2xl">
-              What you can add to a private trip
-            </h2>
-            <Button
-              render={<Link href="/umrah/private" />}
-             
-              variant="outline"
-              size="lg"
-              className="w-full gap-2 sm:w-auto"
-            >
-              Start building <ArrowRight className="size-4" aria-hidden />
-            </Button>
-          </div>
-          <ul className="mt-8 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-7">
-            {BUILDABLE.map((item) => (
-              <li key={item.label} className="flex items-center gap-2.5 text-sm font-medium">
-                <span
-                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card text-primary shadow-xs"
-                  aria-hidden
-                >
-                  <item.icon className="size-4" />
-                </span>
-                {item.label}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* Side-by-side comparison for anyone still undecided. */}
-      <section className="py-16 sm:py-20 lg:py-24">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-          <SectionHeading title="Group or private?" />
-          <div className="mt-10 overflow-x-auto rounded-2xl border border-border">
-            <table className="w-full min-w-[34rem] text-left text-sm">
-              <thead className="bg-secondary/60">
-                <tr>
-                  <th scope="col" className="px-4 py-3">
-                    <span className="sr-only">Compare</span>
-                  </th>
-                  <th scope="col" className="border-l border-border px-4 py-3 font-heading font-bold">
-                    <span className="flex items-center gap-2">
-                      <UsersRound className="size-4 text-primary" aria-hidden /> Group
-                    </span>
-                  </th>
-                  <th scope="col" className="border-l border-border px-4 py-3 font-heading font-bold">
-                    <span className="flex items-center gap-2">
-                      <Settings2 className="size-4 text-brand-accent" aria-hidden /> Private
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {COMPARISON.map((row) => (
-                  <tr key={row.label} className="align-top">
-                    <th scope="row" className="w-1/4 px-4 py-3 font-medium text-muted-foreground">
-                      {row.label}
-                    </th>
-                    <td className="border-l border-border px-4 py-3">{row.group}</td>
-                    <td className="border-l border-border px-4 py-3">{row.private}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Button render={<Link href="/umrah/group" />} size="lg" className="gap-2">
-              Browse group packages
-            </Button>
-            <Button
-              render={<Link href="/umrah/private" />}
-             
-              variant="outline"
-              size="lg"
-              className="gap-2"
-            >
-              Build a private trip
-            </Button>
-          </div>
-        </div>
-      </section>
+      <UmrahBookingJourney />
+      <UmrahServiceGallery />
+      <UmrahFlowComparison />
 
       {/* A taste of the group catalog, so the fixed-price option is concrete. */}
       {featured.length > 0 ? (
