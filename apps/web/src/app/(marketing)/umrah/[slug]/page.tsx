@@ -1,3 +1,4 @@
+import { requireUser } from "@/lib/auth/session";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
@@ -29,6 +30,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
+  await requireUser(`/umrah/${slug}`);
   const pkg = await getPackageBySlug(slug);
   return { title: pkg?.name ?? "Umrah Package" };
 }
