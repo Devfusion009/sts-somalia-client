@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowRight, ChevronDown, ShoppingBag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc/react";
+import { stripPortalPrefix } from "@/lib/subdomain";
 import { cn } from "@/lib/utils";
 
 type NotificationRow = {
@@ -27,17 +28,32 @@ export function newOrderHref(n: { data?: unknown }): string | null {
 }
 
 /**
- * Unread new-order alerts pinned above every admin page as one collapsed bar
- * with the count; expanding it lists the newest few. Opening or dismissing an
- * alert marks it read.
+ * Unread new-order alerts as one collapsed bar on the dashboard; expanding it
+ * lists the newest few. Opening the Orders page counts as having seen them all,
+ * so the bar and the bell clear instead of resurfacing on the next visit.
  */
 export function NewOrderBanner({ notifications }: { notifications: NotificationRow[] }) {
   const router = useRouter();
+  // The proxy rewrites admin.<host>/orders to /admin/orders, so both forms are matched.
+  const path = stripPortalPrefix(usePathname()) ?? "/";
+  const onDashboard = path === "/";
+  const onOrders = path === "/orders" || path.startsWith("/orders/");
   const [open, setOpen] = useState(false);
   const dismiss = trpc.notifications.dismiss.useMutation({ onSuccess: () => router.refresh() });
+  const dismissAll = trpc.notifications.dismissType.useMutation({ onSuccess: () => router.refresh() });
 
   const orders = notifications.filter((n) => n.type === "new_order");
-  if (orders.length === 0) return null;
+  const latestId = orders[0]?.id;
+  const markedFor = useRef<string | null>(null);
+  const { mutate: markAllSeen } = dismissAll;
+
+  useEffect(() => {
+    if (!onOrders || !latestId || markedFor.current === latestId) return;
+    markedFor.current = latestId;
+    markAllSeen({ type: "new_order" });
+  }, [onOrders, latestId, markAllSeen]);
+
+  if (!onDashboard || orders.length === 0) return null;
   const shown = orders.slice(0, MAX_SHOWN);
 
   return (

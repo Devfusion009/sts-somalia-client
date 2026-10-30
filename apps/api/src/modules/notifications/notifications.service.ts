@@ -50,6 +50,18 @@ export class NotificationsService {
     return { ok: true as const };
   }
 
+  /** Marks every unread notification of one type as read, e.g. all new-order alerts once the Orders page is opened. */
+  async dismissType(userId: string, type: string) {
+    await this.rls
+      .get()
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("profile_id", userId)
+      .eq("type", type)
+      .is("read_at", null);
+    return { ok: true as const };
+  }
+
   /**
    * `notifications` already has an admin "for all" RLS policy (see
    * 20260101000010_notifications_audit_storage.sql), so the standard

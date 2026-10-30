@@ -16,6 +16,11 @@ export const notificationsRouter = router({
     return svc.dismiss(ctx.user!.id, input.notificationId);
   }),
 
+  dismissType: protectedProcedure.input(z.object({ type: z.string().min(1).max(64) })).mutation(async ({ ctx, input }) => {
+    const svc = await ctx.resolve(NotificationsService);
+    return svc.dismissType(ctx.user!.id, input.type);
+  }),
+
   admin: router({
     sendBroadcast: protectedAdminProcedure.input(sendBroadcastSchema).mutation(async ({ ctx, input }) => {
       const svc = await ctx.resolve(NotificationsService);
