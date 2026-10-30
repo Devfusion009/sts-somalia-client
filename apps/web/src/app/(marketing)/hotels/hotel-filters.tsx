@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useId } from "react";
 import { StarIcon, TuneIcon } from "@/components/ui/mui-icons";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,8 +22,8 @@ import { PRICE_BANDS } from "@/modules/hotels/price-bands";
 
 function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="border-b border-border px-4 py-4 last:border-b-0">
-      <h3 className="mb-3 text-sm font-bold">{title}</h3>
+    <div className="border-b border-border px-5 py-5 last:border-b-0">
+      <h3 className="mb-3 text-xs font-semibold">{title}</h3>
       <div className="space-y-1">{children}</div>
     </div>
   );
@@ -80,6 +80,7 @@ export function HotelFilters({ amenities, counts }: HotelFiltersProps) {
   const toggle = useCallback(
     (param: string, value: string) => {
       const params = new URLSearchParams(searchParams.toString());
+      params.delete("page");
       const current = (params.get(param) ?? "").split(",").filter(Boolean);
       const next = current.includes(value)
         ? current.filter((v) => v !== value)
@@ -91,6 +92,8 @@ export function HotelFilters({ amenities, counts }: HotelFiltersProps) {
     [router, pathname, searchParams]
   );
 
+  const filterId = useId();
+
   const isOn = (param: string, value: string) =>
     (searchParams.get(param) ?? "").split(",").filter(Boolean).includes(value);
 
@@ -101,10 +104,10 @@ export function HotelFilters({ amenities, counts }: HotelFiltersProps) {
     );
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border bg-secondary/50 px-4 py-3">
+    <div className="overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-5 py-4">
         <h2 className="flex items-center gap-2 text-sm font-bold">
-          Filter by
+          Refine your stay
         </h2>
         {activeCount > 0 ? (
           <button
@@ -112,6 +115,7 @@ export function HotelFilters({ amenities, counts }: HotelFiltersProps) {
             onClick={() => {
               const params = new URLSearchParams(searchParams.toString());
               FILTER_PARAMS.forEach((p) => params.delete(p));
+              params.delete("page");
               router.push(`${pathname}?${params.toString()}`, { scroll: false });
             }}
             className="-my-2 rounded-sm px-1 py-2 text-xs font-semibold text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -128,13 +132,14 @@ export function HotelFilters({ amenities, counts }: HotelFiltersProps) {
           return (
             <div key={stars} className="flex min-h-8 items-center gap-2.5">
               <Checkbox
-                id={`stars-${stars}`}
+                id={`${filterId}-stars-${stars}`}
+                aria-label={`${stars} star hotels`}
                 checked={isOn("stars", value)}
                 onCheckedChange={() => toggle("stars", value)}
                 disabled={count === 0}
               />
               <Label
-                htmlFor={`stars-${stars}`}
+                htmlFor={`${filterId}-stars-${stars}`}
                 className={cn("flex flex-1 cursor-pointer items-center gap-1 text-sm", count === 0 && "opacity-40")}
               >
                 <span className="sr-only">{stars} star</span>
@@ -156,13 +161,14 @@ export function HotelFilters({ amenities, counts }: HotelFiltersProps) {
           return (
             <div key={band.key} className="flex min-h-8 items-center gap-2.5">
               <Checkbox
-                id={`price-${band.key}`}
+                id={`${filterId}-price-${band.key}`}
+                aria-label={band.label}
                 checked={isOn("price", band.key)}
                 onCheckedChange={() => toggle("price", band.key)}
                 disabled={count === 0}
               />
               <Label
-                htmlFor={`price-${band.key}`}
+                htmlFor={`${filterId}-price-${band.key}`}
                 className={cn("flex flex-1 cursor-pointer text-sm", count === 0 && "opacity-40")}
               >
                 {band.label}
@@ -178,11 +184,12 @@ export function HotelFilters({ amenities, counts }: HotelFiltersProps) {
           {amenities.slice(0, 8).map((amenity) => (
             <div key={amenity.key} className="flex min-h-8 items-center gap-2.5">
               <Checkbox
-                id={`amenity-${amenity.key}`}
+                id={`${filterId}-amenity-${amenity.key}`}
+                aria-label={amenity.label}
                 checked={isOn("amenities", amenity.key)}
                 onCheckedChange={() => toggle("amenities", amenity.key)}
               />
-              <Label htmlFor={`amenity-${amenity.key}`} className="flex flex-1 cursor-pointer text-sm">
+              <Label htmlFor={`${filterId}-amenity-${amenity.key}`} className="flex flex-1 cursor-pointer text-sm">
                 {amenity.label}
                 <span className="ml-auto text-xs text-muted-foreground tabular-nums">{amenity.count}</span>
               </Label>
