@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Wallet } from "lucide-react";
+import { ArrowRight, Check, Wallet, ShieldCheck } from "lucide-react";
 import { SubmitButton } from "@/components/submit-button";
 import { countryFlag } from "@/lib/countries";
 import { startVisaApplication } from "@/modules/visa/actions";
@@ -27,7 +27,7 @@ export function VisaApplyForm({
       ) : null}
       <SubmitButton
         size={size}
-        className="w-full gap-2"
+        className="h-12 w-full gap-2 rounded-xl bg-brand-accent font-semibold text-brand-accent-foreground shadow-[0_5px_15px_-6px_rgba(249,115,22,0.5)] hover:bg-brand-accent/90"
         pendingText="Starting…"
       >
         Apply now <ArrowRight className="size-4" aria-hidden />
@@ -68,11 +68,11 @@ export function VisaBookingSummary({
     <section
       id={id}
       aria-labelledby="visa-price"
-      className="scroll-mt-28 overflow-hidden rounded-3xl border border-border bg-card shadow-sm"
+      className="scroll-mt-28 overflow-hidden rounded-3xl border border-border bg-card shadow-[0_15px_40px_-25px_rgba(7,60,52,0.35)]"
     >
-      <div className="flex items-center gap-3.5 bg-linear-to-br from-primary/12 via-primary/5 to-brand-gold/10 px-5 py-4 sm:px-6">
+      <div className="flex items-center gap-3.5 border-b border-white/10 bg-[#073c34] px-5 py-6 text-white sm:px-6">
         <span
-          className="grid size-12 shrink-0 place-items-center rounded-2xl bg-card text-3xl leading-none shadow-xs ring-1 ring-border"
+          className="grid size-11 shrink-0 place-items-center rounded-full bg-white/10 text-2xl leading-none ring-1 ring-white/15"
           aria-hidden
         >
           {countryFlag(destinationCode)}
@@ -80,11 +80,11 @@ export function VisaBookingSummary({
         <div className="min-w-0">
           <h2
             id="visa-price"
-            className="font-heading text-lg leading-snug font-bold"
+            className="font-heading text-lg leading-snug font-semibold"
           >
             {visaName}
           </h2>
-          <p className="text-sm text-muted-foreground">{category}</p>
+          <div className="mt-1 text-xs text-[#badacd]">{category}</div>
         </div>
       </div>
 
@@ -100,14 +100,14 @@ export function VisaBookingSummary({
           ))}
         </dl>
 
-        <div className="mt-4 flex items-end justify-between gap-4 rounded-2xl bg-primary/8 px-4 py-3.5">
+        <div className="mt-5 flex flex-wrap items-end justify-between gap-3 border-t border-dashed border-border pt-5">
           <span className="text-sm font-semibold">
             {nationality ? "Total for you" : "Total from"}
             <span className="block text-xs font-normal text-muted-foreground">
               per traveller
             </span>
           </span>
-          <span className="font-heading text-3xl font-bold text-primary tabular-nums">
+          <span className="font-heading text-[1.85rem] font-semibold tracking-tight text-primary tabular-nums">
             {fmtMoneyExact(total, currency)}
           </span>
         </div>
@@ -118,11 +118,12 @@ export function VisaBookingSummary({
           className="mt-5"
         />
 
-        <ul className="mt-5 space-y-2.5 border-t border-border pt-4">
+        <div className="mt-5 flex items-center gap-2 border-t border-border pt-5 text-[10px] font-semibold tracking-[0.12em] text-primary uppercase"><ShieldCheck className="size-3.5" aria-hidden /> Included with STS</div>
+        <ul className="mt-3 space-y-2.5">
           {assurances.map((text) => (
             <li
               key={text}
-              className="flex items-start gap-2 text-sm text-muted-foreground"
+              className="flex items-start gap-2 text-xs text-muted-foreground"
             >
               <Check
                 className="mt-0.5 size-4 shrink-0 text-primary"
@@ -131,7 +132,7 @@ export function VisaBookingSummary({
               {text}
             </li>
           ))}
-          <li className="flex items-start gap-2 text-sm text-muted-foreground">
+          <li className="flex items-start gap-2 text-xs text-muted-foreground">
             <Wallet
               className="mt-0.5 size-4 shrink-0 text-primary"
               aria-hidden

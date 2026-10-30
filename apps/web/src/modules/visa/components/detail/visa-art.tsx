@@ -12,35 +12,35 @@ export function VisaArtDefs() {
     <svg width="0" height="0" className="absolute" aria-hidden focusable="false">
       <defs>
         <linearGradient id="va-teal" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#19c3a6" />
-          <stop offset="1" stopColor="#006957" />
+          <stop offset="0" stopColor="#5a9b85" />
+          <stop offset="1" stopColor="#073c34" />
         </linearGradient>
         <linearGradient id="va-teal-soft" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#e9faf6" />
-          <stop offset="1" stopColor="#bfe9de" />
+          <stop offset="0" stopColor="#f4f6ed" />
+          <stop offset="1" stopColor="#d9e6db" />
         </linearGradient>
         <linearGradient id="va-paper" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#ffffff" />
-          <stop offset="1" stopColor="#eef6f3" />
+          <stop offset="1" stopColor="#e8eee4" />
         </linearGradient>
         <linearGradient id="va-orange" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ffb25e" />
-          <stop offset="1" stopColor="#ff6a00" />
+          <stop offset="0" stopColor="#deb985" />
+          <stop offset="1" stopColor="#bb7950" />
         </linearGradient>
         <linearGradient id="va-gold" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ffe9a0" />
-          <stop offset="1" stopColor="#d99a0b" />
+          <stop offset="0" stopColor="#e6d0a5" />
+          <stop offset="1" stopColor="#bc9459" />
         </linearGradient>
         <linearGradient id="va-night" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#0f4a40" />
           <stop offset="1" stopColor="#06231e" />
         </linearGradient>
         <radialGradient id="va-glow" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="#19c3a6" stopOpacity="0.35" />
-          <stop offset="1" stopColor="#19c3a6" stopOpacity="0" />
+          <stop offset="0" stopColor="#5a9b85" stopOpacity="0.12" />
+          <stop offset="1" stopColor="#5a9b85" stopOpacity="0" />
         </radialGradient>
         <filter id="va-shadow" x="-30%" y="-30%" width="160%" height="170%">
-          <feDropShadow dx="0" dy="6" stdDeviation="5" floodColor="#06312a" floodOpacity="0.22" />
+          <feDropShadow dx="0" dy="5" stdDeviation="3" floodColor="#06312a" floodOpacity="0.16" />
         </filter>
         <filter id="va-shadow-sm" x="-30%" y="-30%" width="160%" height="170%">
           <feDropShadow dx="0" dy="2.5" stdDeviation="2.2" floodColor="#06312a" floodOpacity="0.2" />
@@ -53,16 +53,6 @@ export function VisaArtDefs() {
 type ArtProps = { className?: string };
 
 const SVG = "h-full w-full overflow-visible";
-
-function Sparkle({ x, y, s = 1, fill = "url(#va-gold)" }: { x: number; y: number; s?: number; fill?: string }) {
-  return (
-    <path
-      transform={`translate(${x} ${y}) scale(${s})`}
-      d="M0-8c.8 5 3 7.2 8 8-5 .8-7.2 3-8 8-.8-5-3-7.2-8-8 5-.8 7.2-3 8-8z"
-      fill={fill}
-    />
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /* Documents                                                           */
@@ -89,8 +79,8 @@ function PassportArt({ className }: ArtProps) {
         <circle cx="120" cy="86" r="12" fill="none" stroke="url(#va-orange)" strokeWidth="1.2" strokeDasharray="2 2.4" />
         <path d="M113 87l5 5 9-11" fill="none" stroke="url(#va-orange)" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
       </g>
-      <Sparkle x={26} y={26} s={1.1} />
-      <Sparkle x={134} y={22} s={0.7} fill="#19c3a6" />
+
+
     </svg>
   );
 }
@@ -115,8 +105,8 @@ function BioPageArt({ className }: ArtProps) {
         <rect x="26" y="90" width="106" height="3" rx="1.5" fill="url(#va-gold)" />
         <rect x="26" y="95" width="88" height="3" rx="1.5" fill="url(#va-gold)" opacity=".55" />
       </g>
-      <Sparkle x={140} y={16} s={0.9} />
-      <Sparkle x={14} y={100} s={0.6} fill="#19c3a6" />
+
+
     </svg>
   );
 }
@@ -136,7 +126,7 @@ function PhotoArt({ className }: ArtProps) {
         <rect x="68" y="97" width="24" height="3" rx="1.5" fill="#0a8f79" opacity=".2" />
       </g>
       <path d="M34 28h-8v8M126 28h8v8M34 94h-8v-8M126 94h8v-8" fill="none" stroke="url(#va-orange)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-      <Sparkle x={138} y={58} s={0.8} />
+
     </svg>
   );
 }
@@ -166,7 +156,7 @@ function StatementArt({ className }: ArtProps) {
         <circle cx="122" cy="82" r="15" fill="none" stroke="#fff" strokeOpacity=".7" strokeWidth="1.6" />
         <path d="M122 72v20M116.5 77.5c0-3 11-3 11 .5s-11 3.5-11 7 11 3 11 .5" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
       </g>
-      <Sparkle x={134} y={24} s={0.8} fill="#19c3a6" />
+
     </svg>
   );
 }
@@ -193,7 +183,7 @@ function TicketArt({ className }: ArtProps) {
         ))}
         <path d="M119 66h20M133 56l11 10-11 10" fill="none" stroke="url(#va-orange)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
       </g>
-      <Sparkle x={20} y={20} s={0.9} />
+
     </svg>
   );
 }
@@ -216,7 +206,7 @@ function LetterArt({ className }: ArtProps) {
         <circle cx="106" cy="86" r="16" fill="none" stroke="#fff" strokeOpacity=".75" strokeWidth="1.6" strokeDasharray="2.4 2.6" />
         <path d="M97 87l7 7 12-14" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
       </g>
-      <Sparkle x={132} y={28} s={0.9} />
+
     </svg>
   );
 }
@@ -260,9 +250,9 @@ function FormStep({ className }: ArtProps) {
         <path d="M147 126l2 6 2-6z" fill="#06312a" />
         <rect x="142" y="52" width="14" height="10" rx="4" fill="url(#va-gold)" />
       </g>
-      <Sparkle x={168} y={34} s={1.2} />
-      <Sparkle x={30} y={44} s={0.8} fill="#19c3a6" />
-      <Sparkle x={34} y={118} s={0.6} />
+
+
+
     </svg>
   );
 }
@@ -282,18 +272,18 @@ function UploadStep({ className }: ArtProps) {
         <path d="M96 90V62M84 73l12-12 12 12" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
       </g>
       <g transform="rotate(-12 150 100)" filter="url(#va-shadow-sm)">
-        <rect x="136" y="82" width="34" height="44" rx="5" fill="url(#va-paper)" stroke="#ff6a00" strokeWidth="2.4" />
+        <rect x="136" y="82" width="34" height="44" rx="5" fill="url(#va-paper)" stroke="#bb7950" strokeWidth="2.4" />
         <path d="M158 82l12 12h-12z" fill="url(#va-orange)" />
-        <rect x="142" y="100" width="22" height="3.6" rx="1.8" fill="#ff6a00" opacity=".55" />
-        <rect x="142" y="108" width="16" height="3.6" rx="1.8" fill="#ff6a00" opacity=".35" />
+        <rect x="142" y="100" width="22" height="3.6" rx="1.8" fill="#bb7950" opacity=".55" />
+        <rect x="142" y="108" width="16" height="3.6" rx="1.8" fill="#bb7950" opacity=".35" />
       </g>
       <g transform="rotate(10 46 112)" filter="url(#va-shadow-sm)">
         <rect x="32" y="96" width="30" height="38" rx="5" fill="url(#va-paper)" stroke="#0a8f79" strokeWidth="2" />
         <circle cx="47" cy="111" r="6" fill="url(#va-teal)" />
         <path d="M37 128c1-8 5-10 10-10s9 2 10 10z" fill="url(#va-teal)" />
       </g>
-      <Sparkle x={160} y={36} s={1.1} />
-      <Sparkle x={26} y={56} s={0.7} fill="#19c3a6" />
+
+
     </svg>
   );
 }
@@ -322,8 +312,8 @@ function PayStep({ className }: ArtProps) {
         <path d="M125.5 80l6 6 11-12" fill="none" stroke="#fff" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round" />
         <rect x="120" y="104" width="28" height="7" rx="3.5" fill="url(#va-teal)" />
       </g>
-      <Sparkle x={26} y={28} s={1} />
-      <Sparkle x={176} y={110} s={0.8} fill="#19c3a6" />
+
+
     </svg>
   );
 }
@@ -333,12 +323,8 @@ function DoneStep({ className }: ArtProps) {
   return (
     <svg viewBox="0 0 200 150" className={cn(SVG, className)} aria-hidden>
       <ellipse cx="100" cy="84" rx="88" ry="58" fill="url(#va-glow)" />
-      <g stroke="url(#va-gold)" strokeWidth="2" strokeLinecap="round" opacity=".8">
-        {[...Array(12)].map((_, i) => {
-          const a = (i / 12) * Math.PI * 2;
-          return <path key={i} d={`M${100 + Math.cos(a) * 62} ${78 + Math.sin(a) * 62}L${100 + Math.cos(a) * 70} ${78 + Math.sin(a) * 70}`} />;
-        })}
-      </g>
+      <circle cx="100" cy="76" r="61" fill="none" stroke="#9db9a9" strokeWidth="0.8" />
+      <circle cx="100" cy="76" r="68" fill="none" stroke="#9db9a9" strokeWidth="0.6" strokeDasharray="2 5" />
       <g filter="url(#va-shadow)">
         <path d="M100 14l44 15v32c0 30-19 48-44 59-25-11-44-29-44-59V29z" fill="url(#va-teal)" />
         <path d="M100 14l44 15v32c0 30-19 48-44 59z" fill="#04382f" opacity=".22" />
@@ -355,9 +341,9 @@ function DoneStep({ className }: ArtProps) {
         <rect x="28" y="110" width="26" height="3.2" rx="1.6" fill="#0a8f79" opacity=".3" />
         <circle cx="52" cy="116" r="6" fill="none" stroke="url(#va-orange)" strokeWidth="2.2" />
       </g>
-      <Sparkle x={30} y={36} s={1.2} />
-      <Sparkle x={176} y={92} s={0.9} fill="#19c3a6" />
-      <Sparkle x={170} y={128} s={0.6} />
+
+
+
     </svg>
   );
 }

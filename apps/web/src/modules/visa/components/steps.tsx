@@ -107,7 +107,7 @@ function wizardBasePath(desk: boolean) {
 
 /** `index` is kept for callers; the stepper beside the form already shows the step number. */
 function StepHeading({ title }: { index?: number; title: string }) {
-  return <h2 className="font-heading text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>;
+  return <h2 className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">{title}</h2>;
 }
 
 /** Back on the left, primary on the right; stacked full-width on phones (primary first). */
@@ -146,7 +146,7 @@ function Field({
   className?: string;
 }) {
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div className={cn("space-y-2 [&_input]:min-h-11 [&_input]:rounded-lg [&_[data-slot=select-trigger]]:min-h-11", className)}>
       <Label htmlFor={htmlFor}>
         {label}
         {required ? <span className="text-destructive"> *</span> : null}
@@ -209,19 +209,16 @@ const APPLICANT_TYPE_CARDS = [
     value: "single",
     icon: User,
     title: "Single applicant",
-    description: "Only myself",
   },
   {
     value: "family",
     icon: Users,
     title: "Family",
-    description: "Me and my family members",
   },
   {
     value: "group",
     icon: UsersRound,
     title: "Group",
-    description: "Me and a group (not family)",
   },
 ] as const;
 
@@ -355,16 +352,16 @@ export function StepApplicantType({
                 aria-checked={active}
                 onClick={() => setApplicantType(card.value)}
                 className={cn(
-                  "flex items-center gap-3 rounded-2xl border bg-card p-4 text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:flex-col sm:gap-2 sm:p-6 sm:text-center",
+                  "relative flex items-center gap-4 rounded-xl border bg-card p-5 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:min-h-40 sm:flex-col sm:items-start sm:gap-5 sm:p-5",
                   active
-                    ? "border-primary shadow-sm ring-2 ring-primary/20"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary/20"
                     : "border-border hover:border-primary/40"
                 )}
               >
                 <span
                   className={cn(
-                    "flex size-10 shrink-0 items-center justify-center rounded-full sm:size-12",
-                    active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    "flex size-11 shrink-0 items-center justify-center rounded-xl",
+                    active ? "bg-primary text-primary-foreground" : "bg-secondary text-primary"
                   )}
                   aria-hidden
                 >
@@ -372,12 +369,11 @@ export function StepApplicantType({
                 </span>
                 <span className="min-w-0 flex-1 sm:flex-none">
                   <span className="block text-sm font-bold">{card.title}</span>
-                  <span className="block text-xs text-muted-foreground">{card.description}</span>
                 </span>
                 <span
                   aria-hidden
                   className={cn(
-                    "flex size-4 shrink-0 items-center justify-center rounded-full border-2 sm:mt-1",
+                    "flex size-4 shrink-0 items-center justify-center rounded-full border-2 sm:absolute sm:top-5 sm:right-5",
                     active ? "border-primary" : "border-muted-foreground/40"
                   )}
                 >
@@ -488,7 +484,7 @@ export function StepApplicantType({
         <ErrorAlert state={state} />
         <div className={STEP_FOOTER}>
           <BackButton href={backHref} />
-          <SubmitButton size="lg" pendingText="Saving…" className="gap-2">
+          <SubmitButton size="lg" pendingText="Saving…" className="min-w-36 gap-2 rounded-xl">
             Continue <ArrowRight className="size-4" aria-hidden />
           </SubmitButton>
         </div>
@@ -569,7 +565,7 @@ export function StepPersonalInfo({
 
       <div className={STEP_FOOTER}>
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=1`} />
-        <SubmitButton size="lg" pendingText="Saving…" className="gap-2">
+        <SubmitButton size="lg" pendingText="Saving…" className="min-w-36 gap-2 rounded-xl">
           Continue <ArrowRight className="size-4" aria-hidden />
         </SubmitButton>
       </div>
@@ -715,7 +711,7 @@ export function StepTravelInfo({
 
       <div className={STEP_FOOTER}>
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=2`} />
-        <SubmitButton size="lg" pendingText="Saving…" className="gap-2">
+        <SubmitButton size="lg" pendingText="Saving…" className="min-w-36 gap-2 rounded-xl">
           Continue <ArrowRight className="size-4" aria-hidden />
         </SubmitButton>
       </div>
@@ -765,12 +761,18 @@ function UploadSlot({
   });
 
   return (
-    <div className="space-y-1.5">
-      <p className="text-sm font-semibold">
+    <div className="min-w-0 space-y-3 rounded-xl bg-secondary/25 p-4 ring-1 ring-border">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <FileText className="size-4 shrink-0 text-primary" aria-hidden="true" />
         {slot.label}
         {slot.required ? <span className="text-destructive"> *</span> : <span className="font-normal text-muted-foreground"> (optional)</span>}
-      </p>
-      {slot.description ? <p className="text-xs text-muted-foreground">{slot.description}</p> : null}
+      </div>
+      {slot.description ? (
+        <details className="text-xs text-muted-foreground">
+          <summary className="w-fit cursor-pointer rounded-sm py-1 font-medium underline decoration-border underline-offset-4 focus-visible:outline-2 focus-visible:outline-primary">Document requirements</summary>
+          <div className="pt-1 leading-relaxed">{slot.description}</div>
+        </details>
+      ) : null}
 
       {existing ? (
         <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
@@ -894,7 +896,7 @@ export function StepDocuments({
         <input type="hidden" name="applicationId" value={application.id} />
         {desk ? <input type="hidden" name="desk" value="1" /> : null}
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=3`} />
-        <SubmitButton size="lg" pendingText="Checking…" className="gap-2">
+        <SubmitButton size="lg" pendingText="Checking…" className="min-w-36 gap-2 rounded-xl">
           Continue <ArrowRight className="size-4" aria-hidden />
         </SubmitButton>
       </form>
@@ -916,8 +918,8 @@ function ReviewSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-border">
-      <div className="flex items-center justify-between gap-3 border-b border-border bg-secondary/40 py-1.5 pr-2 pl-4 sm:pl-5">
+    <section className="overflow-hidden rounded-xl bg-secondary/20">
+      <div className="flex items-center justify-between gap-3 border-b border-border/70 py-2.5 pr-3 pl-4 sm:pl-5">
         <h3 className="text-sm font-semibold">{title}</h3>
         <Button
           variant="ghost"
@@ -1057,7 +1059,7 @@ export function StepReview({
         </div>
       </ReviewSection>
 
-      <div className="flex items-baseline justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-4 sm:px-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-4 rounded-xl bg-secondary px-5 py-6 sm:px-6">
         <div>
           <p className="text-sm font-semibold">Total</p>
           {travellers > 1 ? (
@@ -1096,7 +1098,7 @@ export function StepReview({
 
         <div className={STEP_FOOTER}>
           <BackButton href={`${editBase}4`} />
-          <SubmitButton size="lg" pendingText="Submitting…" className="gap-2">
+          <SubmitButton size="lg" pendingText="Submitting…" className="min-w-36 gap-2 rounded-xl">
             Continue to payment <ArrowRight className="size-4" aria-hidden />
           </SubmitButton>
         </div>
