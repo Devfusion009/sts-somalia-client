@@ -70,3 +70,6 @@ next-env.d.ts
 *CREDENTIALS.local.md
 *CREDENTIALS.local.txt
 *.credentials.local
+
+# credentials
+.secrets/
