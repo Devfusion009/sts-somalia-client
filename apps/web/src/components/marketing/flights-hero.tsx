@@ -3,133 +3,89 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ArrowUpRight, Headphones, Plane, ShieldCheck, Ticket } from "lucide-react";
 import { BedIcon, FlightTakeoffIcon, MosqueIcon, type SvgIconComponent } from "@/components/ui/mui-icons";
 import { cn } from "@/lib/utils";
 
-const MODES: Array<{ key: string; label: string; href: string; icon: SvgIconComponent }> = [
-  { key: "flights", label: "Flights", href: "/flights", icon: FlightTakeoffIcon },
-  { key: "hotels", label: "Stays", href: "/hotels", icon: BedIcon },
-  { key: "umrah", label: "Umrah", href: "/umrah", icon: MosqueIcon },
-];
-
-/**
- * Right-side photo stack: three rounded-square frames, each backed by a
- * thin offset outline square for depth, bleeding off the top/right edge.
- * Hidden below xl where the search card needs the full width.
- */
-const COLLAGE = [
-  {
-    src: "/marketing/dubai.webp",
-    alt: "",
-    frame: "right-[-6%] top-[-10%] size-64",
-    echo: "right-[-10%] top-[-6%] size-64",
-  },
-  {
-    src: "/marketing/airport.webp",
-    alt: "",
-    frame: "right-[34%] top-[30%] size-48",
-    echo: "right-[30%] top-[34%] size-48",
-  },
-  {
-    src: "/marketing/beach.webp",
-    alt: "",
-    frame: "right-[-2%] top-[56%] size-56",
-    echo: "right-[-6%] top-[60%] size-56",
-  },
+const MODES: Array<{ label: string; href: string; icon: SvgIconComponent }> = [
+  { label: "Flights", href: "/flights", icon: FlightTakeoffIcon },
+  { label: "Stays", href: "/hotels", icon: BedIcon },
+  { label: "Umrah", href: "/umrah", icon: MosqueIcon },
 ];
 
 const TRUST_POINTS = [
-  { icon: "shield", title: "Fare rules before you pay", detail: "Bags, refunds and changes on every fare" },
-  { icon: "badge", title: "IATA-experienced booking team", detail: "Staff who've worked airline reservation desks" },
-  { icon: "headset", title: "Support in Somali", detail: "WhatsApp and phone, emergencies around the clock" },
-] as const;
-
-function TrustIcon({ kind }: { kind: (typeof TRUST_POINTS)[number]["icon"] }) {
-  const paths: Record<string, React.ReactNode> = {
-    shield: <path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z" />,
-    badge: <path d="M12 2l2.4 2.4h3.4v3.4L20.2 10l-2.4 2.4v3.4h-3.4L12 18.2l-2.4-2.4H6.2v-3.4L3.8 10l2.4-2.4V4.2h3.4L12 2z" />,
-    headset: <path d="M4 13v-1a8 8 0 0116 0v1M4 13v4a2 2 0 002 2h1v-6H5a1 1 0 00-1 1zm16 0v4a2 2 0 01-2 2h-1v-6h2a1 1 0 011 1z" />,
-  };
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="size-5" aria-hidden>
-      {paths[kind]}
-    </svg>
-  );
-}
+  { icon: ShieldCheck, title: "ISO-certified company" },
+  { icon: Ticket, title: "IATA-experienced booking team" },
+  { icon: Headphones, title: "Support in Somali" },
+];
 
 export function FlightsHero({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <section className="relative isolate overflow-hidden bg-[#04241d] text-white">
-      {/* Solid brand-teal canvas with two soft glows — a highlight behind the
-          photo stack and a warm one low on the opposite corner. No photo, no
-          route lines: the card and the collage carry the imagery. */}
-      <div
-        className="absolute inset-0 bg-[radial-gradient(60%_75%_at_88%_8%,rgba(45,212,180,0.22),transparent),radial-gradient(50%_65%_at_8%_95%,rgba(244,113,28,0.14),transparent)]"
-        aria-hidden
-      />
-
-      {/* Collage */}
-      <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[34%] xl:block" aria-hidden>
-        {COLLAGE.map((tile) => (
-          <div key={tile.src}>
-            <div className={cn("absolute rounded-[2rem] ring-1 ring-white/15", tile.echo)} />
-            <div className={cn("absolute overflow-hidden rounded-[2rem] shadow-2xl shadow-black/40 ring-1 ring-white/10", tile.frame)}>
-              <Image src={tile.src} alt={tile.alt} fill sizes="260px" className="object-cover" />
-            </div>
-          </div>
-        ))}
+    <section className="relative isolate bg-[#f3f7f5]">
+      <div className="absolute inset-x-0 top-0 -z-10 h-[calc(100%-10rem)] overflow-hidden bg-[#073c34] sm:h-[calc(100%-6rem)]" aria-hidden="true">
+        <div className="absolute -top-64 -left-48 size-[650px] rounded-full border border-white/[0.06]" />
+        <div className="absolute -top-40 -left-24 size-[650px] rounded-full border border-white/[0.06]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_90%_0%,#176658_0%,transparent_65%)]" />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4 pt-12 pb-14 sm:px-6 lg:px-8 lg:pt-16 lg:pb-20">
-        <div className="lg:max-w-[72%] xl:max-w-[64%]">
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-balance text-white sm:text-4xl lg:text-[2.75rem]">
-            Where do you want to go?
-          </h1>
+      <div className="mx-auto max-w-7xl px-4 pt-9 sm:px-6 sm:pt-12 lg:px-8 lg:pt-14">
+        <div className="grid items-center gap-8 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
+          <div className="pb-2 lg:pb-5">
+            <div className="mb-5 flex items-center gap-3 text-[11px] font-semibold tracking-[0.22em] text-[#a7d7c9] uppercase">
+              <span className="h-px w-8 bg-[#eaa16f]" aria-hidden="true" />
+              From Somalia. To the world.
+            </div>
+            <h1 className="font-heading text-[2.65rem] leading-[1.06] font-semibold tracking-[-0.045em] text-white sm:text-6xl lg:text-[4.25rem]">
+              A new view.<br />
+              <span className="text-[#a8dec9]">A flight away.</span>
+            </h1>
+            <div className="mt-7 flex flex-wrap items-center gap-x-4 gap-y-3 text-sm text-white/80">
+              <span className="flex items-center gap-2"><Plane className="size-4 text-[#eaa16f]" aria-hidden="true" /> Domestic & international flights</span>
+              <span className="hidden h-3 w-px bg-white/25 sm:block" aria-hidden="true" />
+              <a href="#flight-destinations" className="inline-flex min-h-9 items-center gap-1.5 rounded-sm text-white underline decoration-white/35 underline-offset-4 transition-colors hover:text-[#a8dec9] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Explore destinations <ArrowUpRight className="size-4" aria-hidden="true" /></a>
+            </div>
+          </div>
 
-          {/* Mode switcher — one segmented pill, not disconnected tiles, so the
-              active mode reads as a state change within one control rather
-              than three separate buttons competing for weight. */}
-          <nav aria-label="Booking type" className="mt-6 inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-white/10 p-1 ring-1 ring-white/15 backdrop-blur-sm">
+          <div className="relative hidden pb-5 lg:block">
+            <div className="relative h-[272px] overflow-hidden rounded-[1.5rem] rounded-tr-[5rem] border border-white/15">
+              <Image src="/marketing/hero-aircraft.webp" alt="An aircraft wing above the clouds at sunset" fill preload sizes="(min-width: 1024px) 520px, 100vw" className="object-cover" />
+              <div className="absolute inset-0 bg-linear-to-t from-[#06372f]/60 via-transparent to-transparent" />
+              <span className="absolute top-5 left-5 rounded-full border border-white/30 bg-[#073c34]/40 px-3 py-1.5 text-[10px] font-semibold tracking-[0.18em] text-white uppercase backdrop-blur-md">The window seat awaits</span>
+            </div>
+            <Link href="/flights?origin=MGQ&destination=DXB#flight-search" className="group absolute -bottom-1 -left-6 flex w-[290px] items-center gap-5 rounded-2xl border border-white/20 bg-[#f9fbf7] px-5 py-4 text-[#123d33] shadow-xl transition-transform hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
+              <div><span className="block text-[10px] font-medium text-[#5a7168]">Mogadishu</span><span className="font-heading text-2xl font-bold tracking-tight">MGQ</span></div>
+              <div className="flex flex-1 items-center gap-2 text-[#00947c]" aria-hidden="true"><span className="h-px flex-1 bg-[#cadbd2]" /><Plane className="size-4" /><span className="h-px flex-1 bg-[#cadbd2]" /></div>
+              <div><span className="block text-[10px] font-medium text-[#5a7168]">Dubai</span><span className="font-heading text-2xl font-bold tracking-tight">DXB</span></div>
+              <ArrowUpRight className="size-4 text-[#00947c] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
+
+        <div id="flight-search" className="relative mt-7 scroll-mt-28 rounded-[1.5rem] bg-card text-card-foreground shadow-[0_20px_65px_-25px_rgba(5,48,37,0.3)] ring-1 ring-black/5 sm:mt-9">
+          <nav aria-label="Booking type" className="flex items-center gap-5 border-b border-border px-5 sm:gap-7 sm:px-7">
             {MODES.map((mode) => {
               const active = pathname.startsWith(mode.href);
               return (
-                <Link
-                  key={mode.key}
-                  href={mode.href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "flex h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold whitespace-nowrap transition-colors duration-200",
-                    "focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar focus-visible:outline-none",
-                    active
-                      ? "bg-white text-sidebar shadow-sm"
-                      : "text-white/75 hover:bg-white/10 hover:text-white"
-                  )}
-                >
-                  <mode.icon sx={{ fontSize: 18 }} aria-hidden />
-                  {mode.label}
+                <Link key={mode.href} href={mode.href} aria-current={active ? "page" : undefined} className={cn("relative flex min-h-16 items-center gap-2 px-1 text-sm font-semibold transition-colors focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary", active ? "text-primary after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:rounded-t-full after:bg-primary" : "text-muted-foreground hover:text-primary")}>
+                  <mode.icon sx={{ fontSize: 19 }} aria-hidden />{mode.label}
                 </Link>
               );
             })}
+            <span className="ml-auto hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><ShieldCheck className="size-3.5 text-primary" aria-hidden="true" /> STS Travel & Tours</span>
           </nav>
-
-          <div className="mt-6">{children}</div>
-
-          <ul className="mt-8 grid gap-5 sm:grid-cols-3">
-            {TRUST_POINTS.map((point) => (
-              <li key={point.title} className="flex items-start gap-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white/10 text-sidebar-primary ring-1 ring-white/15">
-                  <TrustIcon kind={point.icon} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-white">{point.title}</span>
-                  <span className="block text-xs text-white/60">{point.detail}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          {children}
         </div>
+
+        <ul className="grid gap-4 py-7 sm:grid-cols-3 sm:gap-6 sm:py-8">
+          {TRUST_POINTS.map((point) => (
+            <li key={point.title} className="flex items-center gap-3 sm:justify-center">
+              <point.icon className="size-[18px] shrink-0 text-[#00816c]" strokeWidth={1.6} aria-hidden="true" />
+              <span className="text-xs font-medium text-[#405d53] sm:text-[13px]">{point.title}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );
