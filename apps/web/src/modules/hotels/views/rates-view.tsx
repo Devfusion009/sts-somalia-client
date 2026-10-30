@@ -1,105 +1,98 @@
 import { format } from "date-fns";
+import { CalendarDays, SlidersHorizontal } from "lucide-react";
 import { getRatePreview, getRateRules } from "@/modules/hotels/rate-queries";
 import { todayIso } from "@/modules/hotels/availability";
 import { RateRulesEditor } from "@/modules/hotels/components/rate-rules-editor";
 import { RatePlansEditor } from "@/modules/hotels/components/rate-plans-editor";
 import { ExtrasEditor } from "@/modules/hotels/components/extras-editor";
 import { getHotelExtras, getRatePlans } from "@/modules/hotels/rate-plan-queries";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageHeader } from "@/components/ui/page-header";
+import { Button } from "@/components/ui/button";
+import { HotelMetric, HotelWorkspaceHeader, hotelStyles as styles } from "@/modules/hotels/components/hotel-workspace";
 import { cn } from "@/lib/utils";
 
 const PREVIEW_DAYS = 14;
 
 export async function RatesView({ hotelId }: { hotelId: string }) {
-
   const today = todayIso();
   const [rules, preview, plans, extras] = await Promise.all([
-    getRateRules(hotelId),
-    getRatePreview(hotelId, today, PREVIEW_DAYS),
-    getRatePlans(hotelId),
-    getHotelExtras(hotelId),
+    getRateRules(hotelId), getRatePreview(hotelId, today, PREVIEW_DAYS), getRatePlans(hotelId), getHotelExtras(hotelId),
   ]);
   const currency = preview[0]?.currency ?? "USD";
   const nights = preview[0]?.nights.map((n) => n.night) ?? [];
+  const currencies = [...new Set(preview.map((room) => room.currency))];
+  const prices = preview.flatMap((room) => room.nights.map((night) => night.rate));
+  const lowest = prices.length && currencies.length === 1 ? Math.min(...prices) : null;
+  const highest = prices.length && currencies.length === 1 ? Math.max(...prices) : null;
+  const rateRange = lowest === null || highest === null ? "—" : lowest === highest ? lowest.toLocaleString("en-US") : `${lowest.toLocaleString("en-US")}–${highest.toLocaleString("en-US")}`;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <PageHeader title="Rates" />
+    <div className={styles.workspace}>
+      <HotelWorkspaceHeader title="Rates & pricing" eyebrow="Revenue management"
+        meta={<span className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground">{currencies.length > 1 ? "Multiple currencies" : currency}</span>}
+        actions={<Button variant="outline" render={<a href="#rate-rules" />}><SlidersHorizontal aria-hidden="true" />Rate rules</Button>}
+      />
+      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <HotelMetric label="Nightly price range" value={rateRange} detail={`${currencies.length === 1 ? currency : "Multiple currencies"} · Next 14 nights`} featured />
+        <HotelMetric label="Room types" value={preview.length} />
+        <HotelMetric label="Active rate plans" value={plans.filter((plan) => plan.isActive).length} />
+        <HotelMetric label="Pricing rules" value={rules.length} />
+      </dl>
 
-      {preview.length > 0 ? (
-        <Card className="overflow-hidden py-0">
-          <CardHeader className="border-b border-border pt-4 pb-3">
-            <CardTitle className="text-base">Next {PREVIEW_DAYS} nights</CardTitle>
-          </CardHeader>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
-                  <th className="sticky left-0 bg-muted px-3 py-2 text-left font-medium">Room type</th>
-                  {nights.map((night) => (
-                    <th key={night} className="px-2 py-2 text-center font-medium whitespace-nowrap tabular-nums">
-                      {format(new Date(`${night}T00:00:00`), "EEE d")}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {preview.map((room) => (
-                  <tr key={room.roomId} className="border-b border-border transition-colors last:border-0 hover:bg-muted/40">
-                    <td className="sticky left-0 bg-card px-3 py-2 font-medium whitespace-nowrap">{room.roomName}</td>
-                    {room.nights.map((n) => (
-                      <td
-                        key={n.night}
-                        title={n.ruleName ?? (n.source === "override" ? "Set for this date" : undefined)}
-                        className={cn(
-                          "px-2 py-2 text-center tabular-nums",
-                          n.source === "rule" && "bg-brand-gold/15 font-medium text-[color-mix(in_oklch,var(--brand-gold),black_50%)] dark:text-brand-gold",
-                          n.source === "override" && "bg-primary/10 font-medium text-primary"
-                        )}
-                      >
-                        {Math.round(n.rate).toLocaleString("en-US")}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      ) : null}
+      <section className={styles.surface} aria-labelledby="nightly-rates-heading">
+        <div className={styles.sectionHeading}>
+          <h2 id="nightly-rates-heading">Nightly rates</h2>
+          <span className="flex items-center gap-2 text-xs text-muted-foreground tabular-nums"><CalendarDays className="size-3.5" aria-hidden="true" />
+            {nights.length ? `${format(new Date(`${nights[0]}T00:00:00`), "d MMM")} – ${format(new Date(`${nights[nights.length - 1]}T00:00:00`), "d MMM yyyy")}` : "Next 14 nights"}
+          </span>
+        </div>
+        {preview.length ? <div className="overflow-x-auto">
+          <table className={cn(styles.rateTable, "w-full border-separate border-spacing-0 text-sm")}>
+            <caption className="sr-only">Effective nightly rates by room type. Currency is listed with each room.</caption>
+            <thead>
+              <tr className="bg-secondary/30 text-muted-foreground">
+                <th scope="col" className="sticky left-0 z-10 min-w-44 bg-card px-5 py-4 text-left text-xs font-medium">Room type</th>
+                {nights.map((night) => {
+                  const date = new Date(`${night}T00:00:00`);
+                  const weekend = date.getDay() === 5 || date.getDay() === 6;
+                  return <th key={night} scope="col" className={cn("min-w-14 px-1.5 py-3 text-center font-normal", weekend && "bg-secondary/60")}>
+                    <span className="block text-[10px]">{format(date, "EEE")}</span>
+                    <span className={cn("mx-auto mt-1 grid size-7 place-items-center rounded-lg text-sm font-semibold tabular-nums", night === today && "bg-primary text-primary-foreground")}>{format(date, "d")}</span>
+                  </th>;
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {preview.map((room) => <tr key={room.roomId}>
+                <th scope="row" className="sticky left-0 z-10 border-r border-b border-border bg-card px-5 py-5 text-left"><span className="block text-xs font-semibold whitespace-nowrap">{room.roomName}</span><span className="mt-1 block text-[10px] font-normal text-muted-foreground tabular-nums">{room.currency} · Base {room.basePrice.toLocaleString("en-US")}</span></th>
+                {room.nights.map((night) => <td key={night.night} title={`${room.currency} ${night.rate.toLocaleString("en-US")} · ${night.ruleName ?? (night.source === "override" ? "Date override" : "Base rate")}`}
+                  className={cn("px-1 py-3 text-center text-xs font-medium tabular-nums", night.source === "rule" && "bg-brand-gold/10", night.source === "override" && "bg-primary/5")}>
+                  <span className={cn("inline-flex min-h-8 min-w-10 items-center justify-center rounded-md px-1", night.source === "rule" && "bg-brand-gold/15 text-foreground", night.source === "override" && "bg-primary/10 text-primary")}>{Math.round(night.rate).toLocaleString("en-US")}</span>
+                  <span className={cn("mx-auto mt-1 block h-0.5 w-4 rounded-full", night.source === "rule" ? "bg-brand-gold" : night.source === "override" ? "bg-primary" : "bg-border")} />
+                </td>)}
+              </tr>)}
+            </tbody>
+          </table>
+        </div> : <div className="py-12 text-center text-sm text-muted-foreground">No room types</div>}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-[11px] text-muted-foreground">
+          <span>{preview.length} room types · {nights.length} nights</span>
+          <div className="flex items-center gap-4"><span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-muted-foreground/40" />Base rate</span><span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-brand-gold" />Rule</span><span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-primary" />Override</span></div>
+        </div>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Rate plans</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <RatePlansEditor hotelId={hotelId} plans={plans} currency={currency} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Extras</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ExtrasEditor hotelId={hotelId} extras={extras} currency={currency} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Rate rules</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <RateRulesEditor
-            hotelId={hotelId}
-            rules={rules}
-            roomTypes={preview.map((r) => ({ id: r.roomId, name: r.roomName }))}
-            today={today}
-          />
-        </CardContent>
-      </Card>
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        <section id="rate-plans" className={cn(styles.surface, "scroll-mt-6")} aria-labelledby="rate-plans-heading">
+          <div className={styles.sectionHeading}><h2 id="rate-plans-heading">Rate plans</h2><span className="rounded-md bg-secondary px-2 py-1 text-xs text-muted-foreground tabular-nums">{plans.length}</span></div>
+          <div className="p-5"><RatePlansEditor hotelId={hotelId} plans={plans} currency={currency} /></div>
+        </section>
+        <section className={styles.surface} aria-labelledby="extras-heading">
+          <div className={styles.sectionHeading}><h2 id="extras-heading">Extras & services</h2><span className="rounded-md bg-secondary px-2 py-1 text-xs text-muted-foreground tabular-nums">{extras.length}</span></div>
+          <div className="p-5"><ExtrasEditor hotelId={hotelId} extras={extras} currency={currency} /></div>
+        </section>
+      </div>
+      <section id="rate-rules" className={cn(styles.surface, "scroll-mt-6")} aria-labelledby="rate-rules-heading">
+        <div className={styles.sectionHeading}><h2 id="rate-rules-heading">Rate rules</h2><span className="rounded-md bg-secondary px-2 py-1 text-xs text-muted-foreground tabular-nums">{rules.length}</span></div>
+        <div className="p-5"><RateRulesEditor hotelId={hotelId} rules={rules} roomTypes={preview.map((room) => ({ id: room.roomId, name: room.roomName }))} today={today} /></div>
+      </section>
     </div>
   );
 }

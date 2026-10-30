@@ -2,6 +2,7 @@
 
 import { useActionState, useRef } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import styles from "./hotel-workspace.module.css";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,9 +33,7 @@ export function ExtrasEditor({ hotelId, extras, currency }: { hotelId: string; e
 
   return (
     <div className="space-y-5">
-      {extras.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No extras</p>
-      ) : (
+      {extras.length > 0 ? (
         <ul className="divide-y divide-border">
           {extras.map((extra) => (
             <li key={extra.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 first:pt-0">
@@ -75,42 +74,45 @@ export function ExtrasEditor({ hotelId, extras, currency }: { hotelId: string; e
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
 
-      <form ref={formRef} action={formAction} className="space-y-4 border-t border-border pt-5">
-        <input type="hidden" name="hotelId" value={hotelId} />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="extra-name">Name</FieldLabel>
-            <Input id="extra-name" name="name" placeholder="Airport transfer" maxLength={80} required aria-invalid={Boolean(state?.error)} />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
+      <details className={styles.editor}>
+        <summary>Add extra<Plus aria-hidden="true" /></summary>
+        <form ref={formRef} action={formAction} className="space-y-4">
+          <input type="hidden" name="hotelId" value={hotelId} />
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field>
-              <FieldLabel htmlFor="extra-price">Price ({currency})</FieldLabel>
-              <Input id="extra-price" name="price" type="number" min={0.01} step="0.01" required className="tabular-nums" />
+              <FieldLabel htmlFor="extra-name">Name</FieldLabel>
+              <Input id="extra-name" name="name" placeholder="Airport transfer" maxLength={80} required aria-invalid={Boolean(state?.error)} />
             </Field>
-            <Field>
-              <FieldLabel htmlFor="extra-unit">Charged</FieldLabel>
-              <select id="extra-unit" name="unit" defaultValue="per_stay" className={NATIVE_SELECT_CLASS}>
-                {EXTRA_UNIT_OPTIONS.map((unit) => (
-                  <option key={unit} value={unit}>
-                    {EXTRA_UNIT_LABEL[unit]}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-2 gap-3">
+              <Field>
+                <FieldLabel htmlFor="extra-price">Price ({currency})</FieldLabel>
+                <Input id="extra-price" name="price" type="number" min={0.01} step="0.01" required className="tabular-nums" />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="extra-unit">Charged</FieldLabel>
+                <select id="extra-unit" name="unit" defaultValue="per_stay" className={NATIVE_SELECT_CLASS}>
+                  {EXTRA_UNIT_OPTIONS.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {EXTRA_UNIT_LABEL[unit]}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <Field className="sm:col-span-2">
+              <FieldLabel htmlFor="extra-description">Description</FieldLabel>
+              <Textarea id="extra-description" name="description" rows={2} maxLength={500} />
             </Field>
           </div>
-          <Field className="sm:col-span-2">
-            <FieldLabel htmlFor="extra-description">Description</FieldLabel>
-            <Textarea id="extra-description" name="description" rows={2} maxLength={500} />
-          </Field>
-        </div>
-        <div className="flex justify-end">
-          <SubmitButton pendingText="Adding…">
-            <Plus aria-hidden="true" /> Add extra
-          </SubmitButton>
-        </div>
-      </form>
+          <div className="flex justify-end">
+            <SubmitButton pendingText="Adding…">
+              <Plus aria-hidden="true" /> Add extra
+            </SubmitButton>
+          </div>
+        </form>
+      </details>
     </div>
   );
 }
