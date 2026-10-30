@@ -1,0 +1,62 @@
+name: CI
+
+# Required check on every pull request into main (QA) and production.
+# Deploy workflows do not run these checks; a merge only ships what passed here.
+
+on:
+  pull_request:
+    branches: [main, production]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: api
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint -w api
+
+      - name: Build
+        run: npm run build -w api
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # apps/web imports the API's compiled declarations (api/dist/trpc/router).
+      - name: Build api types
+        run: npm run build -w api
+
+      - name: Lint
+        run: npm run lint -w web
+
+      - name: Type check
+        run: npx tsc --noEmit -p apps/web
