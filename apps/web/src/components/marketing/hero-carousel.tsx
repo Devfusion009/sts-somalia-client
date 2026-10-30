@@ -202,6 +202,20 @@ export function HeroCarousel() {
   const [focused, setFocused] = useState(false);
   const [stopped, setStopped] = useState(false);
   const paused = hovered || focused || stopped;
+  // The photo paints first; a video loads only after the page has finished and only on a fast, unmetered link.
+  const [videoOk, setVideoOk] = useState(false);
+
+  useEffect(() => {
+    const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    if (conn?.saveData || (conn?.effectiveType && conn.effectiveType !== "4g")) return;
+    const start = () => setVideoOk(true);
+    if (document.readyState === "complete") {
+      const id = setTimeout(start, 1500);
+      return () => clearTimeout(id);
+    }
+    window.addEventListener("load", start, { once: true });
+    return () => window.removeEventListener("load", start);
+  }, []);
 
   const go = useCallback((next: number) => setIndex((next + SLIDES.length) % SLIDES.length), []);
 
@@ -253,29 +267,27 @@ export function HeroCarousel() {
       >
         {SLIDES.map((s, i) => (
           <div key={s.image} className="relative h-full w-full shrink-0">
-            {s.video && !reduced ? (
+            <Image
+              src={s.image}
+              alt=""
+              fill
+              priority={i === 0}
+              sizes="100vw"
+              className="object-cover"
+            />
+            {s.video && videoOk && !reduced && i === index ? (
               <video
                 key={s.video}
                 autoPlay
                 muted
                 loop
                 playsInline
-                preload={i === 0 ? "auto" : "none"}
-                poster={s.image}
+                preload="auto"
                 className="absolute inset-0 h-full w-full object-cover"
               >
                 <source src={s.video} type="video/mp4" />
               </video>
-            ) : (
-              <Image
-                src={s.image}
-                alt=""
-                fill
-                priority={i === 0}
-                sizes="100vw"
-                className="object-cover"
-              />
-            )}
+            ) : null}
 
             {/* Scrim — heavy on the left where the offer card sits */}
             <div className={cn("absolute inset-0 bg-gradient-to-r", THEMES[i].scrim)} aria-hidden />

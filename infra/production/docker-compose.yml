@@ -33,6 +33,8 @@ services:
       NODE_ENV: production
       # Heap cap at about 75% of the container limit so V8 collects before the OOM killer acts.
       NODE_OPTIONS: --max-old-space-size=1200
+      # Server-side calls to the api stay on the Docker network.
+      API_INTERNAL_URL: http://api:4000
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     expose: ["3000"]
     networks: [edge, backend]

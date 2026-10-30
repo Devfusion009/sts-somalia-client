@@ -15,6 +15,19 @@ const nextConfig: NextConfig = {
   // build`/Docker; `next dev` ignores it. See
   // node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/output.md
   output: "standalone",
+  poweredByHeader: false,
+  images: {
+    // Optimized variants are reused for 30 days instead of the 4-hour default.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
+  },
+  async headers() {
+    // Media in public/ is replaced by uploading a new file name, so it can be cached for a week.
+    const media = "public, max-age=604800, stale-while-revalidate=86400";
+    return [
+      { source: "/marketing/:path*", headers: [{ key: "Cache-Control", value: media }] },
+      { source: "/about/:path*", headers: [{ key: "Cache-Control", value: media }] },
+    ];
+  },
   // Next.js blocks cross-origin requests to dev-only assets/endpoints from
   // any host other than localhost by default (a real security feature —
   // prevents a malicious page from reaching your dev server via DNS
