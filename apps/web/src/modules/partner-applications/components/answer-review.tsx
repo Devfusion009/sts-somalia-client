@@ -60,7 +60,7 @@ export function ReviewableAnswer({label, value, children, className}: {label: st
   const review = context.reviews[key];
   const changed = review?.status === "change";
   const accepted = review?.status === "accepted";
-  return <div className={cn("min-w-0 rounded-lg border p-3 transition-colors", changed ? "border-destructive/40 bg-destructive/5" : accepted ? "border-primary/30 bg-primary/5" : "border-border bg-muted/20",className)}>
+  return <div className={cn("min-w-0 rounded-lg border p-3 transition-colors", changed ? "col-span-full border-destructive/40 bg-destructive/5" : accepted ? "border-primary/30 bg-primary/5" : "border-border bg-muted/20",className)}>
     {children}
     <div role="group" aria-label={`Review ${label}`} className="mt-3 flex flex-wrap gap-1.5">
       <Button type="button" size="sm" variant={accepted ? "default" : "outline"} aria-pressed={accepted} disabled={context.sent} onClick={()=>context.update(key,{label,value,status:"accepted",note:""})} className="h-7 gap-1 px-2 text-xs"><Check className="size-3"/> Satisfied</Button>
