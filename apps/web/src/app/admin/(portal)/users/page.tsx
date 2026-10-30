@@ -8,7 +8,8 @@ import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getUsersPage } from "@/modules/admin/queries";
+import { getUsersPage, USER_ROLE_FILTERS, type UserRoleFilter } from "@/modules/admin/queries";
+import { FilterChips } from "@/components/dashboard/filter-chips";
 import { Pager } from "@/components/dashboard/pager";
 import { parsePage } from "@/lib/pagination";
 import { accountRoleBadges } from "@/lib/auth/roles";
@@ -26,17 +27,36 @@ const BADGE_VARIANT = {
   membership: "outline",
 } as const;
 
+const ROLE_CHIPS: { key: "all" | UserRoleFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "admin", label: "Admins" },
+  { key: "agent", label: "Agents" },
+  { key: "customer", label: "Customers" },
+  { key: "hotel_partner", label: "Hotel partners" },
+  { key: "hotel_manager", label: "Hotel managers" },
+  { key: "venue_manager", label: "Venue managers" },
+  { key: "venue_partner", label: "Venue partners" },
+  { key: "affiliate", label: "Affiliates" },
+];
+
 const STATUS_OVERRIDES = { pending_verification: "warning" } as const;
 
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; q?: string }>;
+  searchParams: Promise<{ page?: string; q?: string; role?: string }>;
 }) {
   const sp = await searchParams;
   const page = parsePage(sp.page);
-  const { rows: users, total } = await getUsersPage({ page, q: sp.q });
-  const hrefFor = (n: number) => `/users?${sp.q ? `q=${encodeURIComponent(sp.q)}&` : ""}page=${n}`;
+  const role = USER_ROLE_FILTERS.find((r) => r === sp.role);
+  const { rows: users, total } = await getUsersPage({ page, q: sp.q, role });
+  const params = (extra: Record<string, string | undefined>) => {
+    const out = new URLSearchParams();
+    for (const [k, v] of Object.entries({ q: sp.q, role, ...extra })) if (v) out.set(k, v);
+    const qs = out.toString();
+    return `/users${qs ? `?${qs}` : ""}`;
+  };
+  const hrefFor = (n: number) => params({ page: String(n) });
 
   return (
     <div className="space-y-6">
@@ -49,7 +69,14 @@ export default async function AdminUsersPage({
         }
       />
 
+      <FilterChips
+        label="Filter users by role"
+        active={role ?? "all"}
+        items={ROLE_CHIPS.map((c) => ({ key: c.key, label: c.label, href: params({ role: c.key === "all" ? undefined : c.key, page: undefined }) }))}
+      />
+
       <form action="/admin/users" role="search" className="flex items-center gap-2">
+        {role ? <input type="hidden" name="role" value={role} /> : null}
         <InputGroup className="sm:w-64 max-sm:h-10">
           <InputGroupAddon>
             <Search aria-hidden="true" />
