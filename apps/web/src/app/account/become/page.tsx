@@ -368,7 +368,7 @@ export default async function BecomePartnerPage({
       ) : null}
 
       <Tabs defaultValue={defaultTab}>
-        <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 sm:pb-0">
+        <div className="-mx-4 overflow-x-auto overflow-y-hidden px-4 pb-1 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0">
           <TabsList>
             {programs.map((p) => (
               <TabsTrigger key={p.tab} value={p.tab} className="whitespace-nowrap">
