@@ -89,7 +89,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
   return (
     <>
       {/* ---------------- Desktop pill nav ---------------- */}
-      <nav aria-label="Primary" className="hidden items-center gap-2 lg:flex" onMouseLeave={scheduleClose}>
+      <nav aria-label="Primary" data-nav-loader className="hidden items-center gap-2 lg:flex" onMouseLeave={scheduleClose}>
         {MEGA_SECTIONS.map((section) => {
           const Icon = ICONS[section.icon];
           const active = pathname.startsWith(section.href);
@@ -300,7 +300,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto px-4 pb-4">
-            <nav className="flex flex-col gap-5">
+            <nav data-nav-loader className="flex flex-col gap-5">
               {MEGA_SECTIONS.map((section) => {
                 const Icon = ICONS[section.icon];
                 return (
