@@ -13,6 +13,11 @@ import { refreshSession, withSession } from "@/lib/supabase/proxy";
 const ALL_PORTALS: readonly PortalSubdomain[] = ["admin", "agent", "manager", "affiliate", "partner", "venue"];
 const ALL_PORTAL_PATHS = ALL_PORTALS.map(pathPrefixFor);
 
+/** Public-site sections a visitor must be signed in to open. /umrah itself stays public. */
+const SIGNED_IN_PATHS = ["/flights", "/hotels", "/visa", "/checkout", "/umrah/"];
+const requiresSignIn = (pathname: string) =>
+  SIGNED_IN_PATHS.some((p) => (p.endsWith("/") ? pathname.startsWith(p) : pathname === p || pathname.startsWith(`${p}/`)));
+
 /**
  * Phase 2 portal-subdomain routing (docs/B2B-PORTAL-SEPARATION-BUILD-PROMPT.md).
  * A no-op — every request just passes through — until NEXT_PUBLIC_APP_HOST
@@ -109,6 +114,17 @@ export async function proxy(request: NextRequest) {
   // host stays intact) until then.
   if (portalsAreIsolated() && ALL_PORTAL_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
     return new NextResponse("Not Found", { status: 404, headers: { "content-type": "text/plain" } });
+  }
+
+  if (requiresSignIn(pathname)) {
+    const result = await readEdgeSession(request);
+    // "unverifiable" falls through: the page-level guard decides, as for the portals.
+    if (result.kind === "none") {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.search = `?redirect_to=${encodeURIComponent(pathname + request.nextUrl.search)}`;
+      return withSession(NextResponse.redirect(loginUrl), sessionCookies);
+    }
   }
 
   return withSession(NextResponse.next(forward), sessionCookies);

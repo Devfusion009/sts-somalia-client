@@ -60,10 +60,11 @@ async function sessionUserId(supabase: Awaited<ReturnType<typeof createClient>>)
  * enrolled factor would be decorative rather than enforced). Use in Server
  * Components/layouts.
  */
-export async function requireUser(): Promise<Profile> {
+export async function requireUser(returnTo?: string): Promise<Profile> {
   const profile = await getCurrentProfile();
-  if (!profile) redirect("/login");
-  if (await mfaChallengePending()) redirect("/login/verify-2fa");
+  const query = returnTo?.startsWith("/") && !returnTo.startsWith("//") ? `?redirect_to=${encodeURIComponent(returnTo)}` : "";
+  if (!profile) redirect(`/login${query}`);
+  if (await mfaChallengePending()) redirect(`/login/verify-2fa${query}`);
   return profile;
 }
 

@@ -6,7 +6,7 @@ import { MarketingBreadcrumb } from "@/components/marketing/marketing-breadcrumb
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
-import { getCurrentProfile } from "@/lib/auth/session";
+import { requireUser } from "@/lib/auth/session";
 import {
   getMyDraftUmrahRequest,
   getUmrahServices,
@@ -40,16 +40,13 @@ export default async function PrivateUmrahPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const [{ error }, services, sharingPrices, profile] = await Promise.all([
+  await requireUser("/umrah/private");
+  const [{ error }, services, sharingPrices, draft] = await Promise.all([
     searchParams,
     getUmrahServices(),
     getUmrahSharingPrices(),
-    getCurrentProfile(),
+    getMyDraftUmrahRequest(),
   ]);
-  // Only a signed-in visitor can have a draft at all (starting one requires
-  // an account), so this is skipped entirely for a signed-out visitor rather
-  // than costing them a query that can never return anything.
-  const draft = profile ? await getMyDraftUmrahRequest() : null;
 
   const cheapestByCategory = new Map<string, { price: number; currency: string; unit: string }>();
   for (const service of services) {
@@ -251,7 +248,7 @@ export default async function PrivateUmrahPage({
               {UMRAH_CATEGORIES.map((category) => {
                 const from = cheapestByCategory.get(category.value);
                 return (
-                  <li key={category.value} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                  <li key={category.value} id={`service-${category.value}`} className="flex scroll-mt-32 items-start gap-3 py-3 first:pt-0 last:pb-0">
                     <category.icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold">{category.label}</p>
