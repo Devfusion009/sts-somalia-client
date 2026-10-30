@@ -29,7 +29,7 @@ export default async function PrivateUmrahBuilderPage({
   searchParams: Promise<{ step?: string }>;
 }) {
   const [{ requestId }, { step: stepParam }] = await Promise.all([params, searchParams]);
-  await requireUser();
+  await requireUser(`/umrah/private/${requestId}`);
 
   const request = await getUmrahCustomRequest(requestId);
   if (!request) notFound();
