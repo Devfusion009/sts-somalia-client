@@ -100,7 +100,8 @@ export default function PartnerTermsPage() {
   return (
     <LegalPage
       title="Partner terms and conditions"
-      meta="For travel agent, hotel partner and affiliate accounts on the STS Somalia B2B platform. Last updated: August 2026."
+      meta="For partner accounts on the STS Somalia B2B platform. Last updated: August 2026."
+      audience={["Travel agents", "Hotel partners", "Affiliates"]}
       sections={SECTIONS}
     />
   );
