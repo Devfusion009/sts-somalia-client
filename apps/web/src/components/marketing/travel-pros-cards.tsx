@@ -7,7 +7,7 @@ import { motion } from "motion/react";
 import { usePrefersReducedMotion } from "@/components/ui/aceternity/motion-primitives";
 
 /**
- * "For travel pros" — three utility cards (a "Price alerts" card was cut: no
+ * "For frequent travellers" — four utility cards (a "Price alerts" card was cut: no
  * fare-alert feature exists; it linked to the callback form) with flat-vector illustrations drawn
  * inline. The reference uses isometric 3D art; these are simplified brand-tinted
  * scenes built from primitives so they stay crisp, weightless and on-palette.
@@ -72,6 +72,26 @@ function TripsArt() {
   );
 }
 
+function VisaArt() {
+  return (
+    <svg viewBox="0 0 120 90" fill="none" className="size-full" aria-hidden>
+      <ellipse cx="60" cy="78" rx="42" ry="7" fill={TEAL} opacity="0.14" />
+      {/* passport */}
+      <rect x="30" y="10" width="46" height="62" rx="6" fill={TEAL} opacity="0.2" />
+      <rect x="30" y="10" width="46" height="62" rx="6" stroke={TEAL} strokeWidth="2.5" />
+      <circle cx="53" cy="33" r="10" stroke={TEAL} strokeWidth="2" />
+      <ellipse cx="53" cy="33" rx="4" ry="10" stroke={TEAL} strokeWidth="1.5" />
+      <path d="M43 33h20" stroke={TEAL} strokeWidth="1.5" />
+      <rect x="40" y="52" width="26" height="3.5" rx="1.75" fill={TEAL} />
+      <rect x="40" y="59" width="18" height="3.5" rx="1.75" fill={TEAL} />
+      {/* entry stamp */}
+      <circle cx="82" cy="50" r="17" fill="var(--card)" opacity="0.9" />
+      <circle cx="82" cy="50" r="17" stroke={ORANGE} strokeWidth="3" strokeDasharray="3 2.5" />
+      <path d="M74 51l6 6 11-13" stroke={ORANGE} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 const CARDS = [
   {
     title: "Plan with an expert",
@@ -90,6 +110,12 @@ const CARDS = [
     body: "Keep all your bookings in one place",
     href: "/account/bookings",
     Art: TripsArt,
+  },
+  {
+    title: "Visa",
+    body: "Check entry rules before you fly",
+    href: "/visa",
+    Art: VisaArt,
   },
 ];
 
