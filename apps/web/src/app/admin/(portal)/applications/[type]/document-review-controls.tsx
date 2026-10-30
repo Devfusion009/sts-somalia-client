@@ -5,17 +5,26 @@ import { formatDistanceToNow } from "date-fns";
 import { Check, ExternalLink, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge, type BadgeVariant } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { SubmitButton } from "@/components/submit-button";
 import { setDocumentReviewStatus } from "@/modules/admin/application-actions";
 import type { ApplicationType } from "@/modules/admin/queries";
 
 type ReviewStatus = "pending" | "verified" | "rejected";
 
-const STATUS_META: Record<ReviewStatus, { label: string; variant: BadgeVariant }> = {
-  pending: { label: "Not reviewed", variant: "neutral" },
-  verified: { label: "Verified", variant: "success" },
-  rejected: { label: "Rejected", variant: "destructive" },
+const STATUS_META: Record<ReviewStatus, { label: string; className: string }> = {
+  pending: {
+    label: "Not reviewed",
+    className: "bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30",
+  },
+  verified: {
+    label: "Verified",
+    className: "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30",
+  },
+  rejected: {
+    label: "Rejected",
+    className: "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:ring-rose-500/30",
+  },
 };
 
 /**
@@ -51,7 +60,14 @@ export function DocumentReviewControls({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <Badge variant={meta.variant}>{meta.label}</Badge>
+          <span
+            className={cn(
+              "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset",
+              meta.className
+            )}
+          >
+            {meta.label}
+          </span>
           {status !== "pending" && reviewedAt ? (
             <span className="text-xs text-muted-foreground">
               {reviewerName ? `${reviewerName} · ` : ""}
@@ -77,7 +93,12 @@ export function DocumentReviewControls({
             <input type="hidden" name="status" value="verified" />
             <SubmitButton
               size="icon-sm"
-              variant={status === "verified" ? "default" : "outline"}
+              variant="outline"
+              className={cn(
+                status === "verified"
+                  ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white"
+                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-500/40 dark:text-emerald-300"
+              )}
               aria-label="Verify document"
               title="Verify"
               pendingText=""
@@ -88,7 +109,12 @@ export function DocumentReviewControls({
           <Button
             type="button"
             size="icon-sm"
-            variant={status === "rejected" || rejecting ? "destructive" : "outline"}
+            variant="outline"
+            className={cn(
+              status === "rejected" || rejecting
+                ? "border-rose-600 bg-rose-600 text-white hover:bg-rose-700 hover:text-white"
+                : "border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:border-rose-500/40 dark:text-rose-300"
+            )}
             aria-label="Reject document"
             aria-expanded={rejecting}
             title="Reject"

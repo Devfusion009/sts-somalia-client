@@ -32,10 +32,10 @@ export function AnswerReviewProvider({ children, applicationId, type, enabled }:
   })}}>
     <section id="answer-review" aria-label="Answer review" className="rounded-xl border border-border bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-base font-semibold">Answer review <span className="ml-2 text-xs font-normal text-muted-foreground">{sent ? "Sent" : "Unsaved draft"}</span></h2>
-        <div className="flex flex-wrap gap-3 text-xs tabular-nums">
-          <span className="font-medium text-primary">{entries.filter(r => r.status === "accepted").length} satisfied</span>
-          <span className="font-medium text-destructive">{changes.length} changes requested</span>
+        <h2 className="font-heading text-base font-bold">Answer review <span className={cn("ml-2 rounded-full px-2 py-0.5 align-middle text-[11px] font-semibold", sent ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-muted text-muted-foreground")}>{sent ? "Sent" : "Unsaved draft"}</span></h2>
+        <div className="flex flex-wrap gap-2 text-xs tabular-nums">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700 ring-1 ring-emerald-200 ring-inset dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30"><Check className="size-3"/>{entries.filter(r => r.status === "accepted").length} satisfied</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 font-semibold text-rose-700 ring-1 ring-rose-200 ring-inset dark:bg-rose-500/15 dark:text-rose-300 dark:ring-rose-500/30"><MessageSquare className="size-3"/>{changes.length} changes requested</span>
         </div>
       </div>
       {changes.length > 0 && !sent ? <form action={action} className="mt-4 space-y-3 border-t border-border pt-4">
@@ -60,11 +60,12 @@ export function ReviewableAnswer({label, value, children, className}: {label: st
   const review = context.reviews[key];
   const changed = review?.status === "change";
   const accepted = review?.status === "accepted";
-  return <div className={cn("min-w-0 rounded-lg border p-3 transition-colors", changed ? "col-span-full border-destructive/40 bg-destructive/5" : accepted ? "border-primary/30 bg-primary/5" : "border-border bg-muted/20",className)}>
+  return <div className={cn("relative min-w-0 rounded-lg border border-l-4 p-3 transition-colors", changed ? "col-span-full border-rose-300 border-l-rose-500 bg-rose-50/70 dark:border-rose-500/40 dark:bg-rose-500/10" : accepted ? "border-emerald-200 border-l-emerald-500 bg-emerald-50/60 dark:border-emerald-500/30 dark:bg-emerald-500/10" : "border-border border-l-slate-300 bg-card dark:border-l-slate-600",className)}>
+    {accepted ? <span aria-hidden className="absolute top-2.5 right-2.5 grid size-5 place-items-center rounded-full bg-emerald-500 text-white"><Check className="size-3"/></span> : changed ? <span aria-hidden className="absolute top-2.5 right-2.5 grid size-5 place-items-center rounded-full bg-rose-500 text-white"><MessageSquare className="size-3"/></span> : null}
     {children}
     <div role="group" aria-label={`Review ${label}`} className="mt-3 flex flex-wrap gap-1.5">
-      <Button type="button" size="sm" variant={accepted ? "default" : "outline"} aria-pressed={accepted} disabled={context.sent} onClick={()=>context.update(key,{label,value,status:"accepted",note:""})} className="h-7 gap-1 px-2 text-xs"><Check className="size-3"/> Satisfied</Button>
-      <Button type="button" size="sm" variant={changed ? "destructive" : "outline"} aria-pressed={changed} disabled={context.sent} onClick={()=>context.update(key,{label,value,status:"change",note:review?.note ?? ""})} className="h-7 gap-1 px-2 text-xs"><MessageSquare className="size-3"/> Request change</Button>
+      <Button type="button" size="sm" variant="outline" aria-pressed={accepted} disabled={context.sent} onClick={()=>context.update(key,{label,value,status:"accepted",note:""})} className={cn("h-7 gap-1 px-2 text-xs font-semibold", accepted ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-500/40 dark:text-emerald-300")}><Check className="size-3"/> Satisfied</Button>
+      <Button type="button" size="sm" variant="outline" aria-pressed={changed} disabled={context.sent} onClick={()=>context.update(key,{label,value,status:"change",note:review?.note ?? ""})} className={cn("h-7 gap-1 px-2 text-xs font-semibold", changed ? "border-rose-600 bg-rose-600 text-white hover:bg-rose-700 hover:text-white" : "border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:border-rose-500/40 dark:text-rose-300")}><MessageSquare className="size-3"/> Request change</Button>
       {review && !context.sent ? <Button type="button" variant="ghost" size="sm" aria-label={`Reset review for ${label}`} onClick={()=>context.update(key)} className="h-7 px-2"><RotateCcw className="size-3"/></Button> : null}
     </div>
     {changed ? <div className="mt-3 space-y-1.5">
