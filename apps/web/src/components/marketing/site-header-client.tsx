@@ -440,12 +440,11 @@ export function HeaderSearch() {
     };
   }, [value]);
 
-  // Only the home page hides it initially — it already has a big hero search,
-  // so this one reveals once that scrolls away. Everywhere else it's always up.
+  // The home page reveals destination search after its hero scrolls away.
   const isHome = pathname === "/";
   // A specific hotel's own pages (detail, booking review) aren't a place to
   // search for a destination — you're already at one. /hotels itself (the
-  // listing/search page) keeps the bar.
+  // listing/search page) has a dedicated search form below.
   const onHotelDetail = pathname.startsWith("/hotels/");
   // Visa pages carry their own destination search; the hotel bar is noise there.
   const onVisa = pathname === "/visa" || pathname.startsWith("/visa/");
@@ -456,7 +455,8 @@ export function HeaderSearch() {
   const scrolledPast = useSearchRevealed();
   // Flights has its own route search; this bar submits hotel destinations.
   const onFlights = pathname === "/flights";
-  const visible = !onHotelDetail && !onVisa && !onFlights && (!isHome || scrolledPast);
+  const hasCollectionSearch = pathname === "/hotels" || pathname === "/umrah" || pathname.startsWith("/umrah/");
+  const visible = !onHotelDetail && !onVisa && !onFlights && !hasCollectionSearch && (!isHome || scrolledPast);
 
   return (
     <AnimatePresence initial={false}>

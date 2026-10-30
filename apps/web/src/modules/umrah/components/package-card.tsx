@@ -134,7 +134,7 @@ function HotelLine({ label, hotel }: { label: string; hotel: PackageCardHotel })
 
 export function PackageCard({ pkg }: { pkg: PackageCardData }) {
   const seatsLeft = pkg.nextDeparture
-    ? pkg.nextDeparture.total_seats - pkg.nextDeparture.booked_seats - pkg.nextDeparture.offline_seats
+    ? Math.max(0, pkg.nextDeparture.total_seats - pkg.nextDeparture.booked_seats - pkg.nextDeparture.offline_seats)
     : null;
   const tier = packageTier(pkg);
   const cover = pkg.images[0] ?? null;
@@ -145,9 +145,9 @@ export function PackageCard({ pkg }: { pkg: PackageCardData }) {
   return (
     <Link
       href={`/umrah/${pkg.slug}`}
-      className="group block h-full rounded-xl focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      className="group block h-full rounded-2xl focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
     >
-      <Card className="flex h-full flex-col overflow-hidden py-0 transition-shadow hover:shadow-lg">
+      <Card className="flex h-full flex-col overflow-hidden rounded-2xl border border-border py-0 shadow-none ring-0 transition-colors hover:border-primary/40">
         <div className="relative overflow-hidden">
           {cover ? (
             // Supabase Storage URL, not a local asset — next/image would need the
@@ -157,10 +157,10 @@ export function PackageCard({ pkg }: { pkg: PackageCardData }) {
               src={cover}
               alt=""
               loading="lazy"
-              className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none"
+              className="h-52 w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none"
             />
           ) : (
-            <MediaPlaceholder seed={pkg.id} icon={Landmark} className="h-40 w-full" />
+            <MediaPlaceholder seed={pkg.id} icon={Landmark} className="h-52 w-full" />
           )}
           <div className="absolute top-3 left-3 flex gap-1.5">
             {pkg.isFeatured ? (
@@ -168,19 +168,18 @@ export function PackageCard({ pkg }: { pkg: PackageCardData }) {
                 Featured
               </Badge>
             ) : null}
-            <Badge className="border-transparent bg-card font-semibold text-foreground">{tier.label}</Badge>
+            <Badge className="border-transparent bg-card/95 font-semibold text-foreground">{tier.label}</Badge>
           </div>
           {seatsLeft !== null && seatsLeft <= 10 ? (
-            <Badge className="absolute top-3 right-3 gap-1 border-transparent bg-card font-semibold text-foreground">
+            <Badge className="absolute top-3 right-3 gap-1 border-transparent bg-card/95 font-semibold text-foreground">
               <Users aria-hidden />
-              {seatsLeft} seats left
+              {seatsLeft === 0 ? "Sold out" : `${seatsLeft} seats left`}
             </Badge>
           ) : null}
         </div>
-        <CardContent className="flex flex-1 flex-col gap-2.5 p-4">
+        <CardContent className="flex flex-1 flex-col gap-3 p-5">
           <div>
-            <h3 className="font-heading text-base font-bold leading-tight group-hover:text-primary">{pkg.name}</h3>
-            {pkg.tagline ? <p className="mt-0.5 text-xs text-muted-foreground">{pkg.tagline}</p> : null}
+            <h3 className="font-heading text-lg font-semibold leading-tight tracking-tight group-hover:text-primary">{pkg.name}</h3>
           </div>
 
           {pkg.originIata && pkg.destinationIata ? (
@@ -208,7 +207,7 @@ export function PackageCard({ pkg }: { pkg: PackageCardData }) {
           </div>
 
           {makkah || madinah ? (
-            <div className="flex gap-3 rounded-lg bg-secondary/40 p-2">
+            <div className="flex gap-3 rounded-xl bg-secondary/50 p-3">
               {makkah ? <HotelLine label="Makkah Hotel" hotel={makkah} /> : null}
               {makkah && madinah ? <span className="w-px shrink-0 bg-border" /> : null}
               {madinah ? <HotelLine label="Madinah Hotel" hotel={madinah} /> : null}
@@ -233,10 +232,10 @@ export function PackageCard({ pkg }: { pkg: PackageCardData }) {
             </div>
           ) : null}
 
-          <div className="mt-auto flex items-end justify-between pt-2">
+          <div className="mt-auto flex flex-wrap items-end justify-between gap-3 border-t border-border pt-4">
             <p className="text-sm">
               <span className="block text-xs text-muted-foreground">Starting from</span>
-              <span className="font-heading text-lg font-bold text-primary tabular-nums">
+              <span className="font-heading text-2xl font-semibold tracking-tight text-primary tabular-nums">
                 {pkg.currency} {wholeAmount(pkg.base_price)}
               </span>{" "}
               <span className="text-xs text-muted-foreground">/ pilgrim</span>
@@ -249,7 +248,7 @@ export function PackageCard({ pkg }: { pkg: PackageCardData }) {
                 </span>
               ) : null}
             </p>
-            <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+            <span className="flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3 text-[11px] font-semibold text-primary-foreground">
               View package <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </span>
           </div>

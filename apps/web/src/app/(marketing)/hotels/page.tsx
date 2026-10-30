@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { Suspense } from "react";
-import { BadgeCheck, Building2, Headset, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { searchHotels } from "@/modules/hotels/queries";
@@ -11,8 +11,9 @@ import { amenityLabel } from "@/modules/hotels/images";
 import { HotelSearchFilters } from "./hotel-search-filters";
 import { HotelFilters, HotelFiltersSheet } from "./hotel-filters";
 import { priceBandOf } from "@/modules/hotels/price-bands";
-import { HotelRail, type RailProperty } from "@/components/marketing/hotel-rail";
-import { HotelsFaq, GuestVoices, ExploreMore, HOTEL_FAQS } from "@/components/marketing/hotels-extras";
+import { HotelsCollectionHero } from "@/components/marketing/travel-collection-heroes";
+import styles from "@/components/marketing/travel-collection.module.css";
+import { HotelsFaq, ExploreMore, HOTEL_FAQS } from "@/components/marketing/hotels-extras";
 import { jsonLdScript } from "@/lib/json-ld";
 import type { HotelCardData } from "@/modules/hotels/components/hotel-card";
 
@@ -28,29 +29,12 @@ const faqJsonLd = (faqs: Array<{ question: string; answer: string }>) => ({
   })),
 });
 
-const TRUST_POINTS = [
-  { icon: BadgeCheck, text: "Verified local & international properties" },
-  { icon: ShieldCheck, text: "Secure payment — card, mobile money, or bank" },
-  { icon: Headset, text: "Support in Somali, English and Arabic" },
+const DESTINATIONS = [
+  { name: "Mogadishu", image: "/marketing/slide-coast.webp", region: "Somalia" },
+  { name: "Hargeisa", image: "/marketing/dest-hargeisa.webp", region: "Somalia" },
+  { name: "Nairobi", image: "/marketing/slide-nairobi.webp", region: "Kenya" },
 ];
-
-/* Curated rails shown alongside real inventory. Prices are PLACEHOLDERS for
-   layout — swap for live partner rates before launch. */
-const CENTRAL_STAYS: RailProperty[] = [
-  { name: "Seafront business hotel", image: "/marketing/hotel-exterior.webp", location: "Mogadishu", stars: 4, price: "$95", href: "/hotels?city=Mogadishu" },
-  { name: "City-centre suite hotel", image: "/marketing/hotel-suite.webp", location: "Mogadishu", stars: 5, price: "$140", href: "/hotels?city=Mogadishu" },
-  { name: "Airport transit hotel", image: "/marketing/hotel-reception.webp", location: "Mogadishu", stars: 3, price: "$62", href: "/hotels?city=Mogadishu" },
-  { name: "Downtown guesthouse", image: "/marketing/hotel-budget.webp", location: "Hargeisa", stars: 2, price: "$38", href: "/hotels?city=Hargeisa" },
-  { name: "Corporate stay", image: "/marketing/hotel-business.webp", location: "Nairobi", stars: 4, price: "$78", href: "/hotels?city=Nairobi" },
-];
-
-const LEISURE_STAYS: RailProperty[] = [
-  { name: "Rooftop pool resort", image: "/marketing/hotel-pool.webp", location: "Dubai", stars: 5, price: "$155", href: "/hotels?city=Dubai" },
-  { name: "Seafront terrace hotel", image: "/marketing/hotel-terrace.webp", location: "Mogadishu", stars: 4, price: "$105", href: "/hotels?city=Mogadishu" },
-  { name: "Grand lobby hotel", image: "/marketing/hotel-lobby.webp", location: "Istanbul", stars: 5, price: "$120", href: "/hotels?city=Istanbul" },
-  { name: "Breakfast-included stay", image: "/marketing/hotel-breakfast.webp", location: "Addis Ababa", stars: 4, price: "$70", href: "/hotels?city=Addis%20Ababa" },
-  { name: "Family rooms available", image: "/marketing/hotel-family.webp", location: "Jeddah", stars: 4, price: "$88", href: "/hotels?city=Jeddah" },
-];
+const PAGE_SIZE = 12;
 
 /** Parse a comma-separated multi-select param. */
 const list = (v?: string) => (v ?? "").split(",").filter(Boolean);
@@ -68,8 +52,10 @@ export default async function HotelsPage({
     stars?: string;
     price?: string;
     amenities?: string;
+    page?: string;
   }>;
 }) {
+  const params = await searchParams;
   const {
     city = "",
     checkIn = "",
@@ -79,7 +65,7 @@ export default async function HotelsPage({
     stars = "",
     price = "",
     amenities = "",
-  } = await searchParams;
+  } = params;
 
   const all = await searchHotels({
     city: city || undefined,
@@ -125,8 +111,17 @@ export default async function HotelsPage({
   if (occ) bookingQuery.set("occ", occ);
   const bookingSuffix = bookingQuery.toString() ? `?${bookingQuery.toString()}` : "";
 
-  // The hero h1 already names the city, so the results heading is just the count.
-  const heading = `${hotels.length} propert${hotels.length === 1 ? "y" : "ies"}`;
+  const pageCount = Math.max(1, Math.ceil(hotels.length / PAGE_SIZE));
+  const requestedPage = Number.parseInt(params.page ?? "1", 10);
+  const page = Math.min(pageCount, Math.max(1, Number.isFinite(requestedPage) ? requestedPage : 1));
+  const visibleHotels = hotels.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageHref = (next: number) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value && key !== "page") query.set(key, value); });
+    if (next > 1) query.set("page", String(next));
+    return `/hotels${query.size ? `?${query.toString()}` : ""}#hotel-results-heading`;
+  };
+  const heading = `${hotels.length} ${hotels.length === 1 ? "property" : "properties"}`;
 
   return (
     <div>
@@ -137,42 +132,14 @@ export default async function HotelsPage({
         dangerouslySetInnerHTML={{ __html: jsonLdScript(faqJsonLd(HOTEL_FAQS)) }}
       />
 
-      {/* Hero — photo backdrop, heading, and the bordered search bar */}
-      <section className="relative isolate overflow-hidden bg-sidebar">
-        <Image
-          src="/marketing/hotels-hero-bg.webp"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-center"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/55 to-black/40" aria-hidden />
-
-        <div className="relative z-10 mx-auto max-w-7xl px-4 pt-10 pb-10 sm:px-6 lg:px-8 lg:pt-14 lg:pb-12">
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-balance text-white drop-shadow-lg sm:text-4xl">
-            {city ? `Hotels in ${city}` : "Hotels across Somalia and beyond"}
-          </h1>
-
-          {/* Accent-outlined search bar, as in the reference */}
-          <div className="mt-6 rounded-xl border-2 border-brand-accent">
-            <HotelSearchFilters initial={{ city, checkIn, checkOut, guests, occ }} />
-          </div>
-
-          <ul className="mt-4 flex flex-wrap gap-x-7 gap-y-2">
-            {TRUST_POINTS.map((point) => (
-              <li key={point.text} className="flex items-center gap-2 text-sm font-medium text-white/85 drop-shadow">
-                <point.icon className="size-4 shrink-0 text-teal-300" aria-hidden /> {point.text}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+      <HotelsCollectionHero city={city}>
+        <HotelSearchFilters key={[city, checkIn, checkOut, guests, occ].join("|")} initial={{ city, checkIn, checkOut, guests, occ }} />
+      </HotelsCollectionHero>
 
       {/* Results — filter sidebar + list */}
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="grid gap-6 lg:grid-cols-[268px_1fr]">
-          <aside aria-label="Filters" className="hidden lg:sticky lg:top-44 lg:block lg:self-start">
+      <div className="mx-auto max-w-7xl px-4 pt-6 pb-14 sm:px-6 lg:px-8">
+        <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <aside aria-label="Filters" className="hidden lg:sticky lg:top-28 lg:block lg:self-start">
             <Suspense fallback={<div className="h-96 rounded-xl border border-border bg-card" />}>
               <HotelFilters amenities={facetAmenities} counts={{ stars: starCounts, price: priceCounts }} />
             </Suspense>
@@ -183,11 +150,11 @@ export default async function HotelsPage({
           <section aria-labelledby="hotel-results-heading" className="min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h2 id="hotel-results-heading" className="font-heading text-xl font-bold">
+                <h2 id="hotel-results-heading" className="scroll-mt-32 font-heading text-2xl font-semibold tracking-tight">
                   {heading}
                 </h2>
                 {hotels.length !== all.length ? (
-                  <p className="text-sm text-muted-foreground tabular-nums">Filtered from {all.length}</p>
+                  <span className="text-xs text-muted-foreground tabular-nums">of {all.length} matches</span>
                 ) : null}
               </div>
               <Suspense fallback={null}>
@@ -196,8 +163,8 @@ export default async function HotelsPage({
             </div>
 
             {hotels.length > 0 ? (
-              <div className="mt-4 space-y-4">
-                {hotels.map((hotel) => (
+              <div className="mt-6 space-y-5">
+                {visibleHotels.map((hotel) => (
                   <HotelListRow key={hotel.id} hotel={hotel} bookingSuffix={bookingSuffix} />
                 ))}
               </div>
@@ -216,25 +183,33 @@ export default async function HotelsPage({
                 </EmptyContent>
               </Empty>
             )}
+            {pageCount > 1 ? (
+              <nav aria-label="Hotel result pages" className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
+                <span className="text-xs text-muted-foreground tabular-nums">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, hotels.length)} of {hotels.length} properties</span>
+                <div className="flex items-center gap-3">
+                  {page > 1 ? <Link href={pageHref(page - 1)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-medium hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"><ArrowLeft className="size-3.5" aria-hidden="true" />Previous</Link> : null}
+                  <span className="text-xs text-muted-foreground tabular-nums">{page} / {pageCount}</span>
+                  {page < pageCount ? <Link href={pageHref(page + 1)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 text-xs font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-primary">Next<ArrowRight className="size-3.5" aria-hidden="true" /></Link> : null}
+                </div>
+              </nav>
+            ) : null}
           </section>
         </div>
       </div>
 
-      {/* Themed rails, FAQ and discovery content */}
-      <HotelRail
-        className="bg-muted/40"
-        title="Hotels in the centre, close to business"
-        seeAll={{ label: "See all", href: "/hotels?city=Mogadishu" }}
-        properties={CENTRAL_STAYS}
-      />
-      <HotelRail
-        title="Best for a longer stay"
-        seeAll={{ label: "See all", href: "/hotels" }}
-        properties={LEISURE_STAYS}
-      />
+      <section className="border-t border-border bg-secondary/30 py-14 sm:py-20" aria-labelledby="hotel-destinations">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-7 flex flex-wrap items-end justify-between gap-4"><h2 id="hotel-destinations" className="font-heading text-3xl font-semibold tracking-tight">Where will you stay next?</h2><Link href="/hotels" className="inline-flex min-h-10 items-center gap-2 text-xs font-semibold text-primary">All destinations<ArrowRight className="size-3.5" aria-hidden="true" /></Link></div>
+          <div className={styles.destinationGrid}>
+            {DESTINATIONS.map((destination) => <Link key={destination.name} href={`/hotels?city=${encodeURIComponent(destination.name)}`} className={`${styles.destination} focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary`}>
+              <Image src={destination.image} alt="" fill sizes="(min-width: 768px) 33vw, 100vw" className="object-cover" />
+              <div className="absolute inset-x-6 bottom-6 z-10 flex items-end justify-between gap-4"><div><span className="text-[10px] tracking-widest text-white/70 uppercase">{destination.region}</span><h3 className="mt-1 font-heading text-2xl font-medium">{destination.name}</h3></div><ArrowUpRight className="size-5" aria-hidden="true" /></div>
+            </Link>)}
+          </div>
+        </div>
+      </section>
 
       <HotelsFaq city={city || undefined} />
-      <GuestVoices city={city || undefined} />
       <ExploreMore />
     </div>
   );
