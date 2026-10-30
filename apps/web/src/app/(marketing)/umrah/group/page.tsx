@@ -1,4 +1,3 @@
-import { requireUser } from "@/lib/auth/session";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
@@ -32,7 +31,6 @@ const PROMISES = [
  * A flat grid buries that choice inside a badge on each card.
  */
 export default async function GroupUmrahPage() {
-  await requireUser("/umrah/group");
   const packages = await getAllPackages();
 
   const tierOrder = ["basic", "economy", "standard", "premium", "vip"];

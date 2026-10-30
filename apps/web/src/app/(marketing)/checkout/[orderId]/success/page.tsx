@@ -23,7 +23,7 @@ export default async function CheckoutSuccessPage({
 }) {
   const { orderId } = await params;
   const { order_id: returnedPaymentId, sid, gateway } = await searchParams;
-  await requireUser();
+  await requireUser(`/checkout/${orderId}/success`);
 
   const trpc = await getServerTrpc();
   // Back from Sifalo Pay's hosted checkout: confirm the payment with Sifalo

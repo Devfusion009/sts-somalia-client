@@ -13,10 +13,9 @@ import { refreshSession, withSession } from "@/lib/supabase/proxy";
 const ALL_PORTALS: readonly PortalSubdomain[] = ["admin", "agent", "manager", "affiliate", "partner", "venue"];
 const ALL_PORTAL_PATHS = ALL_PORTALS.map(pathPrefixFor);
 
-/** Public-site sections a visitor must be signed in to open. /umrah itself stays public. */
-const SIGNED_IN_PATHS = ["/flights", "/hotels", "/visa", "/checkout", "/umrah/"];
-const requiresSignIn = (pathname: string) =>
-  SIGNED_IN_PATHS.some((p) => (p.endsWith("/") ? pathname.startsWith(p) : pathname === p || pathname.startsWith(`${p}/`)));
+/** Booking and payment steps need an account; browsing every public page does not. */
+const SIGN_IN_ROUTES = [/^\/checkout(\/|$)/, /^\/visa\/apply(\/|$)/, /^\/hotels\/[^/]+\/book(\/|$)/];
+const requiresSignIn = (pathname: string) => SIGN_IN_ROUTES.some((route) => route.test(pathname));
 
 /**
  * Phase 2 portal-subdomain routing (docs/B2B-PORTAL-SEPARATION-BUILD-PROMPT.md).

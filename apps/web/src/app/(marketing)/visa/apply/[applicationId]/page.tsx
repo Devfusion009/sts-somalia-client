@@ -31,7 +31,7 @@ export default async function VisaWizardPage({
   searchParams: Promise<{ step?: string }>;
 }) {
   const [{ applicationId }, { step: stepParam }] = await Promise.all([params, searchParams]);
-  await requireUser();
+  await requireUser(`/visa/apply/${applicationId}`);
   const trpc = await getServerTrpc();
 
   const application = await getApplicationForWizard(applicationId);

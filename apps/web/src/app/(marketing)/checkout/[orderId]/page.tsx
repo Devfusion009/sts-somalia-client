@@ -28,7 +28,7 @@ export default async function CheckoutPage({
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId } = await params;
-  const profile = await requireUser();
+  const profile = await requireUser(`/checkout/${orderId}`);
 
   const trpc = await getServerTrpc();
   let order: CheckoutOrderRow | null;
