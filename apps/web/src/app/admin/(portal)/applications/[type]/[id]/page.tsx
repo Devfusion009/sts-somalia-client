@@ -9,7 +9,6 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getApplicationDetail,
   getApplicationAuditTrail,
-  getAdminProfiles,
   getDocumentReviews,
   type ApplicationType,
 } from "@/modules/admin/queries";
@@ -24,14 +23,15 @@ import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { StatRail } from "@/components/dashboard/stat-rail";
 import { APPLICATION_STATUS_VARIANT, applicationStatusLabel } from "../../status";
 import { ApplicationActions } from "../../application-actions";
-import { ReviewerPicker } from "../reviewer-picker";
 import { InternalNotesForm } from "../internal-notes-form";
 import { DocumentReviewControls } from "../document-review-controls";
 import {
   SectionTitle,
   BusinessDetailsCard,
   AffiliateDetailCards,
+  DetailSection,
   DocFileIcon,
+  detailSectionLinks,
   headerFacts,
   type Details,
 } from "@/modules/partner-applications/components/detail-cards";
@@ -104,10 +104,9 @@ export default async function ApplicationDetailPage({
   const type = TYPE_FROM_SLUG[slug];
   if (!type) notFound();
 
-  const [application, auditTrail, admins, documentReviews, accountIds] = await Promise.all([
+  const [application, auditTrail, documentReviews, accountIds] = await Promise.all([
     getApplicationDetail(type, id),
     getApplicationAuditTrail(type, id),
-    getAdminProfiles(),
     getDocumentReviews(type, id),
     getAccountIdsByApplication(type, [id]),
   ]);
@@ -134,7 +133,7 @@ export default async function ApplicationDetailPage({
   );
 
   const applicant = application.applicant as unknown as { full_name: string | null; email: string; phone: string | null } | null;
-  const reviewer = application.reviewer as unknown as { full_name: string | null; email: string } | null;
+  const decider = application.decider as unknown as { full_name: string | null; email: string } | null;
   const details = ((application as { business_details?: unknown }).business_details ?? {}) as Details;
   const logoUrl = partnerLogoUrl(typeof details.logoPath === "string" ? details.logoPath : null);
 
@@ -168,6 +167,13 @@ export default async function ApplicationDetailPage({
     format(new Date(submitted), "d MMM yyyy, HH:mm"),
   ].join(" · ");
   const decided = application.status === "approved" || application.status === "rejected";
+  const sections = detailSectionLinks(type);
+  const jumpLinks = [
+    ...sections,
+    ...(type === "affiliate" && (application as { notes?: string }).notes ? [{ id: "notes", label: "Notes" }] : []),
+    { id: "documents", label: "Documents" },
+    { id: "audit", label: "Audit trail" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -221,6 +227,27 @@ export default async function ApplicationDetailPage({
         </Alert>
       ) : null}
 
+      <nav
+        aria-label="Application sections"
+        className="sticky top-14 z-10 -mx-4 overflow-x-auto border-y border-border bg-background/90 px-4 py-2 backdrop-blur-md sm:mx-0 sm:rounded-xl sm:border sm:px-2"
+      >
+        <ol className="flex min-w-max items-center gap-1">
+          {jumpLinks.map((link, i) => (
+            <li key={link.id}>
+              <a
+                href={`#${link.id}`}
+                className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+              >
+                <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[11px] font-semibold tabular-nums">
+                  {i + 1}
+                </span>
+                {link.label}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
       <AnswerReviewProvider key={`${id}:${application.status}`} applicationId={id} type={type} enabled={application.status === "pending" || application.status === "under_review"}>
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-6">
@@ -231,30 +258,23 @@ export default async function ApplicationDetailPage({
           )}
 
           {type === "affiliate" && (application as { notes?: string }).notes ? (
-            <Card>
-              <CardHeader>
-                <SectionTitle>Notes from applicant</SectionTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm break-words">{(application as { notes: string }).notes}</p>
-              </CardContent>
-            </Card>
+            <DetailSection id="notes" step={sections.length + 1} title="Notes from applicant">
+              <p className="text-sm break-words">{(application as { notes: string }).notes}</p>
+            </DetailSection>
           ) : null}
 
-          <Card className="gap-0">
-            <CardHeader className="border-b border-border pb-4">
-              <SectionTitle>
-                <span className="flex items-center gap-2">
-                  Documents
-                  {signedDocs.length > 0 ? (
-                    <Badge variant={verifiedDocs === signedDocs.length ? "success" : "neutral"} className="tabular-nums">
-                      {verifiedDocs}/{signedDocs.length} verified
-                    </Badge>
-                  ) : null}
-                </span>
-              </SectionTitle>
-            </CardHeader>
-            <CardContent className="px-0">
+          <DetailSection
+            id="documents"
+            step={jumpLinks.length - 1}
+            title="Documents"
+            meta={
+              signedDocs.length > 0 ? (
+                <Badge variant={verifiedDocs === signedDocs.length ? "success" : "neutral"} className="tabular-nums">
+                  {verifiedDocs}/{signedDocs.length} verified
+                </Badge>
+              ) : null
+            }
+          >
               {signedDocs.length === 0 ? (
                 <Empty>
                   <EmptyMedia variant="icon">
@@ -263,7 +283,7 @@ export default async function ApplicationDetailPage({
                   <EmptyTitle>No documents</EmptyTitle>
                 </Empty>
               ) : (
-                <ul className="divide-y divide-border">
+                <ul className="-mx-5 -my-5 divide-y divide-border sm:-mx-6">
                   {signedDocs.map((doc) => {
                     const review = documentReviews.get(doc.key);
                     const docReviewer = review?.reviewer as unknown as { full_name: string | null; email: string } | null;
@@ -293,14 +313,9 @@ export default async function ApplicationDetailPage({
                   })}
                 </ul>
               )}
-            </CardContent>
-          </Card>
+          </DetailSection>
 
-          <Card>
-            <CardHeader>
-              <SectionTitle>Audit trail</SectionTitle>
-            </CardHeader>
-            <CardContent>
+          <DetailSection id="audit" title="Audit trail">
               {auditTrail.length === 0 ? (
                 <Empty>
                   <EmptyMedia variant="icon">
@@ -327,11 +342,10 @@ export default async function ApplicationDetailPage({
                   })}
                 </ol>
               )}
-            </CardContent>
-          </Card>
+          </DetailSection>
         </div>
 
-        <aside className="space-y-4">
+        <aside className="space-y-4 xl:sticky xl:top-32">
           <Card>
             <CardHeader>
               <SectionTitle>Review</SectionTitle>
@@ -353,7 +367,7 @@ export default async function ApplicationDetailPage({
                 <div className="border-t border-border pt-4 text-sm">
                   <p className="font-medium">
                     {application.status === "approved" ? "Approved" : "Rejected"}
-                    {reviewer ? ` by ${reviewer.full_name ?? reviewer.email}` : ""}
+                    {decider ? ` by ${decider.full_name ?? decider.email}` : ""}
                   </p>
                   {application.reviewed_at ? (
                     <p className="text-xs text-muted-foreground tabular-nums">
@@ -369,19 +383,6 @@ export default async function ApplicationDetailPage({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <SectionTitle>Assigned reviewer</SectionTitle>
-            </CardHeader>
-            <CardContent>
-              <ReviewerPicker
-                applicationId={application.id}
-                type={type}
-                currentReviewerId={application.assigned_reviewer}
-                admins={admins}
-              />
-            </CardContent>
-          </Card>
 
           <Card>
             <CardHeader>

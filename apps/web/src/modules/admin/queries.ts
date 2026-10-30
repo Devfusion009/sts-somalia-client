@@ -194,7 +194,7 @@ export async function getApplicationDetail(type: ApplicationType, id: string) {
     const { data } = await supabase
       .from("agency_applications")
       .select(
-        "*, applicant:profiles!agency_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!agency_applications_assigned_reviewer_fkey(full_name, email)"
+        "*, applicant:profiles!agency_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!agency_applications_assigned_reviewer_fkey(full_name, email), decider:profiles!agency_applications_reviewed_by_fkey(full_name, email)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -205,7 +205,7 @@ export async function getApplicationDetail(type: ApplicationType, id: string) {
     const { data } = await supabase
       .from("hotel_partner_applications")
       .select(
-        "*, applicant:profiles!hotel_partner_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!hotel_partner_applications_assigned_reviewer_fkey(full_name, email)"
+        "*, applicant:profiles!hotel_partner_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!hotel_partner_applications_assigned_reviewer_fkey(full_name, email), decider:profiles!hotel_partner_applications_reviewed_by_fkey(full_name, email)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -216,7 +216,7 @@ export async function getApplicationDetail(type: ApplicationType, id: string) {
     const { data } = await supabase
       .from("venue_partner_applications")
       .select(
-        "*, applicant:profiles!venue_partner_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!venue_partner_applications_assigned_reviewer_fkey(full_name, email)"
+        "*, applicant:profiles!venue_partner_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!venue_partner_applications_assigned_reviewer_fkey(full_name, email), decider:profiles!venue_partner_applications_reviewed_by_fkey(full_name, email)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -226,7 +226,7 @@ export async function getApplicationDetail(type: ApplicationType, id: string) {
   const { data } = await supabase
     .from("affiliate_applications")
     .select(
-      "*, applicant:profiles!affiliate_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!affiliate_applications_assigned_reviewer_fkey(full_name, email)"
+      "*, applicant:profiles!affiliate_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!affiliate_applications_assigned_reviewer_fkey(full_name, email), decider:profiles!affiliate_applications_reviewed_by_fkey(full_name, email)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -254,13 +254,6 @@ export async function getDocumentReviews(type: ApplicationType, applicationId: s
     .eq("application_id", applicationId);
 
   return new Map((data ?? []).map((row) => [row.doc_key, row]));
-}
-
-/** For the "assign reviewer" picker. */
-export async function getAdminProfiles() {
-  const supabase = await createClient();
-  const { data } = await supabase.from("profiles").select("id, full_name, email").eq("role", "admin").order("full_name");
-  return data ?? [];
 }
 
 export type OrderQueueFilter = "all" | "action" | "upcoming" | Database["public"]["Enums"]["order_status"];

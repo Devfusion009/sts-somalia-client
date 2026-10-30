@@ -432,35 +432,6 @@ export async function saveInternalNotes(
   return { error: null };
 }
 
-const assignReviewerSchema = z.object({
-  applicationId: z.string().uuid(),
-  reviewerId: z.string().uuid().nullable(),
-});
-
-export async function assignReviewer(
-  type: ApplicationType,
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  await requirePlatformAdmin();
-  const raw = formData.get("reviewerId");
-  const parsed = assignReviewerSchema.safeParse({
-    applicationId: formData.get("applicationId"),
-    reviewerId: raw === "unassigned" || !raw ? null : raw,
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from(TABLE[type])
-    .update({ assigned_reviewer: parsed.data.reviewerId })
-    .eq("id", parsed.data.applicationId);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/admin/applications/${type.replace("_", "-")}/${parsed.data.applicationId}`);
-  return { error: null };
-}
-
 /** Marks an application as being actively looked at — pending -> under_review. */
 export async function startReview(type: ApplicationType, applicationId: string): Promise<void> {
   await requirePlatformAdmin();
