@@ -1,3 +1,4 @@
+import { AnswerReviewProvider } from "@/modules/partner-applications/components/answer-review";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -216,10 +217,11 @@ export default async function ApplicationDetailPage({
       ) : null}
       {application.status === "more_info_requested" && application.review_notes ? (
         <Alert variant="warning">
-          <AlertDescription>Requested from applicant: {application.review_notes}</AlertDescription>
+          <AlertDescription className="whitespace-pre-wrap">Requested from applicant: {application.review_notes}</AlertDescription>
         </Alert>
       ) : null}
 
+      <AnswerReviewProvider key={`${id}:${application.status}`} applicationId={id} type={type} enabled={application.status === "pending" || application.status === "under_review"}>
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-6">
           {Object.keys(details).length === 0 ? null : type === "affiliate" ? (
@@ -391,6 +393,7 @@ export default async function ApplicationDetailPage({
           </Card>
         </aside>
       </div>
+      </AnswerReviewProvider>
     </div>
   );
 }

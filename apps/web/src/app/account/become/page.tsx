@@ -242,7 +242,7 @@ function ProgramPanel({
           <Alert variant="destructive">
             <AlertTriangle />
             <AlertTitle>Message from STS</AlertTitle>
-            <AlertDescription>{app.review_notes}</AlertDescription>
+            <AlertDescription className="whitespace-pre-wrap">{app.review_notes}</AlertDescription>
           </Alert>
         ) : null}
       </div>
@@ -271,7 +271,7 @@ function ProgramPanel({
           <Alert variant="destructive">
             <XCircle />
             <AlertTitle>Message from STS</AlertTitle>
-            <AlertDescription>{app.review_notes}</AlertDescription>
+            <AlertDescription className="whitespace-pre-wrap">{app.review_notes}</AlertDescription>
           </Alert>
         ) : null}
       </div>
