@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { addDays, format } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import styles from "./hotel-workspace.module.css";
 import type { RoomAvailability, RoomNight } from "@/modules/hotels/availability";
 
 type Tone = "open" | "limited" | "full" | "unset";
@@ -17,7 +18,7 @@ function toneOf(night: RoomNight): Tone {
 }
 
 const CELL: Record<Tone, string> = {
-  open: "bg-primary/[0.06] text-foreground hover:bg-primary/[0.12]",
+  open: "bg-primary/[0.045] text-foreground hover:bg-primary/[0.10]",
   limited:
     "bg-brand-gold/15 text-[color-mix(in_oklch,var(--brand-gold),black_45%)] hover:bg-brand-gold/25 dark:text-brand-gold",
   full: "bg-destructive/10 text-destructive hover:bg-destructive/15",
@@ -69,6 +70,7 @@ export function AvailabilityBoard({
   const tonight = rooms.map((r) => r.nights.find((n) => n.night === today)).filter((n): n is RoomNight => !!n);
   const tonightCapacity = tonight.reduce((s, n) => s + (n.capacity ?? 0), 0);
   const tonightBooked = tonight.reduce((s, n) => s + n.booked, 0);
+  const tonightCounted = tonight.length > 0 && tonight.every((night) => night.capacity !== null);
   const soldOut = all.filter((n) => toneOf(n) === "full").length;
   const pending = all.reduce((s, n) => s + n.pending, 0);
   const rangeCapacity = all.reduce((s, n) => s + (n.capacity ?? 0), 0);
@@ -77,20 +79,21 @@ export function AvailabilityBoard({
   const stats = [
     {
       label: "Tonight",
-      value: tonight.length ? `${tonightBooked} / ${tonightCapacity}` : "—",
-      meta: tonight.length ? `${pct(tonightBooked, tonightCapacity)}%` : null,
+      value: tonight.length ? `${tonightBooked} / ${tonightCounted ? tonightCapacity : "—"}` : "—",
+      meta: tonightCounted && tonightCapacity > 0 ? `${pct(tonightBooked, tonightCapacity)}%` : null,
     },
-    { label: "Occupancy", value: `${pct(rangeBooked, rangeCapacity)}%`, meta: null },
+    { label: "Range occupancy", value: rangeCapacity ? `${pct(rangeBooked, rangeCapacity)}%` : "—", meta: null },
     { label: "Sold-out nights", value: String(soldOut), meta: null },
-    { label: "Pending", value: String(pending), meta: null },
+    { label: "Pending room nights", value: String(pending), meta: null },
   ];
 
   return (
-    <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <p className="font-heading text-sm font-semibold tabular-nums">
+    <div className={styles.surface}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <div className="flex items-center gap-2.5 font-heading text-sm font-semibold tabular-nums">
+          <CalendarDays className="size-4 text-primary" aria-hidden="true" />
           {format(start, "d MMM")} – {format(end, "d MMM yyyy")}
-        </p>
+        </div>
         <div className="flex items-center gap-1.5">
           <Button
             variant="outline"
@@ -122,12 +125,12 @@ export function AvailabilityBoard({
         <p className="py-12 text-center text-sm text-muted-foreground">No rooms</p>
       ) : (
         <>
-          <dl className="grid grid-cols-2 gap-px border-b border-border bg-border sm:grid-cols-4">
+          <dl className="grid grid-cols-2 border-b border-border sm:grid-cols-4">
             {stats.map((s) => (
-              <div key={s.label} className="bg-secondary/40 px-4 py-2.5">
-                <dt className="text-xs text-muted-foreground">{s.label}</dt>
-                <dd className="mt-0.5 flex items-baseline gap-1.5">
-                  <span className="font-heading text-lg font-semibold tabular-nums">{s.value}</span>
+              <div key={s.label} className="border-r border-border px-5 py-5 last:border-r-0 max-sm:nth-2:border-r-0">
+                <dt className="text-[11px] font-medium text-muted-foreground">{s.label}</dt>
+                <dd className="mt-2.5 flex items-baseline gap-2">
+                  <span className="font-heading text-2xl font-semibold tracking-tight tabular-nums">{s.value}</span>
                   {s.meta ? <span className="text-xs text-muted-foreground tabular-nums">{s.meta}</span> : null}
                 </dd>
               </div>
@@ -136,10 +139,11 @@ export function AvailabilityBoard({
 
           <div className="overflow-x-auto">
             <table className="w-full border-separate border-spacing-0 text-xs">
+              <caption className="sr-only">Available rooms by room type and date. Each cell shows remaining rooms and total capacity.</caption>
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-10 min-w-44 border-r border-b border-border bg-card px-4 py-2 text-left text-xs font-medium text-muted-foreground">
-                    Room
+                  <th className="sticky left-0 z-10 min-w-48 border-r border-b border-border bg-card px-5 py-4 text-left text-xs font-medium text-muted-foreground">
+                    Room type
                   </th>
                   {rooms[0].nights.map((n, i) => {
                     const date = parse(n.night);
@@ -150,7 +154,7 @@ export function AvailabilityBoard({
                       <th
                         key={n.night}
                         className={cn(
-                          "min-w-16 border-b border-border px-0.5 pt-1.5 pb-2 text-center font-medium",
+                          "min-w-20 border-b border-border px-0.5 pt-2.5 pb-3 text-center font-medium",
                           weekend && "bg-secondary/40",
                           isToday && "rounded-t-lg bg-primary/10",
                           monthStart && i > 0 && "border-l"
@@ -185,7 +189,7 @@ export function AvailabilityBoard({
                   );
                   return (
                     <tr key={room.roomId} className="group/row">
-                      <td className="sticky left-0 z-10 border-r border-b border-border bg-card px-4 py-2 group-last/row:border-b-0">
+                      <td className="sticky left-0 z-10 border-r border-b border-border bg-card px-5 py-4 group-last/row:border-b-0">
                         {href ? (
                           <Link
                             href={href}
@@ -218,13 +222,13 @@ export function AvailabilityBoard({
                         const agencyW = cap ? Math.min(100, (night.b2b / cap) * 100) : 0;
                         const customerW = cap ? Math.min(100 - agencyW, (night.b2c / cap) * 100) : 0;
                         const cellClass = cn(
-                          "relative flex h-12 flex-col items-center justify-center overflow-hidden rounded-md transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          styles.inventoryCell,
                           CELL[tone],
                           night.night === today && "ring-2 ring-primary"
                         );
                         const body = (
                           <>
-                            <span className="text-sm leading-none font-semibold tabular-nums">
+                            <span className="text-lg leading-none font-semibold tabular-nums">
                               {tone === "unset" ? "—" : tone === "full" ? "0" : night.available}
                             </span>
                             {night.capacity !== null ? (
@@ -242,7 +246,7 @@ export function AvailabilityBoard({
                           <td
                             key={night.night}
                             className={cn(
-                              "border-b border-border p-0.5 group-last/row:border-b-0",
+                              "border-b border-border p-1 group-last/row:border-b-0",
                               weekend && "bg-secondary/40",
                               night.night === today && "bg-primary/10",
                               (i === 0 || date.getDate() === 1) && i > 0 && "border-l"
@@ -284,7 +288,7 @@ export function AvailabilityBoard({
             </table>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border px-5 py-3.5 text-[11px] text-muted-foreground">
             {LEGEND.map((item) => (
               <span key={item.label} className="flex items-center gap-1.5">
                 <span className={cn("size-2.5 rounded-sm", item.className)} aria-hidden="true" />
