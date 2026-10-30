@@ -188,13 +188,19 @@ function NavGroups({
     }
   }
 
-  function toggleGroup(label: string) {
+  function toggleGroup(label: string, groupEl: HTMLElement | null) {
+    const opening = !openGroups.has(label);
     setOpenGroups((prev) => {
       const next = new Set(prev);
       if (next.has(label)) next.delete(label);
       else next.add(label);
       return next;
     });
+    // A group opened near the bottom (Settings) expanded below the fold of the
+    // scrolling sidebar, so it looked like nothing happened.
+    if (opening && groupEl) {
+      requestAnimationFrame(() => groupEl.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+    }
   }
 
   return (
@@ -207,7 +213,7 @@ function NavGroups({
               render={
                 <button
                   type="button"
-                  onClick={() => toggleGroup(group.label)}
+                  onClick={(e) => toggleGroup(group.label, e.currentTarget.closest<HTMLElement>("[data-slot=sidebar-group]"))}
                   aria-expanded={isOpen}
                   className="flex w-full items-center justify-between gap-2 rounded-md text-[11px] font-medium text-sidebar-foreground/50 transition-colors hover:text-sidebar-foreground"
                 />
