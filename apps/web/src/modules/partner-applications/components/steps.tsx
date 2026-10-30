@@ -61,7 +61,20 @@ import {
   submitApplication,
   type ActionState,
 } from "../actions";
-import { checkUploadFile } from "../schemas";
+import {
+  checkUploadFile,
+  step1AffiliateSchema,
+  step1BusinessSchema,
+  step2AffiliateSchema,
+  step2ContactSchema,
+  step3AffiliateSchema,
+  step3AgencySchema,
+  step3HotelSchema,
+  step3VenueSchema,
+  step4AgencySchema,
+  step4HotelSchema,
+} from "../schemas";
+import { FieldErrorsProvider, WizardField, useFieldErrorCount, useFieldValidation } from "./wizard-field";
 import {
   APP_CONFIG,
   BUSINESS_TYPES,
@@ -205,7 +218,8 @@ function useRestoreOnError(formRef: React.RefObject<HTMLFormElement | null>, sta
   useEffect(() => {
     const snapshot = snapshotRef.current;
     const form = formRef.current;
-    if (!state?.error || !snapshot || !form) return;
+    // Autosave never goes through a real submit, so React never resets the form for it.
+    if (!state?.error || state.autosave || !snapshot || !form) return;
     for (const el of Array.from(form.elements)) {
       if (!(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement)) continue;
       if (el.type === "checkbox" || el.type === "radio" || el.type === "file") continue;
@@ -259,12 +273,22 @@ function StepNav({
   );
 }
 
+/** Field problems are shown on the fields themselves; this carries their count and any error no field owns. */
 function ErrorAlert({ state }: { state: ActionState }) {
-  if (!state?.error) return null;
+  const fieldErrors = useFieldErrorCount();
+  const message =
+    fieldErrors > 0
+      ? fieldErrors === 1
+        ? "Fix 1 field to continue."
+        : `Fix ${fieldErrors} fields to continue.`
+      : state?.error && !state.autosave && !state.fieldErrors
+        ? state.error
+        : null;
+  if (!message) return null;
   return (
     <Alert variant="destructive">
       <AlertCircle />
-      <AlertDescription>{state.error}</AlertDescription>
+      <AlertDescription>{message}</AlertDescription>
     </Alert>
   );
 }
@@ -279,137 +303,123 @@ export function StepBusiness({ kind, application, backHref }: { kind: Applicatio
   const autosave = useAutosave(formRef, formAction);
   const saved = isSaved(state, pending);
   useRestoreOnError(formRef, state);
+  const validation = useFieldValidation(formRef, kind === "affiliate" ? step1AffiliateSchema : step1BusinessSchema, state);
 
   if (kind === "affiliate") {
     return (
-      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
-        <input type="hidden" name="kind" value={kind} />
-        <input type="hidden" name="applicationId" value={application.id} />
-        <ErrorAlert state={state} />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Full name *</Label>
-            <Input name="fullName" defaultValue={s(d.fullName)} required />
+      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} noValidate className="space-y-5">
+        <FieldErrorsProvider value={validation}>
+          <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="applicationId" value={application.id} />
+          <ErrorAlert state={state} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <WizardField name="fullName" label="Full name" required>
+              <Input name="fullName" defaultValue={s(d.fullName)} required />
+            </WizardField>
+            <WizardField name="city" label="City" required>
+              <LocationField name="city" defaultValue={s(d.city)} required />
+            </WizardField>
+            <WizardField name="mobile" label="Mobile number" required>
+              <PhoneField name="mobile" defaultValue={s(d.mobile)} required />
+            </WizardField>
+            <WizardField name="email" label="Email" required>
+              <Input name="email" type="email" defaultValue={s(d.email)} required />
+            </WizardField>
+            <WizardField name="audienceLocation" label="Where is your audience mainly based?" required className="sm:col-span-2">
+              <OptionPicker
+                name="audienceLocation"
+                defaultValue={s(d.audienceLocation)}
+                options={AUDIENCE_LOCATIONS.map((v) => ({ value: v, label: AUDIENCE_LOCATION_LABELS[v] }))}
+              />
+            </WizardField>
           </div>
-          <div className="space-y-1.5">
-            <Label>City *</Label>
-            <LocationField name="city" defaultValue={s(d.city)} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Mobile number *</Label>
-            <PhoneField name="mobile" defaultValue={s(d.mobile)} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Email *</Label>
-            <Input name="email" type="email" defaultValue={s(d.email)} required />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>Where is your audience mainly based? *</Label>
-            <OptionPicker
-              name="audienceLocation"
-              defaultValue={s(d.audienceLocation)}
-              options={AUDIENCE_LOCATIONS.map((v) => ({ value: v, label: AUDIENCE_LOCATION_LABELS[v] }))}
-            />
-          </div>
-        </div>
-        <StepNav backHref={backHref} saving={pending} saved={saved} />
+          <StepNav backHref={backHref} saving={pending} saved={saved} />
+        </FieldErrorsProvider>
       </form>
     );
   }
 
   return (
-    <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
-      <input type="hidden" name="kind" value={kind} />
-      <input type="hidden" name="applicationId" value={application.id} />
-      <ErrorAlert state={state} />
+    <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} noValidate className="space-y-5">
+      <FieldErrorsProvider value={validation}>
+        <input type="hidden" name="kind" value={kind} />
+        <input type="hidden" name="applicationId" value={application.id} />
+        <ErrorAlert state={state} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>Legal business name *</Label>
-          <IconInput icon={Building2} name="legalBusinessName" defaultValue={s(d.legalBusinessName)} required />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <WizardField name="legalBusinessName" label="Legal business name" required>
+            <IconInput icon={Building2} name="legalBusinessName" defaultValue={s(d.legalBusinessName)} required />
+          </WizardField>
+          <WizardField name="tradingName" label="Trading name (if different)">
+            <IconInput icon={Tag} name="tradingName" defaultValue={s(d.tradingName)} />
+          </WizardField>
+          <WizardField name="businessType" label="Business type" required className="sm:col-span-2">
+            <OptionPicker
+              name="businessType"
+              defaultValue={s(d.businessType)}
+              layout="cards"
+              options={BUSINESS_TYPES.map((t) => ({
+                value: t,
+                label: t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+                icon: BUSINESS_TYPE_ICONS[t],
+              }))}
+            />
+          </WizardField>
+          <WizardField name="yearEstablished" label="Year established" required>
+            <YearField name="yearEstablished" defaultValue={s(d.yearEstablished)} min={EARLIEST_BUSINESS_YEAR} max={CURRENT_YEAR} required />
+          </WizardField>
+          <WizardField name="registrationNumber" label="Business registration number">
+            <IconInput icon={FileBadge2} name="registrationNumber" defaultValue={s(d.registrationNumber)} />
+          </WizardField>
+          <WizardField name="taxId" label="Tax identification number">
+            <IconInput icon={Receipt} name="taxId" defaultValue={s(d.taxId)} />
+          </WizardField>
         </div>
-        <div className="space-y-1.5">
-          <Label>Trading name (if different)</Label>
-          <IconInput icon={Tag} name="tradingName" defaultValue={s(d.tradingName)} />
+
+        <Separator />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <WizardField name="officeStreet" label="Office street address" className="sm:col-span-3">
+            <IconInput icon={MapPinned} name="officeStreet" defaultValue={s(d.officeStreet)} />
+          </WizardField>
+          <WizardField name="officeCity" label="City" required>
+            <LocationField name="officeCity" defaultValue={s(d.officeCity)} required />
+          </WizardField>
+          <WizardField name="officeRegion" label="Region">
+            <Input name="officeRegion" defaultValue={s(d.officeRegion)} />
+          </WizardField>
+          <WizardField name="officeCountry" label="Country">
+            <CountryField name="officeCountry" defaultValue={s(d.officeCountry) || "Somalia"} />
+          </WizardField>
         </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label>Business type *</Label>
-          <OptionPicker
-            name="businessType"
-            defaultValue={s(d.businessType)}
-            layout="cards"
-            options={BUSINESS_TYPES.map((t) => ({
-              value: t,
-              label: t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-              icon: BUSINESS_TYPE_ICONS[t],
-            }))}
+
+        <WizardField name="branchesJson" label="Branch offices (optional)">
+          <RepeatableRows
+            hiddenFieldName="branchesJson"
+            initialRows={Array.isArray(d.branches) ? (d.branches as { name: string; location: string }[]) : []}
+            emptyRow={{ name: "", location: "" }}
+            fields={[
+              { key: "name", placeholder: "Branch name" },
+              { key: "location", placeholder: "Location" },
+            ]}
+            addLabel="Add branch"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Year established *</Label>
-          <YearField name="yearEstablished" defaultValue={s(d.yearEstablished)} min={EARLIEST_BUSINESS_YEAR} max={CURRENT_YEAR} required />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Business registration number</Label>
-          <IconInput icon={FileBadge2} name="registrationNumber" defaultValue={s(d.registrationNumber)} />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Tax identification number</Label>
-          <IconInput icon={Receipt} name="taxId" defaultValue={s(d.taxId)} />
-        </div>
-      </div>
+        </WizardField>
 
-      <Separator />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="space-y-1.5 sm:col-span-3">
-          <Label>Office street address</Label>
-          <IconInput icon={MapPinned} name="officeStreet" defaultValue={s(d.officeStreet)} />
+        <Separator />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <WizardField name="businessPhone" label="Business phone" required>
+            <PhoneField name="businessPhone" defaultValue={s(d.businessPhone)} required />
+          </WizardField>
+          <WizardField name="businessEmail" label="Business email" required>
+            <IconInput icon={Mail} name="businessEmail" type="email" defaultValue={s(d.businessEmail)} required />
+          </WizardField>
+          <WizardField name="website" label="Website (optional)" className="sm:col-span-2">
+            <IconInput icon={Globe} name="website" defaultValue={s(d.website)} placeholder="https://" />
+          </WizardField>
         </div>
-        <div className="space-y-1.5">
-          <Label>City *</Label>
-          <LocationField name="officeCity" defaultValue={s(d.officeCity)} required />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Region</Label>
-          <Input name="officeRegion" defaultValue={s(d.officeRegion)} />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Country</Label>
-          <CountryField name="officeCountry" defaultValue={s(d.officeCountry) || "Somalia"} />
-        </div>
-      </div>
 
-      <div className="space-y-1.5">
-        <Label>Branch offices (optional)</Label>
-        <RepeatableRows
-          hiddenFieldName="branchesJson"
-          initialRows={Array.isArray(d.branches) ? (d.branches as { name: string; location: string }[]) : []}
-          emptyRow={{ name: "", location: "" }}
-          fields={[
-            { key: "name", placeholder: "Branch name" },
-            { key: "location", placeholder: "Location" },
-          ]}
-          addLabel="Add branch"
-        />
-      </div>
-
-      <Separator />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>Business phone *</Label>
-          <PhoneField name="businessPhone" defaultValue={s(d.businessPhone)} required />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Business email *</Label>
-          <IconInput icon={Mail} name="businessEmail" type="email" defaultValue={s(d.businessEmail)} required />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label>Website (optional)</Label>
-          <IconInput icon={Globe} name="website" defaultValue={s(d.website)} placeholder="https://" />
-        </div>
-      </div>
-
-      <StepNav backHref={backHref} saving={pending} saved={saved} />
+        <StepNav backHref={backHref} saving={pending} saved={saved} />
+      </FieldErrorsProvider>
     </form>
   );
 }
@@ -424,52 +434,51 @@ export function StepContact({ kind, application }: { kind: ApplicationKind; appl
   const autosave = useAutosave(formRef, formAction);
   const saved = isSaved(state, pending);
   useRestoreOnError(formRef, state);
+  const validation = useFieldValidation(formRef, kind === "affiliate" ? step2AffiliateSchema : step2ContactSchema, state);
 
   if (kind === "affiliate") {
     return (
-      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
-        <input type="hidden" name="kind" value={kind} />
-        <input type="hidden" name="applicationId" value={application.id} />
-        <ErrorAlert state={state} />
-        <div className="space-y-1.5">
-          <Label>National ID or passport number *</Label>
-          <Input name="idNumber" defaultValue={s(d.idNumber)} required />
-        </div>
-        <StepNav backHref={`/account/become/${kind}/${application.id}?step=1`} saving={pending} saved={saved} />
+      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} noValidate className="space-y-5">
+        <FieldErrorsProvider value={validation}>
+          <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="applicationId" value={application.id} />
+          <ErrorAlert state={state} />
+          <WizardField name="idNumber" label="National ID or passport number" required>
+            <Input name="idNumber" defaultValue={s(d.idNumber)} required />
+          </WizardField>
+          <StepNav backHref={`/account/become/${kind}/${application.id}?step=1`} saving={pending} saved={saved} />
+        </FieldErrorsProvider>
       </form>
     );
   }
 
   return (
-    <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
-      <input type="hidden" name="kind" value={kind} />
-      <input type="hidden" name="applicationId" value={application.id} />
-      <ErrorAlert state={state} />
+    <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} noValidate className="space-y-5">
+      <FieldErrorsProvider value={validation}>
+        <input type="hidden" name="kind" value={kind} />
+        <input type="hidden" name="applicationId" value={application.id} />
+        <ErrorAlert state={state} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>Full name *</Label>
-          <IconInput icon={User} name="contactFullName" defaultValue={s(d.contactFullName)} required />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <WizardField name="contactFullName" label="Full name" required>
+            <IconInput icon={User} name="contactFullName" defaultValue={s(d.contactFullName)} required />
+          </WizardField>
+          <WizardField name="contactRole" label="Role / title" required>
+            <RoleField name="contactRole" defaultValue={s(d.contactRole)} />
+          </WizardField>
+          <WizardField name="contactIdNumber" label="National ID or passport number" required>
+            <IconInput icon={IdCard} name="contactIdNumber" defaultValue={s(d.contactIdNumber)} required />
+          </WizardField>
+          <WizardField name="contactMobile" label="Mobile number" required>
+            <PhoneField name="contactMobile" defaultValue={s(d.contactMobile)} required />
+          </WizardField>
+          <WizardField name="contactEmail" label="Email" required className="sm:col-span-2">
+            <IconInput icon={Mail} name="contactEmail" type="email" defaultValue={s(d.contactEmail)} required />
+          </WizardField>
         </div>
-        <div className="space-y-1.5">
-          <Label>Role / title *</Label>
-          <RoleField name="contactRole" defaultValue={s(d.contactRole)} />
-        </div>
-        <div className="space-y-1.5">
-          <Label>National ID or passport number *</Label>
-          <IconInput icon={IdCard} name="contactIdNumber" defaultValue={s(d.contactIdNumber)} required />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Mobile number *</Label>
-          <PhoneField name="contactMobile" defaultValue={s(d.contactMobile)} required />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label>Email *</Label>
-          <IconInput icon={Mail} name="contactEmail" type="email" defaultValue={s(d.contactEmail)} required />
-        </div>
-      </div>
 
-      <StepNav backHref={`/account/become/${kind}/${application.id}?step=1`} saving={pending} saved={saved} />
+        <StepNav backHref={`/account/become/${kind}/${application.id}?step=1`} saving={pending} saved={saved} />
+      </FieldErrorsProvider>
     </form>
   );
 }
@@ -477,8 +486,7 @@ export function StepContact({ kind, application }: { kind: ApplicationKind; appl
 function AmenitiesField({ initial }: { initial: string[] }) {
   const [checked, setChecked] = useState<string[]>(initial);
   return (
-    <div className="space-y-1.5">
-      <Label>Amenities &amp; facilities</Label>
+    <WizardField name="amenities" label="Amenities & facilities">
       <div className="flex flex-wrap gap-2">
         {AMENITIES.map((a) => (
           <label key={a} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
@@ -492,15 +500,14 @@ function AmenitiesField({ initial }: { initial: string[] }) {
         ))}
       </div>
       <input type="hidden" name="amenities" value={checked.join(",")} />
-    </div>
+    </WizardField>
   );
 }
 
 function ProductsField({ initial }: { initial: string[] }) {
   const [checked, setChecked] = useState<string[]>(initial);
   return (
-    <div className="space-y-1.5">
-      <Label>Products you intend to book</Label>
+    <WizardField name="products" label="Products you intend to book">
       <div className="flex flex-wrap gap-3">
         {PRODUCTS.map((p) => (
           <label key={p} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
@@ -517,7 +524,7 @@ function ProductsField({ initial }: { initial: string[] }) {
       </div>
       {/* the server action reads "products" as one comma-joined string, not repeated form entries */}
       <input type="hidden" name="products" value={checked.join(",")} />
-    </div>
+    </WizardField>
   );
 }
 
@@ -535,8 +542,7 @@ function OrgMemberField({
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <div className="space-y-1.5">
-        <Label>Member of a travel trade association?</Label>
+      <WizardField name="isOrgMember" label="Member of a travel trade association?">
         <OptionPicker
           name="isOrgMember"
           defaultValue={isMember}
@@ -546,21 +552,19 @@ function OrgMemberField({
             { value: "no", label: "No" },
           ]}
         />
-      </div>
+      </WizardField>
       {isMember === "yes" ? (
         <>
-          <div className="space-y-1.5">
-            <Label>Association</Label>
+          <WizardField name="orgMemberType" label="Association">
             <OptionPicker
               name="orgMemberType"
               defaultValue={initialType}
               options={ORG_MEMBER_TYPES.map((t) => ({ value: t, label: ORG_MEMBER_TYPE_LABELS[t] }))}
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Membership number</Label>
+          </WizardField>
+          <WizardField name="iataNumber" label="Membership number">
             <Input name="iataNumber" defaultValue={initialNumber} />
-          </div>
+          </WizardField>
         </>
       ) : null}
     </div>
@@ -570,8 +574,7 @@ function OrgMemberField({
 function VenueEventTypesField({ initial }: { initial: string[] }) {
   const [checked, setChecked] = useState<string[]>(initial);
   return (
-    <div className="space-y-1.5">
-      <Label>Events your venue hosts</Label>
+    <WizardField name="eventTypes" label="Events your venue hosts">
       <div className="flex flex-wrap gap-2">
         {VENUE_EVENT_TYPES.map((t) => (
           <label key={t} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
@@ -585,7 +588,7 @@ function VenueEventTypesField({ initial }: { initial: string[] }) {
         ))}
       </div>
       <input type="hidden" name="eventTypes" value={checked.join(",")} />
-    </div>
+    </WizardField>
   );
 }
 
@@ -600,83 +603,87 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
   const autosave = useAutosave(formRef, formAction);
   const saved = isSaved(state, pending);
   useRestoreOnError(formRef, state);
+  const validation = useFieldValidation(
+    formRef,
+    kind === "hotel_partner"
+      ? step3HotelSchema
+      : kind === "venue_partner"
+        ? step3VenueSchema
+        : kind === "affiliate"
+          ? step3AffiliateSchema
+          : step3AgencySchema,
+    state
+  );
 
   if (kind === "hotel_partner") {
     const initialRoomTypes = Array.isArray(d.roomTypes) ? (d.roomTypes as RoomTypeRow[]) : [];
     const initialAmenities = Array.isArray(d.amenities) ? (d.amenities as string[]) : [];
     return (
-      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
-        <input type="hidden" name="kind" value={kind} />
-        <input type="hidden" name="applicationId" value={application.id} />
-        <ErrorAlert state={state} />
+      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} noValidate className="space-y-5">
+        <FieldErrorsProvider value={validation}>
+          <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="applicationId" value={application.id} />
+          <ErrorAlert state={state} />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Property type *</Label>
-            <OptionPicker
-              name="propertyType"
-              defaultValue={s(d.propertyType)}
-              options={PROPERTY_TYPES.map((t) => ({ value: t, label: PROPERTY_TYPE_LABELS[t] }))}
-            />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <WizardField name="propertyType" label="Property type" required>
+              <OptionPicker
+                name="propertyType"
+                defaultValue={s(d.propertyType)}
+                options={PROPERTY_TYPES.map((t) => ({ value: t, label: PROPERTY_TYPE_LABELS[t] }))}
+              />
+            </WizardField>
+            <WizardField name="starRating" label="Star rating" required>
+              <OptionPicker
+                name="starRating"
+                defaultValue={s(d.starRating)}
+                options={STAR_RATINGS.map((r) => ({ value: r, label: STAR_RATING_LABELS[r] }))}
+              />
+            </WizardField>
+            <WizardField name="propertyName" label="Property name" required className="sm:col-span-2">
+              <Input name="propertyName" defaultValue={s(d.propertyName)} required />
+            </WizardField>
           </div>
-          <div className="space-y-1.5">
-            <Label>Star rating *</Label>
-            <OptionPicker
-              name="starRating"
-              defaultValue={s(d.starRating)}
-              options={STAR_RATINGS.map((r) => ({ value: r, label: STAR_RATING_LABELS[r] }))}
-            />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>Property name *</Label>
-            <Input name="propertyName" defaultValue={s(d.propertyName)} required />
-          </div>
-        </div>
 
-        <Separator />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="space-y-1.5 sm:col-span-3">
-            <Label>Property street address</Label>
-            <Input name="propertyStreet" defaultValue={s(d.propertyStreet)} placeholder="Distinct from your office address, if different" />
+          <Separator />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <WizardField name="propertyStreet" label="Property street address" className="sm:col-span-3">
+              <Input name="propertyStreet" defaultValue={s(d.propertyStreet)} placeholder="Distinct from your office address, if different" />
+            </WizardField>
+            <WizardField name="location" label="City" required className="sm:col-span-2">
+              <LocationField name="location" defaultValue={s(d.location)} required />
+            </WizardField>
+            <WizardField name="totalRooms" label="Total rooms / units" required>
+              <Input name="totalRooms" type="number" min="1" defaultValue={s(d.totalRooms)} required />
+            </WizardField>
           </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>City *</Label>
-            <LocationField name="location" defaultValue={s(d.location)} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Total rooms / units *</Label>
-            <Input name="totalRooms" type="number" min="1" defaultValue={s(d.totalRooms)} required />
-          </div>
-        </div>
 
-        <Separator />
-        <RoomTypesField initial={initialRoomTypes} />
+          <Separator />
+          <RoomTypesField initial={initialRoomTypes} />
 
-        <Separator />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Check-in time *</Label>
-            <AnalogTimeField name="checkInTime" defaultValue={s(d.checkInTime) || "14:00"} required />
+          <Separator />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <WizardField name="checkInTime" label="Check-in time" required>
+              <AnalogTimeField name="checkInTime" defaultValue={s(d.checkInTime) || "14:00"} required />
+            </WizardField>
+            <WizardField name="checkOutTime" label="Check-out time" required>
+              <AnalogTimeField name="checkOutTime" defaultValue={s(d.checkOutTime) || "12:00"} required />
+            </WizardField>
+            <WizardField name="cancellationPolicy" label="Cancellation policy" required className="sm:col-span-2">
+              <OptionPicker
+                name="cancellationPolicy"
+                defaultValue={s(d.cancellationPolicy)}
+                layout="stack"
+                options={CANCELLATION_POLICIES.map((c) => ({ value: c, ...CANCELLATION_POLICY_LABELS[c] }))}
+              />
+            </WizardField>
           </div>
-          <div className="space-y-1.5">
-            <Label>Check-out time *</Label>
-            <AnalogTimeField name="checkOutTime" defaultValue={s(d.checkOutTime) || "12:00"} required />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>Cancellation policy *</Label>
-            <OptionPicker
-              name="cancellationPolicy"
-              defaultValue={s(d.cancellationPolicy)}
-              layout="stack"
-              options={CANCELLATION_POLICIES.map((c) => ({ value: c, ...CANCELLATION_POLICY_LABELS[c] }))}
-            />
-          </div>
-        </div>
 
-        <Separator />
-        <AmenitiesField initial={initialAmenities} />
+          <Separator />
+          <AmenitiesField initial={initialAmenities} />
 
-        <StepNav backHref={backHref} saving={pending} saved={saved} />
+          <StepNav backHref={backHref} saving={pending} saved={saved} />
+        </FieldErrorsProvider>
       </form>
     );
   }
@@ -684,82 +691,77 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
   if (kind === "venue_partner") {
     const initialEventTypes = Array.isArray(d.eventTypes) ? (d.eventTypes as string[]) : [];
     return (
-      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
-        <input type="hidden" name="kind" value={kind} />
-        <input type="hidden" name="applicationId" value={application.id} />
-        <ErrorAlert state={state} />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Venue name *</Label>
-            <Input name="venueName" defaultValue={s(d.venueName)} required />
+      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} noValidate className="space-y-5">
+        <FieldErrorsProvider value={validation}>
+          <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="applicationId" value={application.id} />
+          <ErrorAlert state={state} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <WizardField name="venueName" label="Venue name" required>
+              <Input name="venueName" defaultValue={s(d.venueName)} required />
+            </WizardField>
+            <WizardField name="location" label="Location / city" required>
+              <LocationField name="location" defaultValue={s(d.location)} required />
+            </WizardField>
+            <WizardField name="seatedCapacity" label="Seated capacity">
+              <Input name="seatedCapacity" type="number" min="1" defaultValue={s(d.seatedCapacity)} placeholder="e.g. 300" />
+            </WizardField>
+            <WizardField name="standingCapacity" label="Standing capacity" required>
+              <Input name="standingCapacity" type="number" min="1" defaultValue={s(d.standingCapacity)} placeholder="e.g. 500" required />
+            </WizardField>
+            <WizardField name="indicativePrice" label="Indicative price (USD, optional)" className="sm:col-span-2">
+              <Input name="indicativePrice" type="number" min="0" defaultValue={s(d.indicativePrice)} placeholder="e.g. 1500 per event" />
+            </WizardField>
           </div>
-          <div className="space-y-1.5">
-            <Label>Location / city *</Label>
-            <LocationField name="location" defaultValue={s(d.location)} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Seated capacity</Label>
-            <Input name="seatedCapacity" type="number" min="1" defaultValue={s(d.seatedCapacity)} placeholder="e.g. 300" />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Standing capacity *</Label>
-            <Input name="standingCapacity" type="number" min="1" defaultValue={s(d.standingCapacity)} placeholder="e.g. 500" required />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>Indicative price (USD, optional)</Label>
-            <Input name="indicativePrice" type="number" min="0" defaultValue={s(d.indicativePrice)} placeholder="e.g. 1500 per event" />
-          </div>
-        </div>
-        <VenueEventTypesField initial={initialEventTypes} />
-        <StepNav backHref={backHref} saving={pending} saved={saved} />
+          <VenueEventTypesField initial={initialEventTypes} />
+          <StepNav backHref={backHref} saving={pending} saved={saved} />
+        </FieldErrorsProvider>
       </form>
     );
   }
 
   if (kind === "affiliate") {
     return (
-      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
-        <input type="hidden" name="kind" value={kind} />
-        <input type="hidden" name="applicationId" value={application.id} />
-        <ErrorAlert state={state} />
-        <div className="space-y-1.5">
-          <Label>Website / social handles</Label>
-          <RepeatableRows
-            hiddenFieldName="handlesJson"
-            initialRows={Array.isArray(d.handles) ? (d.handles as { platform: string; handle: string }[]) : []}
-            emptyRow={{ platform: "", handle: "" }}
-            fields={[
-              { key: "platform", placeholder: "Platform (e.g. Instagram)" },
-              { key: "handle", placeholder: "Handle or URL" },
-            ]}
-            addLabel="Add handle"
-          />
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Audience size</Label>
-            <Input name="audienceSize" type="number" min="0" defaultValue={s(d.audienceSize)} placeholder="e.g. 15000" />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Primary traffic source *</Label>
-            <OptionPicker
-              name="trafficSource"
-              defaultValue={s(d.trafficSource)}
-              options={TRAFFIC_SOURCES.map((t) => ({ value: t, label: t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) }))}
+      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} noValidate className="space-y-5">
+        <FieldErrorsProvider value={validation}>
+          <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="applicationId" value={application.id} />
+          <ErrorAlert state={state} />
+          <WizardField name="handlesJson" label="Website / social handles">
+            <RepeatableRows
+              hiddenFieldName="handlesJson"
+              initialRows={Array.isArray(d.handles) ? (d.handles as { platform: string; handle: string }[]) : []}
+              emptyRow={{ platform: "", handle: "" }}
+              fields={[
+                { key: "platform", placeholder: "Platform (e.g. Instagram)" },
+                { key: "handle", placeholder: "Handle or URL" },
+              ]}
+              addLabel="Add handle"
             />
+          </WizardField>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <WizardField name="audienceSize" label="Audience size">
+              <Input name="audienceSize" type="number" min="0" defaultValue={s(d.audienceSize)} placeholder="e.g. 15000" />
+            </WizardField>
+            <WizardField name="trafficSource" label="Primary traffic source" required>
+              <OptionPicker
+                name="trafficSource"
+                defaultValue={s(d.trafficSource)}
+                options={TRAFFIC_SOURCES.map((t) => ({ value: t, label: t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) }))}
+              />
+            </WizardField>
           </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label>How do you plan to promote STS Somalia? *</Label>
-          <Textarea
-            name="promotionPlan"
-            rows={3}
-            defaultValue={s(d.promotionPlan)}
-            placeholder="e.g. I post Umrah travel tips to my Instagram followers and share deals in a Somali diaspora WhatsApp group."
-            required
-          />
-        </div>
-        <StepNav backHref={backHref} saving={pending} saved={saved} />
+          <WizardField name="promotionPlan" label="How do you plan to promote STS Somalia?" required>
+            <Textarea
+              name="promotionPlan"
+              rows={3}
+              defaultValue={s(d.promotionPlan)}
+              placeholder="e.g. I post Umrah travel tips to my Instagram followers and share deals in a Somali diaspora WhatsApp group."
+              required
+            />
+          </WizardField>
+          <StepNav backHref={backHref} saving={pending} saved={saved} />
+        </FieldErrorsProvider>
       </form>
     );
   }
@@ -767,43 +769,42 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
   // agency
   const initialProducts = Array.isArray(d.products) ? (d.products as string[]) : [];
   return (
-    <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
-      <input type="hidden" name="kind" value={kind} />
-      <input type="hidden" name="applicationId" value={application.id} />
-      <ErrorAlert state={state} />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>Years of experience in travel</Label>
-          <BucketPicker
-            name="yearsExperience"
-            defaultValue={s(d.yearsExperience)}
-            options={["<1", "1-2", "3-5", "5-10", "10+"]}
-            customPlaceholder="Exact years"
-          />
+    <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} noValidate className="space-y-5">
+      <FieldErrorsProvider value={validation}>
+        <input type="hidden" name="kind" value={kind} />
+        <input type="hidden" name="applicationId" value={application.id} />
+        <ErrorAlert state={state} />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <WizardField name="yearsExperience" label="Years of experience in travel">
+            <BucketPicker
+              name="yearsExperience"
+              defaultValue={s(d.yearsExperience)}
+              options={["<1", "1-2", "3-5", "5-10", "10+"]}
+              customPlaceholder="Exact years"
+            />
+          </WizardField>
+          <WizardField name="staffCount" label="Number of staff using the platform">
+            <BucketPicker
+              name="staffCount"
+              defaultValue={s(d.staffCount)}
+              options={["1", "2-5", "5-10", "10+"]}
+              customPlaceholder="Exact headcount"
+            />
+          </WizardField>
+          <WizardField name="monthlyVolume" label="Estimated monthly booking volume" required className="sm:col-span-2">
+            <OptionPicker
+              name="monthlyVolume"
+              defaultValue={s(d.monthlyVolume)}
+              options={VOLUME_RANGES.map((r) => ({ value: r, label: r }))}
+            />
+          </WizardField>
         </div>
-        <div className="space-y-1.5">
-          <Label>Number of staff using the platform</Label>
-          <BucketPicker
-            name="staffCount"
-            defaultValue={s(d.staffCount)}
-            options={["1", "2-5", "5-10", "10+"]}
-            customPlaceholder="Exact headcount"
-          />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label>Estimated monthly booking volume *</Label>
-          <OptionPicker
-            name="monthlyVolume"
-            defaultValue={s(d.monthlyVolume)}
-            options={VOLUME_RANGES.map((r) => ({ value: r, label: r }))}
-          />
-        </div>
-      </div>
-      <Separator />
-      <OrgMemberField initialIsMember={s(d.isOrgMember)} initialType={s(d.orgMemberType)} initialNumber={s(d.iataNumber)} />
-      <Separator />
-      <ProductsField initial={initialProducts} />
-      <StepNav backHref={backHref} saving={pending} saved={saved} />
+        <Separator />
+        <OrgMemberField initialIsMember={s(d.isOrgMember)} initialType={s(d.orgMemberType)} initialNumber={s(d.iataNumber)} />
+        <Separator />
+        <ProductsField initial={initialProducts} />
+        <StepNav backHref={backHref} saving={pending} saved={saved} />
+      </FieldErrorsProvider>
     </form>
   );
 }
@@ -822,6 +823,11 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
   const autosave = useAutosave(formRef, formAction);
   const saved = isSaved(state, pending);
   useRestoreOnError(formRef, state);
+  const validation = useFieldValidation(
+    formRef,
+    kind === "hotel_partner" || kind === "venue_partner" ? step4HotelSchema : step4AgencySchema,
+    state
+  );
   const backHref = `/account/become/${kind}/${application.id}?step=3`;
 
   // A hotel or venue is a supplier: it's paid out for completed stays/events,
@@ -830,133 +836,125 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
   // mandatory (they're the whole point of this step for a supplier).
   if (kind === "hotel_partner" || kind === "venue_partner") {
     return (
-      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
-        <input type="hidden" name="kind" value={kind} />
-        <input type="hidden" name="applicationId" value={application.id} />
-        <ErrorAlert state={state} />
+      <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} noValidate className="space-y-5">
+        <FieldErrorsProvider value={validation}>
+          <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="applicationId" value={application.id} />
+          <ErrorAlert state={state} />
 
-        <div className="space-y-1.5">
-          <Label>Payout frequency *</Label>
-          <OptionPicker
-            name="payoutFrequency"
-            defaultValue={s(d.payoutFrequency)}
-            options={PAYOUT_FREQUENCIES.map((f) => ({ value: f, label: PAYOUT_FREQUENCY_LABELS[f] }))}
-          />
-        </div>
+          <WizardField name="payoutFrequency" label="Payout frequency" required>
+            <OptionPicker
+              name="payoutFrequency"
+              defaultValue={s(d.payoutFrequency)}
+              options={PAYOUT_FREQUENCIES.map((f) => ({ value: f, label: PAYOUT_FREQUENCY_LABELS[f] }))}
+            />
+          </WizardField>
 
-        <Separator />
-        <p className="text-sm font-semibold">Payout bank account</p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="space-y-1.5">
-            <Label>Bank name *</Label>
-            <IconInput icon={Landmark} name="bankName" defaultValue={s(d.bankName)} required />
+          <Separator />
+          <p className="text-sm font-semibold">Payout bank account</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <WizardField name="bankName" label="Bank name" required>
+              <IconInput icon={Landmark} name="bankName" defaultValue={s(d.bankName)} required />
+            </WizardField>
+            <WizardField name="bankAccountName" label="Account name" required>
+              <IconInput icon={User} name="bankAccountName" defaultValue={s(d.bankAccountName)} required />
+            </WizardField>
+            <WizardField name="bankAccountNumber" label="Account number" required>
+              <IconInput icon={Hash} name="bankAccountNumber" defaultValue={s(d.bankAccountNumber)} required />
+            </WizardField>
           </div>
-          <div className="space-y-1.5">
-            <Label>Account name *</Label>
-            <IconInput icon={User} name="bankAccountName" defaultValue={s(d.bankAccountName)} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Account number *</Label>
-            <IconInput icon={Hash} name="bankAccountNumber" defaultValue={s(d.bankAccountNumber)} required />
-          </div>
-        </div>
 
-        <StepNav backHref={backHref} saving={pending} saved={saved} />
+          <StepNav backHref={backHref} saving={pending} saved={saved} />
+        </FieldErrorsProvider>
       </form>
     );
   }
 
   return (
-    <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} className="space-y-5">
-      <input type="hidden" name="kind" value={kind} />
-      <input type="hidden" name="applicationId" value={application.id} />
-      <ErrorAlert state={state} />
+    <form ref={formRef} action={formAction} onChange={autosave} onClick={autosave} noValidate className="space-y-5">
+      <FieldErrorsProvider value={validation}>
+        <input type="hidden" name="kind" value={kind} />
+        <input type="hidden" name="applicationId" value={application.id} />
+        <ErrorAlert state={state} />
 
-      <div className="space-y-1.5">
-        <Label>Preferred payment model *</Label>
-        <OptionPicker
-          name="paymentModel"
-          defaultValue={paymentModel}
-          onChange={setPaymentModel}
-          layout="cards"
-          options={[
-            { value: "prepaid_wallet", label: "Prepaid wallet top-up", icon: Wallet },
-            { value: "credit_line", label: "Request a credit line", icon: Landmark },
-          ]}
-        />
-      </div>
+        <WizardField name="paymentModel" label="Preferred payment model" required>
+          <OptionPicker
+            name="paymentModel"
+            defaultValue={paymentModel}
+            onChange={setPaymentModel}
+            layout="cards"
+            options={[
+              { value: "prepaid_wallet", label: "Prepaid wallet top-up", icon: Wallet },
+              { value: "credit_line", label: "Request a credit line", icon: Landmark },
+            ]}
+          />
+        </WizardField>
 
-      {paymentModel === "credit_line" ? (
-        <div className="space-y-1.5">
-          <Label>Estimated monthly volume (to help size your limit)</Label>
-          <Input name="estimatedMonthlyVolume" defaultValue={s(d.estimatedMonthlyVolume)} placeholder="e.g. USD 5,000" />
-        </div>
-      ) : null}
-
-      <Separator />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="requestedMarkupPreset">Your markup on STS net prices *</Label>
-          <select
-            id="requestedMarkupPreset"
-            name="requestedMarkupPreset"
-            value={markupPreset}
-            onChange={(e) => setMarkupPreset(e.target.value)}
-            required
-            className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-            <option value="" disabled>
-              Select
-            </option>
-            {MARKUP_PRESETS.map((p) => (
-              <option key={p} value={String(p)}>
-                {p}%
-              </option>
-            ))}
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        {markupPreset === "custom" ? (
-          <div className="space-y-1.5">
-            <Label htmlFor="requestedMarkupCustom">Custom markup (%) *</Label>
-            <Input
-              id="requestedMarkupCustom"
-              name="requestedMarkupCustom"
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              defaultValue={savedMarkup !== null && !savedMarkupIsPreset ? String(savedMarkup) : ""}
-              required
-            />
-          </div>
+        {paymentModel === "credit_line" ? (
+          <WizardField name="estimatedMonthlyVolume" label="Estimated monthly volume (to help size your limit)">
+            <Input name="estimatedMonthlyVolume" defaultValue={s(d.estimatedMonthlyVolume)} placeholder="e.g. USD 5,000" />
+          </WizardField>
         ) : null}
-      </div>
 
-      <Separator />
-      <p className="text-sm font-semibold">Bank account</p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="space-y-1.5">
-          <Label>Bank name</Label>
-          <IconInput icon={Landmark} name="bankName" defaultValue={s(d.bankName)} />
+        <Separator />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <WizardField name="requestedMarkupPreset" label="Your markup on STS net prices" required htmlFor="requestedMarkupPreset">
+            <select
+              id="requestedMarkupPreset"
+              name="requestedMarkupPreset"
+              value={markupPreset}
+              onChange={(e) => setMarkupPreset(e.target.value)}
+              required
+              className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <option value="" disabled>
+                Select
+              </option>
+              {MARKUP_PRESETS.map((p) => (
+                <option key={p} value={String(p)}>
+                  {p}%
+                </option>
+              ))}
+              <option value="custom">Custom</option>
+            </select>
+          </WizardField>
+          {markupPreset === "custom" ? (
+            <WizardField name="requestedMarkupCustom" label="Custom markup (%)" required htmlFor="requestedMarkupCustom">
+              <Input
+                id="requestedMarkupCustom"
+                name="requestedMarkupCustom"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                defaultValue={savedMarkup !== null && !savedMarkupIsPreset ? String(savedMarkup) : ""}
+                required
+              />
+            </WizardField>
+          ) : null}
         </div>
-        <div className="space-y-1.5">
-          <Label>Account name</Label>
-          <IconInput icon={User} name="bankAccountName" defaultValue={s(d.bankAccountName)} />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Account number</Label>
-          <IconInput icon={Hash} name="bankAccountNumber" defaultValue={s(d.bankAccountNumber)} />
-        </div>
-      </div>
 
-      <Separator />
-      <div className="space-y-1.5">
-        <Label>Remarks</Label>
-        <Textarea name="remarks" rows={3} defaultValue={s(d.remarks)} />
-      </div>
+        <Separator />
+        <p className="text-sm font-semibold">Bank account</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <WizardField name="bankName" label="Bank name">
+            <IconInput icon={Landmark} name="bankName" defaultValue={s(d.bankName)} />
+          </WizardField>
+          <WizardField name="bankAccountName" label="Account name">
+            <IconInput icon={User} name="bankAccountName" defaultValue={s(d.bankAccountName)} />
+          </WizardField>
+          <WizardField name="bankAccountNumber" label="Account number">
+            <IconInput icon={Hash} name="bankAccountNumber" defaultValue={s(d.bankAccountNumber)} />
+          </WizardField>
+        </div>
 
-      <StepNav backHref={backHref} saving={pending} saved={saved} />
+        <Separator />
+        <WizardField name="remarks" label="Remarks">
+          <Textarea name="remarks" rows={3} defaultValue={s(d.remarks)} />
+        </WizardField>
+
+        <StepNav backHref={backHref} saving={pending} saved={saved} />
+      </FieldErrorsProvider>
     </form>
   );
 }
