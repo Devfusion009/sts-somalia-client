@@ -8,12 +8,12 @@ import {
   STAR_RATING_LABELS,
   AMENITY_LABELS,
   CANCELLATION_POLICY_LABELS,
+  ORG_MEMBER_TYPE_LABELS,
   PAYOUT_FREQUENCY_LABELS,
 } from "@/modules/partner-applications/config";
 import type { ApplicationType } from "@/modules/admin/queries";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
 export type Details = Record<string, unknown>;
 
@@ -87,9 +87,55 @@ export function DocFileIcon({ fileName }: { fileName: string }) {
 }
 
 /**
+ * One section of an application record: a tinted header band carrying the
+ * wizard step number and the step's own name, so the admin reads the page in
+ * the order the applicant filled it in.
+ */
+export function DetailSection({
+  id,
+  step,
+  title,
+  meta,
+  elevated,
+  children,
+}: {
+  id?: string;
+  step?: number;
+  title: string;
+  meta?: React.ReactNode;
+  elevated?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card id={id} className={cn("scroll-mt-32 gap-0 overflow-hidden py-0", elevated && "shadow-sm")}>
+      <div className="flex items-center gap-3 border-b border-primary/15 bg-primary/[0.06] px-5 py-3 sm:px-6">
+        {step ? (
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground tabular-nums">
+            {step}
+          </span>
+        ) : null}
+        <h2 className="min-w-0 truncate font-heading text-base font-semibold tracking-tight text-foreground">{title}</h2>
+        {meta ? <div className="ml-auto flex shrink-0 items-center gap-2">{meta}</div> : null}
+      </div>
+      <div className="space-y-6 px-5 py-5 sm:px-6">{children}</div>
+    </Card>
+  );
+}
+
+/** A labelled group inside a section, e.g. "Office" within Business details. */
+export function DetailGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3">
+      <h3 className="text-[11px] font-semibold tracking-[0.08em] text-primary uppercase">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+/**
  * `compact` drops to two columns, for grids rendered inside a half-width card.
  *
- * Sentence-case labels over values. An unfilled field renders its "—" at reduced weight instead of
+ * Small uppercase labels over values. An unfilled field renders its "—" at reduced weight instead of
  * the same bold black as real data: at a glance, a page half full of bold
  * em-dashes reads as broken, not as "nothing here yet."
  */
@@ -100,8 +146,15 @@ export function DetailGrid({ rows, compact }: { rows: Array<[string, string]>; c
     <dl className={cn("grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2", !compact && "lg:grid-cols-3")}>
       {visible.map(([label, value]) => (
         <ReviewableAnswer key={label} label={label} value={value} className="min-w-0">
-          <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-          <dd className={cn("mt-0.5 text-sm break-words", value === "—" ? "text-muted-foreground/50" : "font-medium text-foreground")}>{value}</dd>
+          <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
+          <dd
+            className={cn(
+              "mt-1 text-[15px] leading-snug break-words",
+              value === "—" ? "text-muted-foreground/50" : "font-medium text-foreground"
+            )}
+          >
+            {value}
+          </dd>
         </ReviewableAnswer>
       ))}
     </dl>
@@ -153,7 +206,7 @@ export function RoomTypesList({ roomTypes }: { roomTypes: unknown }) {
 export function FullWidthField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <ReviewableAnswer label={label} className="sm:col-span-2 lg:col-span-3">
-      <p className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
       {children}
     </ReviewableAnswer>
   );
@@ -176,7 +229,7 @@ function BusinessIdentityFields(d: Details): Array<[string, string]> {
   ];
 }
 
-/** Unprefixed — these render inside a card already titled "Authorized Contact". */
+/** Unprefixed — these render inside a section already titled "Authorized contact". */
 function ContactFields(d: Details): Array<[string, string]> {
   return [
     ["Name", s(d.contactFullName)],
@@ -192,6 +245,7 @@ function AddressFields(d: Details): Array<[string, string]> {
     ["Office street", s(d.officeStreet)],
     ["Office city", s(d.officeCity)],
     ["Office region", s(d.officeRegion)],
+    ["Country", s(d.officeCountry)],
     ["Business phone", s(d.businessPhone)],
     ["Business email", s(d.businessEmail)],
     ["Website", s(d.website)],
@@ -204,27 +258,47 @@ function SettlementFields(kind: ApplicationType, d: Details): Array<[string, str
       ["Payment model", d.paymentModel === "credit_line" ? "Credit line" : d.paymentModel ? "Prepaid wallet" : "—"],
       ["Requested markup", d.requestedMarkupPercent == null || d.requestedMarkupPercent === "" ? "—" : `${d.requestedMarkupPercent}%`],
       ["Estimated monthly volume", s(d.estimatedMonthlyVolume)],
-      ["Bank name", s(d.bankName)],
-      ["Account name", s(d.bankAccountName)],
-      ["Account number", s(d.bankAccountNumber)],
     ];
   }
+  return [["Payout frequency", d.payoutFrequency ? (PAYOUT_FREQUENCY_LABELS[String(d.payoutFrequency)] ?? titleCase(d.payoutFrequency)) : "—"]];
+}
+
+function BankFields(d: Details): Array<[string, string]> {
   return [
-    ["Payout frequency", d.payoutFrequency ? (PAYOUT_FREQUENCY_LABELS[String(d.payoutFrequency)] ?? titleCase(d.payoutFrequency)) : "—"],
     ["Bank name", s(d.bankName)],
     ["Account name", s(d.bankAccountName)],
     ["Account number", s(d.bankAccountNumber)],
   ];
 }
 
+function orgMembership(d: Details): string {
+  if (d.isOrgMember !== "yes") return d.isOrgMember === "no" ? "No" : "—";
+  const type = d.orgMemberType ? (ORG_MEMBER_TYPE_LABELS as Record<string, string>)[String(d.orgMemberType)] ?? titleCase(d.orgMemberType) : "Yes";
+  return type;
+}
+
 type Branch = { name?: string; location?: string };
 
+/** Section anchors, in wizard order, for the page's jump links. */
+export function detailSectionLinks(kind: ApplicationType): Array<{ id: string; label: string }> {
+  if (kind === "affiliate") {
+    return [
+      { id: "about", label: "About you" },
+      { id: "audience", label: "Audience & reach" },
+    ];
+  }
+  return [
+    { id: "business", label: "Business" },
+    { id: "contact", label: "Contact" },
+    { id: "operations", label: kind === "hotel_partner" ? "Property" : kind === "venue_partner" ? "Venue" : "Operations" },
+    { id: "settlement", label: "Settlement" },
+  ];
+}
+
 /**
- * One card per step the applicant actually filled in, in the same order the
- * wizard asked for them. Previously all of this was a single "Business
- * Details" card with six Separator-delimited blocks, which buried the
- * authorized contact in the middle of the business record — an admin
- * comparing this page against the wizard couldn't line the two up.
+ * One section per wizard step, numbered and named as the applicant saw them:
+ * Business details, Authorized contact, Operations (or Property / Venue
+ * details) and Settlement. Documents (step 5) is rendered by the page.
  */
 export function BusinessDetailsCard({
   kind,
@@ -233,25 +307,19 @@ export function BusinessDetailsCard({
 }: {
   kind: ApplicationType;
   details: Details;
-  /** Soft shadow instead of the plain flat card — opt-in for the customer-facing
-   * view page, which wants more visual weight than the admin console's
-   * intentionally flat treatment. Undefined everywhere else keeps every
-   * existing admin usage pixel-identical. */
+  /** Soft shadow for the customer-facing view page; the admin console stays flat. */
   elevated?: boolean;
 }) {
   const d = details;
   const branches = Array.isArray(d.branches) ? (d.branches as Branch[]).filter((b) => b?.name || b?.location) : [];
-  const cardClass = elevated ? "shadow-sm" : undefined;
 
   return (
     <>
-      <Card className={cardClass}>
-        <CardHeader>
-          <SectionTitle>Business</SectionTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <DetailSection id="business" step={1} title="Business details" elevated={elevated}>
+        <DetailGroup title="Company">
           <DetailGrid rows={BusinessIdentityFields(d)} />
-          <Separator />
+        </DetailGroup>
+        <DetailGroup title="Office">
           <DetailGrid rows={AddressFields(d)} />
           {branches.length > 0 ? (
             <FullWidthField label="Branch offices">
@@ -265,97 +333,87 @@ export function BusinessDetailsCard({
               </ul>
             </FullWidthField>
           ) : null}
-          {kind === "agency" ? (
-            <>
-              <Separator />
-              <DetailGrid
-                rows={[
-                  ["Years of experience", s(d.yearsExperience)],
-                  ["Staff count", s(d.staffCount)],
-                  ["Monthly volume", s(d.monthlyVolume)],
-                  ["IATA number", s(d.iataNumber)],
-                ]}
-              />
-              <FullWidthField label="Products">
-                <PillList items={Array.isArray(d.products) ? (d.products as string[]).map(titleCase) : []} />
-              </FullWidthField>
-            </>
-          ) : null}
-        </CardContent>
-      </Card>
+        </DetailGroup>
+      </DetailSection>
+
+      <DetailSection id="contact" step={2} title="Authorized contact" elevated={elevated}>
+        <DetailGrid rows={ContactFields(d)} />
+      </DetailSection>
+
+      {kind === "agency" ? (
+        <DetailSection id="operations" step={3} title="Operations" elevated={elevated}>
+          <DetailGrid
+            rows={[
+              ["Years of experience", s(d.yearsExperience)],
+              ["Staff count", s(d.staffCount)],
+              ["Monthly volume", s(d.monthlyVolume)],
+              ["Trade association", orgMembership(d)],
+              ["Membership number", s(d.iataNumber)],
+            ]}
+          />
+          <FullWidthField label="Products">
+            <PillList items={Array.isArray(d.products) ? (d.products as string[]).map(titleCase) : []} />
+          </FullWidthField>
+        </DetailSection>
+      ) : null}
 
       {kind === "hotel_partner" ? (
-        <Card className={cardClass}>
-          <CardHeader>
-            <SectionTitle>Property</SectionTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <DetailGrid
-              rows={[
-                ["Property name", s(d.propertyName)],
-                ["Property type", d.propertyType ? (PROPERTY_TYPE_LABELS[String(d.propertyType)] ?? titleCase(d.propertyType)) : "—"],
-                ["Star rating", d.starRating ? `★ ${STAR_RATING_LABELS[String(d.starRating)] ?? d.starRating}` : "—"],
-                ["Location", s(d.location)],
-                ["Property street", s(d.propertyStreet)],
-                ["Total rooms", s(d.totalRooms)],
-                ["Check-in time", s(d.checkInTime)],
-                ["Check-out time", s(d.checkOutTime)],
-                [
-                  "Cancellation Policy",
-                  d.cancellationPolicy ? (CANCELLATION_POLICY_LABELS[String(d.cancellationPolicy)]?.label ?? titleCase(d.cancellationPolicy)) : "—",
-                ],
-              ]}
-            />
-            <FullWidthField label="Room types">
-              <RoomTypesList roomTypes={d.roomTypes} />
-            </FullWidthField>
-            <FullWidthField label="Amenities">
-              <PillList items={Array.isArray(d.amenities) ? (d.amenities as string[]).map((a) => AMENITY_LABELS[a] ?? titleCase(a)) : []} />
-            </FullWidthField>
-          </CardContent>
-        </Card>
+        <DetailSection id="operations" step={3} title="Property details" elevated={elevated}>
+          <DetailGrid
+            rows={[
+              ["Property name", s(d.propertyName)],
+              ["Property type", d.propertyType ? (PROPERTY_TYPE_LABELS[String(d.propertyType)] ?? titleCase(d.propertyType)) : "—"],
+              ["Star rating", d.starRating ? `★ ${STAR_RATING_LABELS[String(d.starRating)] ?? d.starRating}` : "—"],
+              ["Location", s(d.location)],
+              ["Property street", s(d.propertyStreet)],
+              ["Total rooms", s(d.totalRooms)],
+              ["Check-in time", s(d.checkInTime)],
+              ["Check-out time", s(d.checkOutTime)],
+              [
+                "Cancellation policy",
+                d.cancellationPolicy ? (CANCELLATION_POLICY_LABELS[String(d.cancellationPolicy)]?.label ?? titleCase(d.cancellationPolicy)) : "—",
+              ],
+            ]}
+          />
+          <FullWidthField label="Room types">
+            <RoomTypesList roomTypes={d.roomTypes} />
+          </FullWidthField>
+          <FullWidthField label="Amenities">
+            <PillList items={Array.isArray(d.amenities) ? (d.amenities as string[]).map((a) => AMENITY_LABELS[a] ?? titleCase(a)) : []} />
+          </FullWidthField>
+        </DetailSection>
       ) : null}
 
       {kind === "venue_partner" ? (
-        <Card className={cardClass}>
-          <CardHeader>
-            <SectionTitle>Venue</SectionTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <DetailGrid
-              rows={[
-                ["Venue name", s(d.venueName)],
-                ["Location", s(d.location)],
-                ["Seated capacity", s(d.seatedCapacity)],
-                ["Standing capacity", s(d.standingCapacity)],
-                ["Indicative price", d.indicativePrice ? `USD ${d.indicativePrice}` : "—"],
-              ]}
-            />
-            <FullWidthField label="Event types">
-              <PillList items={Array.isArray(d.eventTypes) ? (d.eventTypes as string[]).map(titleCase) : []} />
-            </FullWidthField>
-          </CardContent>
-        </Card>
+        <DetailSection id="operations" step={3} title="Venue details" elevated={elevated}>
+          <DetailGrid
+            rows={[
+              ["Venue name", s(d.venueName)],
+              ["Location", s(d.location)],
+              ["Seated capacity", s(d.seatedCapacity)],
+              ["Standing capacity", s(d.standingCapacity)],
+              ["Indicative price", d.indicativePrice ? `USD ${d.indicativePrice}` : "—"],
+            ]}
+          />
+          <FullWidthField label="Event types">
+            <PillList items={Array.isArray(d.eventTypes) ? (d.eventTypes as string[]).map(titleCase) : []} />
+          </FullWidthField>
+        </DetailSection>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className={cardClass}>
-          <CardHeader>
-            <SectionTitle>Authorized contact</SectionTitle>
-          </CardHeader>
-          <CardContent>
-            <DetailGrid rows={ContactFields(d)} compact />
-          </CardContent>
-        </Card>
-        <Card className={cardClass}>
-          <CardHeader>
-            <SectionTitle>Settlement</SectionTitle>
-          </CardHeader>
-          <CardContent>
-            <DetailGrid rows={SettlementFields(kind, d)} compact />
-          </CardContent>
-        </Card>
-      </div>
+      <DetailSection id="settlement" step={4} title="Settlement" elevated={elevated}>
+        <DetailGroup title={kind === "agency" ? "Payment" : "Payout"}>
+          <DetailGrid rows={SettlementFields(kind, d)} />
+        </DetailGroup>
+        <DetailGroup title="Bank account">
+          <DetailGrid rows={BankFields(d)} />
+        </DetailGroup>
+        {kind === "agency" && d.remarks ? (
+          <FullWidthField label="Remarks">
+            <p className="text-sm break-words whitespace-pre-wrap">{String(d.remarks)}</p>
+          </FullWidthField>
+        ) : null}
+      </DetailSection>
     </>
   );
 }
@@ -371,53 +429,42 @@ function formatHandles(handles: unknown): string {
 
 /**
  * Affiliate's business_details shape has nothing in common with the other
- * three kinds (see partner-applications/actions.ts step1AffiliateSchema
+ * three kinds (see partner-applications/schemas.ts step1AffiliateSchema
  * etc.) — kept as its own grouped rendering, mirroring the applicant's own
  * review (About you, with ID; Audience & reach).
  */
 export function AffiliateDetailCards({ details, elevated }: { details: Details; elevated?: boolean }) {
   const d = details;
-  const cardClass = elevated ? "shadow-sm" : undefined;
   return (
     <>
-      <Card className={cardClass}>
-        <CardHeader>
-          <SectionTitle>About you</SectionTitle>
-        </CardHeader>
-        <CardContent>
-          <DetailGrid
-            rows={[
-              ["Full name", s(d.fullName)],
-              ["City", s(d.city)],
-              ["Audience location", d.audienceLocation ? ((AUDIENCE_LOCATION_LABELS as Record<string, string>)[String(d.audienceLocation)] ?? String(d.audienceLocation)) : "—"],
-              ["Mobile", s(d.mobile)],
-              ["Email", s(d.email)],
-              ["ID number", s(d.idNumber)],
-            ]}
-          />
-        </CardContent>
-      </Card>
+      <DetailSection id="about" step={1} title="About you" elevated={elevated}>
+        <DetailGrid
+          rows={[
+            ["Full name", s(d.fullName)],
+            ["City", s(d.city)],
+            ["Audience location", d.audienceLocation ? ((AUDIENCE_LOCATION_LABELS as Record<string, string>)[String(d.audienceLocation)] ?? String(d.audienceLocation)) : "—"],
+            ["Mobile", s(d.mobile)],
+            ["Email", s(d.email)],
+            ["ID number", s(d.idNumber)],
+          ]}
+        />
+      </DetailSection>
 
-      <Card className={cardClass}>
-        <CardHeader>
-          <SectionTitle>Audience &amp; reach</SectionTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <DetailGrid
-            rows={[
-              ["Website / social handles", formatHandles(d.handles) || "—"],
-              ["Audience size", s(d.audienceSize)],
-              ["Traffic source", d.trafficSource ? humanizeKey(String(d.trafficSource)) : "—"],
-            ]}
-          />
-          <ReviewableAnswer label="Promotion plan" value={s(d.promotionPlan)}>
-            <span className="text-xs font-medium text-muted-foreground">Promotion plan</span>
-            <p className={cn("mt-0.5 text-sm break-words", s(d.promotionPlan) === "—" ? "text-muted-foreground/50" : "font-medium text-foreground")}>
-              {s(d.promotionPlan)}
-            </p>
-          </ReviewableAnswer>
-        </CardContent>
-      </Card>
+      <DetailSection id="audience" step={2} title="Audience & reach" elevated={elevated}>
+        <DetailGrid
+          rows={[
+            ["Website / social handles", formatHandles(d.handles) || "—"],
+            ["Audience size", s(d.audienceSize)],
+            ["Traffic source", d.trafficSource ? humanizeKey(String(d.trafficSource)) : "—"],
+          ]}
+        />
+        <ReviewableAnswer label="Promotion plan" value={s(d.promotionPlan)}>
+          <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Promotion plan</span>
+          <p className={cn("mt-1 text-[15px] break-words", s(d.promotionPlan) === "—" ? "text-muted-foreground/50" : "font-medium text-foreground")}>
+            {s(d.promotionPlan)}
+          </p>
+        </ReviewableAnswer>
+      </DetailSection>
     </>
   );
 }

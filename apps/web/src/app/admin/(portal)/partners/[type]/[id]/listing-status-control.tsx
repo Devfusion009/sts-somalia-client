@@ -14,8 +14,7 @@ const STATUS_OPTIONS = [
  * Admin-only status control for a partner-submitted hotel or room —
  * publishing (making it real, bookable-by-customers inventory) is
  * deliberately not something the partner form can do; this is the only
- * place that transition happens. Same auto-submit-on-change pattern as
- * ReviewerPicker elsewhere in this console.
+ * place that transition happens. Submits as soon as the value changes.
  */
 export function ListingStatusControl({
   kind,
