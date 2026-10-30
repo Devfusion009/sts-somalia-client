@@ -361,7 +361,7 @@ export async function requestMoreInfo(
   const info = await loadApplicantInfo(supabase, type, parsed.data.applicationId);
 
   const { data: userData } = await supabase.auth.getUser();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from(TABLE[type])
     .update({
       status: "more_info_requested",
@@ -369,8 +369,12 @@ export async function requestMoreInfo(
       reviewed_by: userData.user?.id,
       reviewed_at: new Date().toISOString(),
     })
-    .eq("id", parsed.data.applicationId);
+    .eq("id", parsed.data.applicationId)
+    .in("status", ["pending", "under_review", "more_info_requested"])
+    .select("id")
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!updated) return { error: "Application is no longer available for review." };
 
   let emailSent = false;
   if (info) {
@@ -393,6 +397,10 @@ export async function requestMoreInfo(
   }
 
   revalidatePath("/admin/applications");
+  const slug = type.replace("_", "-");
+  revalidatePath(`/admin/applications/${slug}/${parsed.data.applicationId}`);
+  revalidatePath(`/account/become/${slug}/${parsed.data.applicationId}`);
+  revalidatePath("/account/become");
   return { error: null, emailSent };
 }
 

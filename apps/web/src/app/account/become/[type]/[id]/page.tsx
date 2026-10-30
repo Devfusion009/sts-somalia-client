@@ -134,7 +134,7 @@ export default async function PartnerApplicationWizardPage({
         <Alert variant="destructive" className="mb-6">
           <AlertTriangle />
           <AlertTitle>Message from STS</AlertTitle>
-          <AlertDescription>{application.review_notes}</AlertDescription>
+          <AlertDescription className="whitespace-pre-wrap">{application.review_notes}</AlertDescription>
         </Alert>
       ) : null}
 

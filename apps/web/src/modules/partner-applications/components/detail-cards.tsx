@@ -1,3 +1,4 @@
+import { ReviewableAnswer } from "./answer-review";
 import { FileText, FileImage, File as FileIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { humanizeKey } from "@/lib/format-detail";
@@ -94,14 +95,14 @@ export function DocFileIcon({ fileName }: { fileName: string }) {
  */
 export function DetailGrid({ rows, compact }: { rows: Array<[string, string]>; compact?: boolean }) {
   const visible = rows.filter(([, v]) => v !== "");
-  if (visible.length === 0) return <p className="text-sm text-muted-foreground">No details</p>;
+  if (visible.length === 0) return <span className="text-sm text-muted-foreground">No details</span>;
   return (
     <dl className={cn("grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2", !compact && "lg:grid-cols-3")}>
       {visible.map(([label, value]) => (
-        <div key={label} className="min-w-0">
+        <ReviewableAnswer key={label} label={label} value={value} className="min-w-0">
           <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
           <dd className={cn("mt-0.5 text-sm break-words", value === "—" ? "text-muted-foreground/50" : "font-medium text-foreground")}>{value}</dd>
-        </div>
+        </ReviewableAnswer>
       ))}
     </dl>
   );
@@ -151,10 +152,10 @@ export function RoomTypesList({ roomTypes }: { roomTypes: unknown }) {
 
 export function FullWidthField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="sm:col-span-2 lg:col-span-3">
+    <ReviewableAnswer label={label} className="sm:col-span-2 lg:col-span-3">
       <p className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</p>
       {children}
-    </div>
+    </ReviewableAnswer>
   );
 }
 
@@ -409,12 +410,12 @@ export function AffiliateDetailCards({ details, elevated }: { details: Details; 
               ["Traffic source", d.trafficSource ? humanizeKey(String(d.trafficSource)) : "—"],
             ]}
           />
-          <div>
-            <p className="text-xs font-medium text-muted-foreground">Promotion plan</p>
+          <ReviewableAnswer label="Promotion plan" value={s(d.promotionPlan)}>
+            <span className="text-xs font-medium text-muted-foreground">Promotion plan</span>
             <p className={cn("mt-0.5 text-sm break-words", s(d.promotionPlan) === "—" ? "text-muted-foreground/50" : "font-medium text-foreground")}>
               {s(d.promotionPlan)}
             </p>
-          </div>
+          </ReviewableAnswer>
         </CardContent>
       </Card>
     </>
