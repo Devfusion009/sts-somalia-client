@@ -454,7 +454,9 @@ export function HeaderSearch() {
   // live `window.scrollY` snapshot would make React's commit-time re-read
   // disagree with render and loop.
   const scrolledPast = useSearchRevealed();
-  const visible = !onHotelDetail && !onVisa && (!isHome || scrolledPast);
+  // Flights has its own route search; this bar submits hotel destinations.
+  const onFlights = pathname === "/flights";
+  const visible = !onHotelDetail && !onVisa && !onFlights && (!isHome || scrolledPast);
 
   return (
     <AnimatePresence initial={false}>

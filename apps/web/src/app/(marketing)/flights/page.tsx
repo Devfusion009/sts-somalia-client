@@ -131,7 +131,7 @@ export default async function FlightsPage({
       {/* Discovery content only when the visitor hasn't searched yet. */}
       {!hasSearch ? (
         <>
-          <FlightDealsRail title="Travel deals under $500" href="/hotels" deals={FLIGHT_DEALS} />
+          <FlightDealsRail title="Where will you fly next?" href="#flight-search" deals={FLIGHT_DEALS} />
           <TravelProsCards />
           <TrendingGrid
             title="Trending cities"

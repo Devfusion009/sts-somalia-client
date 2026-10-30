@@ -8,7 +8,7 @@ export const DESTINATION_PHOTOS: Record<string, string> = {
   AE: "/marketing/dest-visa-ae.jpg",
   TR: "/marketing/dest-visa-tr.jpg",
   SA: "/marketing/dest-visa-sa.jpg",
-  EG: "/marketing/dest-visa-eg.png",
+  EG: "/marketing/dest-cairo.webp",
   ET: "/marketing/dest-visa-et.jpg",
   KE: "/marketing/dest-visa-ke.png",
   MY: "/marketing/dest-visa-my.png",

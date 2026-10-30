@@ -49,8 +49,8 @@ const CABINS = [
   { value: "first", label: "First" },
 ];
 
-/** Bare cell inside the white pill — no borders of its own, just padding. */
-const CELL = "relative min-w-0 px-4 py-3.5";
+/** Each field keeps a visible boundary and a shared focus treatment. */
+const CELL = "relative min-w-0 rounded-xl border border-border bg-background/50 px-4 py-3 transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15 hover:border-primary/40";
 const RESET_INPUT =
   "h-8 w-full border-0 bg-transparent p-0 text-base font-semibold text-foreground sm:text-sm shadow-none outline-none placeholder:font-normal placeholder:text-muted-foreground focus-visible:ring-0 cursor-pointer " +
   // The native calendar-picker icon stays clickable but invisible, stretched
@@ -185,11 +185,7 @@ function resolveDefault(code: string | undefined, airports: Airport[]): Place | 
   return local ? airportToPlace(local) : { code, label: code, country: "" };
 }
 
-/**
- * Single white search pill: trip type sits above it, everything else lives on
- * one row separated by hairlines, with the accent Search button flush to the
- * right end. Still a plain GET form, so results stay shareable via the URL.
- */
+/** GET parameters keep search results shareable. */
 export function FlightSearchForm({
   airports,
   defaults,
@@ -227,34 +223,31 @@ export function FlightSearchForm({
   const cabinLabel = CABINS.find((c) => c.value === cabin)?.label ?? "Economy";
 
   return (
-    <form className="w-full">
+    <form className="w-full p-4 sm:p-6">
       <input type="hidden" name="trip_type" value={tripType} />
       <input type="hidden" name="adults" value={adults} />
       <input type="hidden" name="cabin" value={cabin} />
 
-      {/* One white card: trip type on top, fields below — a single surface
-          rather than a dropdown floating on the dark canvas plus a
-          separate pill. */}
-      <div className="overflow-hidden rounded-2xl bg-card shadow-2xl shadow-black/30 ring-1 ring-black/[0.04]">
+      <div>
         <RadioGroup
           value={tripType}
           onValueChange={(v) => setTripType(v === "one_way" ? "one_way" : "round_trip")}
           aria-label="Trip type"
-          className="flex w-auto items-center gap-6 border-b border-border px-5 py-3"
+          className="mb-5 flex w-auto items-center gap-1"
         >
-          <label className="flex min-h-8 cursor-pointer items-center gap-2 text-sm font-semibold text-foreground">
+          <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-full px-3 text-sm font-medium text-foreground has-data-checked:bg-primary/8 has-data-checked:text-primary">
             <RadioGroupItem value="one_way" />
             One way
           </label>
-          <label className="flex min-h-8 cursor-pointer items-center gap-2 text-sm font-semibold text-foreground">
+          <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-full px-3 text-sm font-medium text-foreground has-data-checked:bg-primary/8 has-data-checked:text-primary">
             <RadioGroupItem value="round_trip" />
             Return
           </label>
         </RadioGroup>
 
-        <div className="flex flex-col lg:flex-row lg:items-stretch">
-        <div className={cn(CELL, "lg:flex-1 lg:pl-5")}>
-          <label htmlFor="origin" className="mb-0.5 block text-xs font-medium text-muted-foreground">
+        <div className="relative grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        <div className={cn(CELL, "sm:pr-7")}>
+          <label htmlFor="origin" className="mb-1.5 block text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             From
           </label>
           <AirportPicker
@@ -268,8 +261,7 @@ export function FlightSearchForm({
         </div>
 
         {/* Swap straddles the divider between From and To */}
-        <div className="relative flex items-center justify-center lg:w-0">
-          <span className="hidden h-11 w-px bg-border lg:block" aria-hidden />
+        <div className="absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
           <button
             type="button"
             onClick={() => {
@@ -277,14 +269,14 @@ export function FlightSearchForm({
               setDestination(origin);
             }}
             aria-label="Swap departure and destination"
-            className="z-10 grid size-9 place-items-center rounded-full border border-border bg-card text-primary transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none lg:absolute"
+            className="z-10 grid size-9 rotate-90 place-items-center rounded-full border border-border bg-card text-primary transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:rotate-0"
           >
             <SwapHorizIcon sx={{ fontSize: 18 }} aria-hidden />
           </button>
         </div>
 
-        <div className={cn(CELL, "lg:flex-1 lg:pl-6")}>
-          <label htmlFor="destination" className="mb-0.5 block text-xs font-medium text-muted-foreground">
+        <div className={cn(CELL, "sm:col-start-2 sm:pl-7")}>
+          <label htmlFor="destination" className="mb-1.5 block text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             To
           </label>
           <AirportPicker
@@ -299,9 +291,9 @@ export function FlightSearchForm({
 
         </div>
 
-        <div className="grid grid-cols-2 border-t border-border lg:grid-cols-[1fr_1fr_1.25fr_auto]">
-        <div className={cn(CELL, "lg:pl-5")}>
-          <label htmlFor="depart_date" className="mb-0.5 block text-xs font-medium text-muted-foreground">
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-[1fr_1fr_1.2fr_auto]">
+        <div className={CELL}>
+          <label htmlFor="depart_date" className="mb-1.5 block text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             Departure
           </label>
           <div className="flex items-center gap-1.5">
@@ -320,8 +312,8 @@ export function FlightSearchForm({
           </div>
         </div>
 
-        <div className={cn(CELL, "border-l border-border", !roundTrip && "opacity-40")}>
-          <label htmlFor="return_date" className="mb-0.5 block text-xs font-medium text-muted-foreground">
+        <div className={cn(CELL, !roundTrip && "opacity-40")}>
+          <label htmlFor="return_date" className="mb-1.5 block text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             Return
           </label>
           <div className="flex items-center gap-1.5">
@@ -342,8 +334,8 @@ export function FlightSearchForm({
         {/* Travellers + cabin — one popover, one trigger, so every pixel of
             the cell (icon included) opens the same panel instead of two
             adjacent selects with a dead zone between them. */}
-        <div className={cn(CELL, "col-span-2 border-t border-border lg:col-span-1 lg:border-t-0 lg:border-l")}>
-          <span className="mb-0.5 block text-xs font-medium text-muted-foreground">
+        <div className={cn(CELL, "col-span-2 lg:col-span-1")}>
+          <span className="mb-1.5 block text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             Travellers
           </span>
           <Popover>
@@ -400,13 +392,13 @@ export function FlightSearchForm({
           </Popover>
         </div>
 
-        <div className="col-span-2 p-2 lg:col-span-1 lg:flex lg:items-center lg:p-2">
+        <div className="col-span-2 lg:col-span-1 lg:flex lg:items-stretch">
           <button
             type="submit"
-            className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-brand-accent px-8 font-heading text-base font-bold text-brand-accent-foreground shadow-md shadow-brand-accent/30 transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-accent/90 hover:shadow-lg hover:shadow-brand-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none lg:h-[3.25rem] lg:min-w-44"
+            className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-brand-accent px-8 font-heading text-base font-bold text-brand-accent-foreground shadow-md shadow-brand-accent/30 transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-accent/90 hover:shadow-lg hover:shadow-brand-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none lg:h-full lg:min-w-44"
           >
             <SearchIcon sx={{ fontSize: 20 }} aria-hidden />
-            Search
+            Search flights
           </button>
         </div>
         </div>

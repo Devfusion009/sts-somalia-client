@@ -695,11 +695,24 @@ export async function getUpcomingHallBookings(limit = 5) {
  * types can't describe an aggregate embed, and an account belongs to a handful
  * of organisations at most.
  */
-export type UserListFilters = { page: number; q?: string };
+export const USER_ROLE_FILTERS = ["admin", "agent", "customer", "hotel_partner", "hotel_manager", "venue_manager", "venue_partner", "affiliate"] as const;
+export type UserRoleFilter = (typeof USER_ROLE_FILTERS)[number];
+
+export type UserListFilters = { page: number; q?: string; role?: UserRoleFilter };
 
 /** One page of the users table, newest first, with membership counts as aggregates. */
-export async function getUsersPage({ page, q }: UserListFilters) {
+export async function getUsersPage({ page, q, role }: UserListFilters) {
   const supabase = await createClient();
+
+  // Agency and hotel-partner access comes from membership rows, which `role`
+  // can fall out of step with, so those filters match either signal.
+  const memberIds = async (table: "agency_members" | "hotel_partner_members") => {
+    const { data } = await supabase.from(table).select("profile_id").limit(1000);
+    return [...new Set((data ?? []).map((m) => m.profile_id))];
+  };
+  const agencyIds = role === "agent" || role === "customer" ? await memberIds("agency_members") : [];
+  const partnerIds = role === "hotel_partner" || role === "customer" ? await memberIds("hotel_partner_members") : [];
+
   let query = supabase
     .from("profiles")
     // One unbroken literal: supabase-js infers embedded-resource types by
@@ -711,6 +724,15 @@ export async function getUsersPage({ page, q }: UserListFilters) {
       { count: "exact" }
     )
     .order("created_at", { ascending: false });
+
+  if (role === "admin") query = query.eq("is_platform_admin", true);
+  else if (role === "agent") query = agencyIds.length ? query.or(`role.eq.agent,id.in.(${agencyIds.join(",")})`) : query.eq("role", "agent");
+  else if (role === "hotel_partner") query = partnerIds.length ? query.or(`role.eq.hotel_partner,id.in.(${partnerIds.join(",")})`) : query.eq("role", "hotel_partner");
+  else if (role === "customer") {
+    query = query.eq("role", "customer").eq("is_platform_admin", false);
+    const members = [...agencyIds, ...partnerIds];
+    if (members.length) query = query.not("id", "in", `(${members.join(",")})`);
+  } else if (role) query = query.eq("role", role);
 
   const term = searchTerm(q);
   if (term) query = query.or(`full_name.ilike.%${term}%,email.ilike.%${term}%`);

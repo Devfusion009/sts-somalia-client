@@ -11,6 +11,7 @@ import {
   Clock,
   Hourglass,
   ListChecks,
+  Globe2,
   Loader2,
   Plane,
   ShieldCheck,
@@ -66,7 +67,6 @@ const METRIC_ICON: Record<VisaMetricKey, LucideIcon> = {
  */
 export function VisaOverview({
   visaName,
-  overview,
   destinationCode,
   nationality,
   metrics,
@@ -79,7 +79,7 @@ export function VisaOverview({
   /** ISO code of the chosen passport, from the URL. */
   nationality: string | null;
   metrics: VisaMetric[];
-  /** Heading id of the requirements section, focused by "See price and requirements". */
+  /** Heading id of the requirements section, focused by "View requirements". */
   requirementsId: string;
   coverImage: string | null;
 }) {
@@ -94,7 +94,7 @@ export function VisaOverview({
   function choosePassport(code: string | null) {
     if (!code || code === passport) return;
     if (code === destinationCode) {
-      setError(`Your passport can't be from ${destinationName}, the country you're applying to visit.`);
+      setError("Choose a passport from another country.");
       return;
     }
     setError(null);
@@ -119,95 +119,57 @@ export function VisaOverview({
   return (
     <section
       aria-labelledby="visa-title"
-      className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm"
+      className="overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-[0_14px_45px_-25px_rgba(7,60,52,0.25)]"
     >
-      {/* Destination banner */}
-      <div className="relative isolate overflow-hidden bg-[linear-gradient(135deg,var(--sidebar)_0%,color-mix(in_oklch,var(--primary),black_35%)_100%)] text-white">
-        {coverImage ? (
-          <Image
-            src={coverImage}
-            alt=""
-            fill
-            priority
-            sizes="(min-width: 1280px) 1216px, 100vw"
-            unoptimized={!coverImage.startsWith("/")}
-            className="-z-10 object-cover"
-          />
-        ) : (
-          <span
-            aria-hidden
-            className="absolute -top-6 -right-4 -z-10 text-[11rem] leading-none opacity-20 select-none"
-          >
-            {countryFlag(destinationCode)}
+      <div className="relative grid overflow-hidden bg-[#073c34] text-white lg:grid-cols-[1.1fr_1fr]">
+        <div className="relative z-10 flex flex-col items-start px-6 py-8 sm:px-9 sm:py-10 lg:p-10">
+          <span className="inline-flex items-center gap-2 text-[10px] font-semibold tracking-[0.2em] text-[#a7d7c9] uppercase">
+            <span className="h-px w-7 bg-[#d4b681]" aria-hidden /> STS visa services
           </span>
-        )}
-        <span aria-hidden className="absolute inset-0 -z-10 bg-linear-to-t from-black/80 via-black/45 to-black/25" />
-
-        <div className="px-5 pt-5 pb-7 sm:px-8 sm:pt-7 sm:pb-9 lg:px-10 lg:pt-9 lg:pb-11">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/15 py-1 pr-3.5 pl-1 ring-1 ring-white/25 backdrop-blur">
-              <button
-                type="button"
-                onClick={focusSelector}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-white/60",
-                  passport ? "bg-white text-neutral-900" : "bg-brand-accent text-brand-accent-foreground hover:bg-brand-accent/90"
-                )}
-              >
-                {passport ? (
-                  <span className="text-base leading-none" aria-hidden>
-                    {countryFlag(passport)}
-                  </span>
-                ) : (
-                  <BookUser className="size-4" aria-hidden />
-                )}
-                {passport ? countryName(passport) : "Choose your passport"}
-              </button>
-              <ArrowRight className="size-3.5 text-white/80" aria-hidden />
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
-                <span className="text-base leading-none" aria-hidden>
-                  {countryFlag(destinationCode)}
-                </span>
-                {destinationName}
-              </span>
-            </div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
-              <ShieldCheck className="size-3.5" aria-hidden /> Licensed Somali travel agency
-            </span>
-          </div>
-
-          <h1
-            id="visa-title"
-            className="mt-14 max-w-3xl font-heading text-3xl leading-[1.1] font-extrabold tracking-tight text-balance drop-shadow sm:mt-20 sm:text-4xl lg:mt-24 lg:text-5xl"
-          >
+          <h1 id="visa-title" className="mt-7 max-w-xl font-heading text-4xl leading-[1.08] font-semibold tracking-[-0.045em] text-balance sm:text-5xl lg:text-[3.4rem]">
             {visaName}
           </h1>
-          {overview ? (
-            <p className="mt-3 max-w-2xl text-base leading-relaxed text-white/85 sm:text-lg">{overview}</p>
-          ) : null}
+          <div className="mt-6 flex flex-wrap items-center gap-3 text-sm">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-white/90">
+              <span aria-hidden>{countryFlag(destinationCode)}</span>{destinationName}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[#badacd]"><ShieldCheck className="size-4" aria-hidden /> ISO-certified company</span>
+          </div>
+          <button type="button" onClick={focusSelector} className="mt-9 inline-flex min-h-11 items-center gap-2 border-b border-[#a7d7c9]/40 text-sm font-medium text-[#c4e6d8] transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
+            <BookUser className="size-4" aria-hidden />
+            {passport ? `${countryName(passport)} passport` : "Select your passport"}
+            <ArrowRight className="ml-2 size-4" aria-hidden />
+          </button>
+        </div>
+        <div className="relative min-h-48 overflow-hidden lg:min-h-80">
+          {coverImage ? <Image src={coverImage} alt={`${destinationName} cityscape`} fill preload sizes="(min-width: 1280px) 580px, (min-width: 1024px) 50vw, 100vw" unoptimized={!coverImage.startsWith("/")} className="object-cover" /> : <div className="absolute inset-0 grid place-items-center bg-[#125547]"><Globe2 className="size-40 text-[#a7d7c9]/30" strokeWidth={0.6} aria-hidden /></div>}
+          <div className="absolute inset-0 bg-linear-to-t from-[#042c25]/75 via-transparent to-transparent" aria-hidden />
+          <div className="absolute inset-x-6 bottom-5 flex items-center justify-between border-t border-white/35 pt-3 text-xs font-medium tracking-wide text-white sm:inset-x-9">
+            <span>{destinationName}</span><span className="font-mono text-white/80">{destinationCode} / STS</span>
+          </div>
         </div>
       </div>
 
-      <div className="p-5 sm:p-8 lg:p-10">
-        <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+      <div className="p-5 sm:p-7 lg:p-8">
+        <dl className="grid grid-cols-2 gap-x-5 gap-y-6 lg:grid-cols-4">
           {metrics.map((metric) => {
             const Icon = METRIC_ICON[metric.key];
             return (
               <div
                 key={metric.key}
-                className="flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-secondary/40 p-3.5 sm:p-4"
+                className="flex min-w-0 flex-col gap-2 border-l-2 border-primary/20 pl-4 sm:flex-row sm:items-center sm:gap-3"
               >
                 <span
-                  className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary sm:size-11"
+                  className="hidden size-10 shrink-0 place-items-center rounded-xl bg-primary/7 text-primary xl:grid"
                   aria-hidden
                 >
                   <Icon className="size-5" />
                 </span>
                 <div className="min-w-0">
-                  <dt className="text-xs font-medium text-muted-foreground sm:text-sm">{metric.label}</dt>
+                  <dt className="text-[11px] font-medium text-muted-foreground">{metric.label}</dt>
                   <dd
                     className={cn(
-                      "font-heading text-base font-bold break-words tabular-nums transition-opacity sm:text-lg",
+                      "mt-1 font-heading text-base font-semibold break-words tabular-nums transition-opacity sm:text-lg",
                       metric.live && pending && "opacity-40"
                     )}
                   >
@@ -220,10 +182,10 @@ export function VisaOverview({
         </dl>
 
         {/* Passport picker, laid out as the route it prices */}
-        <div className="mt-6 rounded-2xl border border-border bg-secondary/30 p-4 sm:p-5">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] lg:items-end">
+        <div className="mt-7 border-t border-border pt-6">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)] lg:items-end">
             <div className="min-w-0 space-y-2">
-              <label htmlFor={SELECTOR_ID} className="flex items-center gap-2 text-sm font-semibold">
+              <label htmlFor={SELECTOR_ID} className="flex items-center gap-2 text-xs font-semibold">
                 Your passport nationality
                 {pending ? (
                   <span role="status" className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
@@ -277,7 +239,7 @@ export function VisaOverview({
             </div>
 
             <div className="min-w-0 space-y-2">
-              <span className="block text-sm font-semibold">Destination</span>
+              <span className="block text-xs font-semibold">Destination</span>
               <span className="flex h-12 items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 font-heading text-base font-bold">
                 <span className="text-xl leading-none" aria-hidden>
                   {countryFlag(destinationCode)}
@@ -286,8 +248,8 @@ export function VisaOverview({
               </span>
             </div>
 
-            <Button type="button" size="lg" className="h-12 gap-2 rounded-xl px-5" onClick={showRequirements}>
-              <ListChecks aria-hidden /> See price and requirements
+            <Button type="button" size="lg" className="h-12 gap-2 rounded-xl px-4 text-sm" onClick={showRequirements}>
+              <ListChecks aria-hidden /> View requirements
             </Button>
           </div>
 

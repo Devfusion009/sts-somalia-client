@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, FileCheck2 } from "lucide-react";
 import { MarketingBreadcrumb } from "@/components/marketing/marketing-breadcrumb";
 import { getVisaTypeById, getResolvedVisaPricing } from "@/modules/visa/queries";
 import { parseDocumentSlots } from "@/modules/visa/schemas";
@@ -29,29 +29,13 @@ export async function generateMetadata({
 }
 
 const HOW_IT_WORKS = [
-  {
-    title: "Fill the application",
-    text: "Complete the guided online form for yourself, your family or a group.",
-  },
-  {
-    title: "Upload documents",
-    text: "Attach clear copies of the required documents as PDF, JPG or PNG.",
-  },
-  {
-    title: "Pay",
-    text: "Card, mobile money or bank transfer.",
-  },
-  {
-    title: "We handle the rest",
-    text: "Our visa desk reviews every document, submits the application and you follow each step in your account.",
-  },
+  { title: "Application details" },
+  { title: "Document upload" },
+  { title: "Payment" },
+  { title: "Review & submission" },
 ];
 
-const ASSURANCES = [
-  "Documents checked before they reach the consulate",
-  "Status tracking in your account",
-  "Family and group applications together",
-];
+const ASSURANCES = ["Document review", "Application tracking", "Family and group applications"];
 
 const CATEGORY_LABEL: Record<string, string> = {
   tourist: "Tourist visa",
@@ -143,14 +127,14 @@ export default async function VisaDetailPage({
         ]}
       />
 
-      <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-12">
+      <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_350px] lg:gap-8 xl:gap-12">
         <div className="min-w-0 space-y-12">
           <section aria-labelledby={REQUIREMENTS_ID}>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-primary/8 text-primary"><FileCheck2 className="size-4.5" aria-hidden /></span>
               <h2
                 id={REQUIREMENTS_ID}
                 tabIndex={-1}
-                className="scroll-mt-28 font-heading text-2xl font-bold tracking-tight outline-none sm:text-[1.75rem]"
+                className="scroll-mt-28 font-heading text-2xl font-semibold tracking-tight outline-none sm:text-[1.75rem]"
               >
                 Required documents
               </h2>
@@ -159,28 +143,28 @@ export default async function VisaDetailPage({
               ) : null}
             </div>
             {slots.length === 0 ? (
-              <p className="mt-4 text-sm text-muted-foreground">Confirmed by our visa desk after you apply.</p>
+              <p className="mt-4 rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">Document checklist pending.</p>
             ) : (
-              <ul className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {slots.map((slot) => (
                   <li
                     key={slot.key}
-                    className="flex gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs transition-shadow hover:shadow-md"
+                    className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-shadow hover:shadow-md"
                   >
-                    <div className="relative h-28 w-36 shrink-0 overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklch,var(--primary),white_82%),color-mix(in_oklch,var(--primary),white_92%)_55%,color-mix(in_oklch,var(--brand-gold),white_85%))] ring-1 ring-primary/15 max-sm:h-24 max-sm:w-28">
-                      <DocumentArt label={slot.label} />
+                    <div className="relative flex h-36 items-center justify-center border-b border-border/70 bg-[#edf3ef] bg-[linear-gradient(45deg,transparent_49.5%,#dce7df_50%,transparent_50.5%)] bg-[size:24px_24px]">
+                      <DocumentArt label={slot.label} className="max-w-48 p-3 transition-transform duration-300 motion-safe:group-hover:-translate-y-1" />
                     </div>
-                    <div className="min-w-0 py-0.5">
-                      <h3 className="flex flex-wrap items-center gap-2 text-base font-bold">
+                    <div className="flex min-w-0 flex-1 flex-col p-5">
+                      <h3 className="flex flex-wrap items-center gap-2 text-[15px] font-semibold">
                         {slot.label}
-                        <Badge variant={slot.required ? "success" : "neutral"} className="font-medium">
+                        <Badge variant={slot.required ? "success" : "neutral"} className="ml-auto text-[10px] font-medium">
                           {slot.required ? "Required" : "Optional"}
                         </Badge>
                       </h3>
                       {slot.description ? (
-                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{slot.description}</p>
+                        <div className="mt-2 text-sm leading-relaxed text-muted-foreground">{slot.description}</div>
                       ) : null}
-                      <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <p className="mt-auto inline-flex items-center gap-1.5 pt-4 text-[11px] font-medium text-muted-foreground">
                         <Check className="size-3.5 text-primary" aria-hidden />
                         PDF, JPG or PNG{slot.max_mb ? `, up to ${slot.max_mb} MB` : ""}
                       </p>
@@ -192,7 +176,7 @@ export default async function VisaDetailPage({
           </section>
 
           <section aria-labelledby="visa-how">
-            <h2 id="visa-how" className="font-heading text-2xl font-bold tracking-tight sm:text-[1.75rem]">
+            <h2 id="visa-how" className="font-heading text-2xl font-semibold tracking-tight sm:text-[1.75rem]">
               How it works
             </h2>
             <ol className="relative mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -201,26 +185,25 @@ export default async function VisaDetailPage({
                 return (
                   <li
                     key={item.title}
-                    className="relative flex flex-col rounded-2xl border border-border bg-card p-3 pb-5 text-left shadow-xs"
+                    className="relative flex flex-col text-left"
                   >
-                    <div className="relative h-36 w-full overflow-hidden rounded-xl bg-[radial-gradient(circle_at_50%_15%,color-mix(in_oklch,var(--primary),white_80%),color-mix(in_oklch,var(--primary),white_93%)_60%,color-mix(in_oklch,var(--brand-gold),white_88%))] ring-1 ring-primary/10">
+                    <div className="relative h-32 w-full overflow-hidden rounded-2xl border border-border bg-[#edf3ef]">
                       <Art className="p-2" />
                       <span
-                        className="absolute top-2.5 left-2.5 grid size-8 place-items-center rounded-full bg-primary font-heading text-sm font-bold text-primary-foreground tabular-nums shadow-sm ring-4 ring-white/70"
+                        className="absolute top-2 left-2 font-mono text-[11px] font-medium text-primary/75"
                         aria-hidden
                       >
-                        {i + 1}
+                        {String(i + 1).padStart(2, "0")}
                       </span>
                     </div>
-                    <h3 className="mt-4 px-2 text-base font-bold">
+                    <h3 className="mt-3 text-sm font-semibold">
                       <span className="sr-only">Step {i + 1}: </span>
                       {item.title}
                     </h3>
-                    <p className="mt-1.5 px-2 text-sm leading-relaxed text-muted-foreground">{item.text}</p>
                     {i < HOW_IT_WORKS.length - 1 ? (
                       <span
                         aria-hidden
-                        className="absolute top-[4.5rem] -right-[1.15rem] z-10 hidden size-7 place-items-center rounded-full border border-border bg-card text-primary shadow-sm xl:grid"
+                        className="absolute top-14 -right-3 z-10 hidden size-5 place-items-center rounded-full border border-border bg-card text-primary xl:grid"
                       >
                         <ChevronRight className="size-4" strokeWidth={2.5} />
                       </span>
@@ -232,7 +215,7 @@ export default async function VisaDetailPage({
           </section>
 
           <section aria-labelledby="visa-info">
-            <h2 id="visa-info" className="font-heading text-2xl font-bold tracking-tight sm:text-[1.75rem]">
+            <h2 id="visa-info" className="font-heading text-2xl font-semibold tracking-tight sm:text-[1.75rem]">
               Additional information
             </h2>
             <dl className="mt-5 grid grid-cols-1 overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-2">
@@ -274,7 +257,7 @@ export default async function VisaDetailPage({
           </section>
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start" aria-label="Booking">
+        <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start" aria-label="Booking">
           <VisaBookingSummary
             id="apply"
             visaId={visa.id}

@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, MapPin } from "lucide-react";
+import { AlertCircle, ArrowRight, MapPin, BookUser } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { matchesDestination, type DestinationOption } from "@/modules/visa/search";
@@ -46,10 +46,10 @@ function PassportField({ value, onChange }: { value: string | null; onChange: (c
       onValueChange={(code) => onChange(code ?? null)}
       autoHighlight
     >
-      <ComboboxInputGroup className="min-w-0 flex-1 sm:w-44 sm:flex-none">
+      <ComboboxInputGroup className="min-w-0 flex-1">
         <ComboboxInput
           aria-label="Passport country"
-          placeholder="Your passport"
+          placeholder="Select nationality"
           className="h-11 border-0 bg-transparent px-0 text-base font-medium text-neutral-900 shadow-none placeholder:text-neutral-500 focus-visible:ring-0 sm:text-sm dark:bg-transparent"
         />
       </ComboboxInputGroup>
@@ -157,13 +157,11 @@ export function VisaDestinationSearch({
         if (active >= 0 && suggestions[active]) choose(suggestions[active]);
         else go(value);
       }}
-      className="relative mt-8 max-w-2xl"
+      className="relative"
     >
-      <div className="flex flex-col gap-1 rounded-2xl bg-white p-1.5 shadow-2xl ring-primary/40 focus-within:ring-3 sm:flex-row sm:items-center sm:gap-1.5 sm:rounded-full">
-        <div className="flex items-center gap-2 border-b border-neutral-200 px-3.5 sm:border-r sm:border-b-0 sm:pr-3 sm:pl-4">
-          <span className="text-base leading-none" aria-hidden>
-            {passport ? countryFlag(passport) : "🛂"}
-          </span>
+      <div className="grid gap-3 md:grid-cols-[1fr_1.2fr_auto] md:gap-4">
+        <div className="min-w-0 rounded-xl border border-[#dce5df] bg-[#f8faf8] px-4 py-3 transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+          <span className="mb-1 flex items-center gap-2 text-[10px] font-semibold tracking-[0.12em] text-[#5c7468] uppercase"><BookUser className="size-3.5 text-primary" aria-hidden /> Passport nationality</span>
           <PassportField
             value={passport}
             onChange={(code) => {
@@ -172,41 +170,38 @@ export function VisaDestinationSearch({
             }}
           />
         </div>
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 pl-3.5 sm:pl-1">
-        <MapPin className="size-4 shrink-0 text-neutral-500" aria-hidden />
-        <input
-          ref={inputRef}
-          type="text"
-          role="combobox"
-          aria-expanded={showList}
-          aria-controls={listId}
-          aria-autocomplete="list"
-          aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
-          aria-label="Destination country"
-          autoComplete="off"
-          placeholder="Where are you going? UAE, Türkiye, Kenya…"
-          value={value}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? `${listId}-error` : undefined}
-          onChange={(e) => {
-            setValue(e.target.value);
-            setActive(-1);
-            setOpen(true);
-            if (error) setError(sameCountry(e.target.value, passport) ? error : null);
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
-          onKeyDown={onKeyDown}
-          className="h-11 min-w-0 flex-1 bg-transparent text-base text-neutral-900 outline-none placeholder:text-neutral-500 sm:text-sm"
-        />
-        <button
-          type="submit"
-          aria-label="Search"
-          className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-        >
-          <ArrowRight className="size-4.5" aria-hidden />
-        </button>
+        <div className="min-w-0 rounded-xl border border-[#dce5df] bg-[#f8faf8] px-4 py-3 transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+          <label htmlFor={`${listId}-destination`} className="mb-1 flex items-center gap-2 text-[10px] font-semibold tracking-[0.12em] text-[#5c7468] uppercase"><MapPin className="size-3.5 text-primary" aria-hidden /> Destination</label>
+          <input
+            id={`${listId}-destination`}
+            ref={inputRef}
+            type="text"
+            role="combobox"
+            aria-expanded={showList}
+            aria-controls={listId}
+            aria-autocomplete="list"
+            aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
+            aria-label="Destination country"
+            autoComplete="off"
+            placeholder="Where would you like to go?"
+            value={value}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${listId}-error` : undefined}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setActive(-1);
+              setOpen(true);
+              if (error) setError(sameCountry(e.target.value, passport) ? error : null);
+            }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setOpen(false)}
+            onKeyDown={onKeyDown}
+            className="h-11 w-full min-w-0 bg-transparent text-base font-medium text-neutral-900 outline-none placeholder:font-normal placeholder:text-neutral-500 sm:text-sm"
+          />
         </div>
+        <button type="submit" className="flex min-h-14 items-center justify-center gap-3 rounded-xl bg-brand-accent px-7 text-sm font-semibold text-brand-accent-foreground shadow-sm transition-colors hover:bg-brand-accent/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+          Find my visa <ArrowRight className="size-4" aria-hidden />
+        </button>
       </div>
 
       {error ? (
