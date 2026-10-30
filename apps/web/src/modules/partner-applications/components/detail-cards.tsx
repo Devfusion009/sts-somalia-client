@@ -87,15 +87,31 @@ export function DocFileIcon({ fileName }: { fileName: string }) {
 }
 
 /**
+ * Accent per section. Each part of the record keeps its own colour on the
+ * header band, step chip, group captions and jump bar, so an admin can tell
+ * which part of the application they are reading at a glance.
+ */
+export const SECTION_TONES = {
+  teal: "#00947c",
+  blue: "#2563eb",
+  amber: "#d97706",
+  violet: "#7c3aed",
+  sky: "#0284c7",
+  slate: "#475569",
+} as const;
+export type SectionTone = keyof typeof SECTION_TONES;
+
+/**
  * One section of an application record: a tinted header band carrying the
- * wizard step number and the step's own name, so the admin reads the page in
- * the order the applicant filled it in.
+ * section number and the wizard step's own name, so the admin reads the page
+ * in the order the applicant filled it in.
  */
 export function DetailSection({
   id,
   step,
   title,
   meta,
+  tone = "teal",
   elevated,
   children,
 }: {
@@ -103,18 +119,26 @@ export function DetailSection({
   step?: number;
   title: string;
   meta?: React.ReactNode;
+  tone?: SectionTone;
   elevated?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <Card id={id} className={cn("scroll-mt-32 gap-0 overflow-hidden py-0", elevated && "shadow-sm")}>
-      <div className="flex items-center gap-3 border-b border-primary/15 bg-primary/[0.06] px-5 py-3 sm:px-6">
+    <Card
+      id={id}
+      style={{ "--tone": SECTION_TONES[tone] } as React.CSSProperties}
+      className={cn(
+        "scroll-mt-32 gap-0 overflow-hidden border-t-[3px] border-t-[var(--tone)] py-0",
+        elevated && "shadow-sm"
+      )}
+    >
+      <div className="flex items-center gap-3 border-b border-[color-mix(in_oklab,var(--tone)_20%,transparent)] bg-[color-mix(in_oklab,var(--tone)_8%,transparent)] px-5 py-3 sm:px-6">
         {step ? (
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground tabular-nums">
-            {step}
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--tone)] font-mono text-xs font-bold text-white tabular-nums">
+            {String(step).padStart(2, "0")}
           </span>
         ) : null}
-        <h2 className="min-w-0 truncate font-heading text-base font-semibold tracking-tight text-foreground">{title}</h2>
+        <h2 className="min-w-0 truncate font-heading text-[17px] font-bold tracking-tight text-[var(--tone)]">{title}</h2>
         {meta ? <div className="ml-auto flex shrink-0 items-center gap-2">{meta}</div> : null}
       </div>
       <div className="space-y-6 px-5 py-5 sm:px-6">{children}</div>
@@ -126,17 +150,33 @@ export function DetailSection({
 export function DetailGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
-      <h3 className="text-[11px] font-semibold tracking-[0.08em] text-primary uppercase">{title}</h3>
+      <h3 className="flex items-center gap-2 font-heading text-[11px] font-bold tracking-[0.1em] text-[var(--tone,var(--primary))] uppercase">
+        <span aria-hidden className="h-3 w-1 rounded-full bg-[var(--tone,var(--primary))]" />
+        {title}
+      </h3>
       {children}
     </div>
   );
 }
 
+/** Codes, numbers and contact handles read in a monospace face so they are easy to compare and copy. */
+const MONO_FIELD = /(number|\bid\b|tax|phone|mobile|email|website|account|iata|reference)/i;
+/** Names of the business, property or person are the anchors of the record. */
+const NAME_FIELD = /^(legal business name|trading name|name|full name|property name|venue name)$/i;
+
+function valueClass(label: string, value: string): string {
+  if (value === "—") return "text-muted-foreground/50";
+  if (NAME_FIELD.test(label)) return "font-heading text-base font-bold text-foreground";
+  if (MONO_FIELD.test(label)) return "font-mono text-[13.5px] font-medium text-foreground";
+  return "text-[15px] font-medium text-foreground";
+}
+
 /**
  * `compact` drops to two columns, for grids rendered inside a half-width card.
  *
- * Small uppercase labels over values. An unfilled field renders its "—" at reduced weight instead of
- * the same bold black as real data: at a glance, a page half full of bold
+ * Small uppercase labels over values. Names use the heading face, codes and
+ * contact details the monospace face, everything else the body face. An
+ * unfilled field renders its "—" at reduced weight: a page half full of bold
  * em-dashes reads as broken, not as "nothing here yet."
  */
 export function DetailGrid({ rows, compact }: { rows: Array<[string, string]>; compact?: boolean }) {
@@ -146,15 +186,8 @@ export function DetailGrid({ rows, compact }: { rows: Array<[string, string]>; c
     <dl className={cn("grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2", !compact && "lg:grid-cols-3")}>
       {visible.map(([label, value]) => (
         <ReviewableAnswer key={label} label={label} value={value} className="min-w-0">
-          <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
-          <dd
-            className={cn(
-              "mt-1 text-[15px] leading-snug break-words",
-              value === "—" ? "text-muted-foreground/50" : "font-medium text-foreground"
-            )}
-          >
-            {value}
-          </dd>
+          <dt className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</dt>
+          <dd className={cn("mt-1 leading-snug break-words", valueClass(label, value))}>{value}</dd>
         </ReviewableAnswer>
       ))}
     </dl>
@@ -206,7 +239,7 @@ export function RoomTypesList({ roomTypes }: { roomTypes: unknown }) {
 export function FullWidthField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <ReviewableAnswer label={label} className="sm:col-span-2 lg:col-span-3">
-      <p className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
+      <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
       {children}
     </ReviewableAnswer>
   );
@@ -280,18 +313,22 @@ function orgMembership(d: Details): string {
 type Branch = { name?: string; location?: string };
 
 /** Section anchors, in wizard order, for the page's jump links. */
-export function detailSectionLinks(kind: ApplicationType): Array<{ id: string; label: string }> {
+export function detailSectionLinks(kind: ApplicationType): Array<{ id: string; label: string; tone: SectionTone }> {
   if (kind === "affiliate") {
     return [
-      { id: "about", label: "About you" },
-      { id: "audience", label: "Audience & reach" },
+      { id: "about", label: "About you", tone: "teal" },
+      { id: "audience", label: "Audience & reach", tone: "amber" },
     ];
   }
   return [
-    { id: "business", label: "Business" },
-    { id: "contact", label: "Contact" },
-    { id: "operations", label: kind === "hotel_partner" ? "Property" : kind === "venue_partner" ? "Venue" : "Operations" },
-    { id: "settlement", label: "Settlement" },
+    { id: "business", label: "Business", tone: "teal" },
+    { id: "contact", label: "Contact", tone: "blue" },
+    {
+      id: "operations",
+      label: kind === "hotel_partner" ? "Property" : kind === "venue_partner" ? "Venue" : "Operations",
+      tone: "amber",
+    },
+    { id: "settlement", label: "Settlement", tone: "violet" },
   ];
 }
 
@@ -315,7 +352,7 @@ export function BusinessDetailsCard({
 
   return (
     <>
-      <DetailSection id="business" step={1} title="Business details" elevated={elevated}>
+      <DetailSection id="business" step={1} title="Business details" tone="teal" elevated={elevated}>
         <DetailGroup title="Company">
           <DetailGrid rows={BusinessIdentityFields(d)} />
         </DetailGroup>
@@ -336,12 +373,12 @@ export function BusinessDetailsCard({
         </DetailGroup>
       </DetailSection>
 
-      <DetailSection id="contact" step={2} title="Authorized contact" elevated={elevated}>
+      <DetailSection id="contact" step={2} title="Authorized contact" tone="blue" elevated={elevated}>
         <DetailGrid rows={ContactFields(d)} />
       </DetailSection>
 
       {kind === "agency" ? (
-        <DetailSection id="operations" step={3} title="Operations" elevated={elevated}>
+        <DetailSection id="operations" step={3} title="Operations" tone="amber" elevated={elevated}>
           <DetailGrid
             rows={[
               ["Years of experience", s(d.yearsExperience)],
@@ -358,7 +395,7 @@ export function BusinessDetailsCard({
       ) : null}
 
       {kind === "hotel_partner" ? (
-        <DetailSection id="operations" step={3} title="Property details" elevated={elevated}>
+        <DetailSection id="operations" step={3} title="Property details" tone="amber" elevated={elevated}>
           <DetailGrid
             rows={[
               ["Property name", s(d.propertyName)],
@@ -385,7 +422,7 @@ export function BusinessDetailsCard({
       ) : null}
 
       {kind === "venue_partner" ? (
-        <DetailSection id="operations" step={3} title="Venue details" elevated={elevated}>
+        <DetailSection id="operations" step={3} title="Venue details" tone="amber" elevated={elevated}>
           <DetailGrid
             rows={[
               ["Venue name", s(d.venueName)],
@@ -401,7 +438,7 @@ export function BusinessDetailsCard({
         </DetailSection>
       ) : null}
 
-      <DetailSection id="settlement" step={4} title="Settlement" elevated={elevated}>
+      <DetailSection id="settlement" step={4} title="Settlement" tone="violet" elevated={elevated}>
         <DetailGroup title={kind === "agency" ? "Payment" : "Payout"}>
           <DetailGrid rows={SettlementFields(kind, d)} />
         </DetailGroup>
@@ -437,7 +474,7 @@ export function AffiliateDetailCards({ details, elevated }: { details: Details; 
   const d = details;
   return (
     <>
-      <DetailSection id="about" step={1} title="About you" elevated={elevated}>
+      <DetailSection id="about" step={1} title="About you" tone="teal" elevated={elevated}>
         <DetailGrid
           rows={[
             ["Full name", s(d.fullName)],
@@ -450,7 +487,7 @@ export function AffiliateDetailCards({ details, elevated }: { details: Details; 
         />
       </DetailSection>
 
-      <DetailSection id="audience" step={2} title="Audience & reach" elevated={elevated}>
+      <DetailSection id="audience" step={2} title="Audience & reach" tone="amber" elevated={elevated}>
         <DetailGrid
           rows={[
             ["Website / social handles", formatHandles(d.handles) || "—"],

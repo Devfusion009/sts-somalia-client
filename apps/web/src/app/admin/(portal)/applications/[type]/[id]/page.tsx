@@ -33,6 +33,8 @@ import {
   DocFileIcon,
   detailSectionLinks,
   headerFacts,
+  SECTION_TONES,
+  type SectionTone,
   type Details,
 } from "@/modules/partner-applications/components/detail-cards";
 import { partnerLogoUrl } from "@/modules/partner-applications/logo-url";
@@ -56,6 +58,27 @@ const TYPE_LABEL: Record<ApplicationType, string> = {
 const DOCUMENT_BUCKET = "kyc-documents";
 
 type DocumentRef = { key: string; label: string; storage_path: string; file_name: string; uploaded_at: string };
+
+/** Colour and wording per audit action: created green, updated blue, removed red, decisions by outcome. */
+function auditStyle(action: string): { label: string; dot: string; pill: string } {
+  const key = action.toLowerCase();
+  if (key === "insert" || key.includes("submit") || key.includes("creat"))
+    return { label: key === "insert" ? "Created" : action.replace(/_/g, " "), dot: "bg-emerald-500", pill: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" };
+  if (key === "delete" || key.includes("reject"))
+    return { label: key === "delete" ? "Deleted" : action.replace(/_/g, " "), dot: "bg-rose-500", pill: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" };
+  if (key.includes("approv") || key.includes("verif"))
+    return { label: action.replace(/_/g, " "), dot: "bg-emerald-600", pill: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200" };
+  if (key.includes("info") || key.includes("request"))
+    return { label: action.replace(/_/g, " "), dot: "bg-amber-500", pill: "bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" };
+  return { label: key === "update" ? "Updated" : action.replace(/_/g, " "), dot: "bg-blue-500", pill: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" };
+}
+
+/** Left edge and tint of a document row by its review status. */
+const DOC_ROW_STATUS: Record<string, string> = {
+  verified: "border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-500/5",
+  rejected: "border-l-rose-500 bg-rose-50/50 dark:bg-rose-500/5",
+  pending: "border-l-amber-400",
+};
 
 /** Compact 3-node pipeline (Submitted -> Under Review -> Decision) so the admin sees where an application sits at a glance, not just its current label. */
 function ReviewPipeline({ status }: { status: string }) {
@@ -168,11 +191,13 @@ export default async function ApplicationDetailPage({
   ].join(" · ");
   const decided = application.status === "approved" || application.status === "rejected";
   const sections = detailSectionLinks(type);
-  const jumpLinks = [
+  const jumpLinks: Array<{ id: string; label: string; tone: SectionTone }> = [
     ...sections,
-    ...(type === "affiliate" && (application as { notes?: string }).notes ? [{ id: "notes", label: "Notes" }] : []),
-    { id: "documents", label: "Documents" },
-    { id: "audit", label: "Audit trail" },
+    ...(type === "affiliate" && (application as { notes?: string }).notes
+      ? [{ id: "notes", label: "Notes", tone: "slate" as const }]
+      : []),
+    { id: "documents", label: "Documents", tone: "sky" },
+    { id: "audit", label: "Audit trail", tone: "slate" },
   ];
 
   return (
@@ -236,10 +261,11 @@ export default async function ApplicationDetailPage({
             <li key={link.id}>
               <a
                 href={`#${link.id}`}
-                className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                style={{ "--tone": SECTION_TONES[link.tone] } as React.CSSProperties}
+                className="flex items-center gap-2 rounded-lg px-3 py-1.5 font-heading text-sm font-semibold text-foreground/75 transition-colors hover:bg-[color-mix(in_oklab,var(--tone)_10%,transparent)] hover:text-[var(--tone)]"
               >
-                <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[11px] font-semibold tabular-nums">
-                  {i + 1}
+                <span className="flex size-5 items-center justify-center rounded-md bg-[var(--tone)] font-mono text-[10px] font-bold text-white tabular-nums">
+                  {String(i + 1).padStart(2, "0")}
                 </span>
                 {link.label}
               </a>
@@ -258,7 +284,7 @@ export default async function ApplicationDetailPage({
           )}
 
           {type === "affiliate" && (application as { notes?: string }).notes ? (
-            <DetailSection id="notes" step={sections.length + 1} title="Notes from applicant">
+            <DetailSection id="notes" step={sections.length + 1} title="Notes from applicant" tone="slate">
               <p className="text-sm break-words">{(application as { notes: string }).notes}</p>
             </DetailSection>
           ) : null}
@@ -267,6 +293,7 @@ export default async function ApplicationDetailPage({
             id="documents"
             step={jumpLinks.length - 1}
             title="Documents"
+            tone="sky"
             meta={
               signedDocs.length > 0 ? (
                 <Badge variant={verifiedDocs === signedDocs.length ? "success" : "neutral"} className="tabular-nums">
@@ -288,12 +315,15 @@ export default async function ApplicationDetailPage({
                     const review = documentReviews.get(doc.key);
                     const docReviewer = review?.reviewer as unknown as { full_name: string | null; email: string } | null;
                     return (
-                      <li key={doc.storage_path} className="flex gap-3 px-4 py-3 sm:px-6">
+                      <li
+                        key={doc.storage_path}
+                        className={cn("flex gap-3 border-l-4 px-4 py-3 sm:px-6", DOC_ROW_STATUS[review?.status ?? "pending"] ?? DOC_ROW_STATUS.pending)}
+                      >
                         <DocFileIcon fileName={doc.file_name} />
                         <div className="min-w-0 flex-1 space-y-2">
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{doc.label}</p>
-                            <p className="truncate text-xs text-muted-foreground tabular-nums">
+                            <p className="truncate font-heading text-sm font-semibold">{doc.label}</p>
+                            <p className="truncate font-mono text-xs text-muted-foreground tabular-nums">
                               {doc.file_name} · {format(new Date(doc.uploaded_at), "d MMM yyyy, HH:mm")}
                             </p>
                           </div>
@@ -315,7 +345,7 @@ export default async function ApplicationDetailPage({
               )}
           </DetailSection>
 
-          <DetailSection id="audit" title="Audit trail">
+          <DetailSection id="audit" title="Audit trail" tone="slate">
               {auditTrail.length === 0 ? (
                 <Empty>
                   <EmptyMedia variant="icon">
@@ -329,10 +359,17 @@ export default async function ApplicationDetailPage({
                     const actor = event.actor as unknown as { full_name: string | null; email: string } | null;
                     return (
                       <li key={event.id} className="flex items-start gap-3 text-sm">
-                        <span aria-hidden="true" className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
+                        <span aria-hidden="true" className={cn("mt-1.5 size-2 shrink-0 rounded-full", auditStyle(event.action).dot)} />
                         <p className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                          <span className="font-medium capitalize">{event.action.replace(/_/g, " ")}</span>
-                          <span className="text-xs text-muted-foreground tabular-nums">
+                          <span
+                            className={cn(
+                              "rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-wide uppercase",
+                              auditStyle(event.action).pill
+                            )}
+                          >
+                            {auditStyle(event.action).label}
+                          </span>
+                          <span className="font-mono text-xs text-muted-foreground tabular-nums">
                             {format(new Date(event.created_at), "d MMM yyyy, HH:mm")}
                             {actor ? ` · ${actor.full_name ?? actor.email}` : ""}
                           </span>
