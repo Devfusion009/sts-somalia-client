@@ -27,8 +27,12 @@ export async function SiteHeader() {
   // isn't really theirs, even though their portal session cookie is still
   // valid (no custom domain yet means every portal and the public site
   // share one cookie — see the comment on rootOrigin()).
-  const profile = rawProfile && !(await isPortalOnlyIdentity(rawProfile)) ? rawProfile : null;
-  const contexts = profile ? await getMyPartnerContexts(profile.id, profile.full_name) : [];
+  // Both reads need only the profile, so they run together instead of one after the other.
+  const [portalOnly, allContexts] = rawProfile
+    ? await Promise.all([isPortalOnlyIdentity(rawProfile), getMyPartnerContexts(rawProfile.id, rawProfile.full_name)])
+    : [false, []];
+  const profile = rawProfile && !portalOnly ? rawProfile : null;
+  const contexts = profile ? allContexts : [];
 
   return (
     <HeaderShell>

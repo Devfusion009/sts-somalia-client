@@ -19,6 +19,7 @@ const jakarta = Plus_Jakarta_Sans({
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
+  preload: false,
 });
 
 /**
@@ -59,6 +60,7 @@ const tajawal = Tajawal({
   variable: "--font-display",
   subsets: ["latin", "arabic"],
   weight: ["400", "500", "700", "800"],
+  preload: false,
 });
 
 /**
@@ -76,6 +78,7 @@ const amiri = Amiri({
   variable: "--font-islamic",
   subsets: ["latin", "arabic"],
   weight: ["400", "700"],
+  preload: false,
 });
 
 /**
@@ -97,6 +100,7 @@ const adlam = ADLaM_Display({
   variable: "--font-african",
   subsets: ["latin", "adlam"],
   weight: "400",
+  preload: false,
 });
 
 export const metadata: Metadata = {

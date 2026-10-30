@@ -4,6 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import type { AppRouter } from "./shared";
 import { apiUrl } from "./shared";
 
+/** Server-side calls use the internal network address when set, skipping DNS, TLS and the public proxy. */
+function serverApiUrl(): string {
+  return process.env.API_INTERNAL_URL ?? apiUrl();
+}
+
 /**
  * Server-side (vanilla, non-React-Query) tRPC client for Server Components —
  * the reusable version of what api-health/page.tsx proved by hand in phase 0.
@@ -21,7 +26,7 @@ export async function getServerTrpc(options: { timeoutMs?: number } = {}) {
   return createTRPCClient<AppRouter>({
     links: [
       httpBatchLink({
-        url: `${apiUrl()}/trpc`,
+        url: `${serverApiUrl()}/trpc`,
         headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
         // A slow or unreachable api must not hold a page render hostage:
         // callers already treat a failed call as "no data".
@@ -61,7 +66,7 @@ export async function apiUpload(path: string, body: FormData): Promise<{ error: 
     data: { session },
   } = await supabase.auth.getSession();
   try {
-    const res = await fetch(`${apiUrl()}${path}`, {
+    const res = await fetch(`${serverApiUrl()}${path}`, {
       method: "POST",
       body,
       headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
