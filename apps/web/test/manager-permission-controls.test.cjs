@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS harness loads TypeScript through Node's module loader. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
