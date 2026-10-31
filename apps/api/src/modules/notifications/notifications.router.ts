@@ -5,7 +5,7 @@ import { NotificationsService } from "./notifications.service";
 
 export const notificationsRouter = router({
   unread: protectedProcedure
-    .input(z.object({ type: z.string().optional(), limit: z.number().optional() }).optional())
+    .input(z.object({ type: z.string().optional(), limit: z.number().int().min(1).max(100).optional() }).optional())
     .query(async ({ ctx, input }) => {
       const svc = await ctx.resolve(NotificationsService);
       return svc.getUnread(ctx.user!.id, input);
@@ -28,7 +28,7 @@ export const notificationsRouter = router({
     }),
 
     broadcastHistory: protectedAdminProcedure
-      .input(z.object({ limit: z.number().optional() }).optional())
+      .input(z.object({ limit: z.number().int().min(1).max(100).optional() }).optional())
       .query(async ({ ctx, input }) => {
         const svc = await ctx.resolve(NotificationsService);
         return svc.getBroadcastHistory(input?.limit);

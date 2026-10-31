@@ -36,29 +36,32 @@ export class NotificationsService {
       query = query.eq("type", opts.type);
     }
 
-    const { data } = await query;
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
     return data ?? [];
   }
 
   async dismiss(userId: string, notificationId: string) {
-    await this.rls
+    const { error } = await this.rls
       .get()
       .from("notifications")
       .update({ read_at: new Date().toISOString() })
       .eq("id", notificationId)
       .eq("profile_id", userId);
+    if (error) throw new Error(error.message);
     return { ok: true as const };
   }
 
   /** Marks every unread notification of one type as read, e.g. all new-order alerts once the Orders page is opened. */
   async dismissType(userId: string, type: string) {
-    await this.rls
+    const { error } = await this.rls
       .get()
       .from("notifications")
       .update({ read_at: new Date().toISOString() })
       .eq("profile_id", userId)
       .eq("type", type)
       .is("read_at", null);
+    if (error) throw new Error(error.message);
     return { ok: true as const };
   }
 
@@ -103,35 +106,32 @@ export class NotificationsService {
   }
 
   async getBroadcastHistory(limit = 20): Promise<BroadcastHistoryEntry[]> {
-    const { data } = await this.rls
-      .get()
-      .from("notifications")
-      .select("title, body, data, created_at")
-      .eq("type", "broadcast")
-      .order("created_at", { ascending: false })
-      .limit(500);
-
     const byBroadcast = new Map<string, BroadcastHistoryEntry>();
-    for (const row of data ?? []) {
-      const d = row.data as { broadcast_id?: string; audience?: string } | null;
-      const broadcastId = d?.broadcast_id;
-      if (!broadcastId) continue;
-
-      const existing = byBroadcast.get(broadcastId);
-      if (existing) {
-        existing.recipientCount += 1;
-        continue;
+    const pageSize = 500;
+    // Finish the oldest included broadcast before stopping, so a large send
+    // cannot truncate recipient counts or hide all earlier sends.
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await this.rls.get().from("notifications")
+        .select("id, title, body, data, created_at")
+        .eq("type", "broadcast")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(offset, offset + pageSize - 1);
+      if (error) throw new Error(error.message);
+      for (const row of data ?? []) {
+        const d = row.data as { broadcast_id?: string; audience?: string } | null;
+        const broadcastId = d?.broadcast_id;
+        if (!broadcastId) continue;
+        const existing = byBroadcast.get(broadcastId);
+        if (existing) { existing.recipientCount += 1; continue; }
+        if (byBroadcast.size >= limit) return [...byBroadcast.values()];
+        byBroadcast.set(broadcastId, {
+          broadcastId, title: row.title, body: row.body,
+          audience: d?.audience ?? "unknown", createdAt: row.created_at, recipientCount: 1,
+        });
       }
-      byBroadcast.set(broadcastId, {
-        broadcastId,
-        title: row.title,
-        body: row.body,
-        audience: d?.audience ?? "unknown",
-        createdAt: row.created_at,
-        recipientCount: 1,
-      });
+      if (!data || data.length < pageSize) break;
     }
-
-    return [...byBroadcast.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
+    return [...byBroadcast.values()];
   }
 }

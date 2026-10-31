@@ -44,6 +44,9 @@ export const envSchema = z.object({
   BANK_TRANSFER_ACCOUNT_NUMBER: optional,
 
   DUFFEL_API_KEY: optional,
+  EMAIL_PROVIDER: optional,
+  EMAIL_FROM: optional,
+  EMAIL_REPLY_TO: optional,
   RESEND_API_KEY: optional,
   RESEND_FROM_EMAIL: optional,
   TWILIO_ACCOUNT_SID: optional,
