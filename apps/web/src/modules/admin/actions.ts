@@ -90,7 +90,14 @@ const visaTypeSchema = z.object({
   .refine((data) => data.processingMode !== "partner" || !!data.partnerProviderKey, {
     message: "Choose which partner processes this visa type.",
     path: ["partnerProviderKey"],
-  });
+  })
+  .refine(
+    (data) =>
+      data.processingDaysMin === undefined ||
+      data.processingDaysMax === undefined ||
+      data.processingDaysMax >= data.processingDaysMin,
+    { message: "Maximum processing days can't be less than the minimum.", path: ["processingDaysMax"] },
+  );
 
 /** Rows from the admin's structured application-questions editor — same JSON + key-sanitization approach as document slots. */
 function parseApplicationQuestionsJson(input: string | undefined) {

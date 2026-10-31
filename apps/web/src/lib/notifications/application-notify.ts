@@ -1,142 +1,261 @@
 import "server-only";
-import { sendEmail } from "./email";
+import { format } from "date-fns";
+import { sendEmail, type EmailStatus } from "./email";
+import { renderEmail, renderEmailText, escapeHtml, type EmailContent } from "./email-layout";
 import { sendWhatsAppMessage } from "./whatsapp-send";
 import { getIntegrations } from "@/lib/integrations";
+import { portalHref, portalLoginHref, type PortalSubdomain } from "@/lib/subdomain";
 
 export type ApplicationType = "agency" | "hotel_partner" | "affiliate" | "venue_partner";
+export type ApplicationEvent = "approved" | "rejected" | "more_info_requested" | "submitted";
 
 /** Agent Portal sign-in details issued on an agency approval. */
-export type AgentLogin = { agentCode: string; username: string };
+export type AgentLogin = { agentId: string; password: string };
 
-const PORTAL_LABEL: Record<ApplicationType, string> = {
-  agency: "Agent Portal",
-  hotel_partner: "Hotel Partner Portal",
-  affiliate: "Affiliate Dashboard",
-  venue_partner: "Venue Portal",
+const PROGRAM: Record<ApplicationType, string> = {
+  agency: "Travel Agent",
+  hotel_partner: "Hotel Partner",
+  affiliate: "Affiliate",
+  venue_partner: "Venue Partner",
 };
 
-const PORTAL_HREF: Record<ApplicationType, string> = {
-  agency: "/agent",
-  hotel_partner: "/partner",
-  affiliate: "/affiliate",
-  venue_partner: "/venue",
+const PORTAL: Record<ApplicationType, { label: string; subdomain: PortalSubdomain }> = {
+  agency: { label: "Agent Portal", subdomain: "agent" },
+  hotel_partner: { label: "Hotel Partner Portal", subdomain: "partner" },
+  affiliate: { label: "Affiliate Dashboard", subdomain: "affiliate" },
+  venue_partner: { label: "Venue Portal", subdomain: "venue" },
 };
 
-function emailShell(title: string, bodyHtml: string): string {
-  return `
-    <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #1a2e29;">
-      <h1 style="color: #00947c; font-size: 20px;">${title}</h1>
-      ${bodyHtml}
-      <p style="margin-top: 24px; font-size: 12px; color: #6b7280;">
-        STS Somalia &middot; Sultan Business Park, Waaberi District, 21 Oct Street, Muqdisho
-      </p>
-    </div>
-  `;
-}
+/** What a newly approved partner does first, in the order the portal leads them through it. */
+const FIRST_STEPS: Record<ApplicationType, string[]> = {
+  agency: [
+    "Sign in to the Agent Portal with the agent ID and password in this email.",
+    "Change your password under Security.",
+    "Complete your agency profile and bank details.",
+    "Top up your wallet, then start booking flights, hotels, visas and Umrah for your customers.",
+  ],
+  hotel_partner: [
+    "Sign in to the Hotel Partner Portal with your STS account.",
+    "Add your rooms, rates, availability and photos.",
+    "Publish your property so travellers and agents can book it.",
+  ],
+  affiliate: [
+    "Sign in to the Affiliate Dashboard with your STS account.",
+    "Copy your referral link and share it with your audience.",
+    "Track referred bookings and commission from the dashboard.",
+  ],
+  venue_partner: [
+    "Sign in to the Venue Portal with your STS account.",
+    "Add your halls with capacity, pricing and photos.",
+    "Publish them so customers can book events.",
+  ],
+};
 
-function siteUrl(path: string): string {
-  const { siteUrl } = getIntegrations();
-  return `${siteUrl}${path}`;
+function absolute(href: string): string {
+  return /^https?:\/\//.test(href) ? href : `${getIntegrations().siteUrl}${href}`;
 }
 
 /**
- * Best-effort notification on an application status change — sends email
- * and (if a phone number was captured) WhatsApp, but never throws: a
- * notification failure should never block the actual status change from
- * saving. Callers should still surface `emailSent`/`whatsappSent` in the
- * admin UI so staff know if a message genuinely went out.
+ * Who an application email goes to.
+ *
+ * The primary recipient is the email the applicant entered on the
+ * application itself (the authorized contact's, or the affiliate's own), since
+ * that is the address they chose for this business relationship. The address
+ * of the STS account that submitted it is copied when it differs, so the
+ * account holder always learns the outcome too. Without an application email,
+ * the account email is the only recipient.
  */
-export async function notifyApplicant(params: {
+export function applicationRecipients(applicationEmail: string | null | undefined, accountEmail: string): {
+  to: string;
+  cc: string[];
+} {
+  const chosen = applicationEmail?.trim();
+  const valid = chosen && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(chosen) ? chosen : null;
+  if (!valid || valid.toLowerCase() === accountEmail.toLowerCase()) return { to: accountEmail, cc: [] };
+  return { to: valid, cc: [accountEmail] };
+}
+
+export type ApplicationNotice = {
   type: ApplicationType;
-  applicantEmail: string;
-  applicantPhone?: string | null;
+  event: ApplicationEvent;
   referenceNumber: string;
-  event: "approved" | "rejected" | "more_info_requested" | "submitted";
+  /** Business, property or applicant name the application was filed under. */
+  applicantName: string | null;
+  /** Person the email greets: the authorized contact, else the account holder. */
+  recipientName: string | null;
+  to: string;
+  cc?: string[];
+  phone?: string | null;
+  /** Rejection reason or the list of requested changes. */
   message?: string | null;
   agentLogin?: AgentLogin | null;
-}): Promise<{ emailSent: boolean; whatsappSent: boolean }> {
-  const { subject, html, whatsapp } = buildContent(params);
+  decidedAt?: Date;
+};
 
-  const emailResult = await sendEmail({ to: params.applicantEmail, subject, html });
+export type ApplicantNotifyResult = {
+  /** "sent", "not_configured" (no email provider yet) or "failed". */
+  email: EmailStatus;
+  emailTo: string;
+  emailSent: boolean;
+  whatsappSent: boolean;
+};
+
+/**
+ * Tells the applicant about a status change by email (and WhatsApp when a
+ * number is known). Best effort and never throws: the status change has
+ * already been saved, and a delivery problem must not undo it. The caller
+ * reports `email` back to the admin so staff know whether a message went out.
+ */
+export async function notifyApplicant(notice: ApplicationNotice): Promise<ApplicantNotifyResult> {
+  const { subject, html, text, whatsapp } = renderApplicationEmail(notice);
+
+  const emailResult = await sendEmail({ to: notice.to, cc: notice.agentLogin ? undefined : notice.cc, subject, html, text });
 
   let whatsappSent = false;
-  if (params.applicantPhone) {
-    const waResult = await sendWhatsAppMessage({ to: params.applicantPhone, body: whatsapp });
+  if (notice.phone) {
+    const waResult = await sendWhatsAppMessage({ to: notice.phone, body: whatsapp });
     whatsappSent = waResult.sent;
   }
 
-  return { emailSent: emailResult.sent, whatsappSent };
+  return { email: emailResult.status, emailTo: notice.to, emailSent: emailResult.sent, whatsappSent };
 }
 
-function buildContent(params: {
-  type: ApplicationType;
-  referenceNumber: string;
-  event: "approved" | "rejected" | "more_info_requested" | "submitted";
-  message?: string | null;
-  agentLogin?: AgentLogin | null;
-}): { subject: string; html: string; whatsapp: string } {
-  const label = PORTAL_LABEL[params.type];
-  const href = siteUrl(PORTAL_HREF[params.type]);
-  const becomeHref = siteUrl("/account/become");
+/** The finished message for one notice: subject, HTML and plain text, plus the WhatsApp line. */
+export function renderApplicationEmail(notice: ApplicationNotice): {
+  subject: string;
+  html: string;
+  text: string;
+  whatsapp: string;
+} {
+  const { content, textParagraphs, subject, whatsapp } = buildContent(notice);
+  return { subject, html: renderEmail(content), text: renderEmailText({ ...content, textParagraphs }), whatsapp };
+}
 
-  switch (params.event) {
-    case "submitted":
+function greeting(name: string | null): string {
+  return name?.trim() ? `Dear ${name.trim()},` : "Dear Partner,";
+}
+
+function buildContent(n: ApplicationNotice): {
+  content: EmailContent;
+  textParagraphs: string[];
+  subject: string;
+  whatsapp: string;
+} {
+  const program = PROGRAM[n.type];
+  const portal = PORTAL[n.type];
+  const name = n.applicantName?.trim() || null;
+  const nameHtml = name ? `<strong>${escapeHtml(name)}</strong>` : "your business";
+  const ref = n.referenceNumber;
+  const date = format(n.decidedAt ?? new Date(), "d MMMM yyyy");
+  const baseDetails = [
+    { label: "Reference", value: ref, mono: true },
+    { label: "Program", value: program },
+    ...(name ? [{ label: n.type === "affiliate" ? "Applicant" : "Business", value: name }] : []),
+  ];
+
+  switch (n.event) {
+    case "approved": {
+      const loginHref = absolute(n.agentLogin ? portalLoginHref(portal.subdomain) : portalHref(portal.subdomain));
+      const lead = `We have reviewed and approved the ${program} application for ${name ?? "your business"}. Your ${portal.label} is ready to use.`;
       return {
-        subject: `Application received — ${params.referenceNumber}`,
-        html: emailShell(
-          "We've got your application",
-          `<p>Thanks for applying. Your reference number is <strong>${params.referenceNumber}</strong> — our team will review it and get back to you.</p>`
-        ),
-        whatsapp: `STS Somalia: Your application ${params.referenceNumber} has been received and is under review.`,
+        subject: `Approved: your STS ${program} application (${ref})`,
+        whatsapp: n.agentLogin
+          ? `STS Somalia: Your ${program} application ${ref} is approved. Your agent ID and password have been sent by email. Sign in: ${loginHref}`
+          : `STS Somalia: Your ${program} application ${ref} is approved. Open your ${portal.label}: ${loginHref}`,
+        textParagraphs: [greeting(n.recipientName), lead],
+        content: {
+          preheader: `Your ${program} application ${ref} is approved. Your ${portal.label} is ready.`,
+          label: "Application approved",
+          tone: "success",
+          heading: `Welcome to STS Somalia as a ${program} partner`,
+          paragraphs: [
+            escapeHtml(greeting(n.recipientName)),
+            `We have reviewed and approved the ${program} application for ${nameHtml}. Your ${escapeHtml(portal.label)} is ready to use.`,
+          ],
+          details: [
+            ...baseDetails,
+            { label: "Approved on", value: date },
+            ...(n.agentLogin
+              ? [
+                  { label: "Agent ID", value: n.agentLogin.agentId, mono: true },
+                  { label: "Password", value: n.agentLogin.password, mono: true },
+                ]
+              : []),
+          ],
+          steps: { title: "Your next steps", items: FIRST_STEPS[n.type] },
+          button: { label: `Open the ${portal.label}`, href: loginHref },
+        },
       };
-    case "approved":
-      if (params.agentLogin) {
-        const loginHref = siteUrl("/agent/login");
-        const { agentCode, username } = params.agentLogin;
-        return {
-          subject: `You're approved — your STS agent code is ${agentCode}`,
-          html: emailShell(
-            "You're approved!",
-            `<p>Your application (${params.referenceNumber}) has been approved. Sign in to the ${label} with these details and your STS account password.</p>
-             <table style="margin:16px 0;border-collapse:collapse;font-size:15px;">
-               <tr><td style="padding:4px 16px 4px 0;color:#6b7280;">Agent code</td><td style="padding:4px 0;font-family:monospace;font-weight:700;">${agentCode}</td></tr>
-               <tr><td style="padding:4px 16px 4px 0;color:#6b7280;">Username</td><td style="padding:4px 0;font-family:monospace;font-weight:700;">${username}</td></tr>
-             </table>
-             <p><a href="${loginHref}" style="background:#00947c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;">Sign in to the ${label}</a></p>`
-          ),
-          whatsapp: `STS Somalia: Your application ${params.referenceNumber} has been approved. Agent code: ${agentCode}. Username: ${username}. Password: your STS account password. Sign in: ${loginHref}`,
-        };
-      }
+    }
+
+    case "rejected": {
+      const reapply = absolute("/account/become");
+      const lead = `Thank you for applying to the STS ${program} program. After reviewing the application for ${name ?? "your business"}, we are unable to approve it at this time.`;
+      const after = "You may submit a new application 30 days after this decision.";
       return {
-        subject: `You're approved — welcome to STS Somalia`,
-        html: emailShell(
-          "You're approved!",
-          `<p>Your application (${params.referenceNumber}) has been approved. Log in with your existing STS account to open your ${label}.</p>
-           <p><a href="${href}" style="background:#00947c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;">Open ${label}</a></p>`
-        ),
-        whatsapp: `STS Somalia: Great news — your application ${params.referenceNumber} has been approved. Log in to open your ${label}: ${href}`,
+        subject: `Update on your STS ${program} application (${ref})`,
+        whatsapp: `STS Somalia: Your ${program} application ${ref} was not approved.${n.message ? ` Reason: ${n.message}` : ""} You may reapply after 30 days.`,
+        textParagraphs: [greeting(n.recipientName), lead, after],
+        content: {
+          preheader: `A decision on your ${program} application ${ref}.`,
+          label: "Application not approved",
+          tone: "neutral",
+          heading: `Your ${program} application was not approved`,
+          paragraphs: [
+            escapeHtml(greeting(n.recipientName)),
+            `Thank you for applying to the STS ${program} program. After reviewing the application for ${nameHtml}, we are unable to approve it at this time.`,
+            escapeHtml(after),
+          ],
+          details: [...baseDetails, { label: "Decision date", value: date }],
+          note: n.message ? { title: "Reason", body: n.message } : undefined,
+          button: { label: "View your applications", href: reapply },
+        },
       };
-    case "rejected":
+    }
+
+    case "more_info_requested": {
+      const update = absolute("/account/become");
+      const lead = `Our team is reviewing the ${program} application for ${name ?? "your business"} and needs the following before it can continue.`;
       return {
-        subject: `Update on your application — ${params.referenceNumber}`,
-        html: emailShell(
-          "Application not approved",
-          `<p>Your application (${params.referenceNumber}) wasn't approved this time.</p>
-           ${params.message ? `<p><strong>Reason:</strong> ${params.message}</p>` : ""}
-           <p>You're welcome to reapply after 30 days.</p>`
-        ),
-        whatsapp: `STS Somalia: Your application ${params.referenceNumber} wasn't approved.${params.message ? ` Reason: ${params.message}` : ""} You can reapply after 30 days.`,
+        subject: `Action needed on your STS ${program} application (${ref})`,
+        whatsapp: `STS Somalia: We need more information on your ${program} application ${ref}.${n.message ? ` ${n.message}` : ""} Update it here: ${update}`,
+        textParagraphs: [greeting(n.recipientName), lead],
+        content: {
+          preheader: `Your ${program} application ${ref} needs an update before review continues.`,
+          label: "Action needed",
+          tone: "warning",
+          heading: "We need a few more details",
+          paragraphs: [
+            escapeHtml(greeting(n.recipientName)),
+            `Our team is reviewing the ${program} application for ${nameHtml} and needs the following before it can continue.`,
+          ],
+          details: baseDetails,
+          note: n.message ? { title: "Requested by our review team", body: n.message } : undefined,
+          button: { label: "Update your application", href: update },
+        },
       };
-    case "more_info_requested":
+    }
+
+    case "submitted": {
+      const track = absolute("/account/become");
+      const lead = `We have received the ${program} application for ${name ?? "your business"}. Our team will review it and email you with the outcome.`;
       return {
-        subject: `Action needed on your application — ${params.referenceNumber}`,
-        html: emailShell(
-          "We need a bit more information",
-          `<p>To keep reviewing your application (${params.referenceNumber}), we need some more details:</p>
-           ${params.message ? `<p style="background:#fef3c7;padding:12px;border-radius:8px;">${params.message}</p>` : ""}
-           <p><a href="${becomeHref}" style="background:#00947c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;">Update your application</a></p>`
-        ),
-        whatsapp: `STS Somalia: We need more info on application ${params.referenceNumber}.${params.message ? ` ${params.message}` : ""} Update it here: ${becomeHref}`,
+        subject: `Application received: STS ${program} (${ref})`,
+        whatsapp: `STS Somalia: Your ${program} application ${ref} has been received and is under review.`,
+        textParagraphs: [greeting(n.recipientName), lead],
+        content: {
+          preheader: `Your ${program} application ${ref} has been received.`,
+          label: "Application received",
+          tone: "neutral",
+          heading: "Your application is with our team",
+          paragraphs: [
+            escapeHtml(greeting(n.recipientName)),
+            `We have received the ${program} application for ${nameHtml}. Our team will review it and email you with the outcome.`,
+          ],
+          details: baseDetails,
+          button: { label: "Track your application", href: track },
+        },
       };
+    }
   }
 }

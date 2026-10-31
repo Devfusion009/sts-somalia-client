@@ -28,6 +28,11 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // Node test scripts run as CommonJS via `node --test`.
+  {
+    files: ["test/**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

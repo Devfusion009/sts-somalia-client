@@ -40,12 +40,12 @@ export function WizardStepper({
 
   const markerClass = (isCurrent: boolean, isDone: boolean) =>
     cn(
-      "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums",
+      "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
       isCurrent
-        ? "bg-primary text-primary-foreground"
+        ? "bg-primary text-primary-foreground ring-4 ring-primary/10"
         : isDone
           ? "bg-primary/15 text-primary"
-          : "bg-muted text-muted-foreground"
+          : "border border-border bg-card text-muted-foreground"
     );
 
   const markerFor = (step: number, isDone: boolean, isLocked: boolean) =>
@@ -63,12 +63,12 @@ export function WizardStepper({
   return (
     <nav aria-label="Application steps" className="min-w-0">
       {/* Phones/tablets: current step + a row of step markers. */}
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-xs lg:hidden">
-        <p className="text-xs text-muted-foreground tabular-nums">
-          Step {current.step} of {WIZARD_STEPS.length}
-        </p>
-        <p className="font-heading text-base font-bold">{current.label}</p>
-        <ol className="mt-3 flex items-center gap-1.5">
+      <div className="rounded-2xl border border-border bg-card p-5 lg:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-heading text-sm font-semibold">{current.label}</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{current.step} / {WIZARD_STEPS.length}</span>
+        </div>
+        <ol className="mt-5 flex items-center gap-1.5">
           {WIZARD_STEPS.map(({ step, label }) => {
             const { isCurrent, isDone, isLocked } = stateOf(step);
             const text = stateText(isCurrent, isDone, isLocked);
@@ -104,8 +104,12 @@ export function WizardStepper({
       </div>
 
       {/* lg: the vertical rail. */}
-      <div className="hidden rounded-2xl border border-border bg-card p-5 shadow-xs lg:block">
-        <ol className="space-y-1">
+      <div className="hidden rounded-2xl border border-border bg-card p-5 lg:block">
+        <div className="mb-5 flex items-center justify-between gap-2 border-b border-border pb-4">
+          <span className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">Your application</span>
+          <span className="text-xs font-semibold text-primary tabular-nums">{current.step} / {WIZARD_STEPS.length}</span>
+        </div>
+        <ol className="space-y-2">
           {WIZARD_STEPS.map(({ step, label }) => {
             const { isCurrent, isDone, isLocked } = stateOf(step);
             const text = stateText(isCurrent, isDone, isLocked);
@@ -128,17 +132,17 @@ export function WizardStepper({
             return (
               <li key={step} className="relative">
                 {step < WIZARD_STEPS.length ? (
-                  <span aria-hidden className="absolute top-[1.875rem] left-[1.15rem] h-4 w-px bg-border" />
+                  <span aria-hidden className="absolute top-11 left-[1.45rem] h-4 w-px bg-border" />
                 ) : null}
                 {isLocked ? (
-                  <span className="block rounded-lg px-2 py-2">{content}</span>
+                  <span className="block rounded-xl px-2 py-2.5">{content}</span>
                 ) : (
                   <Link
                     href={`${basePath}/${applicationId}?step=${step}`}
                     aria-current={isCurrent ? "step" : undefined}
                     className={cn(
-                      "block rounded-lg px-2 py-2 transition-colors outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50",
-                      isCurrent && "bg-secondary"
+                      "block rounded-xl px-2 py-2.5 transition-colors outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50",
+                      isCurrent && "bg-primary/5"
                     )}
                   >
                     {content}

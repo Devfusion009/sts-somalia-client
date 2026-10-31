@@ -10,6 +10,8 @@ import { toPackageCard, toPackageDetail } from "../mappers/package.mapper";
 import { RedisService } from "../../../infra/redis/redis.service";
 
 const CATALOG_TTL_SECONDS = 300;
+/** Cards carry seat counts, so they refresh faster than the add-on catalog. */
+const PACKAGE_CARD_TTL_SECONDS = 60;
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -38,12 +40,23 @@ export class UmrahCatalogService {
 
   /** Featured first, then cheapest — the landing band reads as a ladder from the entry package. */
   async featuredPackages(limit: number): Promise<PackageCard[]> {
-    const rows = await this.packages.findPublishedCards({ featuredFirst: true, limit });
+    // The rows are cached, not the cards: the card's "next departure" depends on today's date.
+    const rows = await this.cache.cachedRead(
+      `umrah:cards:featured:${limit}`,
+      PACKAGE_CARD_TTL_SECONDS,
+      () => this.packages.findPublishedCards({ featuredFirst: true, limit }),
+      { tags: ["umrah-packages"] }
+    );
     return rows.map((r) => toPackageCard(r, today()));
   }
 
   async allPackages(): Promise<PackageCard[]> {
-    const rows = await this.packages.findPublishedCards({ featuredFirst: false });
+    const rows = await this.cache.cachedRead(
+      "umrah:cards:all",
+      PACKAGE_CARD_TTL_SECONDS,
+      () => this.packages.findPublishedCards({ featuredFirst: false }),
+      { tags: ["umrah-packages"] }
+    );
     return rows.map((r) => toPackageCard(r, today()));
   }
 

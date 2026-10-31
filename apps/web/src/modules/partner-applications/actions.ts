@@ -8,8 +8,6 @@ import { requireUser } from "@/lib/auth/session";
 import {
   APP_CONFIG,
   REJECT_COOLDOWN_DAYS,
-  EARLIEST_BUSINESS_YEAR,
-  CURRENT_YEAR,
   MARKUP_PRESETS,
   docSlotsFor,
   missingRequiredDocSlots,
@@ -17,7 +15,19 @@ import {
 } from "./config";
 import { getEditableApplication, getLatestApplication, getOwnedApplication, type DocumentRef } from "./queries";
 import {
-  phoneSchema,
+  step1BusinessSchema,
+  step1AffiliateSchema,
+  step2ContactSchema,
+  step2AffiliateSchema,
+  step3AgencySchema,
+  step3HotelSchema,
+  step3AffiliateSchema,
+  step3VenueSchema,
+  step4AgencySchema,
+  step4HotelSchema,
+  fieldErrorsOf,
+  normalizeWebsite,
+  type FieldErrors,
   MAX_UPLOAD_BYTES,
   ALLOWED_UPLOAD_TYPES,
   UPLOAD_SIZE_ERROR,
@@ -28,7 +38,20 @@ import {
   LOGO_TYPE_ERROR,
 } from "./schemas";
 
-export type ActionState = { error: string | null } | null;
+/**
+ * `fieldErrors` carries one message per invalid field for the wizard to show
+ * inline. `autosave` marks a result from a background save, whose errors the
+ * wizard does not display: the applicant has not asked to continue yet.
+ */
+export type ActionState = { error: string | null; fieldErrors?: FieldErrors; autosave?: boolean } | null;
+
+function invalid(error: z.ZodError, formData: FormData): ActionState {
+  return {
+    error: error.issues[0]?.message ?? "Check the highlighted fields.",
+    fieldErrors: fieldErrorsOf(error),
+    autosave: formData.get("intent") !== "continue",
+  };
+}
 
 function wizardPath(kind: ApplicationKind, id: string, step: number) {
   return `/account/become/${kind}/${id}?step=${step}`;
@@ -85,40 +108,6 @@ export async function startApplication(formData: FormData): Promise<void> {
 // ---------------------------------------------------------------------------
 // Step 1 — business details (agency / hotel_partner) or "about you" (affiliate)
 // ---------------------------------------------------------------------------
-const step1BusinessSchema = z.object({
-  legalBusinessName: z.string().min(2, "Enter your legal business name."),
-  tradingName: z.string().optional(),
-  businessType: z.string().min(1, "Select a business type."),
-  yearEstablished: z
-    .string()
-    .min(1, "Enter the year your business was established.")
-    .refine((v) => {
-      const year = Number(v);
-      return Number.isInteger(year) && year >= EARLIEST_BUSINESS_YEAR && year <= CURRENT_YEAR;
-    }, `Enter a year between ${EARLIEST_BUSINESS_YEAR} and ${CURRENT_YEAR}.`),
-  registrationNumber: z.string().optional(),
-  taxId: z.string().optional(),
-  officeStreet: z.string().optional(),
-  officeCity: z.string().min(1, "Enter the city."),
-  officeRegion: z.string().optional(),
-  officeCountry: z.string().optional(),
-  businessPhone: phoneSchema,
-  businessEmail: z.string().email("Enter a valid business email."),
-  website: z.string().optional(),
-  branchesJson: z.string().optional(),
-});
-
-// An affiliate is an individual referring an existing B2C platform, not a
-// registered business — no legal name/tax ID/office address, just who they
-// are, how to reach them, and where their audience actually is.
-const step1AffiliateSchema = z.object({
-  fullName: z.string().min(2, "Enter your full name."),
-  city: z.string().min(1, "Enter your city."),
-  audienceLocation: z.string().min(1, "Select where your audience is mainly based."),
-  mobile: phoneSchema,
-  email: z.string().email("Enter a valid email."),
-});
-
 export async function saveStep1(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const kind = kindOf(formData);
   const id = String(formData.get("applicationId"));
@@ -133,7 +122,7 @@ export async function saveStep1(_prev: ActionState, formData: FormData): Promise
 
   if (kind === "affiliate") {
     const parsed = step1AffiliateSchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    if (!parsed.success) return invalid(parsed.error, formData);
     update.business_details = mergeDetails(application.business_details, {
       fullName: parsed.data.fullName,
       city: parsed.data.city,
@@ -144,7 +133,7 @@ export async function saveStep1(_prev: ActionState, formData: FormData): Promise
     });
   } else {
     const parsed = step1BusinessSchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    if (!parsed.success) return invalid(parsed.error, formData);
     let branches: Array<{ name: string; location: string }> = [];
     try {
       branches = parsed.data.branchesJson ? JSON.parse(parsed.data.branchesJson) : [];
@@ -164,7 +153,7 @@ export async function saveStep1(_prev: ActionState, formData: FormData): Promise
       officeCountry: parsed.data.officeCountry || null,
       businessPhone: parsed.data.businessPhone,
       businessEmail: parsed.data.businessEmail,
-      website: parsed.data.website || null,
+      website: normalizeWebsite(parsed.data.website ?? ""),
       branches,
       _wizard_step: Math.max(2, currentStep),
     });
@@ -181,21 +170,6 @@ export async function saveStep1(_prev: ActionState, formData: FormData): Promise
 // ---------------------------------------------------------------------------
 // Step 2 — authorized contact (agency / hotel_partner) or identity verification (affiliate)
 // ---------------------------------------------------------------------------
-const step2ContactSchema = z.object({
-  contactFullName: z.string().min(2, "Enter the contact's full name."),
-  contactRole: z.string().min(1, "Enter their role or title."),
-  contactIdNumber: z.string().min(3, "Enter a national ID or passport number."),
-  contactMobile: phoneSchema,
-  contactEmail: z.string().email("Enter a valid email."),
-});
-
-// The affiliate already gave their name/phone/email in step 1 — step 2 here
-// exists purely to record the ID number backing the document they'll upload
-// in the Documents step, for payout fraud prevention.
-const step2AffiliateSchema = z.object({
-  idNumber: z.string().min(3, "Enter a national ID or passport number."),
-});
-
 export async function saveStep2(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const kind = kindOf(formData);
   const id = String(formData.get("applicationId"));
@@ -209,11 +183,11 @@ export async function saveStep2(_prev: ActionState, formData: FormData): Promise
 
   if (kind === "affiliate") {
     const parsed = step2AffiliateSchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    if (!parsed.success) return invalid(parsed.error, formData);
     details = mergeDetails(application.business_details, { idNumber: parsed.data.idNumber, _wizard_step: step });
   } else {
     const parsed = step2ContactSchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    if (!parsed.success) return invalid(parsed.error, formData);
     details = mergeDetails(application.business_details, {
       contactFullName: parsed.data.contactFullName,
       contactRole: parsed.data.contactRole,
@@ -234,49 +208,6 @@ export async function saveStep2(_prev: ActionState, formData: FormData): Promise
 // ---------------------------------------------------------------------------
 // Step 3 — type-specific operations
 // ---------------------------------------------------------------------------
-const step3AgencySchema = z.object({
-  yearsExperience: z.string().optional(),
-  staffCount: z.string().optional(),
-  monthlyVolume: z.string().min(1, "Select an estimated monthly volume."),
-  products: z.string().optional(), // comma-separated
-  isOrgMember: z.string().optional(),
-  orgMemberType: z.string().optional(),
-  iataNumber: z.string().optional(),
-});
-
-const step3HotelSchema = z.object({
-  propertyType: z.string().min(1, "Select a property type."),
-  propertyName: z.string().min(2, "Enter the property name."),
-  starRating: z.string().min(1, "Select a star rating."),
-  propertyStreet: z.string().optional(),
-  location: z.string().min(2, "Enter the property's location/city."),
-  totalRooms: z.string().min(1, "Enter the total number of rooms."),
-  roomTypesJson: z.string().optional(),
-  checkInTime: z.string().min(1, "Set a check-in time."),
-  checkOutTime: z.string().min(1, "Set a check-out time."),
-  amenities: z.string().optional(), // comma-separated
-  cancellationPolicy: z.string().min(1, "Select a cancellation policy."),
-});
-
-const step3AffiliateSchema = z.object({
-  handlesJson: z.string().optional(),
-  audienceSize: z.string().optional(),
-  trafficSource: z.string().min(1, "Select your primary traffic source."),
-  promotionPlan: z.string().min(10, "Tell us a bit about how you'll promote STS Somalia."),
-});
-
-// Venue application captures the flagship hall's shape — actual venue
-// listings (with photos, live pricing) are created in the Venue Portal after
-// approval, same split as hotel_partner's property step vs the portal.
-const step3VenueSchema = z.object({
-  venueName: z.string().min(2, "Enter the venue name."),
-  location: z.string().min(2, "Enter the venue's location/city."),
-  seatedCapacity: z.string().optional(),
-  standingCapacity: z.string().min(1, "Enter the standing capacity."),
-  eventTypes: z.string().optional(), // comma-separated
-  indicativePrice: z.string().optional(),
-});
-
 export async function saveStep3(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const kind = kindOf(formData);
   const id = String(formData.get("applicationId"));
@@ -290,7 +221,7 @@ export async function saveStep3(_prev: ActionState, formData: FormData): Promise
 
   if (kind === "agency") {
     const parsed = step3AgencySchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    if (!parsed.success) return invalid(parsed.error, formData);
     patch = {
       yearsExperience: parsed.data.yearsExperience || null,
       staffCount: parsed.data.staffCount || null,
@@ -302,7 +233,7 @@ export async function saveStep3(_prev: ActionState, formData: FormData): Promise
     };
   } else if (kind === "hotel_partner") {
     const parsed = step3HotelSchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    if (!parsed.success) return invalid(parsed.error, formData);
     let roomTypes: Array<{ typeName: string; count: string; maxOccupancy: string; basePriceUsd: string }> = [];
     try {
       roomTypes = parsed.data.roomTypesJson ? JSON.parse(parsed.data.roomTypesJson) : [];
@@ -310,7 +241,9 @@ export async function saveStep3(_prev: ActionState, formData: FormData): Promise
       roomTypes = [];
     }
     roomTypes = roomTypes.filter((r) => r.typeName?.trim());
-    if (roomTypes.length === 0) return { error: "Add at least one room type (e.g. Standard Double, Deluxe Suite)." };
+    if (roomTypes.length === 0) {
+      return { error: "Add at least one room type.", autosave: formData.get("intent") !== "continue" };
+    }
     patch = {
       propertyType: parsed.data.propertyType,
       propertyName: parsed.data.propertyName,
@@ -326,7 +259,7 @@ export async function saveStep3(_prev: ActionState, formData: FormData): Promise
     };
   } else if (kind === "venue_partner") {
     const parsed = step3VenueSchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    if (!parsed.success) return invalid(parsed.error, formData);
     patch = {
       venueName: parsed.data.venueName,
       location: parsed.data.location,
@@ -337,7 +270,7 @@ export async function saveStep3(_prev: ActionState, formData: FormData): Promise
     };
   } else {
     const parsed = step3AffiliateSchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    if (!parsed.success) return invalid(parsed.error, formData);
     let handles: Array<{ platform: string; handle: string }> = [];
     try {
       handles = parsed.data.handlesJson ? JSON.parse(parsed.data.handlesJson) : [];
@@ -367,17 +300,6 @@ export async function saveStep3(_prev: ActionState, formData: FormData): Promise
 // ---------------------------------------------------------------------------
 // Step 4 — settlement (agency + hotel_partner only)
 // ---------------------------------------------------------------------------
-const step4AgencySchema = z.object({
-  paymentModel: z.enum(["prepaid_wallet", "credit_line"]),
-  requestedMarkupPreset: z.string().optional(),
-  requestedMarkupCustom: z.string().optional(),
-  estimatedMonthlyVolume: z.string().optional(),
-  bankName: z.string().optional(),
-  bankAccountName: z.string().optional(),
-  bankAccountNumber: z.string().optional(),
-  remarks: z.string().optional(),
-});
-
 /**
  * Preset + custom inputs collapse to one number. An empty custom box (the
  * applicant just switched the select to "Custom") is not an error — the
@@ -398,17 +320,6 @@ function resolveRequestedMarkup(preset: string | undefined, custom: string | und
   return { value: n };
 }
 
-// A hotel is a supplier, not a buyer: it never taps a wallet/credit line, it
-// gets PAID OUT for completed stays, so bank details are mandatory here
-// (they're optional for an agency, whose primary settlement method is the
-// wallet/credit line above) and the only choice to make is payout cadence.
-const step4HotelSchema = z.object({
-  payoutFrequency: z.string().min(1, "Select a payout frequency."),
-  bankName: z.string().min(2, "Enter the bank name."),
-  bankAccountName: z.string().min(2, "Enter the account holder name."),
-  bankAccountNumber: z.string().min(4, "Enter the account number."),
-});
-
 export async function saveStep4(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const kind = kindOf(formData);
   const id = String(formData.get("applicationId"));
@@ -422,7 +333,7 @@ export async function saveStep4(_prev: ActionState, formData: FormData): Promise
   // events — so they share the payout-cadence + mandatory-bank settlement.
   if (kind === "hotel_partner" || kind === "venue_partner") {
     const parsed = step4HotelSchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    if (!parsed.success) return invalid(parsed.error, formData);
     patch = {
       payoutFrequency: parsed.data.payoutFrequency,
       bankName: parsed.data.bankName,
@@ -431,9 +342,15 @@ export async function saveStep4(_prev: ActionState, formData: FormData): Promise
     };
   } else {
     const parsed = step4AgencySchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) return { error: parsed.error.issues[0].message };
+    if (!parsed.success) return invalid(parsed.error, formData);
     const markup = resolveRequestedMarkup(parsed.data.requestedMarkupPreset, parsed.data.requestedMarkupCustom);
-    if ("error" in markup) return { error: markup.error };
+    if ("error" in markup) {
+      return {
+        error: markup.error,
+        fieldErrors: { requestedMarkupCustom: markup.error },
+        autosave: formData.get("intent") !== "continue",
+      };
+    }
     patch = {
       paymentModel: parsed.data.paymentModel,
       requestedMarkupPercent: markup.value,

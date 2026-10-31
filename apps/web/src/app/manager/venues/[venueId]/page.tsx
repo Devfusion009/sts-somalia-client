@@ -5,7 +5,8 @@ import { getDeskVenue } from "@/modules/events/venue-manager-queries";
 import { VenueDashboardView } from "@/modules/events/views/venue-dashboard-view";
 import { priceUnitLabel, venueMoney } from "@/modules/events/components/amenities";
 import { Badge, statusBadgeVariant } from "@/components/ui/badge";
-import { PageHeader } from "@/components/ui/page-header";
+import { WorkspaceCover } from "@/components/portal/workspace-cover";
+import { venueImageUrls } from "@/modules/events/images";
 
 export const metadata = { title: "Dashboard" };
 
@@ -22,7 +23,8 @@ export default async function VenueManagerDashboard({ params }: { params: Promis
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <PageHeader
+      <WorkspaceCover
+        image={venueImageUrls(venue.images)[0] ?? "/marketing/events-hall.webp"}
         title={venue.name}
         status={
           <Badge variant={statusBadgeVariant(venue.status)} className="capitalize">

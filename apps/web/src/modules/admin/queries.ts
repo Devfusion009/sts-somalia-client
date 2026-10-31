@@ -194,7 +194,7 @@ export async function getApplicationDetail(type: ApplicationType, id: string) {
     const { data } = await supabase
       .from("agency_applications")
       .select(
-        "*, applicant:profiles!agency_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!agency_applications_assigned_reviewer_fkey(full_name, email)"
+        "*, applicant:profiles!agency_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!agency_applications_assigned_reviewer_fkey(full_name, email), decider:profiles!agency_applications_reviewed_by_fkey(full_name, email)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -205,7 +205,7 @@ export async function getApplicationDetail(type: ApplicationType, id: string) {
     const { data } = await supabase
       .from("hotel_partner_applications")
       .select(
-        "*, applicant:profiles!hotel_partner_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!hotel_partner_applications_assigned_reviewer_fkey(full_name, email)"
+        "*, applicant:profiles!hotel_partner_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!hotel_partner_applications_assigned_reviewer_fkey(full_name, email), decider:profiles!hotel_partner_applications_reviewed_by_fkey(full_name, email)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -216,7 +216,7 @@ export async function getApplicationDetail(type: ApplicationType, id: string) {
     const { data } = await supabase
       .from("venue_partner_applications")
       .select(
-        "*, applicant:profiles!venue_partner_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!venue_partner_applications_assigned_reviewer_fkey(full_name, email)"
+        "*, applicant:profiles!venue_partner_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!venue_partner_applications_assigned_reviewer_fkey(full_name, email), decider:profiles!venue_partner_applications_reviewed_by_fkey(full_name, email)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -226,7 +226,7 @@ export async function getApplicationDetail(type: ApplicationType, id: string) {
   const { data } = await supabase
     .from("affiliate_applications")
     .select(
-      "*, applicant:profiles!affiliate_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!affiliate_applications_assigned_reviewer_fkey(full_name, email)"
+      "*, applicant:profiles!affiliate_applications_applicant_id_fkey(full_name, email, phone), reviewer:profiles!affiliate_applications_assigned_reviewer_fkey(full_name, email), decider:profiles!affiliate_applications_reviewed_by_fkey(full_name, email)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -254,13 +254,6 @@ export async function getDocumentReviews(type: ApplicationType, applicationId: s
     .eq("application_id", applicationId);
 
   return new Map((data ?? []).map((row) => [row.doc_key, row]));
-}
-
-/** For the "assign reviewer" picker. */
-export async function getAdminProfiles() {
-  const supabase = await createClient();
-  const { data } = await supabase.from("profiles").select("id, full_name, email").eq("role", "admin").order("full_name");
-  return data ?? [];
 }
 
 export type OrderQueueFilter = "all" | "action" | "upcoming" | Database["public"]["Enums"]["order_status"];
@@ -695,11 +688,24 @@ export async function getUpcomingHallBookings(limit = 5) {
  * types can't describe an aggregate embed, and an account belongs to a handful
  * of organisations at most.
  */
-export type UserListFilters = { page: number; q?: string };
+export const USER_ROLE_FILTERS = ["admin", "agent", "customer", "hotel_partner", "hotel_manager", "venue_manager", "venue_partner", "affiliate"] as const;
+export type UserRoleFilter = (typeof USER_ROLE_FILTERS)[number];
+
+export type UserListFilters = { page: number; q?: string; role?: UserRoleFilter };
 
 /** One page of the users table, newest first, with membership counts as aggregates. */
-export async function getUsersPage({ page, q }: UserListFilters) {
+export async function getUsersPage({ page, q, role }: UserListFilters) {
   const supabase = await createClient();
+
+  // Agency and hotel-partner access comes from membership rows, which `role`
+  // can fall out of step with, so those filters match either signal.
+  const memberIds = async (table: "agency_members" | "hotel_partner_members") => {
+    const { data } = await supabase.from(table).select("profile_id").limit(1000);
+    return [...new Set((data ?? []).map((m) => m.profile_id))];
+  };
+  const agencyIds = role === "agent" || role === "customer" ? await memberIds("agency_members") : [];
+  const partnerIds = role === "hotel_partner" || role === "customer" ? await memberIds("hotel_partner_members") : [];
+
   let query = supabase
     .from("profiles")
     // One unbroken literal: supabase-js infers embedded-resource types by
@@ -711,6 +717,15 @@ export async function getUsersPage({ page, q }: UserListFilters) {
       { count: "exact" }
     )
     .order("created_at", { ascending: false });
+
+  if (role === "admin") query = query.eq("is_platform_admin", true);
+  else if (role === "agent") query = agencyIds.length ? query.or(`role.eq.agent,id.in.(${agencyIds.join(",")})`) : query.eq("role", "agent");
+  else if (role === "hotel_partner") query = partnerIds.length ? query.or(`role.eq.hotel_partner,id.in.(${partnerIds.join(",")})`) : query.eq("role", "hotel_partner");
+  else if (role === "customer") {
+    query = query.eq("role", "customer").eq("is_platform_admin", false);
+    const members = [...agencyIds, ...partnerIds];
+    if (members.length) query = query.not("id", "in", `(${members.join(",")})`);
+  } else if (role) query = query.eq("role", role);
 
   const term = searchTerm(q);
   if (term) query = query.or(`full_name.ilike.%${term}%,email.ilike.%${term}%`);

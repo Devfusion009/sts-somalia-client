@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import styles from "@/components/marketing/travel-collection.module.css";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,16 +21,9 @@ export type HotelSearchValues = {
   occ: string;
 };
 
-const CELL = "relative flex-1 px-4 py-2.5 transition-colors focus-within:bg-white/10";
-const FIELD_LABEL = "flex items-center gap-1.5 text-xs font-semibold text-white/75";
-const FIELD_INPUT =
-  "h-9 w-full border-0 bg-transparent p-0 text-base font-medium text-white sm:text-sm shadow-none outline-none placeholder:text-white/50 focus-visible:ring-0 dark:bg-transparent [&::-webkit-calendar-picker-indicator]:invert";
+const FIELD_LABEL = "flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground";
+const FIELD_INPUT = "h-9 w-full border-0 bg-transparent p-0 text-sm font-semibold text-foreground shadow-none outline-none focus-visible:ring-0 dark:bg-transparent";
 
-/**
- * Translucent inline search bar that sits over the panoramic hero photo — one
- * connected dark-glass bar on desktop, stacked cells on mobile. City filters
- * server-side; dates/guests ride along to prefill the booking form.
- */
 export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) {
   const router = useRouter();
   const [values, setValues] = useState(initial);
@@ -56,15 +50,13 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-col overflow-hidden rounded-xl border border-white/20 bg-black/55 shadow-2xl backdrop-blur-md lg:flex-row lg:items-stretch"
+      className={styles.searchForm}
     >
-      <div className={CELL}>
+      <div className={styles.searchCell}>
         <Label htmlFor="city" className={FIELD_LABEL}>
-          <PlaceIcon sx={{ fontSize: 14 }} aria-hidden /> Where
+          <PlaceIcon sx={{ fontSize: 14 }} aria-hidden /> Destination
         </Label>
-        {/* LocationField renders our Input primitive; strip its chrome so it
-            reads as part of the glass bar rather than a nested box. */}
-        <div className="mt-0.5 [&_input]:h-9 [&_input]:border-0 [&_input]:bg-transparent [&_input]:p-0 [&_input]:text-base sm:[&_input]:text-sm [&_input]:font-medium [&_input]:text-white [&_input]:shadow-none [&_input]:placeholder:text-white/50 [&_input]:focus-visible:ring-0">
+        <div className="mt-0.5 [&_input]:h-9 [&_input]:border-0 [&_input]:bg-transparent [&_input]:p-0 [&_input]:text-base sm:[&_input]:text-sm [&_input]:font-semibold [&_input]:text-foreground [&_input]:shadow-none [&_input]:placeholder:text-muted-foreground [&_input]:focus-visible:ring-0">
           <LocationField
             id="city"
             placeholder="Enter a city"
@@ -75,9 +67,7 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
         </div>
       </div>
 
-      <div className="h-px bg-white/15 lg:h-auto lg:w-px" aria-hidden />
-
-      <div className={CELL}>
+      <div className={styles.searchCell}>
         <Label htmlFor="checkIn" className={FIELD_LABEL}>
           <CalendarMonthIcon sx={{ fontSize: 14 }} aria-hidden /> Check-in
         </Label>
@@ -92,9 +82,7 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
         />
       </div>
 
-      <div className="h-px bg-white/15 lg:h-auto lg:w-px" aria-hidden />
-
-      <div className={CELL}>
+      <div className={styles.searchCell}>
         <Label htmlFor="checkOut" className={FIELD_LABEL}>
           <CalendarMonthIcon sx={{ fontSize: 14 }} aria-hidden /> Check-out
         </Label>
@@ -109,9 +97,7 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
         />
       </div>
 
-      <div className="h-px bg-white/15 lg:h-auto lg:w-px" aria-hidden />
-
-      <div className={CELL}>
+      <div className={styles.searchCell}>
         <Label htmlFor="guests" className={FIELD_LABEL}>
           <PeopleAltIcon sx={{ fontSize: 14 }} aria-hidden /> Guests
         </Label>
@@ -120,15 +106,15 @@ export function HotelSearchFilters({ initial }: { initial: HotelSearchValues }) 
           name={null}
           value={parseOccupancy(values.occ, Number.parseInt(values.guests, 10) || undefined)}
           onChange={(rooms) => set("occ", formatOccupancy(rooms))}
-          className="h-9 border-0 bg-transparent px-0 text-base font-medium text-white shadow-none hover:border-0 focus-visible:ring-0 sm:text-sm dark:bg-transparent [&_svg]:hidden"
+          className="h-9 w-full justify-start border-0 bg-transparent px-0 text-sm font-semibold text-foreground shadow-none hover:border-0 focus-visible:ring-0 dark:bg-transparent [&_svg]:hidden"
         />
       </div>
 
       <button
         type="submit"
-        className="flex h-14 shrink-0 items-center justify-center gap-2 bg-brand-accent px-9 font-heading text-sm font-bold text-brand-accent-foreground transition-colors hover:bg-brand-accent/90 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none focus-visible:ring-inset lg:h-auto"
+        className={styles.searchSubmit}
       >
-        <SearchIcon sx={{ fontSize: 20 }} aria-hidden /> Search
+        <SearchIcon sx={{ fontSize: 20 }} aria-hidden /> Find hotels
       </button>
     </form>
   );

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Globe, Headset, ShieldCheck, Timer, Users, Wallet } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Globe, ShieldCheck } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -16,7 +16,7 @@ import { VisaHeroBanner, VisaProcess } from "@/components/marketing/visa-hero";
 import { VisaExpertCard } from "@/components/marketing/visa-expert-card";
 import { ReviewsRail } from "@/components/marketing/reviews-rail";
 import { HomeFaq } from "@/components/marketing/home-faq";
-import { SectionHeading } from "@/components/marketing/section-heading";
+import { VisaBenefits, VisaDocuments } from "@/components/marketing/visa-visual-sections";
 
 export const metadata: Metadata = { title: "Visa Services" };
 
@@ -51,20 +51,6 @@ const VISA_FAQS: Array<{ question: string; answer: string }> = [
   },
 ];
 
-const TRUST_POINTS = [
-  { icon: ShieldCheck, text: "Document review before submission" },
-  { icon: Timer, text: "Application tracking in your account" },
-  { icon: Users, text: "Family and group applications" },
-];
-
-const WHY_US = [
-  { icon: ShieldCheck, text: "Documents checked before they reach the consulate" },
-  { icon: Timer, text: "Status tracking on every application" },
-  { icon: Users, text: "Family and group applications handled together" },
-  { icon: Wallet, text: "Local payment methods — EVC Plus, bank, card" },
-  { icon: Headset, text: "24/7 support from our Mogadishu-based team" },
-];
-
 export default async function VisaListPage({
   searchParams,
 }: {
@@ -83,44 +69,30 @@ export default async function VisaListPage({
 
   return (
     <div>
-      <VisaHeroBanner>
-        <div className="max-w-2xl">
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-balance text-white drop-shadow-lg sm:text-4xl lg:text-5xl">
-            Visa applications, <span className="text-brand-accent">checked before they&apos;re submitted</span>
-          </h1>
-          <p className="mt-4 max-w-lg text-lg leading-relaxed text-white/85 drop-shadow">
-            Our desk reviews every document against what the consulate requires, then tracks your
-            case to a decision.
-          </p>
-
-          <VisaDestinationSearch destinations={destinations} defaultValue={country} defaultPassport={passport} />
-
-          <ul className="mt-7 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-6">
-            {TRUST_POINTS.map((point) => (
-              <li key={point.text} className="flex items-center gap-2 text-sm font-medium text-white/85 drop-shadow">
-                <point.icon className="size-4 shrink-0 text-primary" aria-hidden /> {point.text}
-              </li>
-            ))}
-          </ul>
-        </div>
+      <VisaHeroBanner search={<VisaDestinationSearch key={`${country ?? ""}-${passport ?? ""}`} destinations={destinations} defaultValue={country} defaultPassport={passport} />}>
+        <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#cddbcf] px-3.5 py-2 text-[10px] font-semibold tracking-[0.14em] text-[#547063] uppercase"><ShieldCheck className="size-3.5 text-primary" aria-hidden /> STS Visa Services</span>
+        <h1 className="max-w-2xl font-heading text-[2.7rem] leading-[1.08] font-semibold tracking-[-0.045em] text-[#123e32] sm:text-6xl lg:text-[4.25rem]">
+          Your destination.<br /><span className="text-[#648470]">Our visa expertise.</span>
+        </h1>
+        <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 text-xs font-medium text-[#567263]"><span>Tourist</span><span aria-hidden className="size-1 rounded-full bg-[#b4c8b7]" /><span>Business</span><span aria-hidden className="size-1 rounded-full bg-[#b4c8b7]" /><span>Family visits</span></div>
       </VisaHeroBanner>
 
-      <div className="mx-auto max-w-7xl space-y-16 px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-16 px-4 py-12 sm:px-6 sm:py-16 lg:space-y-20 lg:px-8">
         {featured.length > 0 ? (
           <section aria-labelledby="visa-popular">
             <div id="visa-popular">
-              <SectionHeading align="left" title="Popular destinations" />
+              <div className="flex flex-wrap items-end justify-between gap-4"><div><span className="text-[10px] font-semibold tracking-[0.18em] text-primary uppercase">Your next chapter</span><h2 className="mt-2 font-heading text-3xl font-semibold tracking-tight sm:text-4xl">Places worth the paperwork.</h2></div><a href="#visa-results" className="inline-flex min-h-10 items-center gap-2 rounded-sm text-sm font-medium text-primary focus-visible:outline-2 focus-visible:outline-primary">All visa services <ArrowUpRight className="size-4" aria-hidden /></a></div>
             </div>
-            <ul className="mt-8 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4">
+            <ul className="mt-8 grid grid-cols-1 gap-5 min-[420px]:grid-cols-2 lg:grid-cols-4">
               {featured.map((visa) => {
                 const photo = visaCardImage(visa);
                 return (
                   <li key={visa.id}>
                     <Link
                       href={visaHref(visa.id)}
-                      className="group block rounded-2xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+                      className="group block h-full overflow-hidden rounded-2xl border border-border bg-card shadow-xs transition-shadow hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
                     >
-                      <div className="relative flex aspect-4/3 items-center justify-center overflow-hidden rounded-2xl bg-secondary">
+                      <div className="relative flex aspect-[5/4] items-center justify-center overflow-hidden bg-secondary">
                         {photo ? (
                           <Image
                             src={photo}
@@ -144,15 +116,15 @@ export default async function VisaListPage({
                           </span>
                         ) : null}
                       </div>
-                      <h3 className="mt-3 font-heading text-base leading-snug font-bold transition-colors group-hover:text-primary">
+                      <div className="p-5"><h3 className="font-heading text-base leading-snug font-bold transition-colors group-hover:text-primary">
                         {countryName(visa.destination_country_code)}
                       </h3>
-                      <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-2">
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-2">
                         <span className="text-xs text-muted-foreground">{processingText(visa)}</span>
                         <span className="font-heading text-base font-bold text-foreground tabular-nums sm:text-lg">
-                          {fmtMoney(visa.price, visa.currency)}
+                          <span className="mr-1 text-[10px] font-normal text-muted-foreground">From</span>{fmtMoney(visa.price, visa.currency)}
                         </span>
-                      </div>
+                      </div></div>
                     </Link>
                   </li>
                 );
@@ -161,9 +133,9 @@ export default async function VisaListPage({
           </section>
         ) : null}
 
-        <section id="visa-results" aria-labelledby="visa-results-heading" className="scroll-mt-48">
+        <section id="visa-results" aria-labelledby="visa-results-heading" className="scroll-mt-28">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h2 id="visa-results-heading" className="font-heading text-2xl font-bold tracking-tight">
+            <h2 id="visa-results-heading" className="font-heading text-3xl font-semibold tracking-tight">
               {country ? `Visas for “${country}”` : "All visa services"}
             </h2>
             {visaTypes.length > 0 ? (
@@ -173,12 +145,12 @@ export default async function VisaListPage({
             ) : null}
           </div>
           {visaTypes.length > 0 ? (
-            <ul className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <ul className="mt-7 grid grid-cols-1 gap-4 lg:grid-cols-2">
               {visaTypes.map((visa) => (
                 <li key={visa.id}>
-                  <Card className="h-full py-0 transition-shadow hover:shadow-md">
-                    <CardContent className="flex h-full flex-col gap-4 p-5 sm:flex-row sm:items-start">
-                      <span className="text-3xl leading-none" aria-hidden>
+                  <Card className="group h-full overflow-hidden rounded-2xl py-0 shadow-none transition-all hover:border-primary/35 hover:shadow-md">
+                    <CardContent className="flex h-full flex-col gap-4 p-5 sm:flex-row sm:items-center sm:p-6">
+                      <span className="grid size-14 shrink-0 place-items-center rounded-xl border border-border bg-secondary/50 text-3xl leading-none" aria-hidden>
                         {countryFlag(visa.destination_country_code)}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -231,8 +203,8 @@ export default async function VisaListPage({
                             {fmtMoney(visa.price, visa.currency)}
                           </span>
                         </p>
-                        <Button className="gap-1 sm:mt-2" render={<Link href={visaHref(visa.id)} />}>
-                          Apply <ArrowRight className="size-3.5" aria-hidden />
+                        <Button className="gap-1 bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground sm:mt-3" render={<Link href={visaHref(visa.id)} />}>
+                          View visa <ArrowRight className="size-3.5" aria-hidden />
                           <span className="sr-only">for {visa.name}</span>
                         </Button>
                       </div>
@@ -264,25 +236,12 @@ export default async function VisaListPage({
       </div>
 
       <VisaProcess />
+      <VisaDocuments />
       <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
         <VisaExpertCard wide />
       </div>
 
-      <section className="border-t border-border bg-background py-16 sm:py-20 lg:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionHeading title="Why book your visa with STS" />
-          <ul className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-5">
-            {WHY_US.map((point) => (
-              <li key={point.text} className="flex items-center gap-3 sm:flex-col sm:text-center">
-                <span className="grid size-12 shrink-0 place-items-center rounded-full bg-primary/10 text-primary" aria-hidden>
-                  <point.icon className="size-5" />
-                </span>
-                <p className="text-sm leading-snug text-muted-foreground">{point.text}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+      <VisaBenefits />
 
       <ReviewsRail />
       <HomeFaq faqs={VISA_FAQS} title="Visa questions" />

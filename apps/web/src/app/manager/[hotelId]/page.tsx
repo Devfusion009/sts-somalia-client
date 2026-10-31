@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { addDays, format } from "date-fns";
-import { BedDouble, CalendarPlus, ChevronLeft, ChevronRight, ReceiptText } from "lucide-react";
+import { ArrowRight, BedDouble, CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, ReceiptText, Ticket } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyManagedHotel, hasPermission } from "@/modules/hotels/manager-queries";
 import {
@@ -21,7 +21,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { dateSpan, money } from "@/lib/money";
-import { HotelLogo } from "@/modules/hotels/components/hotel-logo";
+import { WorkspaceCover } from "@/components/portal/workspace-cover";
+import { hotelImageUrls } from "@/modules/hotels/images";
+import styles from "../workspace.module.css";
 
 function GuestList({
   title,
@@ -104,38 +106,17 @@ export default async function ManagerDashboardPage({
   const base = `/manager/${hotelId}`;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <div className="space-y-5">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-          <div className="flex min-w-0 items-center gap-4">
-            <HotelLogo path={managed.hotel.logo_path} className="max-sm:size-12" />
-            <div className="min-w-0 space-y-1">
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">
-                  {managed.hotel.name}
-                </h1>
-                <Badge variant={statusBadgeVariant(managed.hotel.status)} className="capitalize">
-                  {managed.hotel.status.replace(/_/g, " ")}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {managed.hotel.city}, {managed.hotel.country_code}
-              </p>
-            </div>
-          </div>
-          {canEditBookings ? (
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <Button variant="outline" render={<Link href={`${base}/front-desk`} />}>
-                Front desk
-              </Button>
-              <Button render={<Link href={`${base}/bookings/new`} />}>
-                <CalendarPlus aria-hidden="true" /> Book now
-              </Button>
-            </div>
-          ) : null}
-        </header>
+        <WorkspaceCover
+          image={hotelImageUrls(managed.hotel.images)[0] ?? "/marketing/hotels-hero-bg.webp"}
+          title={managed.hotel.name}
+          status={<Badge variant={statusBadgeVariant(managed.hotel.status)} className="capitalize">{managed.hotel.status.replace(/_/g, " ")}</Badge>}
+          meta={<span>{managed.hotel.city}, {managed.hotel.country_code}{profile.manager_code ? ` · ${profile.manager_code}` : ""}</span>}
+          actions={canEditBookings ? <Button render={<Link href={`${base}/bookings/new`} />}><CalendarPlus aria-hidden="true" />New reservation</Button> : undefined}
+        />
 
-        <StatRail>
+        <StatRail className={styles.stats}>
           <StatRailItem label="In house" value={frontDesk.inHouse.length} />
           <StatRailItem label="Arriving today" value={frontDesk.arrivingToday.length} />
           <StatRailItem label="Departing today" value={frontDesk.departingToday.length} />
@@ -144,11 +125,18 @@ export default async function ManagerDashboardPage({
             value={stats.pendingCount}
             tone={stats.pendingCount > 0 ? "warn" : undefined}
           />
-          <StatRailItem label="New today" value={today.newToday} />
-          <StatRailItem label="Checked out today" value={today.checkedOutToday} />
-          <StatRailItem label="Cancelled today" value={today.cancelledToday} />
-          <StatRailItem label="No-shows today" value={today.noShowToday} />
         </StatRail>
+        <dl className={styles.daily}>
+          <div><dt>New today</dt><dd>{today.newToday}</dd></div>
+          <div><dt>Checked out</dt><dd>{today.checkedOutToday}</dd></div>
+          <div><dt>Cancelled</dt><dd>{today.cancelledToday}</dd></div>
+          <div><dt>No-shows</dt><dd>{today.noShowToday}</dd></div>
+        </dl>
+        <nav aria-label="Property operations" className={styles.shortcuts}>
+          <Link href={`${base}/bookings`} className={styles.shortcut}><Ticket className="size-4" aria-hidden="true" />Reservations<ArrowRight className="size-3.5" aria-hidden="true" /></Link>
+          {canEditBookings ? <Link href={`${base}/front-desk`} className={styles.shortcut}><CalendarDays className="size-4" aria-hidden="true" />Front desk<ArrowRight className="size-3.5" aria-hidden="true" /></Link> : null}
+          {hasPermission(managed, "rooms") || hasPermission(managed, "availability") ? <Link href={`${base}/rooms`} className={styles.shortcut}><BedDouble className="size-4" aria-hidden="true" />Rooms & availability<ArrowRight className="size-3.5" aria-hidden="true" /></Link> : null}
+        </nav>
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-3">
@@ -173,9 +161,6 @@ export default async function ManagerDashboardPage({
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Forecast</CardTitle>
-            <p className="text-xs text-muted-foreground tabular-nums">
-              {format(weekStartDate, "d MMM")} – {format(weekEndDate, "d MMM yyyy")}
-            </p>
             <CardAction className="flex items-center gap-1">
               <Button
                 variant="outline"
@@ -196,6 +181,7 @@ export default async function ManagerDashboardPage({
             </CardAction>
           </CardHeader>
           <CardContent className="space-y-5">
+            <time dateTime={weekStart} className="block text-xs text-muted-foreground tabular-nums">{format(weekStartDate, "d MMM")} – {format(weekEndDate, "d MMM yyyy")}</time>
             <dl className="grid grid-cols-3 divide-x divide-border text-center">
               <div className="px-2">
                 <dt className="text-xs text-muted-foreground">Occupancy</dt>
@@ -216,9 +202,9 @@ export default async function ManagerDashboardPage({
 
             <OccupancyDonut booked={forecast.bookedNights} capacity={forecast.capacityNights} />
 
-            {canEditBookings ? (
-              <Button variant="outline" className="w-full" render={<Link href={`${base}/rooms`} />}>
-                Adjust pricing
+            {hasPermission(managed, "rooms") ? (
+              <Button variant="outline" className="w-full" render={<Link href={`${base}/rates`} />}>
+                Manage rates
               </Button>
             ) : null}
           </CardContent>

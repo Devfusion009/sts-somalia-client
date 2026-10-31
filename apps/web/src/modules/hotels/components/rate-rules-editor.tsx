@@ -2,6 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import styles from "./hotel-workspace.module.css";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -54,9 +55,7 @@ export function RateRulesEditor({
 
   return (
     <div className="space-y-5">
-      {rules.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No rules</p>
-      ) : (
+      {rules.length > 0 ? (
         <ul className="divide-y divide-border">
           {rules.map((rule) => (
             <li key={rule.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 first:pt-0">
@@ -85,101 +84,104 @@ export function RateRulesEditor({
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
 
-      <form ref={formRef} action={formAction} className="space-y-4 border-t border-border pt-5">
-        <input type="hidden" name="hotelId" value={hotelId} />
-        {roomId !== "all" ? <input type="hidden" name="roomId" value={roomId} /> : null}
-        <input type="hidden" name="adjustment" value={adjustment} />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="rule-name">Name</FieldLabel>
-            <Input id="rule-name" name="name" placeholder="Ramadan" maxLength={80} required />
-          </Field>
-          <Field>
-            <FieldLabel>Room type</FieldLabel>
-            <Select value={roomId} onValueChange={(v) => setRoomId(String(v ?? "all"))}>
-              <SelectTrigger className="w-full" aria-label="Room type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All room types</SelectItem>
-                {roomTypes.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="rule-start">From</FieldLabel>
-            <Input id="rule-start" name="dateStart" type="date" min={today} required />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="rule-end">To</FieldLabel>
-            <Input id="rule-end" name="dateEnd" type="date" min={today} required />
-          </Field>
-        </div>
-
-        <fieldset className="space-y-1.5">
-          <legend className="text-sm font-medium">Days</legend>
-          <div className="flex flex-wrap gap-1.5">
-            {DAYS.map((label, i) => {
-              const on = days.includes(i);
-              return (
-                <label
-                  key={label}
-                  className={cn(
-                    "inline-flex h-8 cursor-pointer items-center rounded-full border px-3 text-sm transition-colors has-focus-visible:ring-3 has-focus-visible:ring-ring/50 max-sm:h-10",
-                    on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    name="weekdays"
-                    value={i}
-                    checked={on}
-                    onChange={() => setDays((cur) => (on ? cur.filter((d) => d !== i) : [...cur, i]))}
-                    className="sr-only"
-                  />
-                  {label}
-                </label>
-              );
-            })}
+      <details className={styles.editor}>
+        <summary>Create pricing rule<Plus aria-hidden="true" /></summary>
+        <form ref={formRef} action={formAction} className="space-y-4">
+          <input type="hidden" name="hotelId" value={hotelId} />
+          {roomId !== "all" ? <input type="hidden" name="roomId" value={roomId} /> : null}
+          <input type="hidden" name="adjustment" value={adjustment} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="rule-name">Name</FieldLabel>
+              <Input id="rule-name" name="name" placeholder="Ramadan" maxLength={80} required />
+            </Field>
+            <Field>
+              <FieldLabel>Room type</FieldLabel>
+              <Select value={roomId} onValueChange={(v) => setRoomId(String(v ?? "all"))}>
+                <SelectTrigger className="w-full" aria-label="Room type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All room types</SelectItem>
+                  {roomTypes.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="rule-start">From</FieldLabel>
+              <Input id="rule-start" name="dateStart" type="date" min={today} required />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="rule-end">To</FieldLabel>
+              <Input id="rule-end" name="dateEnd" type="date" min={today} required />
+            </Field>
           </div>
-        </fieldset>
 
-        <div className="flex flex-wrap items-end gap-3">
-          <Field>
-            <FieldLabel>Change</FieldLabel>
-            <Select value={adjustment} onValueChange={(v) => setAdjustment(v === "fixed" ? "fixed" : "percent")}>
-              <SelectTrigger className="w-44" aria-label="Change">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="percent">Percent of base</SelectItem>
-                <SelectItem value="fixed">Fixed nightly price</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="rule-value">{adjustment === "percent" ? "Percent (+/-)" : "Price"}</FieldLabel>
-            <Input
-              id="rule-value"
-              name="value"
-              type="number"
-              step="0.01"
-              required
-              className="w-36 tabular-nums"
-              aria-invalid={Boolean(state?.error)}
-            />
-          </Field>
-          <SubmitButton className="sm:ml-auto" pendingText="Adding…">
-            <Plus aria-hidden="true" /> Add rule
-          </SubmitButton>
-        </div>
-      </form>
+          <fieldset className="space-y-1.5">
+            <legend className="text-sm font-medium">Days</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {DAYS.map((label, i) => {
+                const on = days.includes(i);
+                return (
+                  <label
+                    key={label}
+                    className={cn(
+                      "inline-flex h-8 cursor-pointer items-center rounded-full border px-3 text-sm transition-colors has-focus-visible:ring-3 has-focus-visible:ring-ring/50 max-sm:h-10",
+                      on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      name="weekdays"
+                      value={i}
+                      checked={on}
+                      onChange={() => setDays((cur) => (on ? cur.filter((d) => d !== i) : [...cur, i]))}
+                      className="sr-only"
+                    />
+                    {label}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <Field>
+              <FieldLabel>Change</FieldLabel>
+              <Select value={adjustment} onValueChange={(v) => setAdjustment(v === "fixed" ? "fixed" : "percent")}>
+                <SelectTrigger className="w-44" aria-label="Change">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="percent">Percent of base</SelectItem>
+                  <SelectItem value="fixed">Fixed nightly price</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="rule-value">{adjustment === "percent" ? "Percent (+/-)" : "Price"}</FieldLabel>
+              <Input
+                id="rule-value"
+                name="value"
+                type="number"
+                step="0.01"
+                required
+                className="w-36 tabular-nums"
+                aria-invalid={Boolean(state?.error)}
+              />
+            </Field>
+            <SubmitButton className="sm:ml-auto" pendingText="Adding…">
+              <Plus aria-hidden="true" /> Add rule
+            </SubmitButton>
+          </div>
+        </form>
+      </details>
     </div>
   );
 }

@@ -1,12 +1,12 @@
 "use client";
 
+import { useAnswerReview } from "@/modules/partner-applications/components/answer-review";
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X, MessageCircleQuestion } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -43,6 +43,8 @@ export function ApplicationActions({
   layout?: "stack" | "inline";
 }) {
   const router = useRouter();
+  const answerReview = useAnswerReview();
+  const revisionPending = !!answerReview && (answerReview.sent || Object.values(answerReview.reviews).some(r => r.status === "change"));
   const [approveState, approveFormAction] = useActionState(approveApplication.bind(null, type), null);
   const [rejectState, rejectFormAction] = useActionState<NotifyState, FormData>(
     rejectApplication.bind(null, type),
@@ -79,7 +81,7 @@ export function ApplicationActions({
       <div className={cn("flex gap-2", inline ? "items-center justify-end gap-1" : "w-full flex-col")}>
         {inline ? (
           <>
-            <Button size="icon-sm" aria-label="Approve" title="Approve" onClick={() => setApproveOpen(true)}>
+            <Button size="icon-sm" disabled={revisionPending} aria-label="Approve" title="Approve" onClick={() => setApproveOpen(true)}>
               <Check />
             </Button>
             <Button
@@ -87,7 +89,7 @@ export function ApplicationActions({
               variant="outline"
               aria-label="Request more info"
               title="Request more info"
-              onClick={() => setInfoOpen(true)}
+              onClick={() => { if (revisionPending) document.getElementById("answer-review")?.scrollIntoView({ behavior: "smooth", block: "center" }); else setInfoOpen(true); }}
             >
               <MessageCircleQuestion />
             </Button>
@@ -103,11 +105,11 @@ export function ApplicationActions({
           </>
         ) : (
           <>
-            <Button onClick={() => setApproveOpen(true)}>
+            <Button disabled={revisionPending} onClick={() => setApproveOpen(true)}>
               <Check data-icon="inline-start" /> Approve
             </Button>
-            <Button variant="outline" onClick={() => setInfoOpen(true)}>
-              <MessageCircleQuestion data-icon="inline-start" /> Request more info
+            <Button variant="outline" onClick={() => { if (revisionPending) document.getElementById("answer-review")?.scrollIntoView({ behavior: "smooth", block: "center" }); else setInfoOpen(true); }}>
+              <MessageCircleQuestion data-icon="inline-start" /> {revisionPending ? "Review corrections" : "Request more info"}
             </Button>
             <Button variant="destructive" onClick={() => setRejectOpen(true)}>
               <X data-icon="inline-start" /> Reject
@@ -120,7 +122,7 @@ export function ApplicationActions({
             <form action={approveFormAction}>
               <input type="hidden" name="applicationId" value={applicationId} />
               <AlertDialogHeader>
-                <AlertDialogTitle>Approve and create partner account?</AlertDialogTitle>
+                <AlertDialogTitle>{type === "agency" ? "Approve and issue agent credentials?" : "Approve and create partner account?"}</AlertDialogTitle>
               </AlertDialogHeader>
               <Textarea
                 name="note"
@@ -150,7 +152,7 @@ export function ApplicationActions({
               <input type="hidden" name="applicationId" value={applicationId} />
               <AlertDialogHeader>
                 <AlertDialogTitle>Reject this application?</AlertDialogTitle>
-                <AlertDialogDescription>The applicant can reapply after 30 days.</AlertDialogDescription>
+
               </AlertDialogHeader>
               <Textarea
                 name="notes"

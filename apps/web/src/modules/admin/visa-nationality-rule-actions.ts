@@ -17,7 +17,13 @@ const ruleSchema = z.object({
   processingDaysMax: z.coerce.number().int().min(0).optional(),
   eligibilityRequirements: z.string().optional(),
   requiredDocuments: z.string().optional(),
-});
+}).refine(
+  (data) =>
+    data.processingDaysMin === undefined ||
+    data.processingDaysMax === undefined ||
+    data.processingDaysMax >= data.processingDaysMin,
+  { message: "Maximum processing days can't be less than the minimum.", path: ["processingDaysMax"] },
+);
 
 function ruleRow(data: z.infer<typeof ruleSchema>) {
   const documents = parseDocumentSlotsJson(data.requiredDocuments);

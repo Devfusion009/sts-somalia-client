@@ -2,6 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import styles from "./hotel-workspace.module.css";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -41,9 +42,7 @@ export function RatePlansEditor({ hotelId, plans, currency }: { hotelId: string;
 
   return (
     <div className="space-y-5">
-      {plans.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No rate plans</p>
-      ) : (
+      {plans.length > 0 ? (
         <ul className="divide-y divide-border">
           {plans.map((plan) => (
             <li key={plan.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 first:pt-0">
@@ -88,73 +87,76 @@ export function RatePlansEditor({ hotelId, plans, currency }: { hotelId: string;
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
 
-      <form ref={formRef} action={formAction} className="space-y-4 border-t border-border pt-5">
-        <input type="hidden" name="hotelId" value={hotelId} />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="plan-name">Name</FieldLabel>
-            <Input id="plan-name" name="name" placeholder="Flexible rate" maxLength={60} required aria-invalid={Boolean(state?.error)} />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="plan-board">Meal plan</FieldLabel>
-            <select
-              id="plan-board"
-              name="board"
-              value={board}
-              onChange={(e) => setBoard(e.target.value as BoardBasis)}
-              className={NATIVE_SELECT_CLASS}
-            >
-              {BOARD_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {BOARD_LABEL[option]}
-                </option>
-              ))}
-            </select>
-          </Field>
-          {board !== "room_only" ? (
-            <>
-              <Field>
-                <FieldLabel htmlFor="plan-adult">Meals per adult / night ({currency})</FieldLabel>
-                <Input id="plan-adult" name="boardPriceAdult" type="number" min={0} step="0.01" defaultValue="0" className="tabular-nums" />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="plan-child">Meals per child / night ({currency})</FieldLabel>
-                <Input id="plan-child" name="boardPriceChild" type="number" min={0} step="0.01" defaultValue="0" className="tabular-nums" />
-              </Field>
-            </>
-          ) : null}
-          <Field>
-            <FieldLabel htmlFor="plan-cancellation">Cancellation</FieldLabel>
-            <select
-              id="plan-cancellation"
-              name="cancellation"
-              value={cancellation}
-              onChange={(e) => setCancellation(e.target.value === "non_refundable" ? "non_refundable" : "flexible")}
-              className={NATIVE_SELECT_CLASS}
-            >
-              <option value="flexible">Free cancellation</option>
-              <option value="non_refundable">Non-refundable</option>
-            </select>
-          </Field>
-          {cancellation === "flexible" ? (
+      <details className={styles.editor}>
+        <summary>Create rate plan<Plus aria-hidden="true" /></summary>
+        <form ref={formRef} action={formAction} className="space-y-4">
+          <input type="hidden" name="hotelId" value={hotelId} />
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field>
-              <FieldLabel htmlFor="plan-days">Free until (days before check-in)</FieldLabel>
-              <Input id="plan-days" name="freeCancelDays" type="number" min={0} max={60} defaultValue="2" required className="tabular-nums" />
+              <FieldLabel htmlFor="plan-name">Name</FieldLabel>
+              <Input id="plan-name" name="name" placeholder="Flexible rate" maxLength={60} required aria-invalid={Boolean(state?.error)} />
             </Field>
-          ) : null}
-          <Field>
-            <FieldLabel htmlFor="plan-discount">Discount on room price (%)</FieldLabel>
-            <Input id="plan-discount" name="discountPercent" type="number" min={0} max={90} step="0.5" defaultValue="0" className="tabular-nums" />
-          </Field>
-        </div>
-        <div className="flex justify-end">
-          <SubmitButton pendingText="Adding…">
-            <Plus aria-hidden="true" /> Add rate
-          </SubmitButton>
-        </div>
-      </form>
+            <Field>
+              <FieldLabel htmlFor="plan-board">Meal plan</FieldLabel>
+              <select
+                id="plan-board"
+                name="board"
+                value={board}
+                onChange={(e) => setBoard(e.target.value as BoardBasis)}
+                className={NATIVE_SELECT_CLASS}
+              >
+                {BOARD_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {BOARD_LABEL[option]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {board !== "room_only" ? (
+              <>
+                <Field>
+                  <FieldLabel htmlFor="plan-adult">Meals per adult / night ({currency})</FieldLabel>
+                  <Input id="plan-adult" name="boardPriceAdult" type="number" min={0} step="0.01" defaultValue="0" className="tabular-nums" />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="plan-child">Meals per child / night ({currency})</FieldLabel>
+                  <Input id="plan-child" name="boardPriceChild" type="number" min={0} step="0.01" defaultValue="0" className="tabular-nums" />
+                </Field>
+              </>
+            ) : null}
+            <Field>
+              <FieldLabel htmlFor="plan-cancellation">Cancellation</FieldLabel>
+              <select
+                id="plan-cancellation"
+                name="cancellation"
+                value={cancellation}
+                onChange={(e) => setCancellation(e.target.value === "non_refundable" ? "non_refundable" : "flexible")}
+                className={NATIVE_SELECT_CLASS}
+              >
+                <option value="flexible">Free cancellation</option>
+                <option value="non_refundable">Non-refundable</option>
+              </select>
+            </Field>
+            {cancellation === "flexible" ? (
+              <Field>
+                <FieldLabel htmlFor="plan-days">Free until (days before check-in)</FieldLabel>
+                <Input id="plan-days" name="freeCancelDays" type="number" min={0} max={60} defaultValue="2" required className="tabular-nums" />
+              </Field>
+            ) : null}
+            <Field>
+              <FieldLabel htmlFor="plan-discount">Discount on room price (%)</FieldLabel>
+              <Input id="plan-discount" name="discountPercent" type="number" min={0} max={90} step="0.5" defaultValue="0" className="tabular-nums" />
+            </Field>
+          </div>
+          <div className="flex justify-end">
+            <SubmitButton pendingText="Adding…">
+              <Plus aria-hidden="true" /> Add rate
+            </SubmitButton>
+          </div>
+        </form>
+      </details>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { getMyManagedVenue, getPendingHallBookingCount } from "@/modules/events/
 import { getOpenVenueRequestCount } from "@/modules/events/venue-refund-queries";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
+import styles from "@/components/portal/operations-shell.module.css";
 
 /**
  * Tenant boundary for the venue half of the manager portal: every page under
@@ -34,7 +35,8 @@ export default async function ManagerVenueLayout({
   const can = (perm: string) => managed.permissions.includes(perm);
   const navGroups: PortalNavGroup[] = [
     {
-      label: managed.venue.name,
+      label: "Venue workspace",
+      alwaysOpen: true,
       items: [
         { href: base, label: "Dashboard", icon: "overview" },
         { href: `${base}/bookings`, label: "Bookings", icon: "bookings", badge: pending || undefined },
@@ -45,20 +47,24 @@ export default async function ManagerVenueLayout({
         ...(can("photos") ? [{ href: `${base}/photos`, label: "Photos", icon: "photos" as const }] : []),
         ...(can("profile") ? [{ href: `${base}/profile`, label: "Venue Profile", icon: "events" as const }] : []),
         { href: `${base}/reviews`, label: "Reviews", icon: "reviews" },
+        { href: "/manager/security", label: "Security", icon: "security" },
       ],
     },
   ];
 
   return (
     <PortalShell
+      className={styles.shell}
       portalName="Manager Portal"
       roleLabel="Venue Manager"
       navGroups={navGroups}
       profileName={profile.full_name}
-      profileEmail={profile.email}
+      profileEmail={profile.manager_contact_email ?? profile.email}
+      accountCode={profile.manager_code ?? undefined}
       contexts={contexts}
       isPlatformAdmin={profile.is_platform_admin}
       accent="manager"
+      brandName={managed.venue.name}
     >
       {children}
     </PortalShell>

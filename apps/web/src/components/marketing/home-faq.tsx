@@ -1,4 +1,6 @@
-import { ChevronDown } from "lucide-react";
+import { ArrowUpRight, ChevronDown, MessagesSquare, Plus } from "lucide-react";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { SectionHeading } from "@/components/marketing/section-heading";
 import { Reveal } from "@/components/marketing/reveal";
 
@@ -60,29 +62,38 @@ export function HomeFaq({
   faqs = HOME_FAQS,
   title = "Frequently asked questions",
   lead,
+  homepage = false,
 }: {
   faqs?: Array<{ question: string; answer: string }>;
   title?: string;
   lead?: string;
+  homepage?: boolean;
 } = {}) {
   // Structured data is emitted by the page.
   return (
     <section className="bg-background py-16 sm:py-20 lg:py-24">
-      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+      <div className={cn("mx-auto px-4 sm:px-6 lg:px-8", homepage ? "grid max-w-7xl items-start gap-10 lg:grid-cols-[0.8fr_1.4fr] lg:gap-20" : "max-w-3xl")}>
         <Reveal>
-          <SectionHeading title={title} lead={lead} />
+          {homepage ? (
+            <div>
+              <span aria-hidden className="mb-6 grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary"><MessagesSquare className="size-7" strokeWidth={1.5} /></span>
+              <h2 className="max-w-sm font-heading text-3xl leading-tight font-bold tracking-tight text-balance sm:text-4xl lg:text-5xl">{title}</h2>
+              <Link href="#plan" className="mt-7 inline-flex min-h-11 items-center gap-3 rounded-lg text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Contact our team <ArrowUpRight className="size-4" aria-hidden /></Link>
+            </div>
+          ) : <SectionHeading title={title} lead={lead} />}
         </Reveal>
 
         <Reveal delay={100}>
-          <div className="mt-12 divide-y divide-border rounded-2xl border border-border bg-card">
+          <div className={cn(homepage ? "space-y-3" : "mt-12 divide-y divide-border rounded-2xl border border-border bg-card")}>
             {faqs.map((faq) => (
-              <details key={faq.question} className="group px-5 py-1 sm:px-6">
+              <details key={faq.question} className={cn("group px-5 py-1 sm:px-6", homepage && "rounded-2xl border border-border bg-card transition-colors hover:border-primary/35 open:border-primary/30 open:bg-primary/5")}>
                 <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-3 font-heading text-base font-semibold marker:hidden focus-visible:rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden">
                   {faq.question}
-                  <ChevronDown
-                    className="size-5 shrink-0 text-muted-foreground transition-transform duration-300 group-open:rotate-180"
-                    aria-hidden
-                  />
+                  {homepage ? (
+                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-primary transition-colors group-open:bg-primary group-open:text-primary-foreground">
+                      <Plus className="size-4 transition-transform duration-200 group-open:rotate-45" aria-hidden />
+                    </span>
+                  ) : <ChevronDown className="size-5 shrink-0 text-muted-foreground transition-transform duration-300 group-open:rotate-180" aria-hidden />}
                 </summary>
                 <p className="pb-5 text-sm leading-relaxed text-muted-foreground">{faq.answer}</p>
               </details>

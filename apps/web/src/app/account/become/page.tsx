@@ -242,7 +242,7 @@ function ProgramPanel({
           <Alert variant="destructive">
             <AlertTriangle />
             <AlertTitle>Message from STS</AlertTitle>
-            <AlertDescription>{app.review_notes}</AlertDescription>
+            <AlertDescription className="whitespace-pre-wrap">{app.review_notes}</AlertDescription>
           </Alert>
         ) : null}
       </div>
@@ -271,7 +271,7 @@ function ProgramPanel({
           <Alert variant="destructive">
             <XCircle />
             <AlertTitle>Message from STS</AlertTitle>
-            <AlertDescription>{app.review_notes}</AlertDescription>
+            <AlertDescription className="whitespace-pre-wrap">{app.review_notes}</AlertDescription>
           </Alert>
         ) : null}
       </div>
@@ -368,7 +368,7 @@ export default async function BecomePartnerPage({
       ) : null}
 
       <Tabs defaultValue={defaultTab}>
-        <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 sm:pb-0">
+        <div className="-mx-4 overflow-x-auto overflow-y-hidden px-4 pb-1 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0">
           <TabsList>
             {programs.map((p) => (
               <TabsTrigger key={p.tab} value={p.tab} className="whitespace-nowrap">

@@ -89,7 +89,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
   return (
     <>
       {/* ---------------- Desktop pill nav ---------------- */}
-      <nav aria-label="Primary" className="hidden items-center gap-2 lg:flex" onMouseLeave={scheduleClose}>
+      <nav aria-label="Primary" data-nav-loader className="hidden items-center gap-2 lg:flex" onMouseLeave={scheduleClose}>
         {MEGA_SECTIONS.map((section) => {
           const Icon = ICONS[section.icon];
           const active = pathname.startsWith(section.href);
@@ -300,7 +300,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto px-4 pb-4">
-            <nav className="flex flex-col gap-5">
+            <nav data-nav-loader className="flex flex-col gap-5">
               {MEGA_SECTIONS.map((section) => {
                 const Icon = ICONS[section.icon];
                 return (
@@ -440,12 +440,11 @@ export function HeaderSearch() {
     };
   }, [value]);
 
-  // Only the home page hides it initially — it already has a big hero search,
-  // so this one reveals once that scrolls away. Everywhere else it's always up.
+  // The home page reveals destination search after its hero scrolls away.
   const isHome = pathname === "/";
   // A specific hotel's own pages (detail, booking review) aren't a place to
   // search for a destination — you're already at one. /hotels itself (the
-  // listing/search page) keeps the bar.
+  // listing/search page) has a dedicated search form below.
   const onHotelDetail = pathname.startsWith("/hotels/");
   // Visa pages carry their own destination search; the hotel bar is noise there.
   const onVisa = pathname === "/visa" || pathname.startsWith("/visa/");
@@ -454,7 +453,10 @@ export function HeaderSearch() {
   // live `window.scrollY` snapshot would make React's commit-time re-read
   // disagree with render and loop.
   const scrolledPast = useSearchRevealed();
-  const visible = !onHotelDetail && !onVisa && (!isHome || scrolledPast);
+  // Flights has its own route search; this bar submits hotel destinations.
+  const onFlights = pathname === "/flights";
+  const hasCollectionSearch = pathname === "/hotels" || pathname === "/umrah" || pathname.startsWith("/umrah/");
+  const visible = !onHotelDetail && !onVisa && !onFlights && !hasCollectionSearch && (!isHome || scrolledPast);
 
   return (
     <AnimatePresence initial={false}>

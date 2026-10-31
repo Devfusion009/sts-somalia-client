@@ -1,0 +1,111 @@
+.workspace {
+  margin-inline: auto;
+  max-width: 80rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  min-width: 0;
+}
+.surface {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl, 1rem);
+  background: var(--card);
+  box-shadow: 0 2px 3px color-mix(in oklch, var(--foreground) 2%, transparent);
+}
+.metric {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl, 1rem);
+  background: var(--card);
+}
+.featuredMetric {
+  border-color: var(--sidebar);
+  background: linear-gradient(125deg, var(--sidebar), color-mix(in oklch, var(--sidebar) 82%, var(--primary)));
+  color: var(--sidebar-foreground);
+}
+.featuredMetric::after {
+  content: '';
+  position: absolute;
+  width: 10rem;
+  height: 10rem;
+  border: 1px solid color-mix(in oklch, var(--sidebar-foreground) 9%, transparent);
+  border-radius: 50%;
+  right: -6rem;
+  top: -4rem;
+  box-shadow: 0 0 0 1.75rem color-mix(in oklch, var(--sidebar-foreground) 3%, transparent), 0 0 0 3.5rem color-mix(in oklch, var(--sidebar-foreground) 2%, transparent);
+  pointer-events: none;
+}
+.sectionHeading {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .75rem;
+  border-bottom: 1px solid var(--border);
+}
+.sectionHeading h2 {
+  font-family: var(--font-heading);
+  font-size: .9375rem;
+  font-weight: 600;
+  letter-spacing: -.015em;
+}
+.editor {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+.editor:first-child { border-top: 0; padding-top: 0; }
+.editor summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  width: fit-content;
+  min-height: 2.5rem;
+  padding: .5rem .875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--foreground);
+  background: var(--card);
+  font-size: .8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  transition: background .15s, border-color .15s;
+}
+.editor summary::-webkit-details-marker { display: none; }
+.editor summary:hover { background: var(--muted); border-color: var(--primary); }
+.editor summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.editor summary svg { height: .875rem; width: .875rem; transition: transform .15s; }
+.editor[open] summary { margin-bottom: 1.25rem; background: var(--secondary); }
+.editor[open] summary svg { transform: rotate(45deg); }
+.inventoryCell {
+  position: relative;
+  display: flex;
+  height: 4rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  transition: background .15s, border-color .15s;
+  outline: none;
+}
+.inventoryCell:hover { border-color: var(--primary); }
+.inventoryCell:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.rateTable th, .rateTable td { border-bottom: 1px solid var(--border); }
+.rateTable tbody tr:last-child td { border-bottom: 0; }
+.rateTable tbody tr:hover td { background-color: color-mix(in oklch, var(--primary) 4%, var(--card)); }
+.rateTable tbody td:first-child { background: var(--card); }
+.rateTable th:first-child, .rateTable td:first-child { border-right: 1px solid var(--border); }
+@media (max-width: 640px) {
+  .workspace { gap: 1.25rem; }
+  .metric { padding: 1.125rem; }
+  .sectionHeading { padding: 1rem; }
+}

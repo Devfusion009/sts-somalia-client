@@ -1,7 +1,8 @@
 "use client";
 
+import { agentRecoveryHref } from "@/lib/agents/links";
 import { useActionState, useEffect, useRef } from "react";
-import { Building2, Lock, User } from "lucide-react";
+import { Building2, Lock } from "lucide-react";
 import type { ActionState } from "@/lib/auth/actions";
 import { useRestoreOnError } from "@/lib/use-restore-on-error";
 import { DemoLoginButton } from "@/modules/demo/demo-login-button";
@@ -12,11 +13,11 @@ import { SubmitButton } from "@/components/submit-button";
 import { AUTH_CONTROL } from "./auth-frame";
 import { PasswordLabelRow } from "./portal-login-form";
 
-/** The agent code is kept on this device after a successful sign-in. */
-const AGENT_CODE_KEY = "sts-agent-code";
+/** The agent ID is kept on this device after a successful sign-in. */
+const AGENT_CODE_KEY = "sts-agent-id";
 
 /**
- * Agent-portal login form: agent code + username + password, without the
+ * Agent-portal login form: agent ID + password, without the
  * card wrapper (the /agent/login split layout is the frame). The demo button
  * keeps the email sign-in, since demo credentials are an email/password pair.
  */
@@ -33,13 +34,13 @@ export function AgentLoginForm({
 }) {
   const [state, formAction] = useActionState(action, null);
   const formRef = useRef<HTMLFormElement>(null);
-  const agentCodeRef = useRef<HTMLInputElement>(null);
+  const agentIdRef = useRef<HTMLInputElement>(null);
   useRestoreOnError(formRef, state);
 
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(AGENT_CODE_KEY);
-      if (saved && agentCodeRef.current && !agentCodeRef.current.value) agentCodeRef.current.value = saved;
+      if (saved && agentIdRef.current && !agentIdRef.current.value) agentIdRef.current.value = saved;
     } catch {
       // Storage blocked: the field simply starts empty.
     }
@@ -49,7 +50,7 @@ export function AgentLoginForm({
   useEffect(() => {
     if (state?.destination) {
       try {
-        const code = agentCodeRef.current?.value.trim().toUpperCase();
+        const code = agentIdRef.current?.value.trim().toUpperCase();
         if (code) window.localStorage.setItem(AGENT_CODE_KEY, code);
       } catch {
         // Storage blocked: nothing to remember.
@@ -64,44 +65,27 @@ export function AgentLoginForm({
         {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
         <FieldGroup>
           <Field>
-            <FieldLabel htmlFor="agentCode">Agent code</FieldLabel>
+            <FieldLabel htmlFor="agentId">Agent Code</FieldLabel>
             <InputGroup className={AUTH_CONTROL}>
               <InputGroupAddon>
                 <Building2 aria-hidden />
               </InputGroupAddon>
               <InputGroupInput
-                ref={agentCodeRef}
-                id="agentCode"
-                name="agentCode"
-                placeholder="STS001"
-                autoComplete="off"
+                ref={agentIdRef}
+                id="agentId"
+                name="agentId"
+                placeholder="AGT-2026-000001"
+                autoComplete="username"
                 autoCapitalize="characters"
                 spellCheck={false}
-                maxLength={20}
+                maxLength={32}
                 className="uppercase placeholder:normal-case"
                 required
               />
             </InputGroup>
           </Field>
           <Field>
-            <FieldLabel htmlFor="username">Username</FieldLabel>
-            <InputGroup className={AUTH_CONTROL}>
-              <InputGroupAddon>
-                <User aria-hidden />
-              </InputGroupAddon>
-              <InputGroupInput
-                id="username"
-                name="username"
-                autoComplete="username"
-                autoCapitalize="none"
-                spellCheck={false}
-                maxLength={30}
-                required
-              />
-            </InputGroup>
-          </Field>
-          <Field>
-            <PasswordLabelRow />
+            <PasswordLabelRow forgotHref={agentRecoveryHref()} />
             <PasswordInput
               id="password"
               name="password"

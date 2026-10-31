@@ -1,3 +1,5 @@
+import { OperationsMetrics } from "../operations-ui";
+import styles from "../operations.module.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getIntegrationsForAdmin, type IntegrationStatus } from "@/modules/admin/integrations/queries";
@@ -35,7 +37,7 @@ function liveCount(integrations: IntegrationStatus[]) {
 
 function ProviderList({ integrations }: { integrations: IntegrationStatus[] }) {
   return (
-    <div className="space-y-4">
+    <div className={styles.providerGrid}>
       {integrations.map((status) => (
         // Keyed on the active flag so a switch flipped by another card (card
         // processors are mutually exclusive) remounts with the saved state.
@@ -105,12 +107,17 @@ export default async function AdminIntegrationsPage({ searchParams }: { searchPa
   const bank = tab === "payments" ? await getBankTransfer() : null;
 
   return (
-    <div className="space-y-6">
+    <div className={`${styles.page} space-y-6`}>
       <PageHeader title="Integrations" />
 
+      <OperationsMetrics items={[
+        { label: "Live providers", value: liveCount(integrations), tone: "primary" },
+        { label: "Saved · inactive", value: integrations.filter((i) => i.hasCredentials && !i.isActive).length, tone: "warning" },
+        { label: "Not connected", value: integrations.filter((i) => !i.hasCredentials).length },
+      ]} />
       <nav
         aria-label="Integration categories"
-        className="-mx-4 flex gap-x-1 overflow-x-auto border-b px-4 sm:mx-0 sm:flex-wrap sm:px-0"
+        className="flex gap-1 overflow-x-auto rounded-xl border border-border bg-secondary/40 p-1.5"
       >
         {TABS.map((t) => {
           const inTab = integrations.filter((i) => i.provider.category === t.key);
@@ -122,8 +129,8 @@ export default async function AdminIntegrationsPage({ searchParams }: { searchPa
               href={`/admin/integrations?tab=${t.key}`}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "-mb-px flex shrink-0 items-center gap-2 rounded-t-md border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                active ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+                "flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                active ? "border-border bg-card text-foreground shadow-xs" : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
               {t.label}

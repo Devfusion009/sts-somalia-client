@@ -1,187 +1,54 @@
 import Image from "next/image";
-import { ShieldCheck } from "lucide-react";
+import { ArrowDown, ArrowUpRight, FileCheck2, Globe2, Headphones, Plane, ShieldCheck, Wallet } from "lucide-react";
 
-import { countryFlag } from "@/lib/countries";
-import { cn } from "@/lib/utils";
-import { FadeIn, StaggerGroup, StaggerItem, SpotlightCard } from "@/components/ui/aceternity/motion-primitives";
-import { SectionHeading } from "@/components/marketing/section-heading";
-
-import { AccountBalanceIcon, BadgeIcon, DescriptionIcon, EventAvailableIcon, FactCheckIcon, FlightIcon, HealthAndSafetyIcon, HotelIcon, PhotoCameraFrontIcon, TaskAltIcon } from "@/components/ui/mui-icons";
-import type { SvgIconComponent } from "@/components/ui/mui-icons";
-const STEPS: Array<{ icon: SvgIconComponent; title: string; caption: string }> = [
-  {
-    icon: DescriptionIcon,
-    title: "Tell us where you're going",
-    caption: "Exact document list for your passport and destination.",
-  },
-  {
-    icon: FactCheckIcon,
-    title: "We prepare and check everything",
-    caption: "Every document reviewed line by line before submission.",
-  },
-  {
-    icon: EventAvailableIcon,
-    title: "Appointments and submission",
-    caption: "Biometric appointment booked, fees itemised up front.",
-  },
-  {
-    icon: TaskAltIcon,
-    title: "Tracked to approval",
-    caption: "Status updates online until your passport is back.",
-  },
-];
-
-const DOCUMENTS: Array<{ icon: SvgIconComponent; label: string; note: string }> = [
-  { icon: BadgeIcon, label: "Passport", note: "Valid 6+ months beyond travel, with blank pages" },
-  { icon: PhotoCameraFrontIcon, label: "Photographs", note: "Recent, correct size and background for the consulate" },
-  { icon: AccountBalanceIcon, label: "Proof of funds", note: "Bank statements covering the required period" },
-  { icon: FlightIcon, label: "Travel itinerary", note: "Confirmed or held flight reservation" },
-  { icon: HotelIcon, label: "Accommodation", note: "Hotel booking or a host's invitation letter" },
-  { icon: HealthAndSafetyIcon, label: "Insurance", note: "Medical cover where the destination requires it" },
-];
-
-/** Destination photos in the hero collage: source, position/size, country code for the flag chip. */
-const COLLAGE_PHOTOS = [
-  {
-    src: "/marketing/dest-visa-ae.jpg",
-    code: "AE",
-    delay: 0,
-    className: "top-[16%] left-[6%] size-[16rem] rounded-full",
-  },
-  {
-    src: "/marketing/dest-visa-tr.jpg",
-    code: "TR",
-    delay: 1.4,
-    className: "top-[15%] right-[5%] h-[10.5rem] w-[12rem] rounded-[1.75rem]",
-  },
-  {
-    src: "/marketing/dest-visa-sa.jpg",
-    code: "SA",
-    delay: 2.8,
-    className: "top-[55%] right-[7%] h-[12rem] w-[13rem] rounded-[1.75rem]",
-  },
-];
-
-/** Hero band for the visa page — flat-lay artwork with the search laid over it. */
-export function VisaHeroBanner({ children }: { children: React.ReactNode }) {
+/** Decorative travel objects, kept independent of eligibility and application status. */
+function VisaTravelArtwork() {
   return (
-    <section className="relative w-full">
-      <div className="relative isolate overflow-hidden bg-sidebar">
-        <Image
-          src="/marketing/visa-desk.webp"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-right"
-        />
-        {/* Artwork keeps its subject on the left, so the scrim is heaviest there
-            and the copy sits over the clean half. */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/35" aria-hidden />
-
-        {/* Floating ribbon, top right — true and short, not a manufactured stat. */}
-        <div className="absolute top-4 right-0 z-20">
-          <div className="flex items-center gap-2 rounded-l-full bg-primary py-2 pr-6 pl-5 text-xs font-semibold text-primary-foreground shadow-md sm:py-2.5 sm:pr-12 sm:pl-6 sm:text-sm">
-            <ShieldCheck className="size-4 shrink-0" aria-hidden />
-            <span>Licensed Somali travel agency</span>
-          </div>
+    <div className="relative mx-auto h-[310px] w-full max-w-[540px] sm:h-[370px] lg:h-[405px]" aria-hidden="true">
+      <div className="absolute top-4 right-0 size-[290px] rounded-full border border-[#b9cfc1]/60 sm:size-[370px]" />
+      <div className="absolute top-10 right-6 size-[240px] rounded-full border border-dashed border-[#b9cfc1]/70 sm:size-[320px]" />
+      <div className="absolute top-2 right-4 h-[260px] w-[68%] rotate-[5deg] rounded-[1.3rem] bg-white p-2 shadow-[0_20px_50px_-20px_rgba(11,58,43,0.3)] sm:h-[325px] sm:p-2.5 lg:right-5 lg:h-[355px]">
+        <div className="relative h-full overflow-hidden rounded-[0.85rem]">
+          <Image src="/marketing/istanbul.webp" alt="" fill preload sizes="(min-width: 1024px) 370px, (min-width: 640px) 350px, 260px" className="object-cover" />
+          <div className="absolute inset-0 bg-linear-to-t from-[#052e27]/80 via-transparent to-transparent" />
+          <div className="absolute inset-x-5 bottom-5 flex items-end justify-between text-white"><div><span className="text-[9px] tracking-[0.22em] uppercase">Beyond borders</span><span className="mt-1 block font-heading text-2xl font-medium sm:text-3xl">Istanbul, Türkiye</span></div><ArrowUpRight className="mb-1 size-5" /></div>
         </div>
+      </div>
+      <div className="absolute bottom-4 left-4 flex h-[205px] w-[150px] -rotate-[12deg] flex-col items-center rounded-l-lg rounded-r-2xl border border-[#6f9780] bg-[#0a4035] px-4 py-6 text-[#e3c992] shadow-[12px_18px_28px_-10px_rgba(6,40,29,0.45)] sm:bottom-4 sm:left-5 sm:h-[250px] sm:w-[185px] sm:py-8">
+        <div className="absolute inset-2 rounded-r-xl border border-[#d5be87]/25" />
+        <span className="text-[9px] tracking-[0.27em] uppercase">STS Travel</span>
+        <Globe2 className="my-5 size-16 sm:my-6 sm:size-20" strokeWidth={0.65} />
+        <span className="font-heading text-sm tracking-[0.24em] uppercase">Passport</span>
+        <span className="mt-3 h-3 w-5 rounded-sm border border-[#d5be87]/60"><span className="mx-auto block h-full w-2 rounded-full border-x border-[#d5be87]/60" /></span>
+      </div>
+      <div className="absolute right-0 bottom-0 flex items-center gap-3 rounded-xl border border-[#dce5dc] bg-white px-4 py-3 shadow-[0_8px_25px_-12px_rgba(7,60,52,0.25)] sm:right-1 sm:bottom-1">
+        <span className="grid size-10 place-items-center rounded-full bg-[#edf4ef] text-[#167763]"><ShieldCheck className="size-5" strokeWidth={1.5} /></span>
+        <span className="text-xs font-semibold text-[#103e32]">Visa specialists<span className="mt-0.5 block text-[10px] font-normal text-[#677b70]">Mogadishu · Nairobi</span></span>
+      </div>
+      <Plane className="absolute top-2 left-8 size-7 -rotate-12 text-[#c18b56] sm:top-5" strokeWidth={1.2} />
+    </div>
+  );
+}
 
-        {/* Destination collage — hidden below lg where the search pill needs the full width. */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[42%] lg:block" aria-hidden>
-          {/* Seats the collage on its own dark ground so it reads against the
-              desk photo instead of floating over it. */}
-          <div className="absolute inset-0 bg-gradient-to-l from-black/55 via-black/25 to-transparent" />
-          {/* Warm glow behind the circle, for depth. */}
-          <div className="absolute top-[8%] left-[2%] size-[19rem] rounded-full bg-brand-gold/25 blur-[70px]" />
-
-          {COLLAGE_PHOTOS.map((photo) => (
-            <div
-              key={photo.src}
-              style={{ animationDelay: `${photo.delay}s` }}
-              className={cn("tile-float absolute", photo.className)}
-            >
-              <div className="relative size-full overflow-hidden rounded-[inherit] shadow-2xl shadow-black/50 ring-2 ring-white/20">
-                <Image src={photo.src} alt="" fill sizes="256px" className="object-cover" />
-              </div>
-              <span className="absolute -right-2 -bottom-2 grid size-9 place-items-center rounded-full border-2 border-white/90 bg-background text-lg leading-none shadow-md">
-                {countryFlag(photo.code)}
-              </span>
-            </div>
-          ))}
+export function VisaHeroBanner({ children, search }: { children: React.ReactNode; search: React.ReactNode }) {
+  return (
+    <section className="relative isolate border-b border-[#dde5dc] bg-[#f5f5ed] text-[#123e32]">
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true"><div className="absolute -top-40 -right-56 size-[850px] rounded-full bg-[radial-gradient(circle,#e1eadd_0%,transparent_68%)]" /></div>
+      <div className="mx-auto max-w-7xl px-4 pt-10 pb-7 sm:px-6 sm:pt-14 lg:px-8 lg:pt-12">
+        <div className="grid items-center gap-6 pb-6 sm:pb-9 lg:grid-cols-[1.08fr_1fr] lg:gap-10">
+          <div>{children}</div>
+          <VisaTravelArtwork />
         </div>
-
-        <div className="relative z-10 mx-auto max-w-7xl px-4 pt-16 pb-14 sm:px-6 lg:px-8 lg:py-24">{children}</div>
+        <div className="relative z-20 rounded-[1.4rem] border border-[#dce5dc] bg-white p-5 shadow-[0_15px_45px_-25px_rgba(7,60,52,0.25)] sm:p-7">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h2 className="flex items-center gap-2.5 font-heading text-lg font-semibold text-[#123e32]"><Globe2 className="size-5 text-primary" strokeWidth={1.5} /> Where are you travelling?</h2><a href="#visa-results" className="inline-flex items-center gap-1.5 rounded-sm text-xs font-medium text-[#547267] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-primary">All destinations <ArrowDown className="size-3.5" aria-hidden="true" /></a></div>
+          {search}
+        </div>
+        <ul className="mt-6 flex flex-wrap justify-center gap-x-8 gap-y-3 text-[11px] font-medium text-[#4e6c60] sm:text-xs lg:gap-x-14">
+          {[{ icon: ShieldCheck, label: "ISO-certified company" }, { icon: FileCheck2, label: "Document review" }, { icon: Headphones, label: "Support in Somali" }, { icon: Wallet, label: "Local payment options" }].map(({ icon: Icon, label }) => <li key={label} className="flex items-center gap-2"><Icon className="size-4 text-[#00816c]" strokeWidth={1.5} aria-hidden="true" />{label}</li>)}
+        </ul>
       </div>
     </section>
   );
 }
 
-/** Step band ("our flow") + document checklist, shown under the visa results. */
-export function VisaProcess() {
-  return (
-    <>
-      <section className="border-y border-border bg-secondary/30 py-16 sm:py-20 lg:py-24">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <FadeIn>
-            <SectionHeading title="How a visa application works" />
-          </FadeIn>
-
-          <ol className="relative mt-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-            <div
-              className="absolute top-7 right-[12.5%] left-[12.5%] hidden border-t border-dashed border-border lg:block"
-              aria-hidden
-            />
-            {STEPS.map((step, i) => (
-              <li key={step.title} className="relative flex flex-col items-center text-center">
-                <FadeIn delay={i * 0.08} className="flex flex-col items-center">
-                  <span
-                    className="relative z-10 grid size-14 shrink-0 place-items-center rounded-full bg-background text-primary shadow-sm ring-1 ring-border"
-                    aria-hidden
-                  >
-                    <step.icon sx={{ fontSize: 26 }} />
-                  </span>
-                  <h3 className="mt-4 font-heading text-base font-bold">
-                    <span className="sr-only">Step {i + 1}: </span>
-                    {step.title}
-                  </h3>
-                  <p className="mt-1.5 max-w-[15rem] text-sm leading-relaxed text-muted-foreground">
-                    {step.caption}
-                  </p>
-                </FadeIn>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      <section className="bg-background py-16 sm:py-20 lg:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <FadeIn>
-            <SectionHeading
-              align="left"
-              title="What you’ll usually need"
-              lead="Requirements vary by destination and purpose of travel. This is the common core."
-            />
-          </FadeIn>
-
-          <StaggerGroup className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {DOCUMENTS.map((doc) => (
-              <StaggerItem key={doc.label} className="grid">
-                <SpotlightCard className="flex h-full items-start gap-4 rounded-2xl border border-border bg-card p-5 transition-shadow duration-300 hover:shadow-md">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary" aria-hidden>
-                    <doc.icon sx={{ fontSize: 22 }} />
-                  </span>
-                  <div>
-                    <h3 className="font-heading text-base font-bold">{doc.label}</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{doc.note}</p>
-                  </div>
-                </SpotlightCard>
-              </StaggerItem>
-            ))}
-          </StaggerGroup>
-        </div>
-      </section>
-    </>
-  );
-}
+export { VisaProcess } from "./visa-visual-sections";

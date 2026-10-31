@@ -6,7 +6,7 @@ export type ManagedHotel = {
   managerId: string;
   hotelId: string;
   permissions: string[];
-  hotel: { id: string; name: string; city: string; country_code: string; status: string; star_rating: number | null; logo_path: string | null };
+  hotel: { id: string; name: string; city: string; country_code: string; status: string; star_rating: number | null; logo_path: string | null; images?: unknown };
 };
 
 /**
@@ -21,7 +21,7 @@ export async function getMyManagedHotels(profileId: string): Promise<ManagedHote
   const supabase = await createClient();
   const { data } = await supabase
     .from("hotel_managers")
-    .select("id, hotel_id, permissions, hotel:hotels(id, name, city, country_code, status, star_rating, logo_path)")
+    .select("id, hotel_id, permissions, hotel:hotels(id, name, city, country_code, status, star_rating, logo_path, images)")
     .eq("profile_id", profileId)
     .eq("status", "active")
     .order("created_at", { ascending: true });
@@ -66,7 +66,7 @@ export async function getHotelManagers(hotelId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("hotel_managers")
-    .select("id, created_at, permissions, profile:profiles!hotel_managers_profile_id_fkey(id, full_name, email)")
+    .select("id, created_at, permissions, profile:profiles!hotel_managers_profile_id_fkey(id, full_name, email, manager_code, manager_contact_email)")
     .eq("hotel_id", hotelId)
     .eq("status", "active")
     .order("created_at");

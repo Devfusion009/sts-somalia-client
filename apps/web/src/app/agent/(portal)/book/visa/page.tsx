@@ -21,7 +21,7 @@ export default async function AgentVisaDeskPage() {
 
   const supabase = await createClient();
   const customer = await getBookingCustomer(supabase, membership.agency.id);
-  if (!customer) redirect("/agent/book");
+  if (!customer) redirect("/agent/book?service=visa");
 
   const visaTypes = await getVisaTypes();
 
