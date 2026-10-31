@@ -1,3 +1,5 @@
+import { OperationsMetrics } from "../../operations-ui";
+import styles from "../../operations.module.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
@@ -8,7 +10,7 @@ import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { PageHeader } from "@/components/ui/page-header";
-import { FilterChips, StatStrip, StatStripItem } from "@/components/dashboard/filter-chips";
+import { FilterChips } from "@/components/dashboard/filter-chips";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   getTopupQueue,
@@ -117,23 +119,15 @@ export default async function AdminTopupsPage({
   };
 
   return (
-    <div className="space-y-6">
+    <div className={`${styles.page} space-y-6`}>
       <PageHeader title="Top-ups" />
 
-      <StatStrip cols={3}>
-        <StatStripItem
-          label="To review"
-          value={money(totals.toReviewAmount, "USD")}
-          sub={`${totals.toReviewCount} request${totals.toReviewCount === 1 ? "" : "s"}`}
-          tone={totals.toReviewCount > 0 ? "warn" : undefined}
-        />
-        <StatStripItem label="Credited this month" value={money(totals.creditedThisMonth, "USD")} tone="primary" />
-        <StatStripItem
-          label="Declined & failed"
-          value={`${totals.declinedCount} request${totals.declinedCount === 1 ? "" : "s"}`}
-        />
-      </StatStrip>
-
+      <OperationsMetrics items={[
+        { label: "To review", value: money(totals.toReviewAmount, "USD"), detail: `${totals.toReviewCount} requests`, tone: "warning" },
+        { label: "Credited this month", value: money(totals.creditedThisMonth, "USD"), tone: "primary" },
+        { label: "Declined & failed", value: totals.declinedCount, detail: "Requests", tone: "danger" },
+      ]} />
+      <div className={styles.filters}>
       <FilterChips
         label="Filter top-ups"
         active={filter}
@@ -145,7 +139,8 @@ export default async function AdminTopupsPage({
         }))}
       />
 
-      <Card className="overflow-hidden py-0">
+      </div>
+      <Card className={`${styles.table} overflow-hidden py-0`}>
         {requests.length === 0 ? (
           <Empty>
             <EmptyMedia variant="icon">
@@ -154,8 +149,8 @@ export default async function AdminTopupsPage({
             <EmptyTitle>No top-up requests in this view</EmptyTitle>
           </Empty>
         ) : (
-          <Table>
-            <TableHeader>
+          <Table containerClassName="max-h-[65vh]">
+            <TableHeader sticky>
               <TableRow>
                 <TableHead>Agency</TableHead>
                 <TableHead numeric>Amount</TableHead>

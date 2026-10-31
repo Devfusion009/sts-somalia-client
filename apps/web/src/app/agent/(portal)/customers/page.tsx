@@ -62,8 +62,8 @@ export default async function AgentCustomersPage({
         actions={<AddCustomerForm />}
       />
 
-      <form role="search" className="flex items-center gap-2">
-        <InputGroup className="sm:w-72 max-sm:h-10">
+      <form role="search" className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-4">
+        <InputGroup className="min-w-0 flex-1 sm:max-w-80">
           <InputGroupAddon>
             <Search aria-hidden="true" />
           </InputGroupAddon>
@@ -78,6 +78,8 @@ export default async function AgentCustomersPage({
         <Button type="submit" variant="outline">
           Search
         </Button>
+        {q ? <Button variant="ghost" render={<Link href="/agent/customers" />}>Clear</Button> : null}
+        <span className="ml-auto text-xs text-muted-foreground tabular-nums">{registeredCount} STS account{registeredCount === 1 ? "" : "s"}</span>
       </form>
 
       {customers.length === 0 ? (
@@ -90,7 +92,18 @@ export default async function AgentCustomersPage({
           </Empty>
         </Card>
       ) : (
-        <Card className="overflow-hidden py-0">
+        <>
+        <ul className="divide-y divide-border rounded-2xl border border-border bg-card px-4 sm:hidden">
+          {customers.map((customer) => <li key={customer.id} className="flex items-center gap-3 py-4">
+            <div className="min-w-0 flex-1">
+              <Link href={`/agent/customers/${customer.id}`} className="block truncate text-sm font-semibold hover:text-primary">{customer.full_name}</Link>
+              <span className="mt-1 block truncate text-xs text-muted-foreground">{customer.phone ?? customer.email ?? "—"}</span>
+              <span className="mt-1 block text-xs text-muted-foreground tabular-nums">{customer.bookings} booking{customer.bookings === 1 ? "" : "s"}</span>
+            </div>
+            <SelectCustomerButton customerId={customer.id} label="Book" redirectTo="/agent/book" />
+          </li>)}
+        </ul>
+        <Card className="hidden overflow-hidden py-0 sm:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -109,12 +122,15 @@ export default async function AgentCustomersPage({
               {customers.map((customer) => (
                 <TableRow key={customer.id}>
                   <TableCell>
+                    <div className="flex items-center gap-3">
+                    <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-primary">{customer.full_name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("")}</span>
                     <Link
                       href={`/agent/customers/${customer.id}`}
                       className="rounded-sm font-medium outline-none hover:text-primary hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
                       {customer.full_name}
                     </Link>
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {customer.phone ?? customer.email ?? "—"}
@@ -152,6 +168,7 @@ export default async function AgentCustomersPage({
             </TableBody>
           </Table>
         </Card>
+        </>
       )}
 
       <Pager page={page} total={total} hrefFor={hrefFor} />

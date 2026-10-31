@@ -63,6 +63,7 @@ export async function proxy(request: NextRequest) {
     const isAuthRoute =
       pathname === "/login" ||
       pathname.startsWith("/login/") ||
+      (["agent", "manager"].includes(subdomain) && (pathname === "/forgot-password" || pathname === `/${subdomain}/forgot-password`)) ||
       pathname === "/reset-password" ||
       pathname.startsWith("/auth/");
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { UserPlus, Trash2, ChevronRight, Eye, EyeOff, KeyRound, Copy, Check } from "lucide-react";
+import { UserPlus, Trash2, ChevronRight, Eye, EyeOff, KeyRound } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import {
   removeHotelManager,
   resetHotelManagerPassword,
   updateHotelManagerPermissions,
+  retryHotelManagerCredentialEmail,
 } from "@/modules/hotels/manager-invite-actions";
 import { MANAGER_PERMISSIONS } from "@/modules/hotels/manager-permissions";
 import {
@@ -36,8 +37,10 @@ import {
   removeVenueManager,
   resetVenueManagerPassword,
   updateVenueManagerPermissions,
+  retryVenueManagerCredentialEmail,
 } from "@/modules/events/venue-manager-invite-actions";
 import { VENUE_MANAGER_PERMISSIONS } from "@/modules/events/venue-manager-permissions";
+import { ManagerPermissionControls } from "./manager-permission-controls";
 
 /**
  * Hotels and venues share one assignment UI; each kind brings its own id
@@ -52,6 +55,7 @@ const KINDS = {
     update: updateHotelManagerPermissions,
     remove: removeHotelManager,
     reset: resetHotelManagerPassword,
+    retry: retryHotelManagerCredentialEmail,
   },
   venue: {
     idField: "venueId",
@@ -60,6 +64,7 @@ const KINDS = {
     update: updateVenueManagerPermissions,
     remove: removeVenueManager,
     reset: resetVenueManagerPassword,
+    retry: retryVenueManagerCredentialEmail,
   },
 } as const;
 
@@ -68,35 +73,8 @@ type ManagerKind = keyof typeof KINDS;
 type Manager = {
   id: string;
   permissions: string[];
-  profile: { id: string; full_name: string | null; email: string | null } | null;
+  profile: { id: string; full_name: string | null; email: string | null; manager_code?: string | null; manager_contact_email?: string | null } | null;
 };
-
-function CredentialsOnce({ password }: { password: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="space-y-1.5 rounded-lg bg-primary/5 px-3 py-2 ring-1 ring-primary/20">
-      <Badge variant="success">One-time password</Badge>
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate font-mono text-sm select-all">{password}</span>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          className="shrink-0"
-          aria-label={copied ? "Copied" : "Copy password"}
-          title={copied ? "Copied" : "Copy"}
-          onClick={async () => {
-            await navigator.clipboard.writeText(password);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-          }}
-        >
-          {copied ? <Check /> : <Copy />}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 function AddManagerForm({ kind, propertyId }: { kind: ManagerKind; propertyId: string }) {
   const config = KINDS[kind];
@@ -105,7 +83,7 @@ function AddManagerForm({ kind, propertyId }: { kind: ManagerKind; propertyId: s
     <form action={formAction} className="space-y-3 border-t border-border pt-4">
       <input type="hidden" name={config.idField} value={propertyId} />
       <Field>
-        <FieldLabel htmlFor={`${kind}-manager-email`}>Manager email</FieldLabel>
+        <FieldLabel htmlFor={`${kind}-manager-email`}>Manager contact email</FieldLabel>
         <div className="flex flex-wrap items-center gap-2">
           <Input
             id={`${kind}-manager-email`}
@@ -135,55 +113,10 @@ function AddManagerForm({ kind, propertyId }: { kind: ManagerKind; propertyId: s
           <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       ) : null}
-      {state && !state.error ? (
-        state.newPassword ? (
-          <CredentialsOnce password={state.newPassword} />
-        ) : (
-          <p role="status" className="text-xs text-primary">
-            Manager added.
-          </p>
-        )
-      ) : null}
-    </form>
-  );
-}
-
-function PermissionToggle({
-  kind,
-  propertyId,
-  manager,
-  permKey,
-  label,
-}: {
-  kind: ManagerKind;
-  propertyId: string;
-  manager: Manager;
-  permKey: string;
-  label: string;
-}) {
-  const [, formAction] = useActionState(KINDS[kind].update, null);
-  const granted = manager.permissions.includes(permKey);
-  const next = granted ? manager.permissions.filter((p) => p !== permKey) : [...manager.permissions, permKey];
-
-  return (
-    <form action={formAction}>
-      <input type="hidden" name={KINDS[kind].idField} value={propertyId} />
-      <input type="hidden" name="managerId" value={manager.id} />
-      {next.map((p) => (
-        <input key={p} type="hidden" name="permissions" value={p} />
-      ))}
-      <button
-        type="submit"
-        aria-pressed={granted}
-        className={cn(
-          "inline-flex h-7 items-center rounded-full border px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:h-9",
-          granted
-            ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-            : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-        )}
-      >
-        {label}
-      </button>
+      {state && !state.error ? <div role="status" className="space-y-1 text-xs">
+        <div className="font-mono font-medium">{state.managerCode}</div>
+        <div className={state.emailStatus === "sent" ? "text-primary" : "text-destructive"}>{state.emailStatus === "sent" ? "Manager added. Access email sent." : "Manager added. Access email not sent."}</div>
+      </div> : null}
     </form>
   );
 }
@@ -195,8 +128,8 @@ function ResetPasswordControl({ kind, propertyId, managerId }: { kind: ManagerKi
       <form action={formAction}>
         <input type="hidden" name={KINDS[kind].idField} value={propertyId} />
         <input type="hidden" name="managerId" value={managerId} />
-        <SubmitButton variant="outline" size="sm" pendingText="Resetting…">
-          <KeyRound aria-hidden="true" /> Reset password
+        <SubmitButton variant="outline" size="sm" pendingText="Sending…">
+          <KeyRound aria-hidden="true" /> Send reset link
         </SubmitButton>
       </form>
       {state?.error ? (
@@ -204,9 +137,18 @@ function ResetPasswordControl({ kind, propertyId, managerId }: { kind: ManagerKi
           {state.error}
         </p>
       ) : null}
-      {state?.newPassword ? <CredentialsOnce password={state.newPassword} /> : null}
+      {state && !state.error ? <div role="status" className="text-xs text-primary">Reset link sent.</div> : null}
     </div>
   );
+}
+
+function RetryCredentialEmail({ kind, propertyId, managerId }: { kind: ManagerKind; propertyId: string; managerId: string }) {
+  const [state, action] = useActionState(KINDS[kind].retry, null);
+  return <form action={action} className="space-y-2">
+    <input type="hidden" name={KINDS[kind].idField} value={propertyId} /><input type="hidden" name="managerId" value={managerId} />
+    <SubmitButton variant="outline" size="sm" pendingText="Sending…">Retry credential email</SubmitButton>
+    {state ? <div role={state.error ? "alert" : "status"} className={cn("text-xs", state.error ? "text-destructive" : "text-primary")}>{state.error ?? "Credential email sent."}</div> : null}
+  </form>;
 }
 
 /**
@@ -242,7 +184,8 @@ function ManagerRow({ kind, propertyId, manager }: { kind: ManagerKind; property
       >
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{manager.profile?.full_name ?? "—"}</p>
-          <p className="truncate text-xs text-muted-foreground">{manager.profile?.email}</p>
+          {manager.profile?.manager_code ? <div className="mt-0.5 font-mono text-xs text-primary">{manager.profile.manager_code}</div> : null}
+          <p className="truncate text-xs text-muted-foreground">{manager.profile?.manager_contact_email ?? manager.profile?.email}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span className="text-xs text-muted-foreground">
@@ -258,24 +201,19 @@ function ManagerRow({ kind, propertyId, manager }: { kind: ManagerKind; property
             <DialogTitle>{manager.profile?.full_name ?? manager.profile?.email}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {manager.profile?.manager_code ? <dl className="text-sm"><dt className="text-xs text-muted-foreground">Manager ID</dt><dd className="mt-1 font-mono font-semibold">{manager.profile.manager_code}</dd></dl> : null}
             {manager.profile?.full_name ? (
-              <p className="truncate text-sm text-muted-foreground">{manager.profile.email}</p>
+              <p className="truncate text-sm text-muted-foreground">{manager.profile.manager_contact_email ?? manager.profile.email}</p>
             ) : null}
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Permissions</p>
-              <div className="flex flex-wrap gap-2">
-                {config.permissions.map((perm) => (
-                  <PermissionToggle
-                    key={perm.key}
-                    kind={kind}
-                    propertyId={propertyId}
-                    manager={manager}
-                    permKey={perm.key}
-                    label={perm.label}
-                  />
-                ))}
-              </div>
-            </div>
+            <ManagerPermissionControls
+              action={config.update}
+              propertyField={config.idField}
+              propertyId={propertyId}
+              managerId={manager.id}
+              grantedPermissions={manager.permissions}
+              permissions={config.permissions}
+            />
+            <RetryCredentialEmail kind={kind} propertyId={propertyId} managerId={manager.id} />
             <ResetPasswordControl kind={kind} propertyId={propertyId} managerId={manager.id} />
           </div>
           <DialogFooter>

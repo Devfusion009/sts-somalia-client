@@ -36,7 +36,7 @@ export default async function AgentEventDeskPage({
 
   const supabase = await createClient();
   const customer = await getBookingCustomer(supabase, membership.agency.id);
-  if (!customer) redirect("/agent/book");
+  if (!customer) redirect("/agent/book?service=events");
 
   const trpc = await getServerTrpc();
   let venues;

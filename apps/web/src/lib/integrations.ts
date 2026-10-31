@@ -11,6 +11,19 @@ import "server-only";
 
 const bool = (v: string | undefined) => v === "true" || v === "1";
 
+/**
+ * The connected email provider, or null when none is. EMAIL_PROVIDER names it
+ * explicitly; a lone RESEND_API_KEY (the older setup) still counts as Resend.
+ * A named provider without its credential counts as not connected.
+ */
+function emailProvider(): "resend" | null {
+  const named = (process.env.EMAIL_PROVIDER ?? "").trim().toLowerCase();
+  if (named === "resend" || (!named && process.env.RESEND_API_KEY)) {
+    return process.env.RESEND_API_KEY ? "resend" : null;
+  }
+  return null;
+}
+
 export function getIntegrations() {
   const stripe = !!process.env.STRIPE_SECRET_KEY;
   const waafi = !!(
@@ -29,7 +42,7 @@ export function getIntegrations() {
 
   return {
     payments: { stripe, waafi, edahab, testMode },
-    email: { resend: !!process.env.RESEND_API_KEY },
+    email: { provider: emailProvider(), resend: emailProvider() === "resend" },
     whatsappApi: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM),
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
     bankTransfer: {

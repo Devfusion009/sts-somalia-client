@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Building2 } from "lucide-react";
+import { Building2, Plus } from "lucide-react";
 import { requireUserForPortal } from "@/lib/auth/session";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getMyAgency } from "@/modules/agencies/queries";
@@ -14,6 +14,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { getServerTrpc } from "@/lib/trpc/server";
+import { AGENT_SERVICES } from "@/modules/agencies/services";
+import styles from "@/components/portal/operations-shell.module.css";
 
 /** Portal-scoped title — see the admin portal layout for why this lives on the layout. */
 export const metadata: Metadata = {
@@ -25,44 +27,42 @@ export const metadata: Metadata = {
 
 const NAV_GROUPS: PortalNavGroup[] = [
   {
-    label: "Agent",
+    label: "Workspace",
+    alwaysOpen: true,
     items: [
       { href: "/agent", label: "Dashboard", icon: "overview" },
-      { href: "/agent/book", label: "New Booking", icon: "new-booking" },
+      { href: "/agent/book", label: "New booking", icon: "new-booking" },
       { href: "/agent/bookings", label: "Bookings", icon: "bookings" },
-      { href: "/agent/calendar", label: "Event Calendar", icon: "calendar" },
       { href: "/agent/customers", label: "Customers", icon: "profile" },
+      { href: "/agent/finance", label: "Wallet", icon: "payouts" },
+      { href: "/agent/reports", label: "Commissions & earnings", icon: "earnings" },
     ],
   },
-  // Ordered as the money actually moves: what's in the account, what moved
-  // through it, what can be taken out, what STS billed, what was earned,
-  // and the rate that earning is calculated from.
   {
-    label: "Finance",
+    label: "Book travel",
+    alwaysOpen: true,
+    items: AGENT_SERVICES.map((service) => ({ href: service.href, label: service.label, icon: service.icon })),
+  },
+  {
+    label: "Operations",
     items: [
-      { href: "/agent/finance", label: "Overview", icon: "payouts" },
-      { href: "/agent/finance/top-up", label: "Top Up Wallet", icon: "bank" },
+      { href: "/agent/calendar", label: "Event calendar", icon: "calendar" },
+      { href: "/agent/finance/top-up", label: "Top up wallet", icon: "bank" },
       { href: "/agent/finance/transactions", label: "Transactions", icon: "payments" },
-      { href: "/agent/finance/withdrawals", label: "Withdraw Earnings", icon: "bank" },
+      { href: "/agent/finance/withdrawals", label: "Withdraw earnings", icon: "bank" },
       { href: "/agent/finance/billing", label: "Billing", icon: "invoice" },
-      { href: "/agent/reports", label: "Earnings", icon: "earnings" },
       { href: "/agent/markups", label: "Markups", icon: "catalog" },
-    ],
-  },
-  {
-    label: "My Account",
-    items: [
-      { href: "/agent/bank-details", label: "Bank Details", icon: "bank" },
       { href: "/agent/refunds", label: "Refunds", icon: "refund" },
-      { href: "/agent/personal-bookings", label: "Personal Bookings", icon: "bookings" },
     ],
   },
   {
     label: "Agency",
     items: [
-      { href: "/agent/settings", label: "Agency Profile", icon: "agency" },
+      { href: "/agent/settings", label: "Agency profile", icon: "agency" },
       { href: "/agent/team", label: "Team", icon: "team" },
+      { href: "/agent/bank-details", label: "Bank details", icon: "bank" },
       { href: "/agent/security", label: "Security", icon: "security" },
+      { href: "/agent/personal-bookings", label: "Personal bookings", icon: "bookings" },
     ],
   },
 ];
@@ -117,6 +117,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
 
   return (
     <PortalShell
+      className={styles.shell}
       portalName="Agent Portal"
       roleLabel={
         {
@@ -129,13 +130,17 @@ export default async function AgentLayout({ children }: { children: React.ReactN
       }
       navGroups={NAV_GROUPS}
       profileName={profile.full_name}
-      profileEmail={profile.email}
+      profileEmail={profile.email?.endsWith("@agent-login.scoutsts.invalid") ? membership.agency.contact_email : profile.email}
       contexts={contexts}
       isPlatformAdmin={profile.is_platform_admin}
       accent="agent"
-      accountCode={`${membership.agency.agent_code} · ${membership.username}`}
+      accountCode={profile.agent_code ?? membership.agency.agent_code}
       brandLogoUrl={agencyLogoUrl(membership.agency.logo_path)}
-      headerExtra={<AgentNotificationBell notifications={notifications} />}
+      brandName={membership.agency.name}
+      headerExtra={<>
+        <Button size="sm" render={<Link href="/agent/book" />}><Plus className="size-3.5" aria-hidden="true" /><span className="max-sm:sr-only">New booking</span></Button>
+        <AgentNotificationBell notifications={notifications} />
+      </>}
     >
       {account ? <OnboardingStatusBanner checklist={account.checklist} /> : null}
       {children}

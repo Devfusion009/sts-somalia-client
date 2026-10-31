@@ -16,7 +16,7 @@ export default async function AgentFlightDeskPage() {
 
   const supabase = await createClient();
   const customers = await getBookingCustomers(supabase, membership.agency.id);
-  if (customers.length === 0) redirect("/agent/book");
+  if (customers.length === 0) redirect("/agent/book?service=flights");
   const customer = customers[0];
 
   return (

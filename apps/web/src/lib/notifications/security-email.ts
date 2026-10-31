@@ -1,4 +1,6 @@
 import "server-only";
+import { portalHref } from "@/lib/subdomain";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "./email";
 import { getIntegrations } from "@/lib/integrations";
 
@@ -35,6 +37,9 @@ export async function sendSecurityEmail(input: {
   at?: Date;
 }): Promise<void> {
   const { siteUrl } = getIntegrations();
+  const portal = input.to.endsWith("@manager-login.scoutsts.invalid") ? "manager" : input.to.endsWith("@agent-login.scoutsts.invalid") ? "agent" : null;
+  const path = portal ? `${portalHref(portal)}/security` : "/account/security";
+  const securityUrl = /^https?:/.test(path) ? path : `${siteUrl}${path}`;
   const when = (input.at ?? new Date()).toLocaleString("en-GB", {
     day: "numeric",
     month: "short",
@@ -60,13 +65,25 @@ export async function sendSecurityEmail(input: {
       <h1 style="color: #00947c; font-size: 20px;">${SUBJECT[input.kind]}</h1>
       <table style="margin:16px 0;border-collapse:collapse;font-size:14px;">${rows}</table>
       <p>If this wasn't you, change your password and sign out of other devices.</p>
-      <p><a href="${siteUrl}/account/security" style="background:#00947c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;">Review account security</a></p>
+      <p><a href="${escapeHtml(securityUrl)}" style="background:#00947c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;">Review account security</a></p>
       <p style="margin-top: 24px; font-size: 12px; color: #6b7280;">
         STS Somalia &middot; Sultan Business Park, Waaberi District, 21 Oct Street, Muqdisho
       </p>
     </div>`;
   try {
-    await sendEmail({ to: input.to, subject: SUBJECT[input.kind], html });
+    let to = input.to;
+    if (to.endsWith("@agent-login.scoutsts.invalid")) {
+      const { data } = await createAdminClient().from("agent_login_credentials")
+        .select("contact_email").eq("login_email", to).not("approved_at", "is", null).maybeSingle();
+      if (!data) return;
+      to = data.contact_email;
+    }
+    if (to.endsWith("@manager-login.scoutsts.invalid")) {
+      const { data } = await createAdminClient().from("manager_login_credentials").select("contact_email").eq("id", to.split("@")[0]).maybeSingle();
+      if (!data) return;
+      to = data.contact_email;
+    }
+    await sendEmail({ to, subject: SUBJECT[input.kind], html });
   } catch {
     // Never fail the security change on a notification error.
   }

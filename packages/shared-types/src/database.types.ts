@@ -34,6 +34,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      manager_login_credentials: {
+        Row: {
+          id: string
+          manager_code: string
+          contact_email: string
+          profile_id: string | null
+          password_encrypted: string | null
+          email_sent_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          manager_code?: string
+          contact_email: string
+          profile_id?: string | null
+          password_encrypted?: string | null
+          email_sent_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          manager_code?: string
+          contact_email?: string
+          profile_id?: string | null
+          password_encrypted?: string | null
+          email_sent_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      agent_login_credentials: {
+        Row: {
+          application_id: string
+          agent_id: string
+          profile_id: string | null
+          login_email: string
+          contact_email: string
+          password_encrypted: string | null
+          approved_at: string | null
+          email_sent_at: string | null
+          created_at: string
+        }
+        Insert: {
+          application_id: string
+          agent_id?: string
+          profile_id?: string | null
+          login_email: string
+          contact_email: string
+          password_encrypted?: string | null
+          approved_at?: string | null
+          email_sent_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          application_id?: string
+          agent_id?: string
+          profile_id?: string | null
+          login_email?: string
+          contact_email?: string
+          password_encrypted?: string | null
+          approved_at?: string | null
+          email_sent_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       account_deletion_requests: {
         Row: {
           created_at: string
@@ -4007,6 +4073,8 @@ export type Database = {
           country_code: string | null
           created_at: string
           email: string | null
+          manager_code: string | null
+          manager_contact_email: string | null
           full_name: string | null
           id: string
           is_platform_admin: boolean
@@ -4022,6 +4090,8 @@ export type Database = {
           country_code?: string | null
           created_at?: string
           email?: string | null
+          manager_code?: string | null
+          manager_contact_email?: string | null
           full_name?: string | null
           id: string
           is_platform_admin?: boolean
@@ -4037,6 +4107,8 @@ export type Database = {
           country_code?: string | null
           created_at?: string
           email?: string | null
+          manager_code?: string | null
+          manager_contact_email?: string | null
           full_name?: string | null
           id?: string
           is_platform_admin?: boolean
@@ -7013,6 +7085,13 @@ export type Database = {
       }
     }
     Functions: {
+      manager_login_identity: { Args: { p_manager_code: string }; Returns: string }
+      claim_manager_password_recovery: { Args: { p_manager_code: string }; Returns: { login_email: string; contact_email: string }[] }
+
+      claim_agent_password_recovery: { Args: { p_agent_id: string }; Returns: { login_email: string; contact_email: string }[] }
+      agent_login_identity: { Args: { p_agent_id: string }; Returns: string }
+      my_agent_application_login: { Args: { p_application_id: string }; Returns: { agent_id: string; contact_email: string }[] }
+
       _complete_finished_umrah_trips: {
         Args: Record<PropertyKey, never>
         Returns: number

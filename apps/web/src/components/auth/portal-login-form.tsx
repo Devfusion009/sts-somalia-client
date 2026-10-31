@@ -99,12 +99,12 @@ export function PortalLoginForm({
 }
 
 /** "Password" label with the forgot-password link on the right. */
-export function PasswordLabelRow() {
+export function PasswordLabelRow({ forgotHref = "/forgot-password" }: { forgotHref?: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <FieldLabel htmlFor="password">Password</FieldLabel>
       <Link
-        href="/forgot-password"
+        href={forgotHref}
         className="rounded-sm text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         Forgot password?

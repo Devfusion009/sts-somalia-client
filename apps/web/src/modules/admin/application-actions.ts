@@ -1,11 +1,20 @@
 "use server";
 
+import { prepareAgentCredentials, getAgentCredentialDelivery } from "@/lib/agents/credentials";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { decryptCredentials } from "@/lib/integrations-crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requirePlatformAdmin } from "@/lib/auth/session";
-import { notifyApplicant, type AgentLogin } from "@/lib/notifications/application-notify";
+import {
+  applicationRecipients,
+  notifyApplicant,
+  type AgentLogin,
+  type ApplicationEvent,
+} from "@/lib/notifications/application-notify";
+import type { EmailStatus } from "@/lib/notifications/email";
 import { docSlotsFor } from "@/modules/partner-applications/config";
 import type { ActionState } from "@/lib/auth/actions";
 import type { ApplicationType } from "@/modules/admin/queries";
@@ -47,7 +56,28 @@ const PRODUCT_TO_ITEM_TYPE: Record<string, "flight" | "hotel" | "visa" | "umrah"
   halls: "hall",
 };
 
-type ApplicantInfo = { applicantId: string; email: string; phone: string | null; referenceNumber: string };
+/**
+ * Everything a decision notice needs about one application: who filed it,
+ * under what name, and how they asked to be contacted on the form.
+ */
+type ApplicantInfo = {
+  applicantId: string;
+  /** Email of the STS account that submitted the application. */
+  email: string;
+  phone: string | null;
+  referenceNumber: string;
+  /** Business, property or applicant name the application was filed under. */
+  applicantName: string | null;
+  /** Authorized contact (or the affiliate) as entered on the form. */
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  accountName: string | null;
+};
+
+function text(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
 
 async function loadApplicantInfo(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -61,17 +91,56 @@ async function loadApplicantInfo(
   // null here and made every approval/rejection notification a no-op.
   const { data } = (await supabase
     .from(TABLE[type])
-    .select(`applicant_id, reference_number, applicant:profiles!${TABLE[type]}_applicant_id_fkey!inner(email, phone)`)
+    .select(
+      `applicant_id, reference_number, business_details, applicant:profiles!${TABLE[type]}_applicant_id_fkey!inner(email, phone, full_name)`
+    )
     .eq("id", applicationId)
-    .maybeSingle()) as { data: { applicant_id: string; reference_number: string | null; applicant: unknown } | null };
+    .maybeSingle()) as {
+    data: { applicant_id: string; reference_number: string | null; business_details: unknown; applicant: unknown } | null;
+  };
   if (!data) return null;
-  const applicant = data.applicant as { email: string; phone: string | null };
+  const applicant = data.applicant as { email: string; phone: string | null; full_name: string | null };
+  const d = (data.business_details ?? {}) as Record<string, unknown>;
   return {
     applicantId: data.applicant_id,
     email: applicant.email,
     phone: applicant.phone,
     referenceNumber: data.reference_number ?? applicationId,
+    applicantName: text(d.legalBusinessName) ?? text(d.propertyName) ?? text(d.venueName) ?? text(d.fullName),
+    contactName: text(d.contactFullName) ?? text(d.fullName),
+    contactEmail: text(d.contactEmail) ?? text(d.email),
+    contactPhone: text(d.contactMobile) ?? text(d.mobile),
+    accountName: text(applicant.full_name),
   };
+}
+
+/**
+ * Sends the decision email/WhatsApp for one application. The email goes to
+ * the address entered on the application, copied to the account email when
+ * different (see applicationRecipients).
+ */
+async function sendDecisionNotice(
+  type: ApplicationType,
+  info: ApplicantInfo,
+  event: ApplicationEvent,
+  extra: { message?: string | null; agentLogin?: AgentLogin | null } = {}
+) {
+  const { to, cc } = extra.agentLogin
+    ? { to: info.contactEmail!, cc: [] }
+    : applicationRecipients(info.contactEmail, info.email);
+  return notifyApplicant({
+    type: NOTIFY_TYPE[type],
+    event,
+    referenceNumber: info.referenceNumber,
+    applicantName: info.applicantName,
+    recipientName: info.contactName ?? info.accountName,
+    to,
+    cc,
+    phone: info.contactPhone ?? info.phone,
+    message: extra.message,
+    agentLogin: extra.agentLogin,
+    decidedAt: new Date(),
+  });
 }
 
 const IN_APP_NOTIFICATION_CONTENT: Record<
@@ -79,8 +148,8 @@ const IN_APP_NOTIFICATION_CONTENT: Record<
   (type: ApplicationType, referenceNumber: string, message?: string | null) => { title: string; body: string }
 > = {
   approved: (type, ref, message) => ({
-    title: "Your partner application was approved",
-    body: `${TYPE_LABEL_FOR_NOTIFY[type]} application ${ref} is approved — open your new portal from Partner Applications.${message ? ` ${message}` : ""}`,
+    title: `${TYPE_LABEL_FOR_NOTIFY[type]} application approved`,
+    body: `${ref} is approved and your portal is ready.${message ? ` ${message}` : ""}`,
   }),
   rejected: (type, ref, message) => ({
     title: "Your partner application wasn't approved",
@@ -111,6 +180,7 @@ async function notifyApplicantInApp(
   supabase: Awaited<ReturnType<typeof createClient>>,
   params: {
     profileId: string;
+    applicationId: string;
     type: ApplicationType;
     referenceNumber: string;
     event: "approved" | "rejected" | "more_info_requested";
@@ -123,7 +193,7 @@ async function notifyApplicantInApp(
     type: `application_${params.event}`,
     title,
     body,
-    data: { applicationType: params.type, referenceNumber: params.referenceNumber },
+    data: { applicationType: params.type, applicationId: params.applicationId, referenceNumber: params.referenceNumber },
   });
 }
 
@@ -212,7 +282,7 @@ export async function approveApplication(
   const info = await loadApplicantInfo(supabase, type, applicationId);
 
   let error: { message: string } | null = null;
-  let agentLogin: AgentLogin | null = null;
+  let agentId: string | null = null;
 
   if (type === "agency") {
     const { data: appRow } = await supabase
@@ -224,29 +294,25 @@ export async function approveApplication(
     const products = Array.isArray(businessDetails?.products) ? (businessDetails!.products as string[]) : [];
     const allowedProducts = products.map((p) => PRODUCT_TO_ITEM_TYPE[p]).filter((p): p is NonNullable<typeof p> => !!p);
 
-    const result = await supabase.rpc("approve_agency_application", {
-      application_id: applicationId,
-      p_allowed_products: allowedProducts.length > 0 ? allowedProducts : undefined,
-      p_note: note,
-    });
-    error = result.error;
-
-    const logoPath = typeof businessDetails?.logoPath === "string" ? businessDetails.logoPath : null;
-    if (!error && result.data && logoPath) {
-      await carryOverAgencyLogo(supabase, result.data, logoPath);
-    }
-
-    // The agent code and the owner's username are issued by the database
-    // as the agency and its owner membership are created.
-    if (!error && result.data) {
-      const { data: owner } = await supabase
-        .from("agency_members")
-        .select("username, agency:agencies(agent_code)")
-        .eq("agency_id", result.data)
-        .eq("role_in_agency", "owner")
-        .maybeSingle();
-      const agentCode = (owner?.agency as { agent_code: string } | null)?.agent_code;
-      if (owner && agentCode) agentLogin = { agentCode, username: owner.username };
+    if (!info) return { error: "Applicant details could not be loaded." };
+    try {
+      const credential = await prepareAgentCredentials(applicationId, info.contactEmail, info.contactName ?? info.accountName);
+      agentId = credential.agent_id;
+      if (!credential.approved_at) {
+        const result = await supabase.rpc("approve_agency_application", {
+          application_id: applicationId,
+          p_allowed_products: allowedProducts.length > 0 ? allowedProducts : undefined,
+          p_note: note,
+        });
+        if (result.error) {
+          // A concurrent approval may already have committed this identity.
+          if (!(await getAgentCredentialDelivery(applicationId))?.approved_at) error = result.error;
+        }
+        const logoPath = typeof businessDetails?.logoPath === "string" ? businessDetails.logoPath : null;
+        if (!error && result.data && logoPath) await carryOverAgencyLogo(supabase, result.data, logoPath);
+      }
+    } catch (cause) {
+      return { error: cause instanceof Error ? cause.message : "Agent credentials could not be created." };
     }
   } else {
     const result = await supabase.rpc(APPROVE_RPC[type], { application_id: applicationId, p_note: note });
@@ -254,34 +320,70 @@ export async function approveApplication(
   }
   if (error) return { error: error.message };
 
-  let emailSent = false;
+  // 1. In-app first: the applicant's bell and application page update even
+  //    when email is not connected. 2. Then the email.
+  let email: EmailStatus | null = null;
   if (info) {
-    const result = await notifyApplicant({
-      type: NOTIFY_TYPE[type],
-      applicantEmail: info.email,
-      applicantPhone: info.phone,
-      referenceNumber: info.referenceNumber,
-      event: "approved",
-      agentLogin,
-    });
-    emailSent = result.emailSent;
     await notifyApplicantInApp(supabase, {
       profileId: info.applicantId,
+      applicationId: applicationId,
       type,
       referenceNumber: info.referenceNumber,
       event: "approved",
-      message: agentLogin ? `Agent code ${agentLogin.agentCode}, username ${agentLogin.username}.` : null,
+      message: agentId ? `Agent ID ${agentId}.` : null,
     });
+    email = type === "agency"
+      ? await deliverAgentCredentials(applicationId, info)
+      : (await sendDecisionNotice(type, info, "approved")).email;
   }
 
   revalidatePath("/admin/applications");
   revalidatePath("/admin");
+  revalidatePath("/account/become");
+  revalidatePath(`/account/become/${type}/${applicationId}/view`);
 
+  // The partner console says whether the approval email went out.
   if (info?.referenceNumber) {
-    redirect(`/admin/partners/${APPLICATION_SLUG[type]}/${info.referenceNumber}`);
+    redirect(`/admin/partners/${APPLICATION_SLUG[type]}/${info.referenceNumber}?approved=1&email=${email ?? "failed"}`);
   }
 
-  return { error: null, emailSent };
+  return { error: null, emailSent: email === "sent" };
+}
+
+/** Retain only the encrypted delivery copy on failure; never reset an issued password on retry. */
+async function deliverAgentCredentials(applicationId: string, info: ApplicantInfo): Promise<EmailStatus> {
+  const admin = createAdminClient();
+  const { data: credential, error } = await admin.from("agent_login_credentials").select("*")
+    .eq("application_id", applicationId).single();
+  if (error || !credential?.approved_at) return "failed";
+  if (credential.email_sent_at) return "sent";
+  if (!credential.password_encrypted) return "failed";
+  try {
+    const { password } = decryptCredentials(credential.password_encrypted);
+    const result = await sendDecisionNotice("agency", { ...info, contactEmail: credential.contact_email }, "approved", {
+      agentLogin: { agentId: credential.agent_id, password },
+    });
+    if (result.email === "sent") {
+      // An interrupted send may cause a duplicate email, but the same issued
+      // credentials remain valid; a retry never silently rotates the password.
+      const { error: saveError } = await admin.from("agent_login_credentials")
+        .update({ email_sent_at: new Date().toISOString(), password_encrypted: null })
+        .eq("application_id", applicationId);
+      if (saveError) return "failed";
+    }
+    return result.email;
+  } catch { return "failed"; }
+}
+
+export async function retryAgentCredentialEmail(applicationId: string): Promise<ActionState> {
+  await requirePlatformAdmin();
+  if (!z.string().uuid().safeParse(applicationId).success) return { error: "Invalid application." };
+  const supabase = await createClient();
+  const info = await loadApplicantInfo(supabase, "agency", applicationId);
+  if (!info) return { error: "Application not found." };
+  const status = await deliverAgentCredentials(applicationId, info);
+  revalidatePath(`/admin/partners/agency/${info.referenceNumber}`);
+  return { error: status === "sent" ? null : "Credential email was not sent." };
 }
 
 const rejectSchema = z.object({
@@ -312,23 +414,18 @@ export async function rejectApplication(
 
   let emailSent = false;
   if (info) {
-    const result = await notifyApplicant({
-      type: NOTIFY_TYPE[type],
-      applicantEmail: info.email,
-      applicantPhone: info.phone,
-      referenceNumber: info.referenceNumber,
-      event: "rejected",
-      message: parsed.data.notes,
-    });
-    emailSent = result.emailSent;
     await notifyApplicantInApp(supabase, {
       profileId: info.applicantId,
+      applicationId: parsed.data.applicationId,
       type,
       referenceNumber: info.referenceNumber,
       event: "rejected",
       message: parsed.data.notes,
     });
+    emailSent = (await sendDecisionNotice(type, info, "rejected", { message: parsed.data.notes })).emailSent;
   }
+  revalidatePath(`/account/become/${type}/${parsed.data.applicationId}/view`);
+  revalidatePath("/account/become");
 
   revalidatePath("/admin/applications");
   revalidatePath("/admin");
@@ -378,22 +475,15 @@ export async function requestMoreInfo(
 
   let emailSent = false;
   if (info) {
-    const result = await notifyApplicant({
-      type: NOTIFY_TYPE[type],
-      applicantEmail: info.email,
-      applicantPhone: info.phone,
-      referenceNumber: info.referenceNumber,
-      event: "more_info_requested",
-      message: parsed.data.message,
-    });
-    emailSent = result.emailSent;
     await notifyApplicantInApp(supabase, {
       profileId: info.applicantId,
+      applicationId: parsed.data.applicationId,
       type,
       referenceNumber: info.referenceNumber,
       event: "more_info_requested",
       message: parsed.data.message,
     });
+    emailSent = (await sendDecisionNotice(type, info, "more_info_requested", { message: parsed.data.message })).emailSent;
   }
 
   revalidatePath("/admin/applications");

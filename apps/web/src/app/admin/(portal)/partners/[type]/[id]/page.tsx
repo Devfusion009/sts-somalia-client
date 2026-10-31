@@ -1,3 +1,5 @@
+import { getAgentCredentialDelivery } from "@/lib/agents/credentials";
+import { AgentCredentialDelivery } from "./agent-credential-delivery";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -80,11 +82,11 @@ export default async function PartnerAccountConsolePage({
   searchParams,
 }: {
   params: Promise<{ type: string; id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; approved?: string; email?: string }>;
 }) {
   await requirePlatformAdmin();
   const { type: slug, id } = await params;
-  const { tab: requestedTab } = await searchParams;
+  const { tab: requestedTab, approved: justApproved, email: approvalEmail } = await searchParams;
   const initialTab = requestedTab && CONSOLE_TABS.includes(requestedTab) ? requestedTab : "overview";
   const type = ACCOUNT_TYPE_FROM_SLUG[slug];
   if (!type) notFound();
@@ -96,6 +98,7 @@ export default async function PartnerAccountConsolePage({
   detail = await evaluateAutoLive(detail);
 
   const { account, application, entity, members, events, docReviews, checklist } = detail;
+  const agentDelivery = type === "agency" ? await getAgentCredentialDelivery(application.id) : null;
   const applicationHref = `/admin/applications/${slug}/${application.id}`;
   const doneCount = checklist.filter((i) => i.done).length;
   const progressPct = Math.round((doneCount / checklist.length) * 100);
@@ -117,8 +120,24 @@ export default async function PartnerAccountConsolePage({
   const reviewerRow = application.reviewer as { full_name?: string | null; email?: string } | null;
   const meta = [entity.contactEmail, entity.contactPhone].filter(Boolean).join(" · ");
 
+  // Set by approveApplication's redirect: whether the approval email went out.
+  const approvalNotice =
+    justApproved === "1"
+      ? approvalEmail === "sent"
+        ? { variant: "default" as const, text: "Approved. Approval email sent to the applicant." }
+        : approvalEmail === "not_configured"
+          ? { variant: "warning" as const, text: "Approved. Approval email not sent: no email provider is configured." }
+          : { variant: "destructive" as const, text: "Approved. Approval email could not be sent." }
+      : null;
+
   return (
     <div className="space-y-6">
+      {approvalNotice ? (
+        <Alert variant={approvalNotice.variant}>
+          <AlertDescription>{approvalNotice.text}</AlertDescription>
+        </Alert>
+      ) : null}
+      {agentDelivery?.approved_at ? <AgentCredentialDelivery applicationId={application.id} agentId={agentDelivery.agent_id} email={agentDelivery.contact_email} sent={!!agentDelivery.email_sent_at} /> : null}
       <div className="space-y-5">
         <BackLink href="/admin/partners" label="All partner accounts" />
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
@@ -126,7 +145,7 @@ export default async function PartnerAccountConsolePage({
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{entity.name}</h1>
               {entity.agentCode ? (
-                <Badge variant="outline" className="font-mono" title="Agent code">
+                <Badge variant="outline" className="font-mono" title="Agency code">
                   {entity.agentCode}
                 </Badge>
               ) : null}

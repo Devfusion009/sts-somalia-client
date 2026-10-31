@@ -122,7 +122,7 @@ export function ApplicationActions({
             <form action={approveFormAction}>
               <input type="hidden" name="applicationId" value={applicationId} />
               <AlertDialogHeader>
-                <AlertDialogTitle>Approve and create partner account?</AlertDialogTitle>
+                <AlertDialogTitle>{type === "agency" ? "Approve and issue agent credentials?" : "Approve and create partner account?"}</AlertDialogTitle>
               </AlertDialogHeader>
               <Textarea
                 name="note"

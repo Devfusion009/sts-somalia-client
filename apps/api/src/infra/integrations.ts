@@ -10,6 +10,15 @@ import { env } from "../config/env";
 
 const bool = (v: string | undefined) => v === "true" || v === "1";
 
+/** Same rule as apps/web's lib/integrations.ts: EMAIL_PROVIDER, or a lone RESEND_API_KEY. */
+function emailProvider(): "resend" | null {
+  const named = (env().EMAIL_PROVIDER ?? "").trim().toLowerCase();
+  if (named === "resend" || (!named && env().RESEND_API_KEY)) {
+    return env().RESEND_API_KEY ? "resend" : null;
+  }
+  return null;
+}
+
 export function getIntegrations() {
   const stripe = !!env().STRIPE_SECRET_KEY;
   const waafi = !!(
@@ -24,7 +33,7 @@ export function getIntegrations() {
 
   return {
     payments: { stripe, waafi, edahab, testMode },
-    email: { resend: !!env().RESEND_API_KEY },
+    email: { provider: emailProvider(), resend: emailProvider() === "resend" },
     whatsappApi: !!(env().TWILIO_ACCOUNT_SID && env().TWILIO_AUTH_TOKEN && env().TWILIO_WHATSAPP_FROM),
     siteUrl: env().NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
     bankTransfer: {

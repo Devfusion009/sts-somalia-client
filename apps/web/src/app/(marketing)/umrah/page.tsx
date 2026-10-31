@@ -16,12 +16,12 @@ export const metadata: Metadata = {
 
 const FLOWS = [
   {
-    href: "/umrah/group", title: "Group Umrah", label: "Travel together", image: "/about/umrah-group-wide.webp", icon: UsersRound,
+    href: "/umrah/group", title: "Group Umrah", label: "Travel together", image: "/about/umrah-group-restored-v1.webp", icon: UsersRound,
     features: [{ icon: Tag, label: "Fixed package price" }, { icon: CalendarDays, label: "Scheduled departures" }, { icon: Building2, label: "Package hotels" }, { icon: Check, label: "Group guide" }],
     cta: "See group packages",
   },
   {
-    href: "/umrah/private", title: "Private Umrah", label: "Travel your way", image: "/marketing/umrah-private.webp", icon: Plane,
+    href: "/umrah/private", title: "Private Umrah", label: "Travel your way", image: "/marketing/umrah-private-restored-v1.webp", icon: Plane,
     features: [{ icon: CalendarDays, label: "Your travel dates" }, { icon: Building2, label: "Your hotel choices" }, { icon: Plane, label: "Optional flights" }, { icon: UsersRound, label: "Your own party" }],
     cta: "Build a private trip",
   },
@@ -44,7 +44,8 @@ export default async function UmrahPage() {
           <div className="grid gap-5 md:grid-cols-2">
             {FLOWS.map((flow, index) => <Link key={flow.href} href={flow.href} className={styles.flowCard}>
               <div className={styles.flowPhoto}>
-                <Image src={flow.image} alt="" fill sizes="(min-width: 1024px) 230px, (min-width: 768px) 45vw, 38vw" className="object-cover" />
+                {/* Preserve source resolution in these tall object-cover crops. */}
+                <Image src={flow.image} alt="" fill unoptimized className="object-cover" />
                 <span className="absolute bottom-5 left-5 z-10 font-heading text-4xl font-light text-white/80">0{index + 1}</span>
               </div>
               <div className={styles.flowBody}>

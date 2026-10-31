@@ -21,7 +21,7 @@ import { money } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { EarningsPipeline } from "./earnings-pipeline";
 
-export const metadata: Metadata = { title: "Finance" };
+export const metadata: Metadata = { title: "Wallet & finance" };
 
 /** Approved = accepted but not yet transferred, so it reads as in motion, not done. */
 const REQUEST_VARIANT_OVERRIDES = { approved: "info" } as const;
@@ -48,7 +48,7 @@ export default async function AgentFinancePage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Finance"
+        title="Wallet & finance"
         actions={
           <>
             <Button

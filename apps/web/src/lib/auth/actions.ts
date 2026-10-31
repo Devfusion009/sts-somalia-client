@@ -1,11 +1,13 @@
 "use server";
 
+import { managerIdPattern } from "@/lib/managers/identity";
+import { agentIdPattern } from "@/lib/agents/credentials";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { pathPrefixFor, rootOrigin, type PortalSubdomain } from "@/lib/subdomain";
+import { pathPrefixFor, portalHref, rootOrigin, type PortalSubdomain } from "@/lib/subdomain";
 import { recordLoginEvent, recordSecurityEvent } from "@/lib/auth/login-history";
 import { sessionIdFromAccessToken } from "@/lib/auth/device";
 import { consumeRecoveryCode } from "@/lib/auth/recovery-codes";
@@ -95,7 +97,7 @@ export async function signInAction(
     // admin — before being written as one condition here. 2026-08-23: a
     // manager reached the customer site via the account switcher and could
     // switch back into a "My Account" view that isn't really theirs.
-    if (profile?.is_platform_admin || (await hasActiveManagerRow(supabase, user.id))) {
+    if (user.app_metadata?.agent_application_id || user.app_metadata?.manager_identity_id || profile?.is_platform_admin || (await hasActiveManagerRow(supabase, user.id))) {
       await supabase.auth.signOut();
       return { error: "Incorrect email or password." };
     }
@@ -307,7 +309,7 @@ async function signInToPortalAction(
 
 /**
  * Everything after a successful password check, shared by the email form and
- * the agent-code form: audience check, 2FA step-up, destination.
+ * the agent-ID form: audience check, 2FA step-up, destination.
  */
 async function finishPortalSignIn(
   portal: PortalKind,
@@ -338,7 +340,7 @@ async function finishPortalSignIn(
 
   const redirectTo = formData.get("redirect_to");
   const finalDestination =
-    typeof redirectTo === "string" && redirectTo ? redirectTo : portalDestination(portal);
+    typeof redirectTo === "string" && redirectTo.startsWith("/") && !redirectTo.startsWith("//") && !redirectTo.includes("\\") ? redirectTo : portalDestination(portal);
 
   const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (aal?.currentLevel === "aal1" && aal.nextLevel === "aal2") {
@@ -365,65 +367,52 @@ async function finishPortalSignIn(
   return { error: null, destination: finalDestination };
 }
 
-export const signInToAgentPortalAction = signInToPortalAction.bind(null, "agent");
-
-const agentCodeSchema = z.object({
-  agentCode: z
-    .string()
-    .trim()
-    .min(1, "Enter your agent code.")
-    .transform((v) => v.toUpperCase()),
-  username: z
-    .string()
-    .trim()
-    .min(1, "Enter your username.")
-    .transform((v) => v.toLowerCase()),
-  password: z.string().min(1, "Enter your password."),
-});
-
-const AGENT_SIGN_IN_FAILURE = "Incorrect agent code, username or password.";
-
-/**
- * /agent/login: agent code + username + password. The pair resolves to the
- * member's account email on the server (agent_login_email is service-role
- * only), then the normal password sign-in runs with that email. Every miss
- * returns the same line, so the form never tells which part was wrong.
- */
-export async function signInWithAgentCodeAction(
-  _prevState: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const parsed = agentCodeSchema.safeParse({
-    agentCode: formData.get("agentCode"),
-    username: formData.get("username"),
-    password: formData.get("password"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
+/** Email sign-in is reserved for the explicitly enabled disposable demo. */
+export async function signInToAgentPortalAction(prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (process.env.DEMO_LOGIN_ENABLED !== "true" || formData.get("email") !== "demo.agent@stssomalia.com") {
+    return { error: "Use your agent code and password." };
   }
-  const { agentCode, username, password } = parsed.data;
-  if (!/^[A-Z0-9]{3,20}$/.test(agentCode) || !/^[a-z0-9][a-z0-9._-]{2,29}$/.test(username)) {
-    return { error: AGENT_SIGN_IN_FAILURE };
-  }
+  return signInToPortalAction("agent", prev, formData);
+}
 
-  const { data: email } = await createAdminClient().rpc("agent_login_email", {
-    p_agent_code: agentCode,
-    p_username: username,
-  });
-  if (!email) {
-    return { error: AGENT_SIGN_IN_FAILURE };
-  }
+const AGENT_SIGN_IN_FAILURE = "Incorrect agent code or password.";
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    return { error: AGENT_SIGN_IN_FAILURE };
-  }
-
-  return finishPortalSignIn("agent", supabase, formData, AGENT_SIGN_IN_FAILURE);
+export async function signInWithAgentIdAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const agentId = String(formData.get("agentId") ?? "").trim().toUpperCase();
+  const password = String(formData.get("password") ?? "");
+  if (!agentId || !password) return { error: "Enter your agent code and password." };
+  if (!agentIdPattern.test(agentId)) return { error: AGENT_SIGN_IN_FAILURE };
+  try {
+    const { data: email, error: lookupError } = await createAdminClient().rpc("agent_login_identity", { p_agent_id: agentId });
+    if (lookupError || !email) return { error: AGENT_SIGN_IN_FAILURE };
+    const supabase = await createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: AGENT_SIGN_IN_FAILURE };
+    return finishPortalSignIn("agent", supabase, formData, AGENT_SIGN_IN_FAILURE);
+  } catch { return { error: AGENT_SIGN_IN_FAILURE }; }
 }
 export const signInToAdminPortalAction = signInToPortalAction.bind(null, "admin");
-export const signInToManagerPortalAction = signInToPortalAction.bind(null, "manager");
+/** Email authentication is reserved for the explicitly enabled disposable demo. */
+export async function signInToManagerPortalAction(prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (process.env.DEMO_LOGIN_ENABLED !== "true" || formData.get("email") !== "demo.manager@stssomalia.com") return { error: "Use your manager ID and password." };
+  return signInToPortalAction("manager", prev, formData);
+}
+
+export async function signInWithManagerIdAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const managerCode = String(formData.get("managerCode") ?? "").trim().toUpperCase();
+  const password = String(formData.get("password") ?? "");
+  const failure = "Incorrect manager ID or password.";
+  if (!managerCode || !password) return { error: "Enter your manager ID and password." };
+  if (!managerIdPattern.test(managerCode)) return { error: failure };
+  try {
+    const { data: email, error } = await createAdminClient().rpc("manager_login_identity", { p_manager_code: managerCode });
+    if (error || !email) return { error: failure };
+    const supabase = await createClient();
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) return { error: failure };
+    return finishPortalSignIn("manager", supabase, formData, failure);
+  } catch { return { error: failure }; }
+}
 export const signInToAffiliatePortalAction = signInToPortalAction.bind(null, "affiliate");
 export const signInToPartnerPortalAction = signInToPortalAction.bind(null, "partner");
 export const signInToVenuePortalAction = signInToPortalAction.bind(null, "venue");
@@ -584,7 +573,9 @@ export async function updatePasswordAction(
     return { error: error.message };
   }
 
-  redirect("/account");
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user?.app_metadata.manager_identity_id || (user && await hasActiveManagerRow(supabase, user.id))) redirect(portalHref("manager"));
+  redirect(user?.app_metadata.agent_application_id ? portalHref("agent") : "/account");
 }
 
 export async function signOutAction() {
