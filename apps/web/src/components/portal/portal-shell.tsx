@@ -44,6 +44,8 @@ import {
   CalendarRange,
   Images,
   Star,
+  Search,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -55,6 +57,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
+  SidebarInput,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -69,6 +72,7 @@ import { AdminAccountMenu, type AdminMenuInfo } from "@/components/portal/admin-
 import { rootOrigin, stripPortalPrefix } from "@/lib/subdomain";
 import { cn } from "@/lib/utils";
 import type { PartnerContext } from "@/modules/identity/queries";
+import { filterNavigationGroups } from "./navigation-search";
 
 // Icons are resolved from a string key (not passed as component references)
 // because PortalShell is a Client Component: Server Component layouts can
@@ -122,8 +126,8 @@ const MANAGER_TIPS = [
 ];
 
 export type PortalIconName = keyof typeof PORTAL_ICONS;
-export type PortalNavItem = { href: string; label: string; icon: PortalIconName; badge?: number };
-export type PortalNavGroup = { label: string; items: PortalNavItem[] };
+export type PortalNavItem = { href: string; label: string; icon: PortalIconName; badge?: number; searchTerms?: string };
+export type PortalNavGroup = { label: string; items: PortalNavItem[]; alwaysOpen?: boolean };
 export type PortalAccent = "customer" | "agent" | "admin" | "manager";
 
 /**
@@ -144,11 +148,18 @@ export type PortalAccent = "customer" | "agent" | "admin" | "manager";
 function NavGroups({
   navGroups,
   activeHref,
+  query = "",
+  onNavigate,
 }: {
   navGroups: PortalNavGroup[];
   activeHref: string | undefined;
+  query?: string;
+  onNavigate?: () => void;
 }) {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
+  const iconOnly = state === "collapsed" && !isMobile;
+  const isSearching = !iconOnly && query.trim().length > 0;
+  const visibleGroups = filterNavigationGroups(navGroups, isSearching ? query : "");
 
   // Both sides normalised: nav items carry the canonical "/admin/..." path
   // while the address bar shows the proxy-rewritten "/..." on a portal
@@ -205,11 +216,12 @@ function NavGroups({
 
   return (
     <>
-      {navGroups.map((group) => {
-        const isOpen = state === "collapsed" || openGroups.has(group.label);
+      {visibleGroups.length === 0 ? <div role="status" className="px-5 py-6 text-xs text-sidebar-foreground/60">No pages found.</div> : null}
+      {visibleGroups.map((group) => {
+        const isOpen = group.alwaysOpen || isSearching || iconOnly || openGroups.has(group.label);
         return (
           <SidebarGroup key={group.label}>
-            <SidebarGroupLabel
+            {iconOnly ? null : group.alwaysOpen || isSearching ? <SidebarGroupLabel>{group.label}</SidebarGroupLabel> : <SidebarGroupLabel
               render={
                 <button
                   type="button"
@@ -220,8 +232,11 @@ function NavGroups({
               }
             >
               <span>{group.label}</span>
-              <ChevronDown className={cn("size-3.5 shrink-0 transition-transform duration-200", !isOpen && "-rotate-90")} />
-            </SidebarGroupLabel>
+              <span className="ml-auto flex items-center gap-2">
+                {!isOpen && group.items.some((item) => (item.badge ?? 0) > 0) ? <span role="img" aria-label="Pending items" className="size-1.5 rounded-full bg-sidebar-primary" /> : null}
+                <ChevronDown className={cn("size-3.5 shrink-0 transition-transform duration-200", !isOpen && "-rotate-90")} />
+              </span>
+            </SidebarGroupLabel>}
             {isOpen ? (
               <SidebarGroupContent>
                 <SidebarMenu>
@@ -232,13 +247,14 @@ function NavGroups({
                       <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton
                           isActive={active}
+                          aria-current={active ? "page" : undefined}
                           tooltip={item.label}
                           // Active = filled row, white label, brand-teal icon.
                           className={cn(
                             "text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 [&_svg]:text-sidebar-foreground/60",
                             active && "[&_svg]:text-sidebar-primary"
                           )}
-                          render={<Link href={item.href} />}
+                          render={<Link href={item.href} onClick={onNavigate ? () => { onNavigate(); setOpenMobile(false); } : undefined} />}
                         >
                           <Icon />
                           <span>{item.label}</span>
@@ -259,6 +275,17 @@ function NavGroups({
       })}
     </>
   );
+}
+
+function PortalHomeLink({ onActivate, onClick, ...props }: React.ComponentProps<typeof Link> & { onActivate?: () => void }) {
+  const { setOpenMobile } = useSidebar();
+  return <Link {...props} onClick={(event) => {
+    onClick?.(event);
+    if (!event.defaultPrevented) {
+      onActivate?.();
+      setOpenMobile(false);
+    }
+  }} />;
 }
 
 function initials(name: string | null, email: string | null) {
@@ -286,6 +313,8 @@ export function PortalShell({
   accountCode,
   adminMenu,
   menuInfo,
+  className,
+  searchableNavigation = false,
   children,
 }: {
   portalName: string;
@@ -310,9 +339,14 @@ export function PortalShell({
   adminMenu?: AdminMenuInfo;
   /** Help-dialog context for the non-admin portals: workspace name, deployed commit, support address override. */
   menuInfo?: { workspace?: string | null; buildSha?: string | null; supportEmail?: string };
+  /** Portal-specific visual treatment; shared navigation behavior stays in this shell. */
+  className?: string;
+  /** Optional client-side page finder; enabled for the admin console. */
+  searchableNavigation?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [navQuery, setNavQuery] = useState("");
   // The sidebar's own brand mark: like Stripe's or Shopify's dashboard logo,
   // it returns to this portal's own home, never out to the public site — an
   // operator console is a separate product from the B2C site, not a section
@@ -371,12 +405,12 @@ export function PortalShell({
   );
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className={className}>
       <Sidebar collapsible="icon">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" render={<Link href={dashboardHref} />}>
+              <SidebarMenuButton size="lg" render={<PortalHomeLink href={dashboardHref} onActivate={() => setNavQuery("")} />}>
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white p-1">
                   {brandLogoUrl ? (
                     // Agency's own uploaded logo — a Supabase Storage URL, not a
@@ -395,9 +429,25 @@ export function PortalShell({
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
+          {searchableNavigation ? (
+            <div className="relative mt-2 group-data-[collapsible=icon]:hidden">
+              <Search className="pointer-events-none absolute top-2.5 left-3 z-10 size-4 text-sidebar-foreground/50" aria-hidden="true" />
+              <SidebarInput
+                type="search"
+                aria-label="Search navigation"
+                placeholder="Find a page…"
+                value={navQuery}
+                onChange={(event) => setNavQuery(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Escape") setNavQuery(""); }}
+                autoComplete="off"
+                className="h-9 border-sidebar-border bg-sidebar-accent/70 pr-9 pl-9 text-xs text-sidebar-foreground shadow-none placeholder:text-sidebar-foreground/50 focus-visible:ring-sidebar-ring [&::-webkit-search-cancel-button]:hidden"
+              />
+              {navQuery ? <button type="button" aria-label="Clear navigation search" onClick={() => setNavQuery("")} className="absolute top-0.5 right-1 flex size-8 items-center justify-center rounded-md text-sidebar-foreground/60 hover:text-white focus-visible:outline-2 focus-visible:outline-sidebar-ring"><X className="size-3.5" aria-hidden="true" /></button> : null}
+            </div>
+          ) : null}
         </SidebarHeader>
         <SidebarContent>
-          <NavGroups navGroups={navGroups} activeHref={activeHref} />
+          <NavGroups navGroups={navGroups} activeHref={activeHref} query={navQuery} onNavigate={searchableNavigation ? () => setNavQuery("") : undefined} />
           {/* An exit hatch, not a destination — separated from real nav items
               and deliberately muted so it doesn't compete with them. A hotel
               manager's portal isn't a reskinned view of the public site the

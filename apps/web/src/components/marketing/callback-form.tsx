@@ -60,11 +60,11 @@ export function CallbackForm() {
       ref={formRef}
       onSubmit={onSubmit}
       noValidate
-      className="rounded-2xl border border-border bg-card p-6 shadow-2xl shadow-black/25 lg:p-8"
+      className="w-full bg-card p-5 sm:p-6 lg:p-7"
     >
-      <h3 className="font-heading text-xl font-semibold">Request a callback</h3>
+      <h3 className="font-heading text-2xl font-semibold tracking-tight">Request a callback</h3>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <div className="mt-7 grid gap-5 sm:grid-cols-2">
         <Field>
           <FieldLabel htmlFor="callback-name">Your name</FieldLabel>
           <Input
@@ -73,7 +73,7 @@ export function CallbackForm() {
             autoComplete="name"
             placeholder="Amina Hassan"
             required
-            className="h-12"
+            className="h-12 rounded-xl bg-background shadow-none"
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? "callback-error" : undefined}
           />
@@ -87,7 +87,7 @@ export function CallbackForm() {
             autoComplete="tel"
             placeholder="+252 61 1234567"
             required
-            className="h-12"
+            className="h-12 rounded-xl bg-background shadow-none"
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? "callback-error" : undefined}
           />
@@ -95,7 +95,7 @@ export function CallbackForm() {
         <Field className="sm:col-span-2">
           <FieldLabel htmlFor="callback-service">What do you need?</FieldLabel>
           <Select value={service} onValueChange={(value) => setService(value ? String(value) : null)}>
-            <SelectTrigger id="callback-service" className="h-12 w-full">
+            <SelectTrigger id="callback-service" className="h-12! w-full rounded-xl bg-background shadow-none">
               <SelectValue placeholder="Choose a service" />
             </SelectTrigger>
             <SelectContent>
@@ -115,6 +115,7 @@ export function CallbackForm() {
             id="callback-message"
             name="message"
             rows={3}
+            className="min-h-24 rounded-xl bg-background shadow-none"
             placeholder="Travel dates, destination, number of travellers…"
           />
         </Field>
@@ -129,7 +130,7 @@ export function CallbackForm() {
       <Button
         type="submit"
         loading={pending}
-        className="mt-6 h-12 w-full bg-brand-accent text-base font-semibold text-brand-accent-foreground hover:bg-brand-accent/90"
+        className="mt-6 h-12 w-full rounded-xl bg-brand-accent text-base font-semibold text-brand-accent-foreground hover:bg-brand-accent/90"
       >
         {pending ? null : <PhoneCall aria-hidden />}
         Call me back

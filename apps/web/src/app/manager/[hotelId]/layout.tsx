@@ -5,6 +5,7 @@ import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getOpenRequestCount } from "@/modules/hotels/refund-queries";
 import { hotelLogoUrl } from "@/modules/hotels/images";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
+import styles from "@/components/portal/operations-shell.module.css";
 
 /**
  * The tenant boundary for the whole portal: every page under
@@ -38,11 +39,12 @@ export default async function ManagerHotelLayout({
 
   const base = `/manager/${hotelId}`;
   const operate: PortalNavGroup = {
-    label: managed.hotel.name,
+    label: "Property workspace",
+    alwaysOpen: true,
     items: [
       { href: base, label: "Dashboard", icon: "overview" },
       ...(managed.permissions.includes("bookings")
-        ? [{ href: `${base}/bookings/new`, label: "Book Now", icon: "new-booking" as const }]
+        ? [{ href: `${base}/bookings/new`, label: "New reservation", icon: "new-booking" as const }]
         : []),
       { href: `${base}/bookings`, label: "Bookings", icon: "bookings", badge: pendingBookings || undefined },
       ...(managed.permissions.includes("bookings")
@@ -60,6 +62,7 @@ export default async function ManagerHotelLayout({
       ...(managed.permissions.includes("photos") ? [{ href: `${base}/photos`, label: "Photos & Media", icon: "photos" as const }] : []),
       ...(managed.permissions.includes("profile") ? [{ href: `${base}/profile`, label: "Hotel Profile", icon: "hotels" as const }] : []),
       { href: `${base}/reviews`, label: "Reviews", icon: "reviews" },
+      { href: "/manager/security", label: "Security", icon: "security" },
     ],
   };
 
@@ -75,11 +78,13 @@ export default async function ManagerHotelLayout({
 
   return (
     <PortalShell
+      className={styles.shell}
       portalName="Manager Portal"
       roleLabel="Hotel Manager"
       navGroups={navGroups}
       profileName={profile.full_name}
-      profileEmail={profile.email}
+      profileEmail={profile.manager_contact_email ?? profile.email}
+      accountCode={profile.manager_code ?? undefined}
       contexts={contexts}
       isPlatformAdmin={profile.is_platform_admin}
       accent="manager"

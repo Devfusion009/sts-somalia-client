@@ -4,110 +4,15 @@ import { requireAdminPortalAccess } from "@/lib/auth/session";
 import { hasVerifiedFactor } from "@/lib/auth/mfa";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { createClient } from "@/lib/supabase/server";
-import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
+import { PortalShell } from "@/components/portal/portal-shell";
 import { MfaSettings } from "@/modules/auth/components/mfa-settings";
 import { getServerTrpc } from "@/lib/trpc/server";
 import { fireDueEventReminders } from "@/modules/admin/calendar-reminders";
 import { AdminNotificationBell } from "./admin-notification-bell";
 import { NewOrderBanner } from "./new-order-banner";
 import { ShieldAlert } from "lucide-react";
-
-// Reorganized (2026-08-20, per user request) from 7 groups into 6 grouped
-// strictly by JOB rather than loose topic — the previous split had "Hotels"
-// and "Events & Halls" (managing what's listed for sale) sitting in
-// "Operations" while "Visa Catalog"/"Umrah Packages"/"Umrah Services" (the
-// exact same kind of task — manage inventory) sat in a separate "Catalog"
-// group. That inconsistency, not raw group count, was what read as fuzzy:
-// two items of the same TYPE living in different buckets for no reason a
-// user could infer. Fixed by moving every listing/inventory item into one
-// "Catalog & Inventory" group and renaming the leftover queue-processing
-// group to "Bookings & Orders" (every item in it is "a customer submitted
-// something, I need to act on it" — a genuinely different job from
-// managing what's for sale). Settings + Developer also merged: four
-// platform-configuration items split into two groups of two had no
-// defensible boundary either.
-//
-// "Finance" added (2026-09-03, per user request) on the same job-not-topic
-// rule: moving money is its own job, and it had no home at all — payout
-// requests were reachable only by drilling into one agency at a time, which
-// is the wrong shape for a bank run that spans agencies. It costs no extra
-// group: "Reports" was a single Aging Report (a receivables view, so it
-// belongs here anyway) and Refund Requests moved across from Bookings &
-// Orders, where it was the one item that isn't a customer booking to
-// fulfil. Wallet top-ups got its own item the same way Withdrawals did
-// (2026-09-07) — it was reachable only by drilling into one agency at a
-// time, so an admin had no way to see money sent by other agencies waiting
-// to be confirmed. Earnings review is the one still living on the agency
-// page today.
-const NAV_GROUPS: PortalNavGroup[] = [
-  {
-    label: "Overview",
-    items: [{ href: "/admin", label: "Dashboard", icon: "overview" }],
-  },
-  {
-    label: "Bookings & Orders",
-    items: [
-      // First in the group: the queue is the "what needs my hands right now"
-      // surface for the manual-booking workflow — FIFO booking requests.
-      { href: "/admin/queue", label: "Order Queue", icon: "bookings" },
-      { href: "/admin/calendar", label: "Booking Calendar", icon: "calendar" },
-      { href: "/admin/orders", label: "Orders & Payments", icon: "orders" },
-      { href: "/admin/umrah/requests", label: "Private Umrah", icon: "bookings" },
-      { href: "/admin/umrah/bookings", label: "Umrah Bookings", icon: "bookings" },
-      { href: "/admin/umrah/departures", label: "Umrah Departures", icon: "calendar" },
-    ],
-  },
-  {
-    label: "Visa Operations",
-    items: [
-      { href: "/admin/visa", label: "Visa Applications", icon: "visa" },
-      { href: "/admin/visa/appointments", label: "Visa Appointments", icon: "calendar" },
-    ],
-  },
-  {
-    label: "Catalog & Inventory",
-    items: [
-      { href: "/admin/hotels", label: "Hotels", icon: "hotels" },
-      { href: "/admin/events", label: "Events & Halls", icon: "events" },
-      { href: "/admin/catalog/visa", label: "Visa Catalog", icon: "catalog" },
-      { href: "/admin/catalog/umrah", label: "Umrah Packages", icon: "catalog" },
-      { href: "/admin/catalog/umrah/services", label: "Umrah Services", icon: "catalog" },
-    ],
-  },
-  {
-    label: "Partners",
-    items: [
-      { href: "/admin/applications", label: "Partner Applications", icon: "applications" },
-      { href: "/admin/partners", label: "Partner Accounts", icon: "become-partner" },
-      { href: "/admin/agencies", label: "Agencies", icon: "agency" },
-      { href: "/admin/agency-tiers", label: "Agency Tiers", icon: "tiers" },
-      { href: "/admin/broadcasts", label: "Broadcasts", icon: "broadcast" },
-    ],
-  },
-  {
-    label: "Finance",
-    items: [
-      // First two: someone is waiting on money in both directions — an
-      // agency that already sent cash/EVC and is blocked from booking until
-      // it's credited, or one that's owed a payout. Neither can happen
-      // anywhere but here.
-      { href: "/admin/finance/top-ups", label: "Top-ups", icon: "credit-note" },
-      { href: "/admin/finance/withdrawals", label: "Withdrawals", icon: "payouts" },
-      { href: "/admin/refunds", label: "Refund Requests", icon: "refund" },
-      { href: "/admin/reports/aging", label: "Aging Report", icon: "aging" },
-    ],
-  },
-  {
-    label: "Settings",
-    items: [
-      { href: "/admin/users", label: "Users", icon: "team" },
-      { href: "/admin/security", label: "Security", icon: "security" },
-      { href: "/admin/integrations", label: "Integrations", icon: "integrations" },
-      { href: "/admin/site-settings", label: "Site settings", icon: "settings" },
-      { href: "/admin/audit-log", label: "Audit Log", icon: "audit" },
-    ],
-  },
-];
+import { getAdminNavGroups } from "./navigation";
+import styles from "@/components/portal/operations-shell.module.css";
 
 /**
  * Portal-scoped title, set on the LAYOUT rather than per page: the root
@@ -166,40 +71,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     supabase.rpc("admin_nav_counts"),
   ]);
 
-  // Red count badges on the queue-shaped nav items — everything a customer
-  // or partner submitted that is waiting on staff. One RPC round trip; the
-  // bell's 30s router.refresh() re-runs this layout, so the numbers track
-  // new arrivals on the same tick that surfaces their notifications.
-  const navCounts = (navCountsRaw ?? {}) as Record<string, number>;
-  const BADGE_BY_HREF: Record<string, number | undefined> = {
-    "/admin/queue": navCounts.queue,
-    "/admin/refunds": navCounts.refunds,
-    "/admin/visa": navCounts.visa,
-    "/admin/visa/appointments": navCounts.visa_appointments,
-    "/admin/umrah/requests": navCounts.umrah_requests,
-    "/admin/applications": navCounts.partner_applications,
-    // Requests waiting to be reviewed, plus approved ones waiting to be
-    // sent — both are work only an admin can clear.
-    "/admin/finance/withdrawals": navCounts.payout_requests,
-    // Offline top-ups an agency says it already sent — reviewing one credits
-    // the wallet immediately, so this is time-sensitive the same way a
-    // payout is.
-    "/admin/finance/top-ups": navCounts.topup_requests,
-    // The agency decisions that still have no home of their own — markup
-    // changes and earnings waiting on review — are made on an agency's own
-    // page, so they share that page's badge rather than splitting into nav
-    // items that would lead back to the same place. Payouts and top-ups
-    // left this sum when they got their own items: counting the same
-    // request twice would make the sidebar overstate the backlog.
-    "/admin/agencies": (navCounts.markup_requests ?? 0) + (navCounts.earnings_reviews ?? 0),
-  };
-  const navGroups = NAV_GROUPS.map((group) => ({
-    ...group,
-    items: group.items.map((item) => ({ ...item, badge: BADGE_BY_HREF[item.href] || undefined })),
-  }));
+  const navGroups = getAdminNavGroups((navCountsRaw ?? {}) as Record<string, number>);
 
   return (
     <PortalShell
+      className={styles.shell}
+      searchableNavigation
       portalName="Admin Console"
       roleLabel="Admin"
       navGroups={navGroups}

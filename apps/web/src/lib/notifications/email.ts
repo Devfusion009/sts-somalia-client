@@ -2,27 +2,56 @@ import "server-only";
 import { getIntegrations } from "@/lib/integrations";
 
 /**
- * Plain fetch against Resend's REST API — no SDK, matching this codebase's
- * existing convention for third-party providers (see flights/provider.ts,
- * payments/providers.ts: "No SDK — plain fetch, mapped to a small shape the
- * UI owns"). Silently no-ops when RESEND_API_KEY isn't set, same fallback
- * shape as every other optional integration here — callers don't need to
- * check getIntegrations() themselves before calling this.
+ * Transactional email, one entry point for the whole app.
+ *
+ * Configuration (see apps/web/.env.example, "Email"):
+ *   EMAIL_PROVIDER   "resend" today; empty means no provider is connected.
+ *   EMAIL_FROM       Sender, e.g. "STS Somalia <no-reply@scoutsts.com>".
+ *   EMAIL_REPLY_TO   Where replies go, e.g. "info@scoutsts.com".
+ *   RESEND_API_KEY   Credential for the "resend" provider.
+ *
+ * Every caller builds and hands over the full message regardless of
+ * configuration. With no provider connected the message is not sent: the
+ * result says `status: "not_configured"` and one log line records the
+ * recipient and subject, so the email the app would have sent is traceable.
+ * Sending never throws; a failed email must not undo the action that
+ * triggered it.
+ *
+ * Plain fetch against the provider's REST API, no SDK — the codebase's
+ * convention for third-party providers.
  */
 export type SendEmailInput = {
-  to: string;
+  to: string | string[];
+  cc?: string[];
   subject: string;
   html: string;
+  /** Plain-text alternative for clients that do not render HTML. */
+  text?: string;
+  replyTo?: string;
 };
 
-export type SendEmailResult = { sent: boolean; error?: string };
+export type EmailStatus = "sent" | "not_configured" | "failed";
 
-const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL ?? "STS Somalia <notifications@sts-somalia.example>";
+export type SendEmailResult = { sent: boolean; status: EmailStatus; error?: string };
+
+const DEFAULT_FROM = "STS Somalia <notifications@sts-somalia.example>";
+
+function fromAddress(): string {
+  return process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || DEFAULT_FROM;
+}
+
+function asList(value: string | string[]): string[] {
+  return (Array.isArray(value) ? value : [value]).filter(Boolean);
+}
 
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const { email } = getIntegrations();
-  if (!email.resend) {
-    return { sent: false, error: "Resend is not configured (RESEND_API_KEY missing)." };
+  const to = asList(input.to);
+  const replyTo = input.replyTo ?? process.env.EMAIL_REPLY_TO ?? undefined;
+
+  if (email.provider !== "resend") {
+    console.info(`[email] not sent, no provider configured · to=${to.join(",")} · subject="${input.subject}"`);
+    return { sent: false, status: "not_configured", error: "No email provider is configured." };
   }
 
   try {
@@ -33,19 +62,24 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: FROM_ADDRESS,
-        to: [input.to],
+        from: fromAddress(),
+        to,
+        cc: input.cc?.length ? input.cc : undefined,
+        reply_to: replyTo,
         subject: input.subject,
         html: input.html,
+        text: input.text,
       }),
     });
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      return { sent: false, error: `Resend returned ${res.status}: ${body.slice(0, 200)}` };
+      console.error(`[email] provider rejected · status=${res.status} · subject="${input.subject}"`);
+      return { sent: false, status: "failed", error: `Resend returned ${res.status}: ${body.slice(0, 200)}` };
     }
-    return { sent: true };
+    return { sent: true, status: "sent" };
   } catch {
-    return { sent: false, error: "Could not reach the email provider." };
+    console.error(`[email] provider unreachable · subject="${input.subject}"`);
+    return { sent: false, status: "failed", error: "Could not reach the email provider." };
   }
 }

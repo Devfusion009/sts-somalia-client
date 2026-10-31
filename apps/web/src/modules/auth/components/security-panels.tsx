@@ -70,7 +70,7 @@ function StrengthMeter({ password }: { password: string }) {
   );
 }
 
-export function ChangePasswordCard() {
+export function ChangePasswordCard({ forgotHref = "/forgot-password" }: { forgotHref?: string }) {
   const [newPassword, setNewPassword] = useState("");
   const [state, formAction] = useActionState<ActionState, FormData>(async (prev, formData) => {
     const result = await changePasswordAction(prev, formData);
@@ -86,7 +86,7 @@ export function ChangePasswordCard() {
       <CardHeader>
         <CardTitle>Password</CardTitle>
         <CardAction>
-          <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
+          <Link href={forgotHref} className="text-sm font-medium text-primary hover:underline">
             Forgot password?
           </Link>
         </CardAction>

@@ -24,7 +24,7 @@ import { Pager } from "@/components/dashboard/pager";
 import { ReportFilters } from "./report-filters";
 import type { Database } from "@/lib/types/database.types";
 
-export const metadata: Metadata = { title: "Earnings" };
+export const metadata: Metadata = { title: "Commissions & earnings" };
 
 type OrderItemType = Database["public"]["Enums"]["order_item_type"];
 
@@ -95,7 +95,7 @@ export default async function AgentReportsPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Earnings"
+        title="Commissions & earnings"
         actions={
           <>
             <Button variant="outline" nativeButton={false} render={<a href="/agent/reports/export" />}>

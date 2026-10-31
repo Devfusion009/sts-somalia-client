@@ -72,7 +72,7 @@ export async function getPendingHallBookingCount(venueId: string): Promise<numbe
   return count ?? 0;
 }
 
-const MANAGER_SELECT = "id, created_at, permissions, profile:profiles!venue_managers_profile_id_fkey(id, full_name, email)";
+const MANAGER_SELECT = "id, created_at, permissions, profile:profiles!venue_managers_profile_id_fkey(id, full_name, email, manager_code, manager_contact_email)";
 
 /** Active managers of one venue — admin console and the owning partner (RLS "venue_managers: authorized manage"). */
 export async function getVenueManagers(venueId: string) {

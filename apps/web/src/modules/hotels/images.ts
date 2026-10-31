@@ -6,6 +6,7 @@
 export function hotelImageUrl(entry: unknown): string | null {
   if (typeof entry !== "string" || entry.length === 0) return null;
   if (entry.startsWith("http://") || entry.startsWith("https://")) return entry;
+  if (entry.startsWith("/")) return entry;
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
   return base ? `${base}/storage/v1/object/public/hotel-images/${entry}` : null;
 }

@@ -33,7 +33,7 @@ export type PickerRow = {
  * checkboxes are for the case that actually needs the desk — a group going
  * on one departure — where the same product is booked for everyone at once.
  */
-export function CustomerPickerTable({ rows }: { rows: PickerRow[] }) {
+export function CustomerPickerTable({ rows, redirectTo }: { rows: PickerRow[]; redirectTo?: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
   // Which row's "Select" was clicked, so only that button shows the spinner.
@@ -59,13 +59,32 @@ export function CustomerPickerTable({ rows }: { rows: PickerRow[] }) {
         toast.error(result.error);
         return;
       }
-      router.refresh();
+      if (redirectTo) router.push(redirectTo);
+      else router.refresh();
     });
   }
 
   return (
     <>
-      <Card className="overflow-hidden py-0">
+      <div className="sm:hidden">
+        <label className="mb-2 flex min-h-10 items-center gap-3 text-xs text-muted-foreground">
+          <Checkbox aria-label="Select all customers" checked={allChecked} onCheckedChange={() => setSelected(allChecked ? new Set() : new Set(rows.map((row) => row.id)))} />
+          Select all
+        </label>
+        <ul className="divide-y divide-border border-y border-border">
+          {rows.map((row) => (
+            <li key={row.id} className="flex items-center gap-3 py-4">
+              <Checkbox aria-label={`Select ${row.full_name}`} checked={selected.has(row.id)} onCheckedChange={() => toggle(row.id)} />
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{row.full_name}</span>
+                <span className="mt-1 block truncate text-xs text-muted-foreground">{row.phone ?? row.email ?? "—"}</span>
+              </div>
+              <Button size="sm" variant="outline" disabled={pending} loading={pending && pendingId === row.id} onClick={() => commit([row.id], row.id)}>Select</Button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <Card className="hidden overflow-hidden py-0 sm:block">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>

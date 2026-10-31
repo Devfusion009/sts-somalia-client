@@ -22,6 +22,11 @@ type NotificationRow = {
 };
 
 function targetHref(n: NotificationRow): string | null {
+  // A decided application opens its own page, where the progress track shows the outcome.
+  if (n.type === "application_approved" || n.type === "application_rejected") {
+    const d = n.data as { applicationType?: string; applicationId?: string } | null;
+    if (d?.applicationType && d.applicationId) return `/account/become/${d.applicationType}/${d.applicationId}/view`;
+  }
   if (ACTIONABLE_TYPES.has(n.type)) return "/account/become";
   if (
     n.type === "booking_waitlisted" ||

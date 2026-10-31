@@ -1,3 +1,5 @@
+import { OperationsMetrics } from "../../operations-ui";
+import styles from "../../operations.module.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, ChevronRight } from "lucide-react";
@@ -26,15 +28,24 @@ export default async function AdminUmrahDeparturesPage({
   const { past } = await searchParams;
   const showPast = past === "1";
   const now = new Date();
+  const today = now.toISOString().slice(0, 10);
   const from = showPast
     ? new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-    : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const departures = await getDeparturesOverview(from);
+    : today;
+  const overview = await getDeparturesOverview(from);
+  const departures = showPast ? overview.filter((departure) => departure.departure_date < today) : overview;
 
   return (
-    <div className="space-y-6">
+    <div className={`${styles.page} space-y-6`}>
       <PageHeader title="Umrah Departures" actions={<ReleaseUnpaidButton />} />
 
+      <OperationsMetrics items={[
+        { label: showPast ? "Departures · last 6 months" : "Upcoming departures", value: departures.length },
+        { label: "Booked seats", value: departures.reduce((n, d) => n + d.booked_seats, 0) },
+        { label: "Offline seats", value: departures.reduce((n, d) => n + d.offline_seats, 0), tone: "warning" },
+        { label: "Available seats", value: departures.reduce((n, d) => n + Math.max(0, d.total_seats - d.booked_seats - d.offline_seats), 0), tone: "primary" },
+      ]} />
+      <div className={styles.filters}>
       <FilterChips
         label="Departure range"
         active={showPast ? "past" : "upcoming"}
@@ -44,7 +55,8 @@ export default async function AdminUmrahDeparturesPage({
         ]}
       />
 
-      <Card className="overflow-hidden py-0">
+      </div>
+      <Card className={`${styles.table} overflow-hidden py-0`}>
         {departures.length === 0 ? (
           <Empty>
             <EmptyMedia variant="icon">
@@ -53,8 +65,8 @@ export default async function AdminUmrahDeparturesPage({
             <EmptyTitle>No departures</EmptyTitle>
           </Empty>
         ) : (
-          <Table>
-            <TableHeader>
+          <Table containerClassName="max-h-[65vh]">
+            <TableHeader sticky>
               <TableRow>
                 <TableHead>Departure</TableHead>
                 <TableHead>Package</TableHead>
@@ -83,7 +95,13 @@ export default async function AdminUmrahDeparturesPage({
                       </Link>
                       <p className="text-xs text-muted-foreground">to {formatDay(d.return_date)}</p>
                     </TableCell>
-                    <TableCell className="font-medium">{d.package_name}</TableCell>
+                    <TableCell className="min-w-52 font-medium">
+                      {d.package_name}
+                      <div className="mt-2 flex items-center gap-2">
+                        <progress className="h-1.5 w-24 overflow-hidden rounded-full accent-primary" value={Math.min(d.total_seats, d.booked_seats + d.offline_seats)} max={Math.max(1, d.total_seats)} aria-label={`${d.package_name} seat occupancy`} />
+                        <span className="text-xs font-normal text-muted-foreground">{d.booked_seats + d.offline_seats}/{d.total_seats}</span>
+                      </div>
+                    </TableCell>
                     <TableCell numeric>{d.booked_seats}</TableCell>
                     <TableCell numeric>{d.offline_seats}</TableCell>
                     <TableCell numeric className={cn(free <= 0 && "font-medium text-destructive")}>

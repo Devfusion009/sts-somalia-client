@@ -90,6 +90,7 @@ export default async function AgentBookingsPage({
         }
       />
 
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4">
       <FilterChips
         label="Filter bookings"
         active={activeFilter}
@@ -99,6 +100,8 @@ export default async function AgentBookingsPage({
           href: filter.key === "all" ? "/agent/bookings" : `/agent/bookings?type=${filter.key}`,
         }))}
       />
+      <span className="text-xs text-muted-foreground tabular-nums">{total} booking{total === 1 ? "" : "s"}</span>
+      </div>
 
       {filtered.length === 0 ? (
         <Card>
@@ -141,7 +144,7 @@ export default async function AgentBookingsPage({
                     <TableCell className="align-top">
                       <Link
                         href={`/agent/bookings/${order.id}`}
-                        className="rounded-sm font-medium tabular-nums outline-none hover:text-primary hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                        className="rounded-sm font-mono text-xs font-semibold tabular-nums outline-none hover:text-primary hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
                       >
                         {order.order_number}
                       </Link>
@@ -156,10 +159,7 @@ export default async function AgentBookingsPage({
                           const Icon = TYPE_ICON[item.item_type];
                           return (
                             <li key={item.id} className="flex items-start gap-2">
-                              <Icon
-                                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                                aria-hidden="true"
-                              />
+                              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary"><Icon className="size-4" aria-hidden="true" /></span>
                               <div className="min-w-0 max-w-72">
                                 <p className="truncate text-sm font-medium">{info.title}</p>
                                 {info.subtitle ? (

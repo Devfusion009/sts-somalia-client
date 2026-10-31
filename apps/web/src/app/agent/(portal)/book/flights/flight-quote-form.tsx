@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
+import { ArrowLeftRight, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
@@ -71,6 +71,9 @@ export function FlightQuoteForm({
     null
   );
   const [tripType, setTripType] = useState<"one_way" | "round_trip">("one_way");
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
+  const [departDate, setDepartDate] = useState("");
 
   if (state && state.error === null && state.success) {
     return (
@@ -94,16 +97,21 @@ export function FlightQuoteForm({
       <input type="hidden" name="agencyCustomerId" value={agencyCustomerId} />
 
       <FieldSet>
-        <FieldLegend>Route</FieldLegend>
+        <div className="flex items-center justify-between gap-3">
+          <FieldLegend>Route</FieldLegend>
+          <Button type="button" variant="ghost" size="sm" onClick={() => { setOrigin(destination); setDestination(origin); }} aria-label="Swap departure and arrival airports"><ArrowLeftRight className="size-3.5" aria-hidden="true" />Swap</Button>
+        </div>
         <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field>
             <FieldLabel htmlFor="origin">From</FieldLabel>
             <Input
               id="origin"
               name="origin"
+              value={origin}
+              onChange={(event) => setOrigin(event.target.value.toUpperCase())}
               required
               maxLength={3}
-              placeholder="MGQ"
+              placeholder="Airport code · MGQ"
               autoComplete="off"
               className="uppercase"
             />
@@ -113,9 +121,11 @@ export function FlightQuoteForm({
             <Input
               id="destination"
               name="destination"
+              value={destination}
+              onChange={(event) => setDestination(event.target.value.toUpperCase())}
               required
               maxLength={3}
-              placeholder="DXB"
+              placeholder="Airport code · DXB"
               autoComplete="off"
               className="uppercase"
             />
@@ -150,7 +160,7 @@ export function FlightQuoteForm({
         <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field>
             <FieldLabel htmlFor="departDate">Departure</FieldLabel>
-            <Input id="departDate" name="departDate" type="date" required />
+            <Input id="departDate" name="departDate" type="date" value={departDate} onChange={(event) => setDepartDate(event.target.value)} required />
           </Field>
           <Field data-disabled={tripType === "one_way" || undefined}>
             <FieldLabel htmlFor="returnDate">Return</FieldLabel>
@@ -160,6 +170,7 @@ export function FlightQuoteForm({
               type="date"
               required={tripType === "round_trip"}
               disabled={tripType === "one_way"}
+              min={departDate || undefined}
             />
           </Field>
           <Field>

@@ -2,7 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { CheckCircle2, XCircle, ExternalLink, Trash2 } from "lucide-react";
+import { CheckCircle2, XCircle, ExternalLink, Trash2, ChevronDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label";
 import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
 import {
   AlertDialog,
@@ -86,8 +85,8 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
   }
 
   return (
-    <Card className={cn(phase === "live" && "ring-primary/30")}>
-      <CardContent className="space-y-5">
+    <Card className={cn("h-full rounded-xl py-0", phase === "live" && "ring-primary/30")}>
+      <CardContent className="space-y-5 p-5">
         {/* Identity + state. The toggle sits with the status pill rather than
             floating alone, so "what is this doing right now" reads as one unit. */}
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
@@ -123,12 +122,6 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
           </div>
         </div>
 
-        {provider.approvalNote ? (
-          <Alert>
-            <AlertDescription>{provider.approvalNote}</AlertDescription>
-          </Alert>
-        ) : null}
-
         {testResult ? (
           <div
             role="status"
@@ -151,13 +144,14 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
           </div>
         ) : null}
 
-        <form action={saveAction} className="space-y-4">
+        <details className="group/credentials" open={!status.hasCredentials}>
+          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            Credentials <ChevronDown className="size-4 text-muted-foreground transition-transform group-open/credentials:rotate-180" aria-hidden />
+          </summary>
+        <form action={saveAction} className="space-y-4 pt-4">
           <input type="hidden" name="providerKey" value={provider.key} />
           <FieldSet className="max-w-3xl gap-3">
-            <FieldLegend variant="label" className="flex items-center gap-2">
-              Credentials
-              {status.hasCredentials ? <Badge variant="success">Saved</Badge> : null}
-            </FieldLegend>
+            <FieldLegend variant="label" className="sr-only">{provider.name} credentials</FieldLegend>
             <div className="grid gap-4 sm:grid-cols-2">
               {provider.credentialFields.map((field) => (
                 <Field key={field.key}>
@@ -223,9 +217,7 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Remove {provider.name} credentials?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      The integration is deactivated and the stored credentials are deleted.
-                    </AlertDialogDescription>
+                    <AlertDialogDescription className="sr-only">Remove stored credentials</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -251,6 +243,7 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
             </SubmitButton>
           </div>
         </form>
+        </details>
 
         {provider.key === "custom" ? <CustomPartnerConfigForm config={status.config} /> : null}
       </CardContent>

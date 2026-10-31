@@ -61,6 +61,7 @@ import { resolveDateRange, percentChange } from "@/lib/date-range";
 import { PanelPairSkeleton, PanelSkeleton, StatRowSkeleton } from "@/components/dashboard/skeletons";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/auth/session";
+import { AdminWorkspace } from "./admin-workspace";
 
 // Deliberately plural and separate from ROLE_LABELS in lib/auth/roles.ts:
 // these name chart series ("Agents"), not an individual's role ("Travel
@@ -198,6 +199,8 @@ export default async function AdminDashboardPage({
     <div className="space-y-6">
       <PageHeader title="Dashboard" actions={<DateRangePicker currentKey={range.key} />} />
 
+      <AdminWorkspace />
+
       <Suspense fallback={<StatRowSkeleton />}>
         <StatsSection statsP={statsP} trendsP={trendsP} />
       </Suspense>
@@ -239,7 +242,7 @@ async function StatsSection({
   const [stats, statTrends] = await Promise.all([statsP, trendsP]);
   return (
     <>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <StatCard
           label="Total users"
           value={stats.totalUsers}
@@ -675,16 +678,16 @@ function StatCard({
   const body = (
     <Card className={cn(CARD, "h-full", href && "transition-shadow group-hover:shadow-md")}>
       <CardContent className="flex flex-1 flex-col justify-between gap-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-xs leading-tight font-medium text-muted-foreground">{label}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="min-w-0 text-xs leading-tight font-medium text-muted-foreground">{label}</p>
           {change !== null && change !== undefined ? <DeltaPill change={change} /> : null}
         </div>
         <div className="flex items-end justify-between gap-2">
-          <p className="min-w-0 truncate font-heading text-xl leading-none font-semibold tracking-tight tabular-nums sm:text-[26px]">
+          <p className="min-w-0 font-heading text-xl leading-tight font-semibold tracking-tight break-words tabular-nums sm:text-[26px]">
             {value}
           </p>
-          {series && series.length > 1 ? (
-            <span className="hidden shrink-0 sm:block">
+          {series && series.length > 1 && String(value).length <= 6 ? (
+            <span className="hidden shrink-0 2xl:block">
               <Sparkline data={series} positive={positive} />
             </span>
           ) : null}

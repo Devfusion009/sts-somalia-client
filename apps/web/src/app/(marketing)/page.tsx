@@ -157,7 +157,7 @@ export default function HomePage() {
       <WhyUsCards />
       <PartnerCta />
       <SupportCta />
-      <HomeFaq />
+      <HomeFaq homepage />
       <LinkFarm />
     </>
   );

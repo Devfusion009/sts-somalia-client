@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { CheckCircle2, ExternalLink, FileText, Search, Send, Star, XCircle } from "lucide-react";
+import { ArrowRight, BadgeCheck, CheckCircle2, ExternalLink, FileText, KeyRound, Search, Send, Star, XCircle } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ResubmitDocumentForm } from "@/modules/partner-applications/components/resubmit-document-form";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { portalHref, type PortalSubdomain } from "@/lib/subdomain";
 
 export const metadata: Metadata = { title: "Application Details" };
 
@@ -46,29 +47,65 @@ const STATUS_META: Record<string, { label: string; variant: BadgeVariant }> = {
   more_info_requested: { label: "Action needed", variant: "destructive" },
 };
 
-// The application's actual lifecycle, not a decorative sequence: every row in
-// application_status lands on one of these three stops. more_info_requested
-// stays parked at "Under review" rather than getting its own marker — the
-// ball is back with the applicant, but the process hasn't moved to a new
-// stage, and the status badge above already says a document needs attention.
-const APPLICATION_STAGES: TimelineStage[] = [
-  { key: "submitted", label: "Submitted", icon: Send },
-  { key: "under_review", label: "Under review", icon: Search },
-  { key: "decision", label: "Decision", icon: CheckCircle2 },
-];
+const PORTAL: Record<ApplicationKind, { label: string; subdomain: PortalSubdomain }> = {
+  agency: { label: "Agent Portal", subdomain: "agent" },
+  hotel_partner: { label: "Hotel Partner Portal", subdomain: "partner" },
+  affiliate: { label: "Affiliate Dashboard", subdomain: "affiliate" },
+  venue_partner: { label: "Venue Portal", subdomain: "venue" },
+};
 
-function applicationStageIndex(status: string): { index: number; outcome: "pending" | "success" | "failed" } {
-  switch (status) {
+function day(iso: string | null): string | undefined {
+  return iso ? format(new Date(iso), "d MMM yyyy") : undefined;
+}
+
+/**
+ * The application's lifecycle as milestones. Every status lands on one stop:
+ *
+ *   Submitted -> Under review -> Decision                (pending / rejected)
+ *   Submitted -> Under review -> Approved -> Portal ready (approved)
+ *
+ * Approval adds the last milestone: the partner account exists and the
+ * portal can be opened. more_info_requested stays at "Under review": the
+ * ball is back with the applicant, but the process has not moved on, and the
+ * status badge already says something needs attention.
+ */
+function applicationMilestones(
+  application: { status: string; submitted_at: string | null; reviewed_at: string | null },
+  portalLabel: string
+): { stages: TimelineStage[]; index: number; outcome: "pending" | "success" | "failed" } {
+  const submitted = { key: "submitted", label: "Submitted", description: day(application.submitted_at), icon: Send };
+  const review = { key: "under_review", label: "Under review", icon: Search };
+
+  switch (application.status) {
+    case "approved":
+      return {
+        stages: [
+          submitted,
+          review,
+          { key: "approved", label: "Approved", description: day(application.reviewed_at), icon: BadgeCheck },
+          { key: "portal", label: "Portal ready", description: portalLabel, icon: KeyRound },
+        ],
+        index: 3,
+        outcome: "success",
+      };
+    case "rejected":
+      return {
+        stages: [submitted, review, { key: "decision", label: "Not approved", description: day(application.reviewed_at), icon: XCircle }],
+        index: 2,
+        outcome: "failed",
+      };
     case "under_review":
     case "more_info_requested":
-      return { index: 1, outcome: "pending" };
-    case "approved":
-      return { index: 2, outcome: "success" };
-    case "rejected":
-      return { index: 2, outcome: "failed" };
+      return { stages: [submitted, review, { key: "decision", label: "Decision", icon: CheckCircle2 }], index: 1, outcome: "pending" };
     default:
-      return { index: 0, outcome: "pending" };
+      return { stages: [submitted, review, { key: "decision", label: "Decision", icon: CheckCircle2 }], index: 0, outcome: "pending" };
   }
+}
+
+async function agentLoginFor(applicationId: string): Promise<{ agentId: string; contactEmail: string } | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("my_agent_application_login", { p_application_id: applicationId });
+  return data?.[0] ? { agentId: data[0].agent_id, contactEmail: data[0].contact_email } : null;
 }
 
 function StarRow({ value, max = 5 }: { value: number; max?: number }) {
@@ -103,7 +140,12 @@ export default async function ApplicationViewPage({ params }: { params: Promise<
   const displayName = nameValue || `${cfg.label} Application`;
   const facts = headerFacts(type, d);
   const stars = type === "hotel_partner" ? starRatingValue(d) : null;
-  const stage = applicationStageIndex(application.status);
+  const portal = PORTAL[type];
+  const milestones = applicationMilestones(application, portal.label);
+  const approved = application.status === "approved";
+  const agentLogin = approved && type === "agency"
+    ? (await agentLoginFor(id)) ?? (user.agent_code ? { agentId: user.agent_code, contactEmail: user.email ?? "" } : null)
+    : null;
 
   const supabase = await createClient();
   const [signedDocs, reviews] = await Promise.all([
@@ -162,12 +204,49 @@ export default async function ApplicationViewPage({ params }: { params: Promise<
         </Alert>
       ) : null}
 
+      {approved ? (
+        <section
+          aria-labelledby="portal-ready-title"
+          className="flex flex-col gap-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-5 sm:flex-row sm:items-center sm:justify-between dark:border-emerald-500/30 dark:bg-emerald-500/10"
+        >
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-emerald-600 text-white">
+              <BadgeCheck className="size-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h2 id="portal-ready-title" className="font-heading text-base font-bold text-emerald-900 dark:text-emerald-100">
+                Approved · {portal.label} ready
+              </h2>
+              {agentLogin ? (
+                <dl className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                  <div className="flex gap-1.5">
+                    <dt className="text-emerald-800/70 dark:text-emerald-200/70">Agent ID</dt>
+                    <dd className="font-mono font-semibold text-emerald-950 dark:text-emerald-50">{agentLogin.agentId}</dd>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <dt className="text-emerald-800/70 dark:text-emerald-200/70">Credential email</dt>
+                    <dd className="font-mono font-semibold text-emerald-950 dark:text-emerald-50">{agentLogin.contactEmail}</dd>
+                  </div>
+                </dl>
+              ) : application.reviewed_at ? (
+                <p className="mt-0.5 text-sm text-emerald-800/80 tabular-nums dark:text-emerald-200/80">
+                  {format(new Date(application.reviewed_at), "d MMM yyyy")}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <Button className="shrink-0 bg-emerald-600 text-white hover:bg-emerald-700" render={<a href={portalHref(portal.subdomain)} />}>
+            Open {portal.label} <ArrowRight data-icon="inline-end" aria-hidden="true" />
+          </Button>
+        </section>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Progress</CardTitle>
         </CardHeader>
         <CardContent>
-          <StatusTimeline stages={APPLICATION_STAGES} currentIndex={stage.index} outcome={stage.outcome} />
+          <StatusTimeline stages={milestones.stages} currentIndex={milestones.index} outcome={milestones.outcome} />
         </CardContent>
       </Card>
 

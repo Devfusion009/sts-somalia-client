@@ -1,3 +1,4 @@
+import styles from "../../operations.module.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Landmark } from "lucide-react";
@@ -38,7 +39,7 @@ const PAYMENT_FILTERS: { value: UmrahPaymentFilter; label: string }[] = [
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const selectClass = cn(NATIVE_SELECT_CLASS, "w-auto max-w-full max-sm:w-full");
+const selectClass = cn(NATIVE_SELECT_CLASS, "w-full min-w-0 bg-card shadow-none");
 
 export default async function AdminUmrahBookingsPage({
   searchParams,
@@ -69,7 +70,7 @@ export default async function AdminUmrahBookingsPage({
   const filtered = Boolean(stage || departureId || packageId || payment);
 
   return (
-    <div className="space-y-6">
+    <div className={`${styles.page} space-y-6`}>
       <PageHeader
         title="Umrah Bookings"
         status={
@@ -79,6 +80,7 @@ export default async function AdminUmrahBookingsPage({
         }
       />
 
+      <div className={styles.filters}>
       <FilterChips
         label="Filter by stage"
         active={stage ?? "all"}
@@ -88,7 +90,7 @@ export default async function AdminUmrahBookingsPage({
         ]}
       />
 
-      <form method="get" action="/admin/umrah/bookings" className="flex flex-wrap items-center gap-2">
+      <form method="get" action="/admin/umrah/bookings" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1.4fr_1fr_auto]">
         {stage ? <input type="hidden" name="stage" value={stage} /> : null}
         <select name="package" defaultValue={packageId ?? ""} className={selectClass} aria-label="Package">
           <option value="">All packages</option>
@@ -114,12 +116,14 @@ export default async function AdminUmrahBookingsPage({
             </option>
           ))}
         </select>
-        <Button type="submit" variant="outline">
-          Apply
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button type="submit">Apply</Button>
+          {filtered ? <Button variant="ghost" render={<Link href="/admin/umrah/bookings" />}>Reset</Button> : null}
+        </div>
       </form>
+      </div>
 
-      <Card className="overflow-hidden py-0">
+      <Card className={`${styles.table} overflow-hidden py-0`}>
         {bookings.length === 0 ? (
           <Empty>
             <EmptyMedia variant="icon">
@@ -128,8 +132,8 @@ export default async function AdminUmrahBookingsPage({
             <EmptyTitle>{filtered ? "No bookings match these filters" : "No Umrah bookings"}</EmptyTitle>
           </Empty>
         ) : (
-          <Table>
-            <TableHeader>
+          <Table containerClassName="max-h-[65vh]">
+            <TableHeader sticky>
               <TableRow>
                 <TableHead>Reference</TableHead>
                 <TableHead>Booking</TableHead>
@@ -150,7 +154,7 @@ export default async function AdminUmrahBookingsPage({
                 const orderStatus = b.order?.status ?? null;
                 return (
                   <TableRow key={b.id}>
-                    <TableCell className="font-mono text-xs">
+                    <TableCell className="font-mono text-xs text-primary">
                       <Link
                         href={`/admin/umrah/bookings/${b.id}`}
                         className="rounded-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"

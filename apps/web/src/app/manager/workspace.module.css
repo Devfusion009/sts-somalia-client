@@ -1,0 +1,14 @@
+.stats { gap:1rem; overflow:visible; border-radius:0; background:transparent; }
+.stats > div { padding:1.25rem; border:1px solid var(--border); border-radius:1rem; background:var(--card); }
+.stats dd { margin-top:.5rem; font-size:1.75rem; font-weight:600; letter-spacing:-.04em; }
+.daily { display:flex; flex-wrap:wrap; gap:.75rem 2rem; padding:.125rem .25rem; font-size:.6875rem; }
+.daily div { display:flex; align-items:center; gap:.5rem; }
+.daily dt { color:var(--muted-foreground); }
+.daily dd { font-weight:600; font-variant-numeric:tabular-nums; }
+.shortcuts { display:flex; flex-wrap:wrap; gap:.75rem; }
+.shortcut { display:flex; flex:1; min-width:9rem; min-height:3.5rem; align-items:center; gap:.75rem; padding:.875rem 1rem; border:1px solid var(--border); border-radius:.875rem; background:var(--card); font-size:.75rem; font-weight:600; }
+.shortcut:hover { background:var(--accent); border-color:var(--primary); }
+.shortcut:focus-visible { outline:3px solid var(--ring); outline-offset:3px; }
+.shortcut > svg:first-child { color:var(--primary); }
+.shortcut > svg:last-child { margin-left:auto; color:var(--muted-foreground); }
+@media(max-width:639px) { .stats { gap:.625rem; } .stats > div { padding:1rem; } .stats dd { font-size:1.5rem; } .shortcut { min-width:8rem; } }
