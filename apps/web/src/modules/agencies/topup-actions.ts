@@ -87,6 +87,8 @@ export async function requestOfflineTopup(
   }
 
   revalidatePath("/agent/finance/top-up");
+  revalidatePath("/agent");
+  revalidatePath("/admin");
   revalidatePath("/agent/finance");
   return { error: null };
 }
@@ -177,11 +179,14 @@ export async function startOnlineTopup(
   const admin = createAdminClient();
 
   switch (result.type) {
-    case "success":
-      await admin.rpc("settle_agency_topup", {
+    case "success": {
+      const { error: settlementError } = await admin.rpc("settle_agency_topup", {
         p_request_id: topupId,
         p_provider_ref: result.providerRef,
       });
+      if (settlementError) return { error: "Payment received; wallet credit pending reconciliation." };
+      revalidatePath("/agent");
+      revalidatePath("/admin");
       revalidatePath("/agent/finance");
       if (returnTo) {
         revalidatePath("/agent/book", "layout");
@@ -189,6 +194,7 @@ export async function startOnlineTopup(
       }
       redirect("/agent/finance/top-up?status=success");
       break;
+    }
     case "redirect":
       await admin
         .from("agency_topup_requests")
@@ -225,5 +231,7 @@ export async function cancelTopupRequest(formData: FormData): Promise<void> {
   await supabase.rpc("cancel_agency_topup", { p_request_id: requestId });
 
   revalidatePath("/agent/finance/top-up");
+  revalidatePath("/agent");
+  revalidatePath("/admin");
   revalidatePath("/agent/finance");
 }

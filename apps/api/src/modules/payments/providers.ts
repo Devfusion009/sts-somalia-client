@@ -148,7 +148,8 @@ async function initiateWaafiHpp(
         hppKey: gateway.hpp.hppKey,
         hppSuccessCallbackUrl: returnUrl,
         hppFailureCallbackUrl: returnUrl,
-        hppRespDataFormat: 1,
+        hppRespDataFormat: 2,
+        payerInfo: { subscriptionId: input.payerPhone?.replace(/[+\s-]/g, "") },
         paymentMethod: "MWALLET_ACCOUNT",
         transactionInfo: {
           referenceId: input.paymentId,
@@ -164,12 +165,12 @@ async function initiateWaafiHpp(
   const payload = (await res.json().catch(() => ({}))) as {
     responseCode?: string;
     responseMsg?: string;
-    params?: { hppUrl?: string; hppRequestId?: string };
+    params?: { hppUrl?: string; hppRequestId?: string; orderId?: string };
   };
-  if (payload.responseCode !== "2001" || !payload.params?.hppUrl) {
+  if (!res.ok || payload.responseCode !== "2001" || !payload.params?.hppUrl) {
     return { type: "error", message: "Could not start the payment. Try again or choose another method." };
   }
-  return { type: "redirect", url: payload.params.hppUrl, providerRef: payload.params.hppRequestId };
+  return { type: "redirect", url: payload.params.hppUrl, providerRef: payload.params.hppRequestId ?? payload.params.orderId };
 }
 
 async function initiateWaafi(input: InitiationInput, gateway: WaafiGateway, siteUrl: string): Promise<InitiationResult> {
@@ -185,7 +186,7 @@ async function initiateWaafi(input: InitiationInput, gateway: WaafiGateway, site
       apiUserId: gateway.apiUserId,
       apiKey: gateway.apiKey,
       paymentMethod: "MWALLET_ACCOUNT",
-      payerInfo: { accountNo: input.payerPhone },
+      payerInfo: { accountNo: input.payerPhone?.replace(/[+\s-]/g, "") },
       transactionInfo: {
         referenceId: input.orderNumber,
         invoiceId: input.paymentId,
@@ -206,8 +207,13 @@ async function initiateWaafi(input: InitiationInput, gateway: WaafiGateway, site
     responseMsg?: string;
     params?: { transactionId?: string; state?: string };
   };
-  if (payload.responseCode === "2001") {
-    return { type: "success", providerRef: payload.params?.transactionId };
+  // A successful API request is not proof that funds were captured.
+  const state = payload.params?.state?.toUpperCase();
+  if (res.ok && payload.responseCode === "2001" && state === "APPROVED" && payload.params?.transactionId) {
+    return { type: "success", providerRef: payload.params.transactionId };
+  }
+  if (res.ok && payload.responseCode === "2001" && !["DECLINED", "FAILED", "CANCELLED", "EXPIRED"].includes(state ?? "")) {
+    return { type: "instructions", instructions: "Payment confirmation pending.", providerRef: payload.params?.transactionId };
   }
   return { type: "error", message: payload.responseMsg ?? "The mobile money payment was not approved." };
 }

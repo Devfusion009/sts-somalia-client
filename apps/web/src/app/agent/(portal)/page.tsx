@@ -1,3 +1,4 @@
+import { FinancePriorities } from "@/modules/agencies/components/finance-priorities";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, CircleDollarSign, Plus, Ticket, UsersRound, Wallet } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
@@ -49,6 +50,7 @@ export default async function AgentDashboardPage({ searchParams }: {
 
       <LowBalanceBanner />
       <BroadcastBanner />
+      <FinancePriorities agencyId={membership.agency.id} />
 
       <div className={styles.heroGrid}>
         <section className={`${styles.launcher} ${styles.photoLauncher}`} aria-label="Start a booking">
