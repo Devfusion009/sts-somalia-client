@@ -183,42 +183,11 @@ export class PaymentsService {
       return { error: "Only members of the booking agency can pay from its balance." };
     }
 
-    const supabase = this.rls.get();
-    const { data: payment, error: paymentError } = await supabase
-      .from("payments")
-      .insert({
-        order_id: order.id,
-        provider: "wallet",
-        method_label: "Agency Balance",
-        amount,
-        currency: order.currency,
-        status: "processing",
-      })
-      .select()
-      .single();
-    if (paymentError || !payment) {
-      return { error: paymentError?.message ?? "Could not start the payment." };
-    }
-
-    const admin = this.admin.get();
-    const { error: walletError } = await supabase.rpc("apply_agency_wallet_transaction", {
-      target_agency_id: order.agency_id,
-      tx_amount: -amount,
-      tx_type: "booking_payment",
-      target_order_id: order.id,
-      tx_note: `Order ${order.order_number}`,
+    const { error } = await this.rls.get().rpc("pay_order_from_agency_wallet", {
+      p_order_id: order.id,
+      p_amount: amount,
     });
-
-    if (walletError) {
-      await admin.from("payments").update({ status: "failed" }).eq("id", payment.id);
-      return {
-        error: walletError.message.includes("insufficient")
-          ? "Your agency balance (including credit limit) doesn't cover this order — top up with STS or choose another method."
-          : walletError.message,
-      };
-    }
-
-    await admin.from("payments").update({ status: "succeeded" }).eq("id", payment.id);
+    if (error) return { error: error.message };
     return { error: null, result: { type: "success" }, orderId: order.id };
   }
 

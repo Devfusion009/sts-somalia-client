@@ -215,7 +215,7 @@ async function initiateWaafi(input: GatewayCharge, gateway: WaafiGateway): Promi
       apiUserId: gateway.apiUserId,
       apiKey: gateway.apiKey,
       paymentMethod: "MWALLET_ACCOUNT",
-      payerInfo: { accountNo: input.payerPhone },
+      payerInfo: { accountNo: input.payerPhone?.replace(/^\+/, "") },
       transactionInfo: {
         referenceId: input.reference,
         invoiceId: input.recordId,
@@ -236,8 +236,13 @@ async function initiateWaafi(input: GatewayCharge, gateway: WaafiGateway): Promi
     responseMsg?: string;
     params?: { transactionId?: string; state?: string };
   };
-  if (payload.responseCode === "2001") {
-    return { type: "success", providerRef: payload.params?.transactionId };
+  // A successful API request is not proof that funds were captured.
+  const state = payload.params?.state?.toUpperCase();
+  if (res.ok && payload.responseCode === "2001" && state === "APPROVED" && payload.params?.transactionId) {
+    return { type: "success", providerRef: payload.params.transactionId };
+  }
+  if (res.ok && payload.responseCode === "2001" && !["DECLINED", "FAILED", "CANCELLED", "EXPIRED"].includes(state ?? "")) {
+    return { type: "instructions", instructions: "Payment confirmation pending.", providerRef: payload.params?.transactionId };
   }
   return {
     type: "error",

@@ -13,6 +13,9 @@ const PROOF_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"]
 function revalidatePayout(agencyId: string) {
   revalidatePath(`/admin/agencies/${agencyId}`);
   revalidatePath("/admin/agencies");
+  revalidatePath("/admin");
+  revalidatePath("/agent");
+  revalidatePath("/agent/finance/withdrawals");
   revalidatePath("/admin/finance/withdrawals");
 }
 
@@ -243,6 +246,10 @@ export async function approveRefundRequestAction(_prevState: ActionState, formDa
   });
   if (error) return { error: error.message };
 
+  revalidatePath("/admin");
+  revalidatePath("/agent");
+  revalidatePath("/agent/refunds");
+  revalidatePath("/agent/finance");
   revalidatePath("/admin/refunds");
   return { error: null };
 }
@@ -262,6 +269,10 @@ export async function rejectRefundRequestAction(_prevState: ActionState, formDat
   });
   if (error) return { error: error.message };
 
+  revalidatePath("/admin");
+  revalidatePath("/agent");
+  revalidatePath("/agent/refunds");
+  revalidatePath("/agent/finance");
   revalidatePath("/admin/refunds");
   return { error: null };
 }
@@ -528,6 +539,9 @@ export async function reviewAgencyTopup(
 
   revalidatePath(`/admin/agencies/${parsed.data.agencyId}`);
   revalidatePath("/admin/agencies");
+  revalidatePath("/admin");
+  revalidatePath("/agent");
+  revalidatePath("/agent/finance/top-up");
   revalidatePath("/admin/finance/top-ups");
   return { error: null };
 }

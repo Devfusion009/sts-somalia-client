@@ -47,6 +47,8 @@ export async function requestAgencyRefundAction(_prevState: ActionState, formDat
 
   if (error) return { error: error.message };
 
+  revalidatePath("/agent");
+  revalidatePath("/admin");
   revalidatePath("/agent/refunds");
   return { error: null };
 }

@@ -42,6 +42,8 @@ export async function requestAgencyPayout(
   if (error) return { error: error.message };
 
   revalidatePath("/agent/finance/withdrawals");
+  revalidatePath("/agent");
+  revalidatePath("/admin");
   revalidatePath("/agent/finance");
   return { error: null };
 }
@@ -61,5 +63,7 @@ export async function cancelAgencyPayoutRequest(formData: FormData): Promise<voi
     .eq("status", "pending");
 
   revalidatePath("/agent/finance/withdrawals");
+  revalidatePath("/agent");
+  revalidatePath("/admin");
   revalidatePath("/agent/finance");
 }

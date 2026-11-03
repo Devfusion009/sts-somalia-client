@@ -1,3 +1,4 @@
+import { FinancePriorities } from "@/modules/agencies/components/finance-priorities";
 import { Suspense } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNow, parseISO } from "date-fns";
@@ -200,6 +201,7 @@ export default async function AdminDashboardPage({
       <PageHeader title="Dashboard" actions={<DateRangePicker currentKey={range.key} />} />
 
       <AdminWorkspace />
+      <FinancePriorities />
 
       <Suspense fallback={<StatRowSkeleton />}>
         <StatsSection statsP={statsP} trendsP={trendsP} />
