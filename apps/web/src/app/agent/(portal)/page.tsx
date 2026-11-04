@@ -59,15 +59,15 @@ export default async function AgentDashboardPage({ searchParams }: {
         </section>
         <section className={styles.wallet} aria-label="Agency wallet">
           <dl>
-            <dt className={styles.walletLabel}><Wallet className="size-4" aria-hidden="true" />Wallet balance</dt>
-            <dd className={styles.walletAmount}>{money(wallet.balance, "USD")}</dd>
+            <dt className={styles.walletLabel}><Wallet className="size-4" aria-hidden="true" />Available to spend</dt>
+            <dd className={styles.walletAmount}>{money(wallet.available, "USD")}</dd>
           </dl>
           <div className={styles.walletActions}>
             <Link href="/agent/finance/top-up"><Plus className="size-3.5" aria-hidden="true" />Add funds</Link>
             <Link href="/agent/finance">View wallet<ArrowRight className="size-3.5" aria-hidden="true" /></Link>
           </div>
           <dl className={styles.walletFacts}>
-            <div><dt>Available to spend</dt><dd>{money(wallet.available, "USD")}</dd></div>
+            <div><dt>{wallet.balance < 0 ? "Owed to STS" : "Wallet balance"}</dt><dd>{money(Math.abs(wallet.balance), "USD")}</dd></div>
             <div><dt>Credit limit</dt><dd>{money(wallet.creditLimit, "USD")}</dd></div>
           </dl>
         </section>

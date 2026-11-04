@@ -243,7 +243,9 @@ export default async function BatchBookingPage({
               <PayBatchForm
                 batchId={batchId}
                 count={payableOrders.length}
-                amountLabel={money(balance, currency)}
+                amount={balance}
+                available={available}
+                currency={currency}
               />
             </WalletPaymentPanel>
           ) : null}
