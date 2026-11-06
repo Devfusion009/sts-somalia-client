@@ -12,6 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { RefundRequestActions } from "./refund-request-actions";
 import { CustomerRequestActions } from "./customer-request-actions";
 import { money } from "@/lib/money";
+import { getRefundQuote } from "@/modules/hotels/refund-queries";
+import { getHallRefundQuote } from "@/modules/events/hall-detail-queries";
 
 export const metadata: Metadata = { title: "Refund Requests" };
 
@@ -26,7 +28,7 @@ export default async function AdminRefundsPage() {
     supabase
       .from("booking_requests")
       .select(
-        `id, kind, status, reason, requested_amount, approved_amount, currency, created_at,
+        `id, kind, status, reason, requested_amount, approved_amount, currency, created_at, order_id, hotel_booking_id, hall_booking_id,
          order:orders(order_number),
          requester:profiles!booking_requests_requested_by_fkey(full_name, email)`
       )
@@ -36,6 +38,29 @@ export default async function AdminRefundsPage() {
   ]);
 
   const customer = customerRequests ?? [];
+  // Pre-fill the approval amount from the booking's refund policy, or what
+  // was paid when the property has none, instead of 0.
+  const orderIds = [...new Set(customer.map((r) => r.order_id))];
+  const { data: collected } = orderIds.length
+    ? await supabase
+        .from("payments")
+        .select("order_id, amount")
+        .in("order_id", orderIds)
+        .in("status", ["succeeded", "partially_refunded"])
+    : { data: [] };
+  const paidByOrder = new Map<string, number>();
+  for (const p of collected ?? []) paidByOrder.set(p.order_id, (paidByOrder.get(p.order_id) ?? 0) + Number(p.amount));
+  const quotes = await Promise.all(
+    customer.map((req) =>
+      req.status !== "approved" && req.approved_amount === null && req.requested_amount === null
+        ? req.hotel_booking_id
+          ? getRefundQuote(req.hotel_booking_id)
+          : req.hall_booking_id
+            ? getHallRefundQuote(req.hall_booking_id)
+            : Promise.resolve(null)
+        : Promise.resolve(null)
+    )
+  );
 
   return (
     <div className="space-y-6">
@@ -61,7 +86,7 @@ export default async function AdminRefundsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {customer.map((req) => (
+              {customer.map((req, i) => (
                 <TableRow key={req.id}>
                   <TableCell className="text-muted-foreground">{format(new Date(req.created_at), DATE_TIME)}</TableCell>
                   <TableCell className="font-medium">{req.requester?.full_name ?? req.requester?.email ?? "—"}</TableCell>
@@ -88,7 +113,7 @@ export default async function AdminRefundsPage() {
                       status={req.status}
                       kind={req.kind}
                       currency={req.currency}
-                      suggestedAmount={Number(req.approved_amount ?? req.requested_amount ?? 0)}
+                      suggestedAmount={Number(req.approved_amount ?? req.requested_amount ?? quotes[i]?.refundAmount ?? quotes[i]?.paidAmount ?? paidByOrder.get(req.order_id) ?? 0)}
                     />
                   </TableCell>
                 </TableRow>

@@ -218,6 +218,11 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
                 <Download data-icon="inline-start" aria-hidden="true" /> Invoice
               </Button>
             ) : null}
+            {["paid", "partially_paid", "processing", "completed"].includes(order.status) ? (
+              <Button variant="outline" render={<Link href={`/agent/refunds?order=${order.id}`} />}>
+                Request refund
+              </Button>
+            ) : null}
             {payable ? (
               <Button render={<Link href={`/agent/book/order/${order.id}`} />}>
                 Pay now <ArrowRight data-icon="inline-end" aria-hidden="true" />

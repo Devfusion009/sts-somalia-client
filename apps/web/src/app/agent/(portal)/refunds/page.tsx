@@ -16,14 +16,15 @@ import { RequestRefundForm } from "./request-refund-form";
 
 export const metadata: Metadata = { title: "Refunds" };
 
-export default async function AgentRefundsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+export default async function AgentRefundsPage({ searchParams }: { searchParams: Promise<{ page?: string; order?: string }> }) {
   const profile = await requireUser();
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
 
   const canRequest = ["owner", "admin", "booking_staff"].includes(membership.roleInAgency);
 
-  const page = parsePage((await searchParams).page);
+  const params = await searchParams;
+  const page = parsePage(params.page);
   const [{ rows: requests, total }, refundableOrders] = await Promise.all([
     getAgencyRefundRequests(membership.agency.id, page),
     canRequest ? getAgencyRefundableOrders(membership.agency.id) : Promise.resolve([]),
@@ -36,7 +37,7 @@ export default async function AgentRefundsPage({ searchParams }: { searchParams:
       <PageHeader
         title="Refunds"
         meta={total > 0 ? <span className="tabular-nums">{total} {total === 1 ? "request" : "requests"}</span> : null}
-        actions={canRequest ? <RequestRefundForm orders={refundableOrders} /> : null}
+        actions={canRequest ? <RequestRefundForm orders={refundableOrders} initialOrderId={params.order} /> : null}
       />
 
       <Card className="overflow-hidden py-0">

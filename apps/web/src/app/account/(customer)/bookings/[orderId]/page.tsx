@@ -238,7 +238,9 @@ export default async function BookingDetailPage({
     !waitlisted &&
     (["pending", "confirmed"].includes(hotelStatus ?? "") ||
       ["pending", "confirmed"].includes(hallStatus ?? "") ||
-      umrahBookingStatus === "confirmed");
+      umrahBookingStatus === "confirmed" ||
+      // A flight request becomes payable once staff have quoted a fare.
+      (order.order_items.some((item) => item.item_type === "flight") && Number(order.total) > 0));
   const nextStep = payNow
     ? { label: "Amount due", amount: Number(order.total), action: "Pay now" }
     : balanceDue > 0
