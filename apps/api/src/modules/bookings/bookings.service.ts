@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, ConflictException } from "@nestjs/common";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RlsSupabaseService } from "../../infra/supabase/rls-supabase.service";
 import type { Database, OpenBookingRequestInput, BookingType, UnifiedBooking } from "@sts/shared-types";
@@ -252,7 +252,7 @@ export class BookingsService {
       .in("status", ["requested", "in_review"])
       .maybeSingle();
     if (existing) {
-      throw new Error("You already have an open request of this type for this booking.");
+      throw new ConflictException("You already have an open request of this type for this booking.");
     }
 
     const { error } = await supabase.from("booking_requests").insert({

@@ -95,6 +95,8 @@ export class PrivateTripService {
       nights_makkah: input.nightsMakkah,
       nights_madinah: input.nightsMadinah,
       pilgrims: names.map((full_name, i) => ({ ...(existing[i] ?? { gender: "male" }), full_name })),
+      // A smaller party cannot keep a room sized for more guests than travel.
+      room_sharing: Math.min(Number(request.room_sharing) || 4, Math.max(1, Math.min(4, input.numPilgrims))),
       current_step: Math.max(request.current_step, 2),
     });
     // Party size and nights reprice every line already chosen.
@@ -106,6 +108,9 @@ export class PrivateTripService {
   async saveServices(userId: string, input: TripServicesInput) {
     const request = await this.editable(input.requestId, userId);
     if (!isRoomSharing(input.roomSharing)) throw new BadRequestException("Choose a room type.");
+    if (input.roomSharing > request.num_pilgrims) {
+      throw new BadRequestException("Choose a room type for your party size.");
+    }
 
     const ids = input.serviceIds.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
     const services = await this.catalog.findPublishedByIds(ids);
