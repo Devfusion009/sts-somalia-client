@@ -39,6 +39,13 @@ export function CustomerRequestActions({
   suggestedAmount: number;
 }) {
   const [decision, setDecision] = useState<Decision | null>(null);
+  // Controlled so a refused amount stays in the field: React resets an
+  // uncontrolled action form after every submit, error or not.
+  const [amount, setAmount] = useState(String(suggestedAmount));
+  function openDecision(next: Decision) {
+    setAmount(String(suggestedAmount));
+    setDecision(next);
+  }
   const [, formAction] = useActionState<AdminRequestState, FormData>(async (prev, formData) => {
     const result = await decideCustomerRequest(prev, formData);
     if (result?.error) toast.error(result.error, { position: "top-center" });
@@ -57,15 +64,15 @@ export function CustomerRequestActions({
       <div className="flex justify-end gap-2">
         {open ? (
           <>
-            <Button size="sm" onClick={() => setDecision("approved")}>
+            <Button size="sm" onClick={() => openDecision("approved")}>
               <Check aria-hidden="true" /> Approve
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => setDecision("rejected")}>
+            <Button size="sm" variant="destructive" onClick={() => openDecision("rejected")}>
               <X aria-hidden="true" /> Decline
             </Button>
           </>
         ) : status === "approved" && refunds ? (
-          <Button size="sm" variant="outline" onClick={() => setDecision("completed")}>
+          <Button size="sm" variant="outline" onClick={() => openDecision("completed")}>
             <Banknote aria-hidden="true" /> Mark paid
           </Button>
         ) : null}
@@ -89,7 +96,8 @@ export function CustomerRequestActions({
                     type="number"
                     min={0}
                     step="0.01"
-                    defaultValue={suggestedAmount}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
                     required
                     className="tabular-nums"
                   />

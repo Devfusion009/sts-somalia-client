@@ -11,7 +11,7 @@ import { categoryLabel, ROOM_SHARING_LABELS, UMRAH_TIER_LABELS } from "@/modules
 import { formatMoney, tripDurationDays, tripReturnDate } from "@/modules/umrah/pricing";
 import { UmrahRequestActions, UmrahPriceQuoteForm } from "./request-actions";
 
-export const metadata = { title: "Private Umrah Requests | Admin Console" };
+export const metadata = { title: "Private Umrah Requests" };
 
 function formatDate(value: string | null) {
   if (!value) return "Dates to confirm";

@@ -200,7 +200,10 @@ export default async function CheckoutPage({
                   Balance due by {format(parseISO(order.balance_due_at), "d MMM yyyy")}
                 </p>
               ) : null}
-              {umrahItem ? null : <p className="mt-2 text-xs text-muted-foreground">All fees are non-refundable.</p>}
+              {/* Hotel, hall and Umrah refunds follow their own cancellation rules; only visa fees are never returned. */}
+              {order.order_items.some((item) => item.item_type === "visa") ? (
+                <p className="mt-2 text-xs text-muted-foreground">All fees are non-refundable.</p>
+              ) : null}
             </div>
           </section>
         </aside>

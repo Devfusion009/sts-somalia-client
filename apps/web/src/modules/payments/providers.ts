@@ -133,7 +133,7 @@ function initiateManual(input: GatewayCharge, { bankTransfer }: PaymentGateways)
     return {
       type: "instructions",
       instructions:
-        `Transfer ${input.currency} ${input.amount.toFixed(2)} to ${bankTransfer.bankName}, ` +
+        `Transfer ${input.currency} ${input.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} to ${bankTransfer.bankName}, ` +
         `account "${bankTransfer.accountName}", account no. ${bankTransfer.accountNumber}. ` +
         `Use ${input.reference} as the transfer reference, then share the receipt with our team ` +
         `on +252 611 444 420. We confirm transfers within one working day.`,
@@ -143,7 +143,7 @@ function initiateManual(input: GatewayCharge, { bankTransfer }: PaymentGateways)
     type: "instructions",
     instructions:
       `Visit any STS office and quote ${input.reference} to pay ` +
-      `${input.currency} ${input.amount.toFixed(2)} in cash. Head office: Sultan Business Park, ` +
+      `${input.currency} ${input.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} in cash. Head office: Sultan Business Park, ` +
       `Waaberi District, 21 Oct Street, Muqdisho — open Sat–Thu, 8:00–17:00.`,
   };
 }
@@ -275,7 +275,7 @@ async function initiateEdahab(input: GatewayCharge, gateway: EdahabGateway): Pro
       type: "instructions",
       providerRef: String(payload.InvoiceId),
       instructions:
-        `We sent invoice #${payload.InvoiceId} for ${input.currency} ${input.amount.toFixed(2)} ` +
+        `We sent invoice #${payload.InvoiceId} for ${input.currency} ${input.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ` +
         `to eDahab number ${input.payerPhone}. Approve it in your eDahab app or dial the eDahab ` +
         `USSD menu to complete payment.`,
     };

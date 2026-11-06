@@ -22,12 +22,28 @@ const STATUSES: OrderStatus[] = [
 export function OrderStatusSelect({ orderId, status }: { orderId: string; status: OrderStatus }) {
   const [state, formAction, isPending] = useActionState(updateOrderStatus, null);
 
+  const [value, setValue] = useState<OrderStatus>(status);
+  const [asking, setAsking] = useState<OrderStatus | null>(null);
+
+  // The server-side status moves on its own (a confirmed payment, a refund,
+  // a cancellation elsewhere on the page); follow it after each refresh
+  // instead of keeping the value this select was first rendered with.
+  const [syncedStatus, setSyncedStatus] = useState(status);
+  if (status !== syncedStatus) {
+    setSyncedStatus(status);
+    setValue(status);
+  }
+
+  // A refused change snaps the select back to the saved status.
+  const [seenState, setSeenState] = useState(state);
+  if (state !== seenState) {
+    setSeenState(state);
+    if (state?.error) setValue(status);
+  }
+
   useEffect(() => {
     if (state?.error) toast.error(state.error);
   }, [state]);
-
-  const [value, setValue] = useState<OrderStatus>(status);
-  const [asking, setAsking] = useState<OrderStatus | null>(null);
 
   function commit(next: OrderStatus) {
     setValue(next);
