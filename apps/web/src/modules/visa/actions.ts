@@ -25,7 +25,7 @@ export type ActionState = {
   /** Submitted field values echoed back so forms can re-fill after a
    *  validation error (React 19 resets uncontrolled fields post-action). */
   values?: Record<string, string>;
-  /** Set only for desk (agent-portal) submissions — see advanceWizard(). */
+  /** Next step on the current host, consumed by the wizard forms. */
   destination?: string;
 } | null;
 
@@ -71,14 +71,15 @@ function deskWizardPath(applicationId: string, step: number) {
  * to a path meant for the public site's host: the same trap deskOrderPath
  * documents for hotel bookings. A desk submission gets its destination back
  * as state and navigates client-side instead (window.location.href, which
- * always resolves against the actual current origin); everyone else gets a
- * normal server redirect.
+ * always resolves against the actual current origin). Public submissions use
+ * the same handoff: a saved step must not leave useActionState pending while
+ * the App Router tries to resolve a Server Action redirect.
  */
 function advanceWizard(formData: FormData, applicationId: string, step: number): ActionState {
-  if (formData.get("desk") === "1") {
-    return { error: null, destination: deskWizardPath(applicationId, step) };
-  }
-  redirect(wizardPath(applicationId, step));
+  const destination = formData.get("desk") === "1"
+    ? deskWizardPath(applicationId, step)
+    : wizardPath(applicationId, step);
+  return { error: null, destination };
 }
 
 // ---------------------------------------------------------------------------
