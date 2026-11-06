@@ -105,7 +105,7 @@ export default async function AdminOrdersPage({
         items={FILTERS.map((f) => ({
           key: f.key,
           label: f.label,
-          href: `/orders?filter=${f.key}`,
+          href: `/admin/orders?filter=${f.key}`,
           count:
             f.key === "all"
               ? queue.total
@@ -357,7 +357,7 @@ export default async function AdminOrdersPage({
         </div>
       )}
 
-      <Pager page={page} total={queue.matching} hrefFor={(n) => `/orders?filter=${filter}&page=${n}`} />
+      <Pager page={page} total={queue.matching} hrefFor={(n) => `/admin/orders?filter=${filter}&page=${n}`} />
     </div>
   );
 }
