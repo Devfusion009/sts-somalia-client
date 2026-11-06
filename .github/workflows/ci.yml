@@ -36,6 +36,14 @@ jobs:
       - name: Build
         run: npm run build -w api
 
+      - name: Booking and payment regression tests
+        run: >-
+          node --test --test-concurrency=1
+          packages/shared-types/test/events.test.mjs
+          packages/shared-types/test/umrah.test.mjs
+          apps/api/test/waafi-payments.test.cjs
+          apps/api/test/notifications-roles.test.cjs
+
   web:
     name: web
     runs-on: ubuntu-latest
