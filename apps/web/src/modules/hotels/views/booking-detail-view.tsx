@@ -316,7 +316,7 @@ export async function BookingDetailView({
                   </Detail>
                 ) : null}
               </dl>
-              {canManage && isOffline && !booking.paidAt && live ? (
+              {canManage && isOffline && !booking.paidAt && (live || booking.status === "completed") ? (
                 <form action={markBookingPaid} className="mt-4 flex justify-end border-t border-border pt-4">
                   <input type="hidden" name="bookingId" value={booking.id} />
                   <input type="hidden" name="hotelId" value={hotelId} />
