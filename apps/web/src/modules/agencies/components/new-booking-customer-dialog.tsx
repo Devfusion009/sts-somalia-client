@@ -65,7 +65,7 @@ export function NewBookingCustomerDialog({ redirectTo }: { redirectTo?: string }
             </Field>
             <Field>
               <FieldLabel htmlFor="email">Email</FieldLabel>
-              <Input id="email" name="email" type="email" placeholder="Links to their STS account" />
+              <Input id="email" name="email" type="email" />
             </Field>
             <FieldError>{state?.error}</FieldError>
           </FieldGroup>

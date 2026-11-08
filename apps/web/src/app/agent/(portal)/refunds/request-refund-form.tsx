@@ -58,8 +58,10 @@ export function RequestRefundForm({
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="orderId">Order</FieldLabel>
-              <select id="orderId" name="orderId" defaultValue={preselect} className={NATIVE_SELECT_CLASS}>
-                <option value="">Not tied to a specific order</option>
+              <select id="orderId" name="orderId" defaultValue={preselect} required className={NATIVE_SELECT_CLASS}>
+                <option value="" disabled>
+                  Choose an order
+                </option>
                 {orders.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.order_number} — {money(Number(o.total), o.currency)}

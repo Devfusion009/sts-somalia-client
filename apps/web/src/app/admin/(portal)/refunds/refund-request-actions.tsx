@@ -6,7 +6,6 @@ import { Check, X, AlertCircle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -60,7 +59,6 @@ export function RefundRequestActions({ requestId }: { requestId: string }) {
             <input type="hidden" name="requestId" value={requestId} />
             <AlertDialogHeader>
               <AlertDialogTitle>Reject this refund request?</AlertDialogTitle>
-              <AlertDialogDescription>The wallet is not credited.</AlertDialogDescription>
             </AlertDialogHeader>
             {rejectState?.error ? (
               <Alert variant="destructive" className="my-2">
