@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 import { money } from "@/lib/money";
+import { getAgencyMarkupRule } from "@/modules/agencies/markup";
 
 export default async function AgentUmrahBookingPage({
   params,
@@ -30,6 +31,7 @@ export default async function AgentUmrahBookingPage({
   if (!pkg) notFound();
 
   const upcomingDepartures = bookableDepartures(pkg.umrah_package_departures ?? []);
+  const markup = await getAgencyMarkupRule(supabase, membership.agency.id, "umrah");
 
   const seatsOnSale = upcomingDepartures.reduce(
     (sum, d) => sum + Math.max(d.total_seats - d.booked_seats - d.offline_seats, 0),
@@ -64,6 +66,7 @@ export default async function AgentUmrahBookingPage({
             departures={upcomingDepartures}
             pricing={pkg.umrah_package_pricing}
             action={isGroup ? createBatchBooking : undefined}
+            desk={{ customers: customers.map((c) => ({ id: c.id, full_name: c.full_name })), markup }}
             bookedForSlot={
               <>
                 <input type="hidden" name="agencyCustomerId" value={customers[0].id} />
