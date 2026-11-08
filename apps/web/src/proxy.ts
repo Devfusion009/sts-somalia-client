@@ -139,5 +139,7 @@ export const config = {
   // finished attaching event listeners, so every onClick handler silently
   // did nothing — no console error, no network request, nothing. Confirmed
   // by A/B testing the identical page with subdomains on vs. off.
-  matcher: ["/((?!_next/|favicon.ico|api/).*)"],
+  // Files from public/ (e.g. /marketing/*.webp) are served as-is on every
+  // host; rewriting them into a portal's path tree 404s them.
+  matcher: ["/((?!_next/|favicon.ico|api/|.*\\.(?:avif|webp|png|jpe?g|gif|svg|ico|woff2?|txt|xml|webmanifest)$).*)"],
 };
