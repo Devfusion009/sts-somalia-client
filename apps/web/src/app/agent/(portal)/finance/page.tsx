@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { TransferEarningsForm } from "./transfer-earnings-form";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -41,7 +43,7 @@ export default async function AgentFinancePage() {
   const pendingTopups = topups.filter((t) => t.status === "pending");
 
   const lastPayout = payouts[0] ?? null;
-  const openRequest = requests.find((r) => r.status === "pending" || r.status === "approved") ?? null;
+  const openRequest = requests.find((r) => r.status === "pending" || r.status === "approved" || r.status === "processing") ?? null;
 
   const negative = wallet.balance < 0;
 
@@ -100,6 +102,9 @@ export default async function AgentFinancePage() {
 
       <section className="space-y-3">
         <SectionHead title="Earnings">
+          {["owner", "admin"].includes(membership.roleInAgency) ? (
+            <TransferEarningsForm amount={earnings.available} transferId={randomUUID()} disabled={earnings.available <= 0 || !!openRequest} />
+          ) : null}
           <Button variant="outline" size="sm" className="ml-auto" render={<Link href="/agent/reports" />}>
             All entries
           </Button>
@@ -136,7 +141,7 @@ export default async function AgentFinancePage() {
                 )}
               </div>
               <div className="min-w-0 space-y-1 sm:pl-4">
-                <dt className="text-xs text-muted-foreground">Last payout</dt>
+                <dt className="text-xs text-muted-foreground">Last earnings settlement</dt>
                 {lastPayout ? (
                   <dd>
                     <span className="font-heading text-lg font-semibold tabular-nums">
@@ -144,8 +149,9 @@ export default async function AgentFinancePage() {
                     </span>
                     <span className="block truncate text-xs text-muted-foreground tabular-nums">
                       {format(new Date(lastPayout.paid_at), "d MMM yyyy")}
-                      {lastPayout.method ? ` · ${lastPayout.method}` : ""}
-                      {lastPayout.payout_reference ? ` · ${lastPayout.payout_reference}` : ""}
+                      {lastPayout.method === "wallet"
+                        ? " · Transferred to wallet"
+                        : `${lastPayout.method ? ` · ${lastPayout.method}` : ""}${lastPayout.payout_reference ? ` · ${lastPayout.payout_reference}` : ""}`}
                     </span>
                   </dd>
                 ) : (

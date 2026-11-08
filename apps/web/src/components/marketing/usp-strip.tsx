@@ -18,7 +18,7 @@ export function UspStrip() {
     <div className="border-y border-white/10 bg-sidebar py-3 text-sidebar-foreground">
       <InfiniteMovingRow speed={48}>
         {USPS.map((usp) => (
-          <span key={usp} className="flex shrink-0 items-center gap-2 px-6 text-sm font-semibold whitespace-nowrap">
+          <span key={usp} className="flex shrink-0 items-center gap-2 px-6 text-sm font-semibold whitespace-nowrap motion-reduce:shrink motion-reduce:whitespace-normal">
             <VerifiedIcon sx={{ fontSize: 18 }} className="text-brand-accent" />
             {usp}
           </span>

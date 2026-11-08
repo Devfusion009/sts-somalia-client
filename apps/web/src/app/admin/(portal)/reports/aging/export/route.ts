@@ -14,7 +14,8 @@ export async function GET() {
       aging_since: new Date(r.agingSince).toISOString().slice(0, 10),
       aging_days: r.agingDays,
       bucket: r.bucket,
-    }))
+    })),
+    ["agency", "email", "outstanding_usd", "aging_since", "aging_days", "bucket"]
   );
 
   const filename = `aging-report-${new Date().toISOString().slice(0, 10)}.csv`;

@@ -8,7 +8,7 @@ import { dbException, throwIfDbError } from "../../../common/errors/db-error";
 export const IMAGES_BUCKET = "umrah-images";
 
 const CARD_SELECT =
-  "id, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats, offline_seats), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
+  "id, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats, offline_seats, sales_close_days, status), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
 
 const DETAIL_SELECT = `id, slug, name, description, tagline, tier, is_featured, origin_iata, destination_iata,
   duration_days, includes, images, base_price, original_price, currency, status,

@@ -34,7 +34,7 @@ export type EmailStatus = "sent" | "not_configured" | "failed";
 
 export type SendEmailResult = { sent: boolean; status: EmailStatus; error?: string };
 
-const DEFAULT_FROM = "STS Somalia <notifications@sts-somalia.example>";
+const DEFAULT_FROM = "Scout Travel Solution <no-reply@scoutsts.com>";
 
 function fromAddress(): string {
   return process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || DEFAULT_FROM;

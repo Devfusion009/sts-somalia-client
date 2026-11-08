@@ -3,6 +3,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { RlsSupabaseService } from "../../infra/supabase/rls-supabase.service";
 import type { Database, OpenBookingRequestInput, BookingType, UnifiedBooking } from "@sts/shared-types";
 
+/** "14 Dec 2026" — the one date format used across STS screens. Dates stay on their calendar day. */
+function displayDate(value: string): string {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  return new Date(dateOnly ? `${value}T00:00:00Z` : value).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: dateOnly ? "UTC" : "Africa/Mogadishu",
+  });
+}
+
 const ORDER_ITEM_FK: Record<BookingType, string> = {
   hotel: "hotel_booking_id",
   flight: "flight_booking_id",
@@ -133,7 +144,7 @@ export class BookingsService {
         id: b.id,
         type: "hotel" as const,
         title: b.hotels?.name ?? "Hotel booking",
-        subtitle: `${b.check_in} → ${b.check_out}`,
+        subtitle: `${displayDate(b.check_in)} → ${displayDate(b.check_out)}`,
         status: b.status,
         price: b.total_price,
         currency: b.currency,
@@ -145,7 +156,7 @@ export class BookingsService {
         id: b.id,
         type: "flight" as const,
         title: `${b.origin_iata} → ${b.destination_iata}`,
-        subtitle: new Date(b.depart_at).toLocaleDateString(),
+        subtitle: displayDate(b.depart_at),
         status: b.status,
         price: b.total_price,
         currency: b.currency,
@@ -197,7 +208,7 @@ export class BookingsService {
         id: h.id,
         type: "hall" as const,
         title: h.event_venues?.name ?? "Hall booking",
-        subtitle: `${h.event_type.replace(/_/g, " ")} · ${h.start_date}${h.end_date !== h.start_date ? ` → ${h.end_date}` : ""}`,
+        subtitle: `${h.event_type.replace(/_/g, " ")} · ${displayDate(h.start_date)}${h.end_date !== h.start_date ? ` → ${displayDate(h.end_date)}` : ""}`,
         status: h.status,
         price: h.price,
         currency: h.currency,

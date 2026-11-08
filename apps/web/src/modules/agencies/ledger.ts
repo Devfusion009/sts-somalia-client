@@ -167,8 +167,8 @@ export async function getAgencyLedger(agencyId: string, filters: LedgerFilters =
     rows.push({
       id: `payout-${payout.id}`,
       group: "withdrawal",
-      type: "Withdrawal",
-      detail: payout.method ? `Transfer · ${payout.method}` : "Transfer",
+      type: payout.method === "wallet" ? "Earnings to wallet" : "Withdrawal",
+      detail: payout.method === "wallet" ? "Agency wallet" : payout.method ? `Transfer · ${payout.method}` : "Transfer",
       reference: payout.payout_reference ?? null,
       customer: null,
       status: "Completed",
