@@ -112,11 +112,14 @@ export default async function AdminAgencyDetailPage({
     });
   }
 
+  const mogadishuToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Mogadishu" }).format(new Date());
   const pendingEntries = pending.rows.map((e) => ({
       id: e.id,
       amount: Number(e.amount),
       orderNumber: e.order?.order_number ?? null,
       createdAt: e.created_at,
+      serviceEndsOn: e.serviceEndsOn,
+      approvable: e.serviceEndsOn !== null && e.serviceEndsOn < mogadishuToday,
     }));
   const pendingMarkupRequests = markupRequests.filter((r) => r.status === "pending");
   const decidedMarkupRequests = markupRequests.filter((r) => r.status !== "pending").slice(0, 5);
