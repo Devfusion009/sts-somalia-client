@@ -145,8 +145,8 @@ export default async function UmrahPackagePage({
                 </span>
                 <span className="text-xs text-muted-foreground"> / pilgrim</span>
               </p>
-              <Button render={<a href="#book" />} size="lg" className="shrink-0">
-                Book now
+              <Button render={upcomingDepartures.length > 0 ? <a href="#book" /> : undefined} disabled={upcomingDepartures.length === 0} size="lg" className="shrink-0">
+                {upcomingDepartures.length > 0 ? "Book now" : "No departures"}
               </Button>
             </div>
           </header>
@@ -334,8 +334,8 @@ export default async function UmrahPackagePage({
                 <dd className="font-semibold">{tier.label}</dd>
               </div>
             </dl>
-            <Button render={<a href="#book" />} size="lg" className="mt-5 hidden w-full lg:inline-flex">
-              Book now
+            <Button render={upcomingDepartures.length > 0 ? <a href="#book" /> : undefined} disabled={upcomingDepartures.length === 0} size="lg" className="mt-5 hidden w-full lg:inline-flex">
+              {upcomingDepartures.length > 0 ? "Book now" : "No departures"}
             </Button>
           </div>
 

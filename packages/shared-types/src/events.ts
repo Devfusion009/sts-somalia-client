@@ -79,6 +79,7 @@ export function hallAwaitingQuote(booking: {
   if (booking.status !== "pending" && booking.status !== "waitlisted") return false;
   const unit = booking.venue?.price_unit;
   return (
+    unit === "per_person" ||
     Number(booking.venue?.base_price ?? 0) <= 0 ||
     (unit === "per_hour" && !booking.start_time)
   );

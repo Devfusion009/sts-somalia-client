@@ -87,14 +87,8 @@ const PURPOSE_LABELS: Record<string, string> = Object.fromEntries(PURPOSE_OPTION
 /* Shared bits                                                               */
 /* ------------------------------------------------------------------------- */
 
-/**
- * Desk (agent-portal) step submissions come back with a destination instead
- * of a server redirect — see advanceWizard() in actions.ts for why a
- * redirect() can't be trusted to land on the agent host. A plain assignment,
- * not router.push(), for the same reason PayFromWalletForm uses one: it
- * always resolves against the actual current origin.
- */
-function useDeskNavigate(state: ActionState) {
+/** Navigate after a saved public or agent step on the current origin. */
+function useWizardNavigate(state: ActionState) {
   useEffect(() => {
     if (state?.destination) window.location.href = state.destination;
   }, [state]);
@@ -333,7 +327,7 @@ export function StepApplicantType({
   desk?: boolean;
 }) {
   const [state, formAction] = useActionState(saveApplicantType, null);
-  useDeskNavigate(state);
+  useWizardNavigate(state);
   const [applicantType, setApplicantType] = useState(application.applicant_type);
   const members = application.members;
 
@@ -506,7 +500,7 @@ export function StepPersonalInfo({
   desk?: boolean;
 }) {
   const [state, formAction] = useActionState(savePersonalInfo, null);
-  useDeskNavigate(state);
+  useWizardNavigate(state);
   const t = (application.traveler_details ?? {}) as Record<string, string>;
   const c = (application.contact_details ?? {}) as Record<string, string>;
   // After a validation error, prefer what the user just typed over saved data.
@@ -625,7 +619,7 @@ export function StepTravelInfo({
   desk?: boolean;
 }) {
   const [state, formAction] = useActionState(saveTravelInfo, null);
-  useDeskNavigate(state);
+  useWizardNavigate(state);
   const t = (application.travel_details ?? {}) as Record<string, string | boolean | null>;
   const v = state?.values ?? {};
   const str = (key: string) => (typeof t[key] === "string" ? (t[key] as string) : "");
@@ -870,7 +864,7 @@ export function StepDocuments({
   desk?: boolean;
 }) {
   const [state, formAction] = useActionState(continueFromDocuments, null);
-  useDeskNavigate(state);
+  useWizardNavigate(state);
   const slots = parseDocumentSlots(application.resolved_documents ?? application.visa_type?.required_documents);
   const byKey = new Map(application.documents.map((d) => [d.document_type, d]));
 
@@ -958,7 +952,7 @@ export function StepReview({
   desk?: boolean;
 }) {
   const [state, formAction] = useActionState(submitVisaApplication, null);
-  useDeskNavigate(state);
+  useWizardNavigate(state);
   const t = (application.traveler_details ?? {}) as Record<string, string>;
   const c = (application.contact_details ?? {}) as Record<string, string>;
   const travel = (application.travel_details ?? {}) as Record<string, string | boolean | null>;
