@@ -11,6 +11,7 @@ import { MediaPlaceholder } from "@/components/media-placeholder";
 import { Card, CardContent } from "@/components/ui/card";
 import { AgencyBookingSlot, viewerAgencyId } from "@/modules/agencies/components/agency-booking-slot";
 import { BookingReviewForm } from "./booking-review-form";
+import { hotelLocation } from "@/modules/hotels/location";
 
 export const metadata: Metadata = { title: "Review your booking" };
 
@@ -69,8 +70,7 @@ export default async function HotelBookingReviewPage({
           <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
             <MapPin className="size-3.5 shrink-0" aria-hidden />
             <span className="truncate">
-              {hotel.address_line ? `${hotel.address_line}, ` : ""}
-              {hotel.city}, {hotel.country_code}
+              {hotelLocation(hotel)}
             </span>
           </p>
         </div>

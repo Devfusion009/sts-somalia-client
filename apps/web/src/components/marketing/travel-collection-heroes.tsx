@@ -14,7 +14,7 @@ export function HotelsCollectionHero({ city, children }: { city: string; childre
             <span className={styles.kicker}>STS stays</span>
             <h1 id="hotel-collection-title" className={styles.hotelTitle}>{city ? <>Hotels in<br /><span className={styles.editorial}>{city}.</span></> : <>Find your stay.<br /><span className={styles.editorial}>Somalia & beyond.</span></>}</h1>
           </div>
-          <span className={styles.photoCaption}><MapPin className="size-3.5" aria-hidden="true" />Dubai, United Arab Emirates</span>
+          {city ? null : <span className={styles.photoCaption}><MapPin className="size-3.5" aria-hidden="true" />Dubai, United Arab Emirates</span>}
         </div>
         <div className={styles.searchDock}>{children}</div>
         <ul className={styles.trustRow}>

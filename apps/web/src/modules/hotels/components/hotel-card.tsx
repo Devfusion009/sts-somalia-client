@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MediaPlaceholder } from "@/components/media-placeholder";
 import { amenityLabel } from "@/modules/hotels/images";
+import { hotelCityCountry } from "@/modules/hotels/location";
 
 export type HotelCardData = {
   id: string;
@@ -60,7 +61,7 @@ export function HotelCard({ hotel }: { hotel: HotelCardData }) {
         </h3>
         <p className="flex items-center gap-1 text-xs text-muted-foreground">
           <MapPin className="size-3.5" aria-hidden />
-          {hotel.city}, {hotel.country_code}
+          {hotelCityCountry(hotel)}
         </p>
         {hotel.amenities.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
