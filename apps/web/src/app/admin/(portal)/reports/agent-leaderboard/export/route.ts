@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   });
 
   const rows = await getAgentLeaderboard(range.from, range.to, 50);
-  const csv = toCsv(rows.map((r, i) => ({ rank: i + 1, agency: r.name, orders: r.orders, revenue_usd: r.revenue })));
+  const csv = toCsv(rows.map((r, i) => ({ rank: i + 1, agency: r.name, orders: r.orders, revenue_usd: r.revenue })), ["rank", "agency", "orders", "revenue_usd"]);
 
   return new Response(csv, {
     headers: {

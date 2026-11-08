@@ -4,10 +4,11 @@
  * Quotes any field containing a comma, quote, or newline; doubles embedded
  * quotes per the spec.
  */
-export function toCsv(rows: Record<string, string | number>[]): string {
-  if (rows.length === 0) return "";
+export function toCsv(rows: Record<string, string | number>[], columns?: string[]): string {
+  // An empty export still carries its column names.
+  if (rows.length === 0) return columns ? columns.join(",") : "";
 
-  const headers = Object.keys(rows[0]);
+  const headers = columns ?? Object.keys(rows[0]);
   const escapeField = (value: string | number): string => {
     const str = String(value);
     if (/[",\n\r]/.test(str)) {
