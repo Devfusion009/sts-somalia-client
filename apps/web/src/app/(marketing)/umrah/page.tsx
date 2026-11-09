@@ -5,7 +5,7 @@ import { ArrowRight, BadgeCheck, Building2, CalendarDays, Check, Headset, Lock, 
 import { SectionHeading } from "@/components/marketing/section-heading";
 import { PackageCard } from "@/modules/umrah/components/package-card";
 import { getFeaturedPackages } from "@/modules/umrah/queries";
-import { UmrahBookingJourney, UmrahServiceGallery, UmrahSupportSection } from "@/components/marketing/umrah-visual-sections";
+import { UmrahBookingJourney, UmrahServiceGallery, UmrahFlowComparison } from "@/components/marketing/umrah-visual-sections";
 import { UmrahCollectionHero } from "@/components/marketing/travel-collection-heroes";
 import styles from "@/components/marketing/travel-collection.module.css";
 
@@ -45,7 +45,7 @@ export default async function UmrahPage() {
             {FLOWS.map((flow, index) => <Link key={flow.href} href={flow.href} className={styles.flowCard}>
               <div className={styles.flowPhoto}>
                 {/* Preserve source resolution in these tall object-cover crops. */}
-                <Image src={flow.image} alt="" fill unoptimized sizes="(max-width: 767px) 40vw, (max-width: 1023px) 50vw, 22vw" className="object-cover" />
+                <Image src={flow.image} alt="" fill unoptimized className="object-cover" />
                 <span className="absolute bottom-5 left-5 z-10 font-heading text-4xl font-light text-white/80">0{index + 1}</span>
               </div>
               <div className={styles.flowBody}>
@@ -66,9 +66,9 @@ export default async function UmrahPage() {
           <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">{featured.map((pkg) => <PackageCard key={pkg.id} pkg={pkg} />)}</div>
         </div>
       </section> : null}
-      <UmrahServiceGallery />
       <UmrahBookingJourney />
-      <UmrahSupportSection />
+      <UmrahServiceGallery />
+      <UmrahFlowComparison />
     </div>
   );
 }
