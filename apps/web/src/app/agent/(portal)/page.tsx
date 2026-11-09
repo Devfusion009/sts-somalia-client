@@ -37,7 +37,7 @@ export default async function AgentDashboardPage({ searchParams }: {
     getAgencyPendingPayments(membership.agency.id),
   ]);
   const currency = metrics.revenue.currency;
-  const commissionConfigured = membership.agency.commission_rate_set_at !== null;
+  const commissionConfigured = membership.agency.commission_rate_set_at !== null || Number(membership.agency.commission_rate) > 0;
 
   return (
     <div className="space-y-6">
@@ -54,7 +54,7 @@ export default async function AgentDashboardPage({ searchParams }: {
 
       <div className={styles.heroGrid}>
         <section className={`${styles.launcher} ${styles.photoLauncher}`} aria-label="Start a booking">
-          <WorkspaceCover compact headingLevel={2} image="/marketing/hero-aircraft.webp" title="Start a booking" actions={<Link href="/agent/book" className="inline-flex items-center gap-2 rounded-lg border border-white/35 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Booking desk<ArrowRight className="size-3.5" aria-hidden="true" /></Link>} />
+          <WorkspaceCover compact headingLevel={2} image="/marketing/agent-booking-desk-v1.webp" title="Start a booking" actions={<Link href="/agent/book" className="inline-flex items-center gap-2 rounded-lg border border-white/35 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Booking desk<ArrowRight className="size-3.5" aria-hidden="true" /></Link>} />
           <ServiceLauncher />
         </section>
         <section className={styles.wallet} aria-label="Agency wallet">

@@ -7085,6 +7085,10 @@ export type Database = {
       }
     }
     Functions: {
+      transfer_agency_earnings_to_wallet: {
+        Args: { p_agency_id: string; p_amount: number; p_transfer_id: string }
+        Returns: string
+      }
       manager_login_identity: { Args: { p_manager_code: string }; Returns: string }
       claim_manager_password_recovery: { Args: { p_manager_code: string }; Returns: { login_email: string; contact_email: string }[] }
 

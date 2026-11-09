@@ -46,8 +46,10 @@ export function CommissionEntryReview({ agencyId, entries }: { agencyId: string;
     });
   }
 
-  const selectedTotal = entries.filter((e) => selected.has(e.id)).reduce((sum, e) => sum + e.amount, 0);
-  const allSelected = selected.size === entries.length;
+  const selectedEntries = entries.filter((entry) => selected.has(entry.id));
+  const selectedIds = selectedEntries.map((entry) => entry.id);
+  const selectedTotal = selectedEntries.reduce((sum, entry) => sum + entry.amount, 0);
+  const allSelected = selectedIds.length === entries.length;
 
   return (
     <div className="space-y-3">
@@ -59,7 +61,7 @@ export function CommissionEntryReview({ agencyId, entries }: { agencyId: string;
             checked={allSelected}
             onChange={() => setSelected(allSelected ? new Set() : new Set(entries.map((e) => e.id)))}
           />
-          {selected.size} of {entries.length} selected · {usd(selectedTotal)}
+          {selectedIds.length} of {entries.length} selected · {usd(selectedTotal)}
         </label>
         {entries.map((entry) => (
           <label
@@ -91,20 +93,20 @@ export function CommissionEntryReview({ agencyId, entries }: { agencyId: string;
         <form action={formAction}>
           <input type="hidden" name="agencyId" value={agencyId} />
           <input type="hidden" name="decision" value="rejected" />
-          {[...selected].map((id) => (
+          {selectedIds.map((id) => (
             <input key={id} type="hidden" name="entryIds" value={id} />
           ))}
-          <SubmitButton size="sm" variant="outline" disabled={selected.size === 0} pendingText="Reversing…">
+          <SubmitButton size="sm" variant="outline" disabled={selectedIds.length === 0} pendingText="Reversing…">
             <X data-icon="inline-start" /> Reverse
           </SubmitButton>
         </form>
         <form action={formAction}>
           <input type="hidden" name="agencyId" value={agencyId} />
           <input type="hidden" name="decision" value="approved" />
-          {[...selected].map((id) => (
+          {selectedIds.map((id) => (
             <input key={id} type="hidden" name="entryIds" value={id} />
           ))}
-          <SubmitButton size="sm" disabled={selected.size === 0} pendingText="Approving…">
+          <SubmitButton size="sm" disabled={selectedIds.length === 0} pendingText="Approving…">
             <Check data-icon="inline-start" /> Approve <span className="tabular-nums">{usd(selectedTotal)}</span>
           </SubmitButton>
         </form>
