@@ -737,6 +737,16 @@ export async function getAgencyTeam(agencyId: string) {
   return data ?? [];
 }
 
+/** Request-scoped so the dashboard header and checklist share one count. */
+export const getAgencyTeamCount = cache(async (agencyId: string): Promise<number> => {
+  const supabase = await createClient();
+  const { count, error } = await supabase.from("agency_members")
+    .select("id", { count: "exact", head: true })
+    .eq("agency_id", agencyId).eq("status", "active");
+  if (error) throw error;
+  return count ?? 0;
+});
+
 // ---------------------------------------------------------------------------
 // Agent dashboard — period-scoped KPIs (bookings/revenue/earned split with
 // deltas + sparkline series), onboarding checklist, and a blended recent-
@@ -846,21 +856,16 @@ export type AgencyOnboardingStatus = {
 /** Drives the dashboard's "Getting started" checklist — hidden once all three are true. */
 export async function getAgencyOnboardingStatus(agencyId: string): Promise<AgencyOnboardingStatus> {
   const supabase = await createClient();
-  const [{ count: orderCount }, { count: markupCount }, { count: memberCount }] = await Promise.all([
-    supabase.from("orders").select("id", { count: "exact", head: true }).eq("agency_id", agencyId),
-    supabase.from("agency_markups").select("id", { count: "exact", head: true }).eq("agency_id", agencyId),
-    supabase
-      .from("agency_members")
-      .select("id", { count: "exact", head: true })
-      .eq("agency_id", agencyId)
-      .eq("status", "active"),
+  const [{ data: orders }, { data: markups }, memberCount] = await Promise.all([
+    supabase.from("orders").select("id").eq("agency_id", agencyId).limit(1),
+    supabase.from("agency_markups").select("id").eq("agency_id", agencyId).limit(1),
+    getAgencyTeamCount(agencyId),
   ]);
 
   return {
-    hasFirstBooking: (orderCount ?? 0) > 0,
-    hasMarkupConfigured: (markupCount ?? 0) > 0,
-    // > 1 because the owner's own row already counts as one active member.
-    hasInvitedTeamMember: (memberCount ?? 0) > 1,
+    hasFirstBooking: Boolean(orders?.length),
+    hasMarkupConfigured: Boolean(markups?.length),
+    hasInvitedTeamMember: memberCount > 1,
   };
 }
 

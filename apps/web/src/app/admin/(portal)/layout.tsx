@@ -6,7 +6,6 @@ import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { createClient } from "@/lib/supabase/server";
 import { PortalShell } from "@/components/portal/portal-shell";
 import { MfaSettings } from "@/modules/auth/components/mfa-settings";
-import { getServerTrpc } from "@/lib/trpc/server";
 import { fireDueEventReminders } from "@/modules/admin/calendar-reminders";
 import { AdminNotificationBell } from "./admin-notification-bell";
 import { NewOrderBanner } from "./new-order-banner";
@@ -40,11 +39,8 @@ const REQUIRE_ADMIN_MFA = false;
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireAdminPortalAccess();
 
-  // Independent of each other, so they run together instead of as a chain of
-  // round trips: the layout re-runs on every 30s bell refresh, which made each
-  // extra serial hop a recurring cost, not a one-off.
+  // Notifications load independently in the client; only shell data blocks entry.
   const supabase = await createClient();
-  const trpc = await getServerTrpc();
 
   // Opportunistic reminder sweep — the real, always-on delivery path is the
   // Vercel Cron at /api/cron/admin-event-reminders (see vercel.json). This
@@ -55,18 +51,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // cookies() from within after().
   after(() => fireDueEventReminders(supabase));
 
-  const [mfaEnabled, notifications, contexts, { data: navCountsRaw }] = await Promise.all([
+  const [mfaEnabled, contexts, { data: navCountsRaw }] = await Promise.all([
     // Mandatory TOTP enrollment for the admin console: an account can hold
     // is_platform_admin and still have zero verified factors (enrollment is
     // opt-in everywhere else). Block every /admin route behind an inline
     // enrollment prompt rather than redirecting to /admin/security — that
     // route lives under this same layout, so a redirect would loop.
     hasVerifiedFactor(),
-    // apps/api is a separate deployment (not yet reachable from every
-    // environment) — the rest of the admin portal has nothing to do with
-    // notifications, so it shouldn't 500 just because that one dependency
-    // is down.
-    trpc.notifications.unread.query({ limit: 10 }).catch(() => []),
     getMyPartnerContexts(profile.id, profile.full_name),
     supabase.rpc("admin_nav_counts"),
   ]);
@@ -85,7 +76,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       contexts={contexts}
       isPlatformAdmin={profile.is_platform_admin}
       accent="admin"
-      headerExtra={<AdminNotificationBell notifications={notifications} />}
+      headerExtra={<AdminNotificationBell />}
       adminMenu={{
         mfaEnabled,
         supportEmail: process.env.SUPPORT_EMAIL ?? null,
@@ -104,7 +95,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       ) : (
         <>
-          <NewOrderBanner notifications={notifications} />
+          <NewOrderBanner />
           {children}
         </>
       )}
