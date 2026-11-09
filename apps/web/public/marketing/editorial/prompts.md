@@ -1,0 +1,12 @@
+# Image generation prompts
+
+Mode: built-in `image_gen` tool. Opaque backgrounds. Reference: existing
+licensed `apps/web/public/marketing/madinah.webp` for the Umrah hero only.
+
+## flights-dubai-dawn.webp
+
+Use case: ads-marketing. Asset type: premium travel website hero background, very wide landscape 2400x1350. Create an extraordinary cinematic photographic art-directed aerial of the Dubai coastline, turquoise Persian Gulf, elegantly winding waterways, downtown Dubai and the recognisable Burj Khalifa rising on the RIGHT HALF in soft warm peach sunrise haze, a tiny realistic unbranded passenger jet traveling toward the city far right above the skyline. The LEFT HALF is expansive deep teal ocean and soft dark atmospheric negative space, suitable for large white typography to be added separately in HTML. Immersive high-end travel editorial, beautiful natural geographical scale, restrained filmic color grading, deep emerald shadows, aquamarine water and golden sunlight, refined and credible, crisp details, no fantasy objects, no oversaturated colors. Full bleed single continuous landscape, no borders, no split panels, no collage, no text, no typography, no logos, no watermark. Attractive panoramic composition, horizon in upper third, skyline to the right.
+
+## umrah-madinah-twilight.webp
+
+Use case: ads-marketing. Asset type: luxury Umrah travel website panoramic hero, 2400x1350 landscape. Input image 1 is reference photography of Al Masjid an Nabawi in Madinah for architectural identity and beautiful proportions. Create a new elevated editorial photographic interpretation of this same sacred mosque courtyard at serene blue hour just after sunset, softly illuminated cream minarets and green dome on the RIGHT HALF, geometric marble courtyard sweeping into the foreground, a few tiny modestly dressed visitors at a distance, tranquil respectful atmosphere. Keep recognizable mosque identity, realistic architecture and restrained treatment. The LEFT HALF should have deep dark teal twilight sky and subdued shadowed courtyard with very little visual clutter, for white web headline overlay added separately. Breathtaking but natural amber lamps contrasted with deep petrol sky, warm ivory marble, elegant travel photography, very high detail, graceful composition, grounded realism. Single continuous full bleed image. No added text, no logos, no watermarks, no collage, no labels, no borders. Do not invent business staff or suggest a specific hotel or booked service. Hero illustration based on the real mosque.

@@ -1,0 +1,214 @@
+.flightSection { background:#f6f7f3; }
+.flightHero { position:relative; isolation:isolate; min-height:35.5rem; overflow:hidden; background:#0b3635; color:#fff; }
+.heroImage { object-fit:cover; object-position:center 52%; }
+.heroShade { position:absolute; inset:0; background:linear-gradient(90deg,rgb(4 32 34 / 88%),rgb(5 37 38 / 58%) 40%,rgb(5 37 38 / 8%) 75%),linear-gradient(0deg,rgb(4 32 34 / 55%),transparent 35%); }
+.heroInner { position:relative; max-width:80rem; min-height:inherit; margin:auto; padding:4.25rem 2rem 8rem; }
+.eyebrow { display:inline-flex; align-items:center; gap:.8rem; font-size:.625rem; font-weight:600; letter-spacing:.22em; text-transform:uppercase; color:#e2e9df; }
+.eyebrow>span { width:1.7rem; height:1px; background:#e5c58e; }
+.flightCopy { position:relative; z-index:1; max-width:47rem; }
+.flightTitle { margin:1.5rem 0 0; font-family:var(--font-heading); font-size:clamp(2.8rem,5.3vw,5rem); line-height:1.08; font-weight:500; letter-spacing:-.045em; word-spacing:.06em; }
+.flightTitle em,.serif { font-family:Georgia,'Times New Roman',serif; font-weight:400; font-style:italic; letter-spacing:-.045em; }
+.flightTitle em { color:#edd6ac; }
+.heroLinks { display:flex; flex-wrap:wrap; align-items:center; gap:1rem 1.75rem; margin-top:2rem; }
+.goldButton { display:inline-flex; align-items:center; justify-content:center; gap:1.25rem; min-height:3.25rem; padding:.75rem 1.4rem; border-radius:.5rem; background:#e8cb96; color:#153b32; font-size:.75rem; font-weight:700; transition:background .2s; }
+.goldButton:hover { background:#f4dfb8; }
+.textLink { display:inline-flex; align-items:center; gap:.65rem; min-height:2.75rem; font-size:.75rem; font-weight:500; color:inherit; }
+.heroRoute { position:absolute; right:2rem; bottom:9rem; width:18rem; padding:1.2rem 1.4rem; border:1px solid rgb(255 255 255 / 30%); border-radius:.75rem; background:rgb(5 39 40 / 60%); backdrop-filter:blur(14px); transition:background .2s; }
+.heroRoute:hover { background:rgb(5 39 40 / 90%); }
+.routeKicker { font-size:.5625rem; letter-spacing:.16em; text-transform:uppercase; color:#e8cb96; }
+.routeCities { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-top:.9rem; font-family:var(--font-heading); font-size:1.65rem; font-weight:500; }
+.routeCities small { display:block; margin-bottom:.25rem; font-family:var(--font-sans); font-size:.625rem; font-weight:400; color:#d5e5de; }
+.artCaption { position:absolute; bottom:6.25rem; right:2rem; display:flex; align-items:center; gap:.4rem; font-size:.5625rem; letter-spacing:.04em; color:rgb(255 255 255 / 80%); }
+.bookingWrap { position:relative; z-index:2; max-width:80rem; margin:-4.5rem auto 0; padding:0 2rem; }
+.bookingDock { scroll-margin-top:7rem; border-radius:1rem; border:1px solid #dfe6df; background:var(--card); color:var(--card-foreground); box-shadow:0 18px 50px -28px rgb(8 42 33 / 35%); }
+.bookingNav { display:flex; align-items:center; gap:1.75rem; padding:0 1.75rem; border-bottom:1px solid var(--border); }
+.bookingTab { position:relative; display:flex; align-items:center; gap:.5rem; min-height:3.75rem; font-size:.8125rem; font-weight:600; color:var(--muted-foreground); }
+.bookingTab:hover,.activeTab { color:var(--primary); }
+.activeTab::after { content:''; position:absolute; bottom:-1px; inset-inline:0; height:3px; background:var(--primary); border-radius:3px 3px 0 0; }
+.bookingBrand { display:flex; align-items:center; gap:.4rem; margin-left:auto; font-size:.625rem; color:var(--muted-foreground); }
+.flightTrust { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:1rem 3.5rem; padding:1.75rem 0; color:#52665c; font-size:.6875rem; }
+.flightTrust li { display:flex; align-items:center; gap:.65rem; }
+.flightTrust svg { color:#1a786b; }
+.compactHero { min-height:16rem; }
+.compactHero .heroInner { padding-top:2.5rem; }
+.compactHero .flightTitle { margin-top:.75rem; font-size:3rem; }
+.compactHero .artCaption { bottom:5.5rem; }
+.discovery { padding:4.75rem 0 4rem; background:#fff; color:#183d34; }
+.container { max-width:80rem; margin:auto; padding-inline:2rem; }
+.sectionTop { display:flex; align-items:end; justify-content:space-between; flex-wrap:wrap; gap:1.5rem; margin-bottom:2rem; }
+.sectionKicker { display:flex; align-items:center; gap:.7rem; color:#65786b; font-size:.625rem; font-weight:600; letter-spacing:.18em; text-transform:uppercase; }
+.sectionKicker::before { content:''; width:1.5rem; height:1px; background:#a68c5d; }
+.sectionTitle { margin-top:.8rem; font-family:var(--font-heading); font-size:clamp(1.9rem,3.1vw,2.75rem); line-height:1.15; font-weight:500; letter-spacing:-.05em; word-spacing:.035em; }
+.sectionLink { display:inline-flex; min-height:2.75rem; align-items:center; gap:.75rem; font-size:.75rem; font-weight:600; color:#146b5d; }
+.destinationGrid { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:1rem; }
+.destinationCard { position:relative; isolation:isolate; display:flex; align-items:end; min-height:25rem; overflow:hidden; border-radius:1rem; background:#1b473b; color:#fff; }
+.destinationCard::after { content:''; position:absolute; z-index:-1; inset:0; background:linear-gradient(0deg,rgb(3 26 29 / 85%),rgb(3 26 29 / 10%) 65%); }
+.destinationCard img { z-index:-2; object-fit:cover; transition:transform .6s; }
+.destinationCard:hover img { transform:scale(1.05); }
+.destinationBody { width:100%; padding:1.7rem; }
+.destinationBody>span { display:block; font-size:.625rem; letter-spacing:.18em; text-transform:uppercase; color:#e3e7d9; }
+.destinationBottom { display:flex; align-items:end; justify-content:space-between; gap:1rem; margin-top:.65rem; }
+.destinationBottom h3 { font-family:var(--font-heading); font-size:2rem; font-weight:500; letter-spacing:-.05em; }
+.roundArrow { display:grid; place-items:center; flex-shrink:0; width:2.5rem; height:2.5rem; border:1px solid rgb(255 255 255 / 50%); border-radius:50%; transition:background .2s; }
+.destinationCard:hover .roundArrow { background:rgb(255 255 255 / 20%); }
+.routeLinks { display:flex; align-items:center; flex-wrap:wrap; gap:.625rem; margin-top:1.5rem; }
+.routeLinks>span { margin-right:.5rem; font-size:.6875rem; color:#63766b; }
+.routeLinks a { display:flex; align-items:center; gap:.75rem; min-height:2.75rem; border:1px solid #e1e7df; border-radius:2rem; padding:.5rem 1.1rem; font-size:.6875rem; transition:border-color .2s,background .2s; }
+.routeLinks a:hover { border-color:#548a76; background:#f2f6ef; }
+.concierge { padding:1rem 0 4rem; background:#fff; color:#143c33; }
+.conciergeGrid { display:grid; grid-template-columns:.95fr 1.3fr; overflow:hidden; border-radius:1rem; background:#edf1e8; }
+.conciergePhoto { position:relative; min-height:21rem; }
+.conciergePhoto img { object-fit:cover; }
+.conciergeContent { padding:2.75rem 3rem; }
+.conciergeLinks { display:flex; flex-wrap:wrap; gap:.75rem 1.5rem; margin-top:1.5rem; }
+.conciergeLinks a { display:flex; align-items:center; gap:.6rem; min-height:2.75rem; font-size:.75rem; font-weight:600; }
+.umrahHero { position:relative; isolation:isolate; overflow:hidden; min-height:38rem; color:#fff; background:#0b3433; }
+.umrahHero .heroImage { object-position:center 58%; }
+.umrahHero .heroShade { background:linear-gradient(90deg,rgb(3 30 30 / 94%),rgb(3 30 30 / 65%) 40%,rgb(3 30 30 / 5%) 80%),linear-gradient(0deg,rgb(3 30 30 / 80%),transparent 45%); }
+.umrahHero .heroInner { padding-top:4.5rem; padding-bottom:5.5rem; }
+.umrahHero .flightTitle { font-size:clamp(3rem,5.5vw,5.25rem); }
+.umrahHero .artCaption { bottom:2rem; }
+.umrahFeatures { display:flex; gap:2rem; flex-wrap:wrap; margin-top:2.5rem; font-size:.6875rem; color:#d2ded4; }
+.umrahFeatures li { display:flex; align-items:center; gap:.6rem; }
+.umrahFeatures svg { color:#e8cb96; }
+.umrahRoute { display:flex; align-items:center; gap:1.25rem; margin-top:2rem; font-size:.625rem; letter-spacing:.1em; text-transform:uppercase; color:#b7cabe; }
+.umrahRoute span { width:2.5rem; height:1px; background:#658476; }
+.outlineButton { display:inline-flex; align-items:center; justify-content:center; gap:1rem; min-height:3.25rem; padding:.75rem 1.4rem; border:1px solid rgb(255 255 255 / 40%); border-radius:.5rem; font-size:.75rem; font-weight:600; transition:background .2s; }
+.outlineButton:hover { background:rgb(255 255 255 / 10%); }
+.serviceSection { padding:5rem 0; background:#f7f7f1; color:#173c32; }
+.serviceSection+.serviceSection { padding-top:0; }
+.serviceMeta { display:flex; align-items:center; gap:.5rem; font-size:.625rem; color:#63776c; }
+.serviceGrid { display:grid; grid-template-columns:1.5fr 1fr 1fr; gap:1rem; }
+.servicePhoto { position:relative; display:block; width:100%; min-height:18rem; overflow:hidden; background:#dbe4da; border-radius:.875rem; text-align:left; cursor:zoom-in; }
+.servicePhoto img { object-fit:cover; transition:transform .6s; }
+.servicePhoto:hover img { transform:scale(1.04); }
+.servicePhoto::after { content:''; position:absolute; inset:0; background:linear-gradient(0deg,rgb(3 27 23 / 80%),transparent 55%); pointer-events:none; }
+.servicePhotoLabel { position:absolute; z-index:1; left:1.25rem; right:1.25rem; bottom:1.25rem; display:flex; align-items:center; justify-content:space-between; gap:.7rem; color:white; }
+.servicePhotoLabel strong { display:block; font-family:var(--font-heading); font-size:1rem; font-weight:500; }
+.servicePhotoLabel small { display:block; margin-top:.3rem; font-size:.625rem; color:#e1e9df; }
+.zoomIcon { display:grid; place-items:center; width:2rem; height:2rem; flex-shrink:0; border:1px solid rgb(255 255 255 / 40%); border-radius:50%; }
+.serviceGrid .servicePhoto:first-child { grid-row:span 2; min-height:31rem; }
+.serviceGrid .servicePhoto:not(:first-child) { min-height:15rem; }
+.serviceGrid .servicePhoto:last-child:nth-child(4) { grid-column:2 / -1; }
+.serviceNote { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; padding-top:1.25rem; font-size:.625rem; color:#63776c; }
+.serviceNote a { display:inline-flex; align-items:center; gap:.6rem; min-height:2.75rem; font-size:.6875rem; font-weight:600; color:#196958; }
+.hotelGrid { display:grid; grid-template-columns:1fr 1.3fr 1fr; gap:1rem; }
+.hotelGrid .servicePhoto { min-height:15rem; }
+.hotelGrid .servicePhoto:nth-child(2) { grid-row:span 2; min-height:31rem; }
+.hotelGrid .servicePhoto:nth-child(4) { grid-column:1; grid-row:2; }
+.hotelDetails { display:flex; flex-direction:column; justify-content:center; gap:1.2rem; padding:1.5rem; border:1px solid #dce3d5; border-radius:.875rem; background:#eef1e7; }
+.hotelDetails>span { font-family:Georgia,'Times New Roman',serif; font-size:1.8rem; line-height:1.1; font-style:italic; color:#496049; }
+.hotelDetails ul { display:grid; gap:.7rem; font-size:.6875rem; }
+.hotelDetails li { display:flex; align-items:center; gap:.5rem; }
+.timelineSection { padding:4rem 0; color:#e8eee3; background:#0d3b34; }
+.timelineTop { display:flex; justify-content:space-between; align-items:end; flex-wrap:wrap; gap:1.5rem; }
+.timelineTop .sectionKicker { color:#bbccba; }
+.timeline { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:1.5rem; margin-top:2.5rem; }
+.timeline li { border-top:1px solid #557566; padding-top:1.25rem; }
+.timelineNumber { display:flex; justify-content:space-between; align-items:center; color:#c9b887; font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:1.5rem; }
+.timeline h3 { margin-top:1.25rem; font-size:.75rem; font-weight:500; line-height:1.5; }
+.supportSection { padding:4.5rem 0; background:#fff; color:#173c32; }
+.supportGrid { display:grid; grid-template-columns:1.1fr 1fr; gap:4rem; align-items:center; }
+.supportPhoto { position:relative; min-height:24rem; overflow:hidden; border-radius:1rem; background:#e2e8db; }
+.supportPhoto img { object-fit:cover; }
+.supportPhoto>span { position:absolute; bottom:1rem; left:1rem; padding:.5rem .8rem; border-radius:.35rem; background:rgb(8 42 35 / 80%); color:#fff; font-size:.625rem; }
+.supportContacts { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; margin-top:1.75rem; }
+.supportPhone { display:inline-flex; align-items:center; gap:.5rem; min-height:2.75rem; font-size:.75rem; font-weight:600; }
+.supportFacts { display:grid; gap:.8rem; border-top:1px solid #dce3d6; margin-top:2rem; padding-top:1.5rem; font-size:.6875rem; color:#607268; }
+.supportFacts li { display:flex; align-items:center; gap:.65rem; }
+.goldButton:focus-visible,.textLink:focus-visible,.heroRoute:focus-visible,.bookingTab:focus-visible,.sectionLink:focus-visible,.destinationCard:focus-visible,.routeLinks a:focus-visible,.conciergeLinks a:focus-visible,.outlineButton:focus-visible,.servicePhoto:focus-visible,.serviceNote a:focus-visible,.supportPhone:focus-visible { outline:3px solid #c59b59; outline-offset:4px; }
+@media(max-width:1023px) {
+ .flightHero { min-height:32rem; }
+ .heroInner { padding-top:3.5rem; }
+ .heroRoute { width:15rem; bottom:8rem; }
+ .flightTitle { max-width:36rem; font-size:clamp(2.8rem,6vw,4rem); }
+ .heroLinks { gap:.75rem 1rem; }
+ .destinationCard { min-height:21rem; }
+ .destinationBody { padding:1.25rem; }
+ .destinationBottom h3 { font-size:1.6rem; }
+ .conciergeContent { padding:2rem; }
+ .serviceGrid,.hotelGrid { grid-template-columns:1fr 1fr; }
+ .serviceGrid .servicePhoto:first-child { grid-row:auto; min-height:18rem; }
+ .serviceGrid .servicePhoto:not(:first-child) { min-height:18rem; }
+ .serviceGrid .servicePhoto:last-child:nth-child(4) { grid-column:auto; }
+ .hotelGrid .servicePhoto { min-height:18rem; }
+ .hotelGrid .servicePhoto:nth-child(2) { grid-row:auto; min-height:18rem; }
+ .hotelGrid .servicePhoto:nth-child(4) { grid-column:auto; grid-row:auto; }
+ .hotelDetails { grid-column:1/-1; flex-direction:row; align-items:center; justify-content:space-between; }
+ .hotelDetails ul { grid-template-columns:1fr 1fr; column-gap:1.5rem; }
+ .supportGrid { gap:2rem; }
+ .compactHero { min-height:15rem; }
+}
+@media(max-width:767px) {
+ .container { padding-inline:1.25rem; }
+ .flightHero { min-height:34rem; }
+ .heroImage { object-position:62% center; }
+ .heroShade { background:linear-gradient(90deg,rgb(4 32 34 / 88%),rgb(5 37 38 / 40%)),linear-gradient(0deg,rgb(4 32 34 / 45%),transparent); }
+ .heroInner { padding:3rem 1.25rem 8rem; }
+ .flightTitle { font-size:clamp(2.65rem,8.5vw,4rem); margin-top:1.25rem; }
+ .eyebrow { font-size:.5625rem; letter-spacing:.16em; }
+ .heroLinks { margin-top:1.75rem; align-items:start; }
+ .heroRoute { display:none; }
+ .artCaption { right:1.25rem; bottom:6rem; }
+ .bookingWrap { padding:0 1rem; }
+ .bookingNav { gap:1.5rem; padding-inline:1.25rem; }
+ .bookingBrand { display:none; }
+ .bookingTab { min-height:3.5rem; font-size:.75rem; }
+ .flightTrust { justify-content:start; gap:.85rem; padding:1.5rem .25rem; font-size:.625rem; }
+ .flightTrust li { flex-basis:100%; }
+ .flightTrust svg { width:1rem; height:1rem; }
+ .discovery { padding:3rem 0; }
+ .sectionTop { gap:.75rem; margin-bottom:1.5rem; }
+ .destinationGrid { grid-template-columns:1fr 1fr; gap:.75rem; }
+ .destinationCard { min-height:17rem; }
+ .destinationCard:first-child { grid-column:1/-1; min-height:23rem; }
+ .destinationBody { padding:1.1rem; }
+ .destinationBody>span { font-size:.5625rem; letter-spacing:.1em; }
+ .destinationBottom h3 { font-size:1.4rem; }
+ .destinationCard:first-child h3 { font-size:2rem; }
+ .roundArrow { width:2rem; height:2rem; }
+ .routeLinks { gap:.5rem; }
+ .routeLinks>span { flex-basis:100%; margin-bottom:.25rem; }
+ .routeLinks a { padding-inline:.85rem; }
+ .concierge { padding-bottom:3rem; }
+ .conciergeGrid { grid-template-columns:1fr; }
+ .conciergePhoto { min-height:17rem; }
+ .conciergeContent { padding:1.75rem 1.5rem; }
+ .umrahHero { min-height:38rem; }
+ .umrahHero .heroImage { object-position:right center; }
+ .umrahHero .heroShade { background:linear-gradient(90deg,rgb(3 30 30 / 91%),rgb(3 30 30 / 42%)),linear-gradient(0deg,rgb(3 30 30 / 75%),transparent 45%); }
+ .umrahHero .heroInner { padding:3.5rem 1.25rem 4.5rem; }
+ .umrahHero .flightTitle { font-size:clamp(3.2rem,10.5vw,4.5rem); }
+ .umrahHero .heroLinks { gap:.75rem; }
+ .umrahFeatures { gap:.85rem 1.5rem; margin-top:2rem; font-size:.625rem; }
+ .umrahRoute { gap:.75rem; font-size:.5625rem; }
+ .umrahRoute span { width:1.5rem; }
+ .serviceSection { padding:3rem 0; }
+ .serviceMeta { font-size:.5625rem; }
+ .serviceGrid,.hotelGrid { gap:.75rem; }
+ .serviceGrid .servicePhoto:first-child { grid-column:1/-1; min-height:16rem; }
+ .serviceGrid .servicePhoto:not(:first-child) { min-height:12.5rem; }
+ .serviceGrid .servicePhoto:last-child:nth-child(4) { grid-column:1/-1; min-height:14rem; }
+ .servicePhotoLabel { left:.85rem; right:.85rem; bottom:.85rem; }
+ .servicePhotoLabel strong { font-size:.8125rem; }
+ .servicePhotoLabel small { font-size:.5625rem; }
+ .zoomIcon { width:1.75rem; height:1.75rem; }
+ .hotelGrid .servicePhoto { min-height:13rem; }
+ .hotelGrid .servicePhoto:nth-child(2) { min-height:13rem; }
+ .hotelDetails { flex-direction:column; align-items:start; padding:1.25rem; }
+ .hotelDetails>span { font-size:1.5rem; }
+ .hotelDetails ul { font-size:.625rem; }
+ .timelineSection { padding:3rem 0; }
+ .timeline { grid-template-columns:1fr 1fr; gap:1.5rem; margin-top:2rem; }
+ .timeline li:last-child { grid-column:1/-1; }
+ .timeline h3 { margin-top:.75rem; }
+ .supportSection { padding:3rem 0; }
+ .supportGrid { grid-template-columns:1fr; }
+ .supportPhoto { min-height:19rem; }
+ .compactHero { min-height:15rem; }
+ .compactHero .flightTitle { font-size:2.65rem; }
+}
+@media(prefers-reduced-motion:reduce) {
+ .destinationCard img,.servicePhoto img { transition:none; }
+ .destinationCard:hover img,.servicePhoto:hover img { transform:none; }
+}
