@@ -44,10 +44,10 @@ function playChime() {
  * page has not seen before. The unread rows already present on first mount
  * never trigger it, and the bell stays still between arrivals.
  */
-export function useBellAlert(ids: string[]) {
+export function useBellAlert(ids: string[] | undefined) {
   const ref = useRef<HTMLButtonElement>(null);
   const seen = useRef<Set<string> | null>(null);
-  const key = ids.join(",");
+  const key = ids?.join(",");
 
   useEffect(() => {
     window.addEventListener("pointerdown", unlockAudio, { once: true });
@@ -59,6 +59,7 @@ export function useBellAlert(ids: string[]) {
   }, []);
 
   useEffect(() => {
+    if (key === undefined) return;
     const current = key ? key.split(",") : [];
     const previous = seen.current;
     seen.current = new Set(current);

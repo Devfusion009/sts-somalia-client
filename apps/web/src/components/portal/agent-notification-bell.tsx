@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { trpc } from "@/lib/trpc/react";
 import { cn } from "@/lib/utils";
 import { useBellAlert } from "@/components/portal/use-bell-alert";
+import { usePortalNotifications } from "@/components/portal/use-portal-notifications";
 import { ACTIONABLE_TYPES } from "@/lib/notifications/actionable-types";
 
 type NotificationRow = {
@@ -46,36 +47,21 @@ function targetHref(n: NotificationRow): string | null {
   return null;
 }
 
-const POLL_MS = 30_000;
-
-/**
- * Agent-portal counterpart to AdminNotificationBell — same table, same
- * dismiss/poll/toast behavior, different type→link map and alert trigger.
- * A low agency balance is this portal's equivalent of a new order: the one
- * condition that blocks the agent from booking until they act on it.
- */
-export function AgentNotificationBell({ notifications }: { notifications: NotificationRow[] }) {
+/** Notification reads and dismissals update only the shared client query. */
+export function AgentNotificationBell() {
+  const { data, isPending, isError } = usePortalNotifications();
+  const notifications = data ?? [];
+  const utils = trpc.useUtils();
   const router = useRouter();
   const dismiss = trpc.notifications.dismiss.useMutation({
-    onSuccess: () => router.refresh(),
+    onSuccess: () => utils.notifications.unread.invalidate(),
   });
   const seenIds = useRef<Set<string> | null>(null);
 
   useEffect(() => {
-    const tick = () => {
-      if (document.visibilityState === "visible") router.refresh();
-    };
-    const timer = setInterval(tick, POLL_MS);
-    document.addEventListener("visibilitychange", tick);
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", tick);
-    };
-  }, [router]);
-
-  useEffect(() => {
+    if (!data) return;
     if (seenIds.current) {
-      const newlyArrived = notifications.filter((n) => !seenIds.current!.has(n.id));
+      const newlyArrived = data.filter((n) => !seenIds.current!.has(n.id));
       for (const n of newlyArrived) {
         const href = targetHref(n);
         toast.info(n.title, {
@@ -84,13 +70,13 @@ export function AgentNotificationBell({ notifications }: { notifications: Notifi
         });
       }
     }
-    seenIds.current = new Set(notifications.map((n) => n.id));
-  }, [notifications, router]);
+    seenIds.current = new Set(data.map((n) => n.id));
+  }, [data, router]);
 
   const lowBalanceAlert = notifications.some((n) => n.type === "low_balance");
   const actionAlert = lowBalanceAlert || notifications.some((n) => ACTIONABLE_TYPES.has(n.type));
 
-  const bellRef = useBellAlert(notifications.map((n) => n.id));
+  const bellRef = useBellAlert(data?.map((n) => n.id));
 
   return (
     <Popover>
@@ -126,7 +112,7 @@ export function AgentNotificationBell({ notifications }: { notifications: Notifi
           ) : null}
         </div>
         {notifications.length === 0 ? (
-          <p className="px-3 py-6 text-center text-sm text-muted-foreground">No notifications</p>
+          <p className="px-3 py-6 text-center text-sm text-muted-foreground">{isPending ? "Loading notifications" : isError ? "Notifications unavailable" : "No notifications"}</p>
         ) : (
           <div className="max-h-80 divide-y divide-border overflow-y-auto">
             {notifications.map((n) => (

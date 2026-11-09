@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Building2, Plus } from "lucide-react";
@@ -5,7 +6,7 @@ import { requireUserForPortal } from "@/lib/auth/session";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { agencyLogoUrl } from "@/modules/agencies/logo";
-import { getMyPartnerAccountId, getPartnerAccount } from "@/modules/admin/partner-accounts";
+import { getAgencyOnboardingChecklist } from "@/modules/admin/partner-accounts";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
 import { OnboardingStatusBanner } from "@/components/portal/onboarding-status-banner";
@@ -13,7 +14,6 @@ import { AgentNotificationBell } from "@/components/portal/agent-notification-be
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { getServerTrpc } from "@/lib/trpc/server";
 import { AGENT_SERVICES } from "@/modules/agencies/services";
 import styles from "@/components/portal/operations-shell.module.css";
 
@@ -103,17 +103,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
     return <PortalSuspendedNotice portalLabel="Agent Portal" />;
   }
 
-  const trpc = await getServerTrpc();
-  const [accountId, contexts, notifications] = await Promise.all([
-    getMyPartnerAccountId("agency", membership.agency.id),
-    getMyPartnerContexts(profile.id, profile.full_name),
-    // apps/api is a separate deployment (not yet reachable from every
-    // environment) — the rest of the agent portal has nothing to do with
-    // notifications, so it shouldn't 500 just because that one dependency
-    // is down.
-    trpc.notifications.unread.query({ limit: 10 }).catch(() => []),
-  ]);
-  const account = accountId ? await getPartnerAccount(accountId) : null;
+  const contexts = await getMyPartnerContexts(profile.id, profile.full_name);
 
   return (
     <PortalShell
@@ -139,11 +129,20 @@ export default async function AgentLayout({ children }: { children: React.ReactN
       brandName={membership.agency.name}
       headerExtra={<>
         <Button size="sm" render={<Link href="/agent/book" />}><Plus className="size-3.5" aria-hidden="true" /><span className="max-sm:sr-only">New booking</span></Button>
-        <AgentNotificationBell notifications={notifications} />
+        <AgentNotificationBell />
       </>}
     >
-      {account ? <OnboardingStatusBanner checklist={account.checklist} /> : null}
+      <Suspense fallback={null}>
+        <AgencyOnboarding agency={membership.agency} />
+      </Suspense>
       {children}
     </PortalShell>
   );
+}
+
+async function AgencyOnboarding({ agency }: {
+  agency: Parameters<typeof getAgencyOnboardingChecklist>[0];
+}) {
+  const checklist = await getAgencyOnboardingChecklist(agency);
+  return checklist ? <OnboardingStatusBanner checklist={checklist} /> : null;
 }

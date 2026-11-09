@@ -2,22 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowRight, ChevronDown, ShoppingBag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc/react";
+import { usePortalNotifications } from "@/components/portal/use-portal-notifications";
 import { stripPortalPrefix } from "@/lib/subdomain";
 import { cn } from "@/lib/utils";
-
-type NotificationRow = {
-  id: string;
-  type: string;
-  title: string;
-  body: string | null;
-  data?: unknown;
-  created_at: string;
-};
 
 const MAX_SHOWN = 3;
 
@@ -32,15 +24,16 @@ export function newOrderHref(n: { data?: unknown }): string | null {
  * lists the newest few. Opening the Orders page counts as having seen them all,
  * so the bar and the bell clear instead of resurfacing on the next visit.
  */
-export function NewOrderBanner({ notifications }: { notifications: NotificationRow[] }) {
-  const router = useRouter();
+export function NewOrderBanner() {
+  const { data: notifications = [] } = usePortalNotifications(false);
+  const utils = trpc.useUtils();
   // The proxy rewrites admin.<host>/orders to /admin/orders, so both forms are matched.
   const path = stripPortalPrefix(usePathname()) ?? "/";
   const onDashboard = path === "/";
   const onOrders = path === "/orders" || path.startsWith("/orders/");
   const [open, setOpen] = useState(false);
-  const dismiss = trpc.notifications.dismiss.useMutation({ onSuccess: () => router.refresh() });
-  const dismissAll = trpc.notifications.dismissType.useMutation({ onSuccess: () => router.refresh() });
+  const dismiss = trpc.notifications.dismiss.useMutation({ onSuccess: () => utils.notifications.unread.invalidate() });
+  const dismissAll = trpc.notifications.dismissType.useMutation({ onSuccess: () => utils.notifications.unread.invalidate() });
 
   const orders = notifications.filter((n) => n.type === "new_order");
   const latestId = orders[0]?.id;
