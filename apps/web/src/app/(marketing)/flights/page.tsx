@@ -3,11 +3,13 @@ import { Clock3, Luggage, MoveRight, Plane, RefreshCcw, ShieldCheck } from "luci
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FlightsHero } from "@/components/marketing/flights-hero";
-import { FlightDiscovery } from "@/components/marketing/flight-discovery";
+import { FlightDealsRail } from "@/components/marketing/flight-deals-rail";
+import { TravelProsCards } from "@/components/marketing/travel-pros-cards";
 import { TrendingGrid } from "@/components/marketing/trending-grid";
 import { DealsByDestination, FlightsFaq } from "@/components/marketing/flight-accordions";
 import { jsonLdScript } from "@/lib/json-ld";
 import {
+  FLIGHT_DEALS,
   TRENDING_CITIES,
   TRENDING_COUNTRIES,
   DEAL_GROUPS,
@@ -122,14 +124,15 @@ export default async function FlightsPage({
         />
       ) : null}
 
-      <FlightsHero compact={hasSearch}>
-        <FlightSearchForm key={JSON.stringify(defaults)} airports={airports} defaults={defaults} />
+      <FlightsHero>
+        <FlightSearchForm airports={airports} defaults={defaults} />
       </FlightsHero>
 
       {/* Discovery content only when the visitor hasn't searched yet. */}
       {!hasSearch ? (
         <>
-          <FlightDiscovery />
+          <FlightDealsRail title="Where will you fly next?" href="#flight-search" deals={FLIGHT_DEALS} />
+          <TravelProsCards />
           <TrendingGrid
             title="Trending cities"
             subtitle="The routes most searched by travellers from Somalia"
