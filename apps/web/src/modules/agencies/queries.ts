@@ -291,13 +291,23 @@ export async function getAgencyPendingCommissionEntries(agencyId: string, limit 
   const supabase = await createClient();
   const { data, count } = await supabase
     .from("agency_commission_entries")
-    .select("id, amount, created_at, order:order_id (order_number)", { count: "exact" })
+    .select("id, amount, created_at, order_id, order:order_id (order_number)", { count: "exact" })
     .eq("agency_id", agencyId)
     .eq("status", "pending")
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(limit);
-  return { rows: data ?? [], total: count ?? 0 };
+  const rows = data ?? [];
+  // Commission is approved only after the booking's last service date.
+  const orderIds = [...new Set(rows.map((r) => r.order_id))];
+  const { data: ends } = orderIds.length
+    ? await supabase.rpc("order_service_end_dates", { p_order_ids: orderIds })
+    : { data: [] };
+  const endByOrder = new Map((ends ?? []).map((e) => [e.order_id, e.end_date]));
+  return {
+    rows: rows.map((r) => ({ ...r, serviceEndsOn: endByOrder.get(r.order_id) ?? null })),
+    total: count ?? 0,
+  };
 }
 
 /** Recorded commission payouts for an agency, newest first; `limit` caps how many. */
@@ -727,6 +737,16 @@ export async function getAgencyTeam(agencyId: string) {
   return data ?? [];
 }
 
+/** Request-scoped so the dashboard header and checklist share one count. */
+export const getAgencyTeamCount = cache(async (agencyId: string): Promise<number> => {
+  const supabase = await createClient();
+  const { count, error } = await supabase.from("agency_members")
+    .select("id", { count: "exact", head: true })
+    .eq("agency_id", agencyId).eq("status", "active");
+  if (error) throw error;
+  return count ?? 0;
+});
+
 // ---------------------------------------------------------------------------
 // Agent dashboard — period-scoped KPIs (bookings/revenue/earned split with
 // deltas + sparkline series), onboarding checklist, and a blended recent-
@@ -836,21 +856,16 @@ export type AgencyOnboardingStatus = {
 /** Drives the dashboard's "Getting started" checklist — hidden once all three are true. */
 export async function getAgencyOnboardingStatus(agencyId: string): Promise<AgencyOnboardingStatus> {
   const supabase = await createClient();
-  const [{ count: orderCount }, { count: markupCount }, { count: memberCount }] = await Promise.all([
-    supabase.from("orders").select("id", { count: "exact", head: true }).eq("agency_id", agencyId),
-    supabase.from("agency_markups").select("id", { count: "exact", head: true }).eq("agency_id", agencyId),
-    supabase
-      .from("agency_members")
-      .select("id", { count: "exact", head: true })
-      .eq("agency_id", agencyId)
-      .eq("status", "active"),
+  const [{ data: orders }, { data: markups }, memberCount] = await Promise.all([
+    supabase.from("orders").select("id").eq("agency_id", agencyId).limit(1),
+    supabase.from("agency_markups").select("id").eq("agency_id", agencyId).limit(1),
+    getAgencyTeamCount(agencyId),
   ]);
 
   return {
-    hasFirstBooking: (orderCount ?? 0) > 0,
-    hasMarkupConfigured: (markupCount ?? 0) > 0,
-    // > 1 because the owner's own row already counts as one active member.
-    hasInvitedTeamMember: (memberCount ?? 0) > 1,
+    hasFirstBooking: Boolean(orders?.length),
+    hasMarkupConfigured: Boolean(markups?.length),
+    hasInvitedTeamMember: memberCount > 1,
   };
 }
 
@@ -1010,7 +1025,7 @@ export async function getAgencyRecentActivity(agencyId: string, limit = 10): Pro
       .limit(limit),
     supabase
       .from("agency_wallet_transactions")
-      .select("id, type, amount, created_at")
+      .select("id, type, amount, note, created_at")
       .eq("agency_id", agencyId)
       .order("created_at", { ascending: false })
       .limit(limit),
@@ -1039,7 +1054,10 @@ export async function getAgencyRecentActivity(agencyId: string, limit = 10): Pro
       (t): AgencyActivityItem => ({
         id: `wallet-${t.id}`,
         kind: "wallet",
-        title: WALLET_TX_LABEL[t.type] ?? "Wallet transaction",
+        title:
+          t.type === "deposit" && t.note === "Approved earnings transfer"
+            ? "Earnings transfer"
+            : (WALLET_TX_LABEL[t.type] ?? "Wallet transaction"),
         subtitle: Number(t.amount) >= 0 ? "Credited" : "Debited",
         amount: Number(t.amount),
         currency: "USD",
@@ -1047,7 +1065,8 @@ export async function getAgencyRecentActivity(agencyId: string, limit = 10): Pro
         href: "/agent/finance/transactions",
       })
     ),
-    ...(payouts ?? []).map(
+    // Wallet transfers already appear as their wallet credit.
+    ...(payouts ?? []).filter((p) => p.method !== "wallet").map(
       (p): AgencyActivityItem => ({
         id: `payout-${p.id}`,
         kind: "payout",

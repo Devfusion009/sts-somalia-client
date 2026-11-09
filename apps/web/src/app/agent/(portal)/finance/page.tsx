@@ -149,8 +149,9 @@ export default async function AgentFinancePage() {
                     </span>
                     <span className="block truncate text-xs text-muted-foreground tabular-nums">
                       {format(new Date(lastPayout.paid_at), "d MMM yyyy")}
-                      {lastPayout.method ? ` · ${lastPayout.method}` : ""}
-                      {lastPayout.payout_reference ? ` · ${lastPayout.payout_reference}` : ""}
+                      {lastPayout.method === "wallet"
+                        ? " · Transferred to wallet"
+                        : `${lastPayout.method ? ` · ${lastPayout.method}` : ""}${lastPayout.payout_reference ? ` · ${lastPayout.payout_reference}` : ""}`}
                     </span>
                   </dd>
                 ) : (

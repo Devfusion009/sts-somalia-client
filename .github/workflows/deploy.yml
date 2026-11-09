@@ -65,6 +65,7 @@ jobs:
           EMAIL_FROM=${{ vars.EMAIL_FROM }}
           EMAIL_REPLY_TO=${{ vars.EMAIL_REPLY_TO }}
           RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+          INTEGRATIONS_ENCRYPTION_KEY=${{ secrets.INTEGRATIONS_ENCRYPTION_KEY }}
           EOF
 
       - name: Ship build artifacts
@@ -142,6 +143,7 @@ jobs:
           EMAIL_FROM=${{ vars.EMAIL_FROM }}
           EMAIL_REPLY_TO=${{ vars.EMAIL_REPLY_TO }}
           RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+          INTEGRATIONS_ENCRYPTION_KEY=${{ secrets.INTEGRATIONS_ENCRYPTION_KEY }}
           EOF
 
       - name: Restart

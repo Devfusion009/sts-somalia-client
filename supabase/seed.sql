@@ -265,7 +265,7 @@ with pk1 as (
   returning id
 ), pk1d as (
   insert into public.umrah_package_departures (package_id, departure_date, return_date, total_seats, booked_seats)
-  select id, current_date + 21, current_date + 28, 45, 38 from pk1
+  select id, current_date + 21, current_date + 27, 45, 38 from pk1
 )
 insert into public.umrah_package_hotels (package_id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order)
 select id, 'makkah', 'Al Masa Hotel', 3, 800, 3, 'Quad sharing', 0 from pk1
@@ -286,9 +286,9 @@ with pk2 as (
   returning id
 ), pk2d as (
   insert into public.umrah_package_departures (package_id, departure_date, return_date, total_seats, booked_seats)
-  select id, current_date + 27, current_date + 37, 45, 0 from pk2
+  select id, current_date + 27, current_date + 36, 45, 0 from pk2
   union all
-  select id, current_date + 57, current_date + 67, 45, 0 from pk2
+  select id, current_date + 57, current_date + 66, 45, 0 from pk2
 )
 insert into public.umrah_package_hotels (package_id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order)
 select id, 'makkah', 'Al Kiswah Towers', 3, 900, 5, 'Quad sharing', 0 from pk2
@@ -309,7 +309,7 @@ with pk3 as (
   returning id
 ), pk3d as (
   insert into public.umrah_package_departures (package_id, departure_date, return_date, total_seats, booked_seats)
-  select id, current_date + 52, current_date + 64, 40, 12 from pk3
+  select id, current_date + 52, current_date + 63, 40, 12 from pk3
 )
 insert into public.umrah_package_hotels (package_id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order)
 select id, 'makkah', 'Makkah Millennium', 4, 250, 6, 'Triple sharing', 0 from pk3
@@ -330,7 +330,7 @@ with pk4 as (
   returning id
 ), pk4d as (
   insert into public.umrah_package_departures (package_id, departure_date, return_date, total_seats, booked_seats)
-  select id, current_date + 38, current_date + 50, 40, 32 from pk4
+  select id, current_date + 38, current_date + 49, 40, 32 from pk4
 )
 insert into public.umrah_package_hotels (package_id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order)
 select id, 'makkah', 'Elaf Ajyad', 4, 450, 6, 'Triple sharing', 0 from pk4
@@ -351,7 +351,7 @@ with pk5 as (
   returning id
 ), pk5d as (
   insert into public.umrah_package_departures (package_id, departure_date, return_date, total_seats, booked_seats)
-  select id, current_date + 41, current_date + 56, 35, 20 from pk5
+  select id, current_date + 41, current_date + 55, 35, 20 from pk5
 )
 insert into public.umrah_package_hotels (package_id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order)
 select id, 'makkah', 'Hilton Suites Makkah', 4, 220, 8, 'Triple sharing', 0 from pk5
@@ -372,9 +372,9 @@ with pk6 as (
   returning id
 ), pk6d as (
   insert into public.umrah_package_departures (package_id, departure_date, return_date, total_seats, booked_seats)
-  select id, current_date + 42, current_date + 56, 40, 0 from pk6
+  select id, current_date + 42, current_date + 55, 40, 0 from pk6
   union all
-  select id, current_date + 72, current_date + 86, 40, 0 from pk6
+  select id, current_date + 72, current_date + 85, 40, 0 from pk6
 )
 insert into public.umrah_package_hotels (package_id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order)
 select id, 'makkah', 'Swissotel Al Maqam', 5, 180, 7, 'Double sharing', 0 from pk6
@@ -395,7 +395,7 @@ with pk7 as (
   returning id
 ), pk7d as (
   insert into public.umrah_package_departures (package_id, departure_date, return_date, total_seats, booked_seats)
-  select id, current_date + 66, current_date + 80, 30, 9 from pk7
+  select id, current_date + 66, current_date + 79, 30, 9 from pk7
 )
 insert into public.umrah_package_hotels (package_id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order)
 select id, 'makkah', 'Pullman ZamZam Makkah', 5, 150, 7, 'Family room', 0 from pk7
@@ -416,7 +416,7 @@ with pk8 as (
   returning id
 ), pk8d as (
   insert into public.umrah_package_departures (package_id, departure_date, return_date, total_seats, booked_seats)
-  select id, current_date + 84, current_date + 94, 50, 44 from pk8
+  select id, current_date + 84, current_date + 93, 50, 44 from pk8
 )
 insert into public.umrah_package_hotels (package_id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order)
 select id, 'makkah', 'Jabal Omar Marriott', 4, 200, 5, 'Double sharing', 0 from pk8
@@ -437,7 +437,7 @@ with pk9 as (
   returning id
 ), pk9d as (
   insert into public.umrah_package_departures (package_id, departure_date, return_date, total_seats, booked_seats)
-  select id, current_date + 87, current_date + 108, 30, 0 from pk9
+  select id, current_date + 87, current_date + 107, 30, 0 from pk9
 )
 insert into public.umrah_package_hotels (package_id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order)
 select id, 'makkah', 'Raffles Makkah Palace', 5, 50, 12, 'Haram-view suite', 0 from pk9

@@ -20,6 +20,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { createUmrahBooking } from "@/modules/umrah/actions";
 import { sharingLabel } from "@/modules/umrah/images";
 import { cn } from "@/lib/utils";
+import type { AgencyMarkupRule } from "@/modules/agencies/markup";
 
 type Departure = {
   id: string;
@@ -32,6 +33,18 @@ type Departure = {
 };
 
 type SharingRate = { sharing: number; price: number | string };
+
+/** Agent desk context: the selected customers and the agency's Umrah markup. */
+type DeskContext = {
+  customers: { id: string; full_name: string }[];
+  markup: AgencyMarkupRule | null;
+};
+
+function marginOn(net: number, markup: AgencyMarkupRule | null) {
+  if (!markup) return 0;
+  const amount = markup.markupType === "percent" ? (net * markup.value) / 100 : markup.value;
+  return Math.round(amount * 100) / 100;
+}
 
 function seatsLeftOn(d: Departure) {
   return d.total_seats - d.booked_seats - d.offline_seats;
@@ -85,6 +98,7 @@ export function BookingForm({
   pricing = [],
   bookedForSlot,
   action,
+  desk,
 }: {
   packageSlug: string;
   currency: string;
@@ -95,6 +109,7 @@ export function BookingForm({
   bookedForSlot?: React.ReactNode;
   /** The agent desk swaps in its group action, which books for every selected customer. */
   action?: typeof createUmrahBooking;
+  desk?: DeskContext;
 }) {
   const [state, formAction] = useActionState(action ?? createUmrahBooking, null);
   const [selectedId, setSelectedId] = useState<string | null>(departures[0]?.id ?? null);
@@ -128,7 +143,13 @@ export function BookingForm({
   const priceFor = (d: Departure | null) =>
     rates.length > 0 ? (selectedRate?.price ?? 0) : Number(d?.price_override ?? basePrice);
   const unitPrice = priceFor(selected);
-  const totalPrice = unitPrice * numPilgrims;
+  // A group books one pilgrim per selected customer, each on its own order.
+  const groupCustomers = desk && desk.customers.length > 1 ? desk.customers : null;
+  const pilgrimsPerOrder = groupCustomers ? 1 : numPilgrims;
+  const orderCount = groupCustomers ? groupCustomers.length : 1;
+  const orderNet = unitPrice * pilgrimsPerOrder;
+  const orderMargin = desk ? marginOn(orderNet, desk.markup) : 0;
+  const totalPrice = (orderNet + orderMargin) * orderCount;
   const needsSharing = rates.length > 0 && !selectedRate;
   const pilgrimStep = rates.length > 0 ? 3 : 2;
 
@@ -226,6 +247,23 @@ export function BookingForm({
 
       <section className="space-y-4">
         <SectionHeading index={pilgrimStep} title="Pilgrim details" />
+        {groupCustomers ? (
+          <>
+            <input type="hidden" name="num_pilgrims" value={1} />
+            <div className="divide-y divide-border">
+              {groupCustomers.map((customer, i) => (
+                <PilgrimFields
+                  key={customer.id}
+                  prefix={`c_${customer.id}__pilgrim_0`}
+                  index={i}
+                  title={customer.full_name}
+                  defaultName={customer.full_name}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
         <Field label="Number of pilgrims" htmlFor="num_pilgrims" required className="max-w-xs">
           <Input
             id="num_pilgrims"
@@ -242,53 +280,17 @@ export function BookingForm({
 
         <div className="divide-y divide-border">
           {Array.from({ length: numPilgrims }).map((_, i) => (
-            <fieldset key={i} className="min-w-0 space-y-4 py-5 first:pt-2 last:pb-0">
-              <legend className="contents">
-                <span className="flex items-center gap-2 text-sm font-semibold">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-muted text-xs tabular-nums text-foreground">
-                    {i + 1}
-                  </span>
-                  Pilgrim {i + 1}
-                  {i === 0 ? <Badge variant="info">Lead pilgrim</Badge> : null}
-                </span>
-              </legend>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Full name (as in passport)" htmlFor={`pilgrim_${i}_full_name`} required className="sm:col-span-2">
-                  <Input id={`pilgrim_${i}_full_name`} name={`pilgrim_${i}_full_name`} placeholder="Enter full name" required />
-                </Field>
-                <Field label="Gender" htmlFor={`pilgrim_${i}_gender`} required>
-                  <Select name={`pilgrim_${i}_gender`} defaultValue="male">
-                    <SelectTrigger id={`pilgrim_${i}_gender`} className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Date of birth" htmlFor={`pilgrim_${i}_date_of_birth`}>
-                  <Input id={`pilgrim_${i}_date_of_birth`} name={`pilgrim_${i}_date_of_birth`} type="date" />
-                </Field>
-                <Field label="Nationality" htmlFor={`pilgrim_${i}_nationality`}>
-                  <Input id={`pilgrim_${i}_nationality`} name={`pilgrim_${i}_nationality`} placeholder="e.g. Somali" />
-                </Field>
-                <Field label="Passport number" htmlFor={`pilgrim_${i}_passport_number`}>
-                  <Input id={`pilgrim_${i}_passport_number`} name={`pilgrim_${i}_passport_number`} placeholder="Enter passport number" />
-                </Field>
-                <Field label="Passport expiry" htmlFor={`pilgrim_${i}_passport_expiry`}>
-                  <Input id={`pilgrim_${i}_passport_expiry`} name={`pilgrim_${i}_passport_expiry`} type="date" />
-                </Field>
-                <Field label="Mahram name (if applicable)" htmlFor={`pilgrim_${i}_mahram_name`}>
-                  <Input id={`pilgrim_${i}_mahram_name`} name={`pilgrim_${i}_mahram_name`} />
-                </Field>
-                <Field label="Relation to mahram" htmlFor={`pilgrim_${i}_mahram_relation`}>
-                  <Input id={`pilgrim_${i}_mahram_relation`} name={`pilgrim_${i}_mahram_relation`} />
-                </Field>
-              </div>
-            </fieldset>
+            <PilgrimFields
+              key={i}
+              prefix={`pilgrim_${i}`}
+              index={i}
+              title={`Pilgrim ${i + 1}`}
+              lead={i === 0}
+            />
           ))}
         </div>
+          </>
+        )}
       </section>
 
       <section className="space-y-4">
@@ -307,13 +309,16 @@ export function BookingForm({
       <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-card p-4 shadow-md ring-1 ring-foreground/10">
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">
-            Total for {numPilgrims} pilgrim{numPilgrims > 1 ? "s" : ""}
+            {groupCustomers
+              ? `Total · ${orderCount} customers`
+              : `Total for ${numPilgrims} pilgrim${numPilgrims > 1 ? "s" : ""}`}
           </p>
           <p className="font-heading text-2xl font-bold tabular-nums text-primary">
             {money(totalPrice, currency)}
           </p>
           <p className="text-xs text-muted-foreground tabular-nums">
-            {money(unitPrice, currency)} × {numPilgrims}
+            {money(unitPrice, currency)} × {pilgrimsPerOrder * orderCount}
+            {orderMargin > 0 ? ` + ${money(orderMargin * orderCount, currency)} margin` : ""}
             {selectedRate ? ` · ${sharingLabel(selectedRate.sharing)}` : ""}
           </p>
         </div>
@@ -336,5 +341,67 @@ export function BookingForm({
         </div>
       </div>
     </form>
+  );
+}
+
+function PilgrimFields({
+  prefix,
+  index,
+  title,
+  lead,
+  defaultName,
+}: {
+  prefix: string;
+  index: number;
+  title: string;
+  lead?: boolean;
+  defaultName?: string;
+}) {
+  return (
+    <fieldset className="min-w-0 space-y-4 py-5 first:pt-2 last:pb-0">
+      <legend className="contents">
+        <span className="flex items-center gap-2 text-sm font-semibold">
+          <span className="flex size-6 items-center justify-center rounded-full bg-muted text-xs tabular-nums text-foreground">
+            {index + 1}
+          </span>
+          {title}
+          {lead ? <Badge variant="info">Lead pilgrim</Badge> : null}
+        </span>
+      </legend>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Full name (as in passport)" htmlFor={`${prefix}_full_name`} required className="sm:col-span-2">
+          <Input id={`${prefix}_full_name`} name={`${prefix}_full_name`} placeholder="Enter full name" defaultValue={defaultName} required />
+        </Field>
+        <Field label="Gender" htmlFor={`${prefix}_gender`} required>
+          <Select name={`${prefix}_gender`} defaultValue="male">
+            <SelectTrigger id={`${prefix}_gender`} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="male">Male</SelectItem>
+              <SelectItem value="female">Female</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Date of birth" htmlFor={`${prefix}_date_of_birth`}>
+          <Input id={`${prefix}_date_of_birth`} name={`${prefix}_date_of_birth`} type="date" />
+        </Field>
+        <Field label="Nationality" htmlFor={`${prefix}_nationality`}>
+          <Input id={`${prefix}_nationality`} name={`${prefix}_nationality`} placeholder="e.g. Somali" />
+        </Field>
+        <Field label="Passport number" htmlFor={`${prefix}_passport_number`}>
+          <Input id={`${prefix}_passport_number`} name={`${prefix}_passport_number`} placeholder="Enter passport number" />
+        </Field>
+        <Field label="Passport expiry" htmlFor={`${prefix}_passport_expiry`}>
+          <Input id={`${prefix}_passport_expiry`} name={`${prefix}_passport_expiry`} type="date" />
+        </Field>
+        <Field label="Mahram name (if applicable)" htmlFor={`${prefix}_mahram_name`}>
+          <Input id={`${prefix}_mahram_name`} name={`${prefix}_mahram_name`} />
+        </Field>
+        <Field label="Relation to mahram" htmlFor={`${prefix}_mahram_relation`}>
+          <Input id={`${prefix}_mahram_relation`} name={`${prefix}_mahram_relation`} />
+        </Field>
+      </div>
+    </fieldset>
   );
 }

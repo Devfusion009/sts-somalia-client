@@ -15,6 +15,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
     label: "Bookings & fulfilment",
     items: [
       { href: "/admin/orders", label: "Orders & payments", icon: "orders", searchTerms: "flights tickets reservations bookings" },
+      { href: "/admin/flights", label: "Flight requests", icon: "bookings", searchTerms: "flights tickets quotes fares PNR" },
       { href: "/admin/visa", label: "Visa applications", icon: "visa", searchTerms: "cases processing documents" },
       { href: "/admin/visa/appointments", label: "Visa appointments", icon: "calendar" },
       { href: "/admin/umrah/requests", label: "Private Umrah requests", icon: "bookings", searchTerms: "quotes custom" },

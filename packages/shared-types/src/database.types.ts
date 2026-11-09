@@ -7089,6 +7089,10 @@ export type Database = {
         Args: { p_agency_id: string; p_amount: number; p_transfer_id: string }
         Returns: string
       }
+      order_service_end_dates: {
+        Args: { p_order_ids: string[] }
+        Returns: { order_id: string; end_date: string | null }[]
+      }
       manager_login_identity: { Args: { p_manager_code: string }; Returns: string }
       claim_manager_password_recovery: { Args: { p_manager_code: string }; Returns: { login_email: string; contact_email: string }[] }
 

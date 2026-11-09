@@ -86,7 +86,12 @@ export function StepServices({
 }) {
   const basePath = desk ? "/agent/book/umrah/private" : "/umrah/private";
   const [state, formAction] = useActionState(saveUmrahTripServices, null);
-  const [roomSharing, setRoomSharing] = useState<RoomSharing>(initialRoomSharing);
+  // A private party never shares with strangers, so a room cannot be sized
+  // for more guests than are travelling.
+  const maxSharing = Math.max(1, Math.min(4, trip.numPilgrims));
+  const [roomSharing, setRoomSharing] = useState<RoomSharing>(
+    Math.min(initialRoomSharing, maxSharing) as RoomSharing
+  );
   const sharing = useMemo<SharingContext>(
     () => ({ roomSharing, sharingPrices }),
     [roomSharing, sharingPrices]
@@ -206,15 +211,17 @@ export function StepServices({
           >
             {ROOM_SHARING_OPTIONS.map((option) => {
               const active = roomSharing === option.value;
+              const tooBig = option.value > maxSharing;
               return (
                 <button
                   key={option.value}
                   type="button"
                   role="radio"
                   aria-checked={active}
+                  disabled={tooBig}
                   onClick={() => setRoomSharing(option.value)}
                   className={cn(
-                    "flex flex-col rounded-2xl border-2 px-4 py-3 text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    "flex flex-col rounded-2xl border-2 px-4 py-3 text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-45",
                     active
                       ? "border-primary bg-primary/[0.04] shadow-sm"
                       : "border-border bg-card hover:border-primary/40"

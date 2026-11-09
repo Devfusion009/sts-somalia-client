@@ -110,10 +110,16 @@ function isRedirectError(error: unknown): boolean {
   );
 }
 
+/** Fields prefixed `c_<customerId>__` belong to that customer's booking only. */
 function cloneFor(formData: FormData, customerId: string): FormData {
   const clone = new FormData();
+  const own = `c_${customerId}__`;
   for (const [key, value] of formData.entries()) {
     if (key === "agencyCustomerId" || key === "desk") continue;
+    if (key.startsWith("c_")) {
+      if (key.startsWith(own)) clone.append(key.slice(own.length), value);
+      continue;
+    }
     clone.append(key, value);
   }
   clone.set("agencyCustomerId", customerId);

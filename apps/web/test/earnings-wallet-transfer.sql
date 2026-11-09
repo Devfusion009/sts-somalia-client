@@ -7,6 +7,8 @@ begin
 end $$;
 create trigger reject_test_earnings_settlement before insert on agency_commission_payouts
   for each row execute function pg_temp.reject_test_earnings_settlement();
+-- Fixtures approve demo entries directly; the travel-date guard is covered separately.
+alter table agency_commission_entries disable trigger agency_commission_entries_after_service;
 do $$
 declare
   v_agency uuid;

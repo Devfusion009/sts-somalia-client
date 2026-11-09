@@ -125,7 +125,7 @@ export function CheckoutForm({
 
   return (
     <form action={handleSubmit} className="space-y-6">
-      {remaining < 1 - 0.005 ? null : (
+      {remaining < 1 - 0.005 || (isFirstPayment && minDeposit >= remaining) ? null : (
         <fieldset>
           <legend id="pay-amount-heading" className="font-heading text-base font-semibold">
             Amount

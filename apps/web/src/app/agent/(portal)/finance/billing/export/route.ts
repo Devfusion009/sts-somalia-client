@@ -20,7 +20,8 @@ export async function GET() {
       note: tx.note ?? "",
       amount_usd: Number(tx.amount).toFixed(2),
       balance_after_usd: Number(tx.balance_after).toFixed(2),
-    }))
+    })),
+    ["date", "type", "document_number", "order_number", "note", "amount_usd", "balance_after_usd"]
   );
 
   const filename = `wallet-statement-${new Date().toISOString().slice(0, 10)}.csv`;

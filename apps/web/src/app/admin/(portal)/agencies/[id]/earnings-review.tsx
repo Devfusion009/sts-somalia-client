@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { AlertTriangle, Banknote, Check, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +25,9 @@ type PendingEntry = {
   amount: number;
   orderNumber: string | null;
   createdAt: string;
+  /** Last service date; commission is approved only after it has passed. */
+  serviceEndsOn: string | null;
+  approvable: boolean;
 };
 
 const usd = (amount: number) => money(amount, "USD");
@@ -35,7 +39,9 @@ const usd = (amount: number) => money(amount, "USD");
  */
 export function CommissionEntryReview({ agencyId, entries }: { agencyId: string; entries: PendingEntry[] }) {
   const [state, formAction] = useActionState(reviewAgencyCommissionEntries, null);
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(entries.map((e) => e.id)));
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(entries.filter((e) => e.approvable).map((e) => e.id))
+  );
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -50,6 +56,8 @@ export function CommissionEntryReview({ agencyId, entries }: { agencyId: string;
   const selectedIds = selectedEntries.map((entry) => entry.id);
   const selectedTotal = selectedEntries.reduce((sum, entry) => sum + entry.amount, 0);
   const allSelected = selectedIds.length === entries.length;
+  const approveEntries = selectedEntries.filter((entry) => entry.approvable);
+  const approveTotal = approveEntries.reduce((sum, entry) => sum + entry.amount, 0);
 
   return (
     <div className="space-y-3">
@@ -78,6 +86,11 @@ export function CommissionEntryReview({ agencyId, entries }: { agencyId: string;
             <span className="text-xs text-muted-foreground tabular-nums">
               {format(new Date(entry.createdAt), "d MMM yyyy")}
             </span>
+            {entry.approvable ? null : (
+              <Badge variant="warning">
+                {entry.serviceEndsOn ? `Travel ends ${format(parseISO(entry.serviceEndsOn), "d MMM yyyy")}` : "Service not complete"}
+              </Badge>
+            )}
             <span className="ml-auto font-medium tabular-nums">{usd(entry.amount)}</span>
           </label>
         ))}
@@ -103,11 +116,11 @@ export function CommissionEntryReview({ agencyId, entries }: { agencyId: string;
         <form action={formAction}>
           <input type="hidden" name="agencyId" value={agencyId} />
           <input type="hidden" name="decision" value="approved" />
-          {selectedIds.map((id) => (
-            <input key={id} type="hidden" name="entryIds" value={id} />
+          {approveEntries.map((entry) => (
+            <input key={entry.id} type="hidden" name="entryIds" value={entry.id} />
           ))}
-          <SubmitButton size="sm" disabled={selectedIds.length === 0} pendingText="Approving…">
-            <Check data-icon="inline-start" /> Approve <span className="tabular-nums">{usd(selectedTotal)}</span>
+          <SubmitButton size="sm" disabled={approveEntries.length === 0} pendingText="Approving…">
+            <Check data-icon="inline-start" /> Approve <span className="tabular-nums">{usd(approveTotal)}</span>
           </SubmitButton>
         </form>
       </div>

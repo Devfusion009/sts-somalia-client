@@ -121,7 +121,8 @@ export function describeOrderItem(item: DescribableOrderItem): {
         title: booking
           ? `Flight ${booking.origin_iata} → ${booking.destination_iata}`
           : "Flight booking",
-        subtitle: booking ? format(new Date(booking.depart_at), "d MMM yyyy, HH:mm") : "",
+        // Quoted fares carry a date, not a departure time; the e-ticket has the times.
+        subtitle: booking ? format(new Date(booking.depart_at), "d MMM yyyy") : "",
         href: "/account/bookings",
       };
     }

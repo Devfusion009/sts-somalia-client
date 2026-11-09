@@ -132,7 +132,7 @@ export default async function CheckoutPage({
 
   const ROW = "flex items-baseline justify-between gap-4";
   const holdUntil = order.hold_expires_at
-    ? new Date(order.hold_expires_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+    ? new Date(order.hold_expires_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Mogadishu" })
     : null;
 
   return (
@@ -200,7 +200,10 @@ export default async function CheckoutPage({
                   Balance due by {format(parseISO(order.balance_due_at), "d MMM yyyy")}
                 </p>
               ) : null}
-              {umrahItem ? null : <p className="mt-2 text-xs text-muted-foreground">All fees are non-refundable.</p>}
+              {/* Hotel, hall and Umrah refunds follow their own cancellation rules; only visa fees are never returned. */}
+              {order.order_items.some((item) => item.item_type === "visa") ? (
+                <p className="mt-2 text-xs text-muted-foreground">All fees are non-refundable.</p>
+              ) : null}
             </div>
           </section>
         </aside>
@@ -256,7 +259,7 @@ export default async function CheckoutPage({
                   <CalendarClock />
                   <AlertTitle className="tabular-nums">
                     Seats held until{" "}
-                    {umrahSeatsHeldUntil.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                    {umrahSeatsHeldUntil.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Mogadishu" })}
                   </AlertTitle>
                 </Alert>
               ) : null}

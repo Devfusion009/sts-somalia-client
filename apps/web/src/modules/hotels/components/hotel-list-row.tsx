@@ -4,6 +4,7 @@ import { MediaPlaceholder } from "@/components/media-placeholder";
 import { HotelAmenitiesList } from "@/modules/hotels/components/hotel-amenities-list";
 import type { HotelCardData } from "@/modules/hotels/components/hotel-card";
 import styles from "@/components/marketing/travel-collection.module.css";
+import { hotelCityCountry } from "@/modules/hotels/location";
 
 export function HotelListRow({ hotel, bookingSuffix = "" }: { hotel: HotelCardData; bookingSuffix?: string }) {
   const isExternal = !!hotel.externalSource;
@@ -22,7 +23,7 @@ export function HotelListRow({ hotel, bookingSuffix = "" }: { hotel: HotelCardDa
           {hotel.bookingMode ? <span className="rounded-md bg-secondary px-2 py-1 text-[10px] font-medium text-secondary-foreground">{hotel.bookingMode === "manual" ? "Request to book" : "Online booking"}</span> : null}
         </div>
         <h3 className="font-heading text-lg leading-snug font-semibold tracking-tight sm:text-xl">{isExternal ? hotel.name : <Link href={href} target="_blank" rel="noopener noreferrer" className="rounded-sm hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">{hotel.name}</Link>}</h3>
-        <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin className="size-3.5 shrink-0" aria-hidden="true" />{hotel.city}, {hotel.country_code}</div>
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin className="size-3.5 shrink-0" aria-hidden="true" />{hotelCityCountry(hotel)}</div>
         {hotel.description ? <div className="mt-3 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{hotel.description}</div> : null}
         <HotelAmenitiesList amenities={hotel.amenities} limit={3} />
         {isExternal ? <span className="mt-2 text-[11px] text-muted-foreground">via {hotel.externalSource}</span> : null}

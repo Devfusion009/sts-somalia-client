@@ -43,9 +43,11 @@ export function formatDate(iso: string | null) {
   if (!iso) return null;
   const ms = Date.parse(iso);
   if (Number.isNaN(ms)) return null;
-  return new Date(ms).toLocaleDateString(undefined, {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso);
+  return new Date(ms).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: dateOnly ? "UTC" : "Africa/Mogadishu",
   });
 }

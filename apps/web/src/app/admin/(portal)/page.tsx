@@ -201,7 +201,7 @@ export default async function AdminDashboardPage({
       <PageHeader title="Dashboard" actions={<DateRangePicker currentKey={range.key} />} />
 
       <AdminWorkspace />
-      <FinancePriorities />
+      <Suspense fallback={null}><FinancePriorities /></Suspense>
 
       <Suspense fallback={<StatRowSkeleton />}>
         <StatsSection statsP={statsP} trendsP={trendsP} />

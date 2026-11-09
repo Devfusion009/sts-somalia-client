@@ -12,6 +12,8 @@ const ICONS = { flights: Plane, hotels: Hotel, visa: Stamp, umrah: Landmark, eve
 export function ServiceTabs({ hasCustomer }: { hasCustomer: boolean }) {
   const pathname = stripPortalPrefix(usePathname()) ?? "/";
   const serviceKey = useSearchParams().get("service");
+  // Step 2 lists the same services as cards, so the tab bar would repeat them.
+  if (hasCustomer && pathname === "/book") return null;
   return (
     <nav aria-label="Travel services" className={styles.serviceTabs}>
       {AGENT_SERVICES.map((service) => {
