@@ -102,6 +102,7 @@ export const PROVIDER_CATALOG: ProviderDefinition[] = [
       { key: "api_key", label: "API key", placeholder: "API-..." },
       { key: "store_id", label: "Store ID", plain: true, optional: true },
       { key: "hpp_key", label: "HPP key", placeholder: "HPP-...", optional: true },
+      { key: "webhook_secret", label: "Webhook signing secret", optional: true },
     ],
   },
   {

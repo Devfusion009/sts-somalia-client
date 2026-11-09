@@ -54,6 +54,7 @@ test("agent booking controls and wallet stream before slow analytics and finance
     },
     "@/lib/date-range": { resolveDateRange: () => ({ key: "30d", label: "Last 30 days", granularity: "day" }), percentChange: () => null, bucketLabel: (key) => key },
     "@/lib/money": { money: (amount) => `USD ${amount}` },
+    "@/components/portal/agent-money": load("components/portal/agent-money.tsx", {}, () => ({ __esModule: true, default: {} })),
     "@/modules/agencies/components/finance-priorities": { FinancePriorities: async () => { await finance.promise; return "Finance loaded"; } },
     "@/components/ui/page-header": { PageHeader: ({ title, meta }) => React.createElement("header", null, title, meta) },
     "@/components/portal/workspace-cover": { WorkspaceCover: ({ title }) => React.createElement("h2", null, title) },
@@ -75,14 +76,14 @@ test("agent booking controls and wallet stream before slow analytics and finance
   try {
     await shell.promise;
     assert.match(html, /Start a booking/);
-    assert.match(html, /USD 5505/);
+    assert.match(html.replace(/<[^>]*>/g, ""), /USD 5505/);
     assert.match(html, /href="\/agent\/finance\/top-up"/);
     assert.doesNotMatch(html, /Finance loaded/);
     metrics.resolve({ revenue: { current: 120, previous: 0, series: [120], currency: "USD" }, bookings: { current: 2, previous: 0, series: [2] }, earned: { current: 12, previous: 0 }, buckets: ["2026-11-09"] });
-    activity.resolve([]); onboarding.resolve({}); team.resolve(1); pending.resolve({ count: 1, amount: 75, currency: "USD" }); finance.resolve();
+    activity.resolve([]); onboarding.resolve({}); team.resolve(1); pending.resolve({ count: 1, amounts: [{ amount: 75, currency: "USD" }] }); finance.resolve();
     await ended;
-    assert.match(html, /USD 120/);
-    assert.match(html, /USD 75/);
+    assert.match(html.replace(/<[^>]*>/g, ""), /USD 120/);
+    assert.match(html.replace(/<[^>]*>/g, ""), /USD 75/);
     assert.match(html, /Finance loaded/);
     assert.deepEqual(errors, []);
   } finally {
@@ -192,3 +193,31 @@ for (const [name, source] of [
     assert.equal(invalidations, 1);
   });
 }
+
+test("agent shell does not wait for optional account switching lookups", { timeout: 3000 }, async () => {
+  const accountLookup = deferred();
+  let shellProps;
+  const { default: Layout } = load("app/agent/(portal)/layout.tsx", {
+    "@/lib/auth/session": { requireUserForPortal: async () => ({ id: "agent", full_name: "Amina", email: "agent@sts.test" }) },
+    "@/modules/agencies/queries": { getMyAgency: async () => ({ agency: { id: "own", name: "Agency", status: "active" }, roleInAgency: "owner" }) },
+    "@/modules/agencies/logo": { agencyLogoUrl: () => null },
+    "@/modules/identity/queries": { getMyPartnerContexts: () => accountLookup.promise },
+    "@/modules/admin/partner-accounts": { getAgencyOnboardingChecklist: async () => null },
+    "@/modules/agencies/services": { AGENT_SERVICES: [] },
+    "@/components/portal/portal-shell": { PortalShell: (props) => { shellProps = props; return React.createElement("main", null, props.children); } },
+    "next/link": { __esModule: true, default: ({ children }) => React.createElement("a", null, children) },
+  }, (id) => id.endsWith('.css') ? { __esModule: true, default: {} } : UI);
+  try {
+    const element = await Layout({ children: "Booking page ready" });
+    const output = new PassThrough();
+    let html = '';
+    output.on('data', (chunk) => { html += chunk.toString(); });
+    const ended = new Promise((resolve) => output.on('end', resolve));
+    let stream;
+    stream = renderToPipeableStream(element, { onShellReady: () => stream.pipe(output) });
+    await ended;
+    assert.match(html, /Booking page ready/);
+    assert.equal(typeof shellProps.contexts.then, 'function');
+    assert.equal(shellProps.brandName, 'Agency');
+  } finally { accountLookup.resolve([]); }
+});

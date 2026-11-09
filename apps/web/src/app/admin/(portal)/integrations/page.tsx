@@ -111,7 +111,7 @@ export default async function AdminIntegrationsPage({ searchParams }: { searchPa
       <PageHeader title="Integrations" />
 
       <OperationsMetrics items={[
-        { label: "Live providers", value: liveCount(integrations), tone: "primary" },
+        { label: "Active providers", value: liveCount(integrations), tone: "primary" },
         { label: "Saved · inactive", value: integrations.filter((i) => i.hasCredentials && !i.isActive).length, tone: "warning" },
         { label: "Not connected", value: integrations.filter((i) => !i.hasCredentials).length },
       ]} />

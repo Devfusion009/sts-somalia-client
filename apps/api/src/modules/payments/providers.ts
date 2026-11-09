@@ -1,3 +1,5 @@
+import { chargeWaafi, type WaafiAttempt } from "@sts/shared-types/dist/waafi-server";
+import { createAdminClient } from "../../infra/supabase/supabase-clients";
 import type { PaymentMethodDef, InitiationResult } from "@sts/shared-types";
 import {
   getPaymentGateways,
@@ -122,100 +124,26 @@ async function initiateRazorpay(input: InitiationInput, gateway: RazorpayGateway
   return { type: "redirect", url: link.short_url, providerRef: link.id };
 }
 
-/**
- * WaafiPay hosted payment page: the customer pays on WaafiPay's page, then
- * returns to the success URL, where WaafiService re-reads the result from
- * WaafiPay before settling. The return URL query is never trusted.
- */
-async function initiateWaafiHpp(
-  input: InitiationInput,
-  gateway: WaafiGateway & { hpp: NonNullable<WaafiGateway["hpp"]> },
-  siteUrl: string
-): Promise<InitiationResult> {
-  const returnUrl = `${siteUrl}/checkout/${input.orderId}/success?order_id=${input.paymentId}&gateway=waafi`;
-  const res = await fetch(gateway.apiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      schemaVersion: "1.0",
-      requestId: input.paymentId,
-      timestamp: new Date().toISOString(),
-      channelName: "WEB",
-      serviceName: "HPP_PURCHASE",
-      serviceParams: {
-        merchantUid: gateway.merchantUid,
-        storeId: gateway.hpp.storeId,
-        hppKey: gateway.hpp.hppKey,
-        hppSuccessCallbackUrl: returnUrl,
-        hppFailureCallbackUrl: returnUrl,
-        hppRespDataFormat: 2,
-        payerInfo: { subscriptionId: input.payerPhone?.replace(/[+\s-]/g, "") },
-        paymentMethod: "MWALLET_ACCOUNT",
-        transactionInfo: {
-          referenceId: input.paymentId,
-          invoiceId: input.orderNumber,
-          amount: input.amount.toFixed(2),
-          currency: input.currency,
-          description: input.description,
-        },
-      },
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
-  const payload = (await res.json().catch(() => ({}))) as {
-    responseCode?: string;
-    responseMsg?: string;
-    params?: { hppUrl?: string; hppRequestId?: string; orderId?: string };
-  };
-  if (!res.ok || payload.responseCode !== "2001" || !payload.params?.hppUrl) {
-    return { type: "error", message: "Could not start the payment. Try again or choose another method." };
-  }
-  return { type: "redirect", url: payload.params.hppUrl, providerRef: payload.params.hppRequestId ?? payload.params.orderId };
-}
-
 async function initiateWaafi(input: InitiationInput, gateway: WaafiGateway, siteUrl: string): Promise<InitiationResult> {
-  if (gateway.hpp) return initiateWaafiHpp(input, { ...gateway, hpp: gateway.hpp }, siteUrl);
-  const body = {
-    schemaVersion: "1.0",
-    requestId: input.paymentId,
-    timestamp: new Date().toISOString(),
-    channelName: "WEB",
-    serviceName: "API_PURCHASE",
-    serviceParams: {
-      merchantUid: gateway.merchantUid,
-      apiUserId: gateway.apiUserId,
-      apiKey: gateway.apiKey,
-      paymentMethod: "MWALLET_ACCOUNT",
-      payerInfo: { accountNo: input.payerPhone?.replace(/[+\s-]/g, "") },
-      transactionInfo: {
-        referenceId: input.orderNumber,
-        invoiceId: input.paymentId,
-        amount: input.amount.toFixed(2),
-        currency: input.currency,
-        description: input.description,
-      },
+  const admin = createAdminClient();
+  return chargeWaafi({
+    referenceId: input.paymentId, amount: input.amount, currency: input.currency,
+    description: input.description, payerPhone: input.payerPhone,
+    successUrl: `${siteUrl}/checkout/${input.orderId}/success?order_id=${input.paymentId}&gateway=waafi`, cancelUrl: `${siteUrl}/checkout/${input.orderId}/success?order_id=${input.paymentId}&gateway=waafi`,
+  }, gateway, {
+    async begin() {
+      const { data, error } = await admin.rpc("begin_waafi_attempt", {
+        p_reference_id: input.paymentId, p_order_id: input.orderId, p_topup_id: null,
+        p_environment: gateway.environment, p_merchant_uid: gateway.merchantUid,
+      });
+      if (error) throw new Error("Payment attempt could not be reserved.");
+      return data as unknown as WaafiAttempt;
     },
-  };
-
-  const res = await fetch(gateway.apiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    async save(result) {
+      const { error } = await admin.rpc("record_waafi_attempt", { p_reference_id: input.paymentId, p_result: result });
+      if (error) throw new Error("Payment result could not be recorded.");
+    },
   });
-  const payload = (await res.json()) as {
-    responseCode?: string;
-    responseMsg?: string;
-    params?: { transactionId?: string; state?: string };
-  };
-  // A successful API request is not proof that funds were captured.
-  const state = payload.params?.state?.toUpperCase();
-  if (res.ok && payload.responseCode === "2001" && state === "APPROVED" && payload.params?.transactionId) {
-    return { type: "success", providerRef: payload.params.transactionId };
-  }
-  if (res.ok && payload.responseCode === "2001" && !["DECLINED", "FAILED", "CANCELLED", "EXPIRED"].includes(state ?? "")) {
-    return { type: "instructions", instructions: "Payment confirmation pending.", providerRef: payload.params?.transactionId };
-  }
-  return { type: "error", message: payload.responseMsg ?? "The mobile money payment was not approved." };
 }
 
 async function initiateEdahab(input: InitiationInput, gateway: EdahabGateway): Promise<InitiationResult> {

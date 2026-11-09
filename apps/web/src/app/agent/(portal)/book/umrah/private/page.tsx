@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -96,7 +97,7 @@ export default async function AgentPrivateUmrahLauncherPage({
               />
               <StatRailItem
                 label="Subtotal"
-                value={draft.subtotal > 0 ? formatMoney(draft.subtotal, draft.currency) : "—"}
+                value={draft.subtotal > 0 ? <AgentMoney value={formatMoney(draft.subtotal, draft.currency)} /> : "—"}
               />
             </StatRail>
           </CardContent>

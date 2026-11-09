@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, use, useState } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -71,7 +71,7 @@ export function PortalAccountMenu({
   email: string | null;
   roleLabel: string;
   accountCode?: string | null;
-  contexts: PartnerContext[];
+  contexts: PartnerContext[] | Promise<PartnerContext[]>;
   isPlatformAdmin: boolean;
   showPersonalAccount: boolean;
   info: PortalMenuInfo;
@@ -142,39 +142,9 @@ export function PortalAccountMenu({
           </div>
 
           <div className="p-1.5">
-            {showPersonalAccount || isPlatformAdmin || contexts.length > 0 ? (
-              <>
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="px-2">Switch account</DropdownMenuLabel>
-                </DropdownMenuGroup>
-                {showPersonalAccount ? (
-                  <DropdownMenuItem render={<Link href={rootOrigin() ? `${rootOrigin()}/account` : "/account"} />} className="gap-2.5 rounded-lg py-2">
-                    <User /> Personal account
-                  </DropdownMenuItem>
-                ) : null}
-                {isPlatformAdmin ? (
-                  <DropdownMenuItem render={<Link href={portalHref("admin")} />} className="gap-2.5 rounded-lg py-2">
-                    <ShieldCheck /> Admin Console
-                  </DropdownMenuItem>
-                ) : null}
-                {contexts.map((c) => (
-                  <DropdownMenuItem key={c.type} render={<Link href={c.href} />} className="gap-2.5 rounded-lg py-2">
-                    <LayoutDashboard />
-                    <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                      <span className="truncate">
-                        {c.name} <span className="text-muted-foreground">· {c.label}</span>
-                      </span>
-                      {c.status && c.status !== "live" ? (
-                        <Badge variant={statusBadgeVariant(c.status)} className="shrink-0 capitalize">
-                          {c.status.replace(/_/g, " ")}
-                        </Badge>
-                      ) : null}
-                    </span>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-              </>
-            ) : null}
+            <Suspense fallback={null}>
+              <AccountSwitchItems contexts={contexts} showPersonalAccount={showPersonalAccount} isPlatformAdmin={isPlatformAdmin} />
+            </Suspense>
 
             {info.securityHref ? (
               <DropdownMenuItem render={<Link href={info.securityHref} />} className="gap-2.5 rounded-lg py-2">
@@ -300,4 +270,45 @@ export function PortalAccountMenu({
       </Dialog>
     </>
   );
+}
+
+function AccountSwitchItems({ contexts, showPersonalAccount, isPlatformAdmin }: {
+  contexts: PartnerContext[] | Promise<PartnerContext[]>;
+  showPersonalAccount: boolean;
+  isPlatformAdmin: boolean;
+}) {
+  const resolved = Array.isArray(contexts) ? contexts : use(contexts);
+  return showPersonalAccount || isPlatformAdmin || resolved.length > 0 ? (
+    <>
+      <DropdownMenuGroup>
+        <DropdownMenuLabel className="px-2">Switch account</DropdownMenuLabel>
+      </DropdownMenuGroup>
+      {showPersonalAccount ? (
+        <DropdownMenuItem render={<Link href={rootOrigin() ? `${rootOrigin()}/account` : "/account"} />} className="gap-2.5 rounded-lg py-2">
+          <User /> Personal account
+        </DropdownMenuItem>
+      ) : null}
+      {isPlatformAdmin ? (
+        <DropdownMenuItem render={<Link href={portalHref("admin")} />} className="gap-2.5 rounded-lg py-2">
+          <ShieldCheck /> Admin Console
+        </DropdownMenuItem>
+      ) : null}
+      {resolved.map((c) => (
+        <DropdownMenuItem key={c.type} render={<Link href={c.href} />} className="gap-2.5 rounded-lg py-2">
+          <LayoutDashboard />
+          <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+            <span className="truncate">
+              {c.name} <span className="text-muted-foreground">· {c.label}</span>
+            </span>
+            {c.status && c.status !== "live" ? (
+              <Badge variant={statusBadgeVariant(c.status)} className="shrink-0 capitalize">
+                {c.status.replace(/_/g, " ")}
+              </Badge>
+            ) : null}
+          </span>
+        </DropdownMenuItem>
+      ))}
+      <DropdownMenuSeparator />
+    </>
+  ) : null;
 }

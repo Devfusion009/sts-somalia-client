@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { getActiveProviderCredentials } from "./credentials";
-import { getRedisClient } from "@/lib/redis";
+import { getRedisClient, redisCacheKey } from "@/lib/redis";
 
 /**
  * Hotelbeds Booking API — always hits the TEST/sandbox host. A freshly
@@ -36,7 +36,7 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const REDIS_KEY_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 function destinationCacheKey(countryCode: string): string {
-  return `hotelbeds:destinations:${countryCode}`;
+  return redisCacheKey(`hotelbeds:destinations:${countryCode}`);
 }
 
 async function readDestinationCache(countryCode: string): Promise<DestinationCacheEntry | null> {

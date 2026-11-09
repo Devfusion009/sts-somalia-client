@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -233,15 +234,15 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
       </div>
 
       <StatRail className={cn(balanceDueBy && "lg:grid-cols-5")}>
-        <StatRailItem label="Net" value={money(Number(order.subtotal), order.currency)} />
-        <StatRailItem label="Your margin" value={money(Number(order.markup_amount ?? 0), order.currency)} />
+        <StatRailItem label="Net" value={<AgentMoney value={money(Number(order.subtotal), order.currency)} />} />
+        <StatRailItem label="Your margin" value={<AgentMoney value={money(Number(order.markup_amount ?? 0), order.currency)} />} />
         <StatRailItem
           label="Customer pays"
-          value={awaitingPrice ? "On request" : money(total, order.currency)}
+          value={awaitingPrice ? "On request" : <AgentMoney value={money(total, order.currency)} />}
         />
         <StatRailItem
           label="Balance"
-          value={awaitingPrice ? "On request" : money(balance, order.currency)}
+          value={awaitingPrice ? "On request" : <AgentMoney value={money(balance, order.currency)} />}
           tone={!awaitingPrice && balance > 0 && PAYABLE.includes(order.status) ? "warn" : undefined}
         />
         {balanceDueBy ? <StatRailItem label="Balance due by" value={balanceDueBy} tone="warn" /> : null}
@@ -282,10 +283,10 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
                     ) : null}
                   </div>
                   <div className="shrink-0 text-right text-sm tabular-nums">
-                    <p className="font-medium">{money(Number(item.total_price), order.currency)}</p>
+                    <p className="font-medium">{<AgentMoney value={money(Number(item.total_price), order.currency)} />}</p>
                     {item.quantity > 1 ? (
                       <p className="text-xs text-muted-foreground">
-                        {item.quantity} × {money(Number(item.unit_price), order.currency)}
+                        {item.quantity} × {<AgentMoney value={money(Number(item.unit_price), order.currency)} />}
                       </p>
                     ) : null}
                   </div>
@@ -487,7 +488,7 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
                       </Badge>
                     </TableCell>
                     <TableCell numeric className="text-sm font-medium">
-                      {money(Number(payment.amount), payment.currency)}
+                      {<AgentMoney value={money(Number(payment.amount), payment.currency)} />}
                     </TableCell>
                   </TableRow>
                 ))}

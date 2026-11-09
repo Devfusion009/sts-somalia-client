@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import { ChevronRight } from "lucide-react";
 import { money } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -49,7 +50,7 @@ export function EarningsPipeline({
               TONE_STYLES[stage.tone]
             )}
           >
-            {money(stage.amount, "USD")}
+            {<AgentMoney value={money(stage.amount, "USD")} />}
           </p>
           {i < stages.length - 1 ? (
             <ChevronRight

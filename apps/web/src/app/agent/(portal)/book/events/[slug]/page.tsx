@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -87,7 +88,7 @@ export default async function AgentVenueBookingPage({
               <div className="flex items-baseline justify-between gap-3 pb-2">
                 <dt className="text-muted-foreground">Rate</dt>
                 <dd className="text-right font-medium tabular-nums">
-                  {price > 0 ? money(price, venue.currency) : "On request"}
+                  {price > 0 ? <AgentMoney value={money(price, venue.currency)} /> : "On request"}
                 </dd>
               </div>
               {price > 0 ? (

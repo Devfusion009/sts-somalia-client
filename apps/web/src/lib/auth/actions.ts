@@ -16,6 +16,7 @@ import { consumeRecoveryCode } from "@/lib/auth/recovery-codes";
 export type ActionState = {
   error: string | null;
   destination?: string;
+  paymentAttemptStatus?: "pending" | "failed";
   orderId?: string;
 } | null;
 

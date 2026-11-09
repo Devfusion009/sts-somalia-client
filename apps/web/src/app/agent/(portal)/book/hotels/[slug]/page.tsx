@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import { notFound, redirect } from "next/navigation";
 import { BedDouble, Star } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
@@ -135,7 +136,7 @@ export default async function AgentHotelRoomsPage({
                     </TableCell>
                     <TableCell numeric className="text-sm font-medium">
                       {room.base_price > 0 ? (
-                        money(Number(room.base_price), room.currency)
+                        <AgentMoney value={money(Number(room.base_price), room.currency)} />
                       ) : (
                         <span className="font-normal text-muted-foreground">On request</span>
                       )}

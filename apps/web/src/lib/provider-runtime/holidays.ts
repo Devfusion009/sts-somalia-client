@@ -1,4 +1,6 @@
 import "server-only";
+import { createHash } from "node:crypto";
+import { cachedRead } from "@/lib/redis";
 
 /**
  * Public holidays for the admin Booking Calendar — merges two free, keyless
@@ -31,24 +33,21 @@ const ISLAMIC_HOLIDAYS_API_URL = process.env.ISLAMIC_HOLIDAYS_API_URL ?? "https:
 // one must cost the holiday markers, not the whole page: on timeout the
 // existing catch returns no holidays for that source.
 const EXTERNAL_TIMEOUT_MS = 2500;
+const HOLIDAY_TTL_SECONDS = 86400;
+const providerKey = (url: string) => createHash("sha256").update(url).digest("hex").slice(0, 12);
 
 type NagerHoliday = { date: string; name: string; localName: string };
 
 async function fetchCivilHolidaysForYear(year: number): Promise<PublicHoliday[]> {
-  try {
+  return cachedRead(`holidays:civil:${providerKey(HOLIDAYS_API_URL)}:${HOLIDAYS_COUNTRY_CODE}:${year}`, HOLIDAY_TTL_SECONDS, async () => {
     const res = await fetch(`${HOLIDAYS_API_URL}/PublicHolidays/${year}/${HOLIDAYS_COUNTRY_CODE}`, {
-      // Holidays for a given year never change once published — a day of
-      // staleness is a non-issue, and this keeps a month of calendar page
-      // loads from hammering a free public API.
-      next: { revalidate: 60 * 60 * 24 },
+      cache: "no-store",
       signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS),
     });
-    if (!res.ok) return [];
+    if (!res.ok) throw new Error("Holiday provider is unavailable.");
     const payload = (await res.json()) as NagerHoliday[];
     return payload.map((h) => ({ date: h.date, name: h.name, localName: h.localName }));
-  } catch {
-    return [];
-  }
+  }).catch(() => []);
 }
 
 // Aladhan's per-day "holidays" field is sourced from a Sufi/Naqshbandi
@@ -73,12 +72,12 @@ function parseAladhanDate(ddmmyyyy: string): string | null {
 }
 
 async function fetchIslamicHolidaysForMonth(year: number, month: number): Promise<PublicHoliday[]> {
-  try {
+  return cachedRead(`holidays:islamic:${providerKey(ISLAMIC_HOLIDAYS_API_URL)}:${year}:${month}`, HOLIDAY_TTL_SECONDS, async () => {
     const res = await fetch(`${ISLAMIC_HOLIDAYS_API_URL}/gToHCalendar/${month}/${year}`, {
-      next: { revalidate: 60 * 60 * 24 },
+      cache: "no-store",
       signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS),
     });
-    if (!res.ok) return [];
+    if (!res.ok) throw new Error("Holiday provider is unavailable.");
     const payload = (await res.json()) as { data?: AladhanCalendarDay[] };
 
     const out: PublicHoliday[] = [];
@@ -93,9 +92,7 @@ async function fetchIslamicHolidaysForMonth(year: number, month: number): Promis
       }
     }
     return out;
-  } catch {
-    return [];
-  }
+  }).catch(() => []);
 }
 
 /** Every distinct (year, month) the range [from, to] (yyyy-mm-dd) touches. */

@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PartyPopper, Search } from "lucide-react";
@@ -102,7 +103,7 @@ export default async function AgentEventDeskPage({
                     <TableCell numeric className="text-sm font-medium">
                       {price > 0 ? (
                         <>
-                          {money(price, venue.currency)}
+                          {<AgentMoney value={money(price, venue.currency)} />}
                           {venue.price_unit === "per_person" ? (
                             <span className="ml-1 font-normal text-muted-foreground">pp</span>
                           ) : null}

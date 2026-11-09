@@ -260,7 +260,15 @@ export function OnlineTopupForm({
   /** Portal path to land on once the wallet is credited (booking desk). */
   returnTo?: string;
 }) {
-  const [state, formAction] = useActionState<ActionState, FormData>(startOnlineTopup, null);
+  const attempt = useRef<{ fingerprint: string; key: string } | null>(null);
+  const [state, formAction] = useActionState<ActionState, FormData>(async (previous, data) => {
+    const fingerprint = JSON.stringify([data.get("amount"), data.get("method"), data.get("payerPhone")]);
+    if (!attempt.current || attempt.current.fingerprint !== fingerprint) attempt.current = { fingerprint, key: crypto.randomUUID() };
+    data.set("idempotencyKey", attempt.current.key);
+    const result = await startOnlineTopup(previous, data);
+    if (result?.paymentAttemptStatus === "failed") attempt.current = null;
+    return result;
+  }, null);
   const [methodId, setMethodId] = useState(methods[0]?.id ?? "");
   const selected = methods.find((m) => m.id === methodId);
   const router = useRouter();

@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
@@ -99,6 +100,7 @@ export default async function AgentCustomersPage({
               <Link href={`/agent/customers/${customer.id}`} className="block truncate text-sm font-semibold hover:text-primary">{customer.full_name}</Link>
               <span className="mt-1 block truncate text-xs text-muted-foreground">{customer.phone ?? customer.email ?? "—"}</span>
               <span className="mt-1 block text-xs text-muted-foreground tabular-nums">{customer.bookings} booking{customer.bookings === 1 ? "" : "s"}</span>
+              {customer.spent > 0 ? <span className="mt-2 block text-sm"><AgentMoney value={money(customer.spent, customer.currency)} /></span> : null}
             </div>
             <SelectCustomerButton customerId={customer.id} label="Book" redirectTo="/agent/book" />
           </li>)}
@@ -111,7 +113,7 @@ export default async function AgentCustomersPage({
                 <TableHead>Contact</TableHead>
                 <TableHead>Account</TableHead>
                 <TableHead numeric>Bookings</TableHead>
-                <TableHead numeric>Spent</TableHead>
+                <TableHead numeric className="bg-primary/5 text-primary">Spent</TableHead>
                 <TableHead numeric>Last booking</TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
@@ -126,7 +128,7 @@ export default async function AgentCustomersPage({
                     <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-primary">{customer.full_name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("")}</span>
                     <Link
                       href={`/agent/customers/${customer.id}`}
-                      className="rounded-sm font-medium outline-none hover:text-primary hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                      className="rounded-sm font-semibold outline-none hover:text-primary hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
                       {customer.full_name}
                     </Link>
@@ -146,10 +148,10 @@ export default async function AgentCustomersPage({
                     )}
                   </TableCell>
                   <TableCell numeric className="text-sm">
-                    {customer.bookings}
+                    <Badge variant="neutral" className="tabular-nums">{customer.bookings}</Badge>
                   </TableCell>
-                  <TableCell numeric className="text-sm">
-                    {customer.spent > 0 ? money(customer.spent, customer.currency) : "—"}
+                  <TableCell numeric className="bg-primary/5 text-sm">
+                    {customer.spent > 0 ? <AgentMoney value={money(customer.spent, customer.currency)} /> : "—"}
                   </TableCell>
                   <TableCell numeric className="text-sm text-muted-foreground">
                     {customer.lastBookingAt

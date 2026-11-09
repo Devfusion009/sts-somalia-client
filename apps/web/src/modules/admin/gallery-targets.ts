@@ -13,8 +13,8 @@ export const TARGETS: Record<"hotel" | "room" | "venue", GalleryTarget> = {
     table: "hotels",
     bucket: "hotel-images",
     pathPrefix: (id) => `${id}`,
-    revalidate: (id) => {
-      void invalidateCache("hotels");
+    revalidate: async (id) => {
+      await invalidateCache("hotels");
       revalidatePath(`/admin/hotels/${id}`);
       revalidatePath("/admin/hotels");
     },
@@ -23,8 +23,8 @@ export const TARGETS: Record<"hotel" | "room" | "venue", GalleryTarget> = {
     table: "hotel_rooms",
     bucket: "hotel-images",
     pathPrefix: (id) => `rooms/${id}`,
-    revalidate: () => {
-      void invalidateCache("hotels");
+    revalidate: async () => {
+      await invalidateCache("hotels");
       revalidatePath(`/admin/hotels`, "layout");
     },
   },
@@ -32,8 +32,8 @@ export const TARGETS: Record<"hotel" | "room" | "venue", GalleryTarget> = {
     table: "event_venues",
     bucket: "venue-images",
     pathPrefix: (id) => `${id}`,
-    revalidate: (id) => {
-      void invalidateCache("events");
+    revalidate: async (id) => {
+      await invalidateCache("events");
       revalidatePath(`/admin/events/${id}`);
       revalidatePath("/admin/events");
     },

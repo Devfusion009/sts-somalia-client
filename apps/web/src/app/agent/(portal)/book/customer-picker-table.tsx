@@ -73,10 +73,10 @@ export function CustomerPickerTable({ rows, redirectTo }: { rows: PickerRow[]; r
         </label>
         <ul className="divide-y divide-border border-y border-border">
           {rows.map((row) => (
-            <li key={row.id} className="flex items-center gap-3 py-4">
+            <li key={row.id} className={`flex items-center gap-3 py-4 ${selected.has(row.id) ? "bg-accent" : ""}`}>
               <Checkbox aria-label={`Select ${row.full_name}`} checked={selected.has(row.id)} onCheckedChange={() => toggle(row.id)} />
               <div className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{row.full_name}</span>
+                <span className="block truncate text-sm font-semibold">{row.full_name}</span>
                 <span className="mt-1 block truncate text-xs text-muted-foreground">{row.phone ?? row.email ?? "—"}</span>
               </div>
               <Button size="sm" variant="outline" disabled={pending} loading={pending && pendingId === row.id} onClick={() => commit([row.id], row.id)}>Select</Button>
@@ -119,7 +119,7 @@ export function CustomerPickerTable({ rows, redirectTo }: { rows: PickerRow[]; r
                   </TableCell>
                   <TableCell>
                     <span className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">{row.full_name}</span>
+                      <span className="font-semibold">{row.full_name}</span>
                       {row.profile_id ? <Badge variant="info">STS account</Badge> : null}
                     </span>
                   </TableCell>
@@ -127,7 +127,7 @@ export function CustomerPickerTable({ rows, redirectTo }: { rows: PickerRow[]; r
                     {row.phone ?? row.email ?? "—"}
                   </TableCell>
                   <TableCell numeric className="text-sm">
-                    {row.bookings}
+                    <Badge variant="neutral" className="tabular-nums">{row.bookings}</Badge>
                   </TableCell>
                   <TableCell numeric className="text-sm text-muted-foreground">
                     {row.lastBookingAt ? format(new Date(row.lastBookingAt), "d MMM yyyy") : "—"}

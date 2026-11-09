@@ -1,5 +1,8 @@
 "use client";
 
+import { AgentMoney } from "@/components/portal/agent-money";
+
+
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -50,7 +53,7 @@ export function PayBatchForm({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size="lg" className="w-full tabular-nums" />}>
-        Pay {label} · {money(amount, currency)}
+        Pay {label} · {<AgentMoney value={money(amount, currency)} />}
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
@@ -60,16 +63,16 @@ export function PayBatchForm({
         <dl className="space-y-2 text-sm">
           <div className="flex items-baseline justify-between gap-3">
             <dt className="text-muted-foreground">Available to spend</dt>
-            <dd className="tabular-nums">{money(available, currency)}</dd>
+            <dd className="tabular-nums">{<AgentMoney value={money(available, currency)} />}</dd>
           </div>
           <div className="flex items-baseline justify-between gap-3">
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className="tabular-nums">− {money(amount, currency)}</dd>
+            <dd className="tabular-nums">− {<AgentMoney value={money(amount, currency)} />}</dd>
           </div>
           <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2">
             <dt className="font-medium">Available after</dt>
             <dd className="font-heading text-base font-semibold tabular-nums text-primary">
-              {money(available - amount, currency)}
+              {<AgentMoney value={money(available - amount, currency)} />}
             </dd>
           </div>
         </dl>

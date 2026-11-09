@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import { randomUUID } from "node:crypto";
 import { TransferEarningsForm } from "./transfer-earnings-form";
 import type { Metadata } from "next";
@@ -90,13 +91,13 @@ export default async function AgentFinancePage() {
             value={
               <span className={negative ? "text-destructive" : undefined}>
                 {negative ? "−" : ""}
-                {money(Math.abs(wallet.balance), "USD")}
+                {<AgentMoney value={money(Math.abs(wallet.balance), "USD")} />}
               </span>
             }
             sub={negative ? "Owed to STS" : undefined}
           />
-          <StatStripItem label="Credit limit" value={money(wallet.creditLimit, "USD")} />
-          <StatStripItem label="Available to spend" value={money(wallet.available, "USD")} tone="primary" />
+          <StatStripItem label="Credit limit" value={<AgentMoney value={money(wallet.creditLimit, "USD")} />} />
+          <StatStripItem label="Available to spend" value={<AgentMoney value={money(wallet.available, "USD")} />} tone="primary" />
         </StatStrip>
       </section>
 
@@ -124,7 +125,7 @@ export default async function AgentFinancePage() {
                 {openRequest ? (
                   <dd className="flex flex-wrap items-center gap-2">
                     <span className="font-heading text-lg font-semibold tabular-nums">
-                      {money(Number(openRequest.amount), "USD")}
+                      {<AgentMoney value={money(Number(openRequest.amount), "USD")} />}
                     </span>
                     <Badge
                       variant={statusBadgeVariant(openRequest.status, REQUEST_VARIANT_OVERRIDES)}
@@ -145,7 +146,7 @@ export default async function AgentFinancePage() {
                 {lastPayout ? (
                   <dd>
                     <span className="font-heading text-lg font-semibold tabular-nums">
-                      {money(Number(lastPayout.amount), "USD")}
+                      {<AgentMoney value={money(Number(lastPayout.amount), "USD")} />}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground tabular-nums">
                       {format(new Date(lastPayout.paid_at), "d MMM yyyy")}

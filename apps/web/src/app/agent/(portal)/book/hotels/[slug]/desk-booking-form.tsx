@@ -1,5 +1,8 @@
 "use client";
 
+import { AgentMoney } from "@/components/portal/agent-money";
+
+
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -209,11 +212,11 @@ export function DeskBookingForm({
                 <>
                   <div className="flex items-baseline justify-between gap-3">
                     <dt className="text-muted-foreground tabular-nums">Net · {nightsLabel}</dt>
-                    <dd className="tabular-nums">{money(net, room.currency)}</dd>
+                    <dd className="tabular-nums">{<AgentMoney value={money(net, room.currency)} />}</dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
                     <dt className="text-muted-foreground">Your margin</dt>
-                    <dd className="tabular-nums">{money(margin, room.currency)}</dd>
+                    <dd className="tabular-nums">{<AgentMoney value={money(margin, room.currency)} />}</dd>
                   </div>
                   <div
                     className={cn(
@@ -223,19 +226,19 @@ export function DeskBookingForm({
                   >
                     <dt>{isGroup ? "Per customer" : "Customer pays"}</dt>
                     <dd className={cn("tabular-nums", !isGroup && "font-heading text-base")}>
-                      {money(customerPays, room.currency)}
+                      {<AgentMoney value={money(customerPays, room.currency)} />}
                     </dd>
                   </div>
                   {isGroup ? (
                     <div className="flex items-baseline justify-between gap-3 border-t border-border pt-1.5 font-semibold">
                       <dt className="tabular-nums">Total · {customerCount} customers</dt>
-                      <dd className="font-heading text-base tabular-nums">{money(grandTotal, room.currency)}</dd>
+                      <dd className="font-heading text-base tabular-nums">{<AgentMoney value={money(grandTotal, room.currency)} />}</dd>
                     </div>
                   ) : null}
                   {shortBy > 0 ? (
                     <div className="flex items-baseline justify-between gap-3 border-t border-border pt-1.5 text-destructive">
                       <dt className="font-medium">Short by</dt>
-                      <dd className="font-semibold tabular-nums">{money(shortBy, room.currency)}</dd>
+                      <dd className="font-semibold tabular-nums">{<AgentMoney value={money(shortBy, room.currency)} />}</dd>
                     </div>
                   ) : null}
                 </>

@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
@@ -69,7 +70,7 @@ export default async function AgentRefundsPage({ searchParams }: { searchParams:
                     {req.reason}
                   </TableCell>
                   <TableCell numeric className="font-medium">
-                    {money(Number(req.amount), req.currency)}
+                    {<AgentMoney value={money(Number(req.amount), req.currency)} />}
                   </TableCell>
                   <TableCell>
                     <Badge variant={statusBadgeVariant(req.status)} className="capitalize">

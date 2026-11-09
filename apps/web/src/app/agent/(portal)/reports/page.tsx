@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
@@ -127,16 +128,16 @@ export default async function AgentReportsPage({
       <StatStrip>
         <StatStripItem
           label="Total earned"
-          value={usd(report.earnedTotal)}
+          value={<AgentMoney value={usd(report.earnedTotal)} />}
           sub={`${report.earnedCount} settled ${report.earnedCount === 1 ? "booking" : "bookings"}`}
         />
-        <StatStripItem label="Earned this month" value={usd(report.earnedThisMonth)} sub={format(new Date(), "MMMM yyyy")} />
+        <StatStripItem label="Earned this month" value={<AgentMoney value={usd(report.earnedThisMonth)} />} sub={format(new Date(), "MMMM yyyy")} />
         <StatStripItem
           label="In review by STS"
-          value={usd(summary.inReview)}
+          value={<AgentMoney value={usd(summary.inReview)} />}
           tone={summary.inReview > 0 ? "warn" : undefined}
         />
-        <StatStripItem label="Available to withdraw" value={usd(summary.available)} tone="primary" />
+        <StatStripItem label="Available to withdraw" value={<AgentMoney value={usd(summary.available)} />} tone="primary" />
       </StatStrip>
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -165,7 +166,7 @@ export default async function AgentReportsPage({
                       <TableCell className="font-medium">{format(new Date(`${row.month}-01`), "MMM yyyy")}</TableCell>
                       <TableCell numeric>{row.bookings}</TableCell>
                       <TableCell numeric className="font-medium">
-                        {usd(row.total)}
+                        {<AgentMoney value={usd(row.total)} />}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -200,7 +201,7 @@ export default async function AgentReportsPage({
                     <TableHead numeric>Rate</TableHead>
                     <TableHead numeric>Commission</TableHead>
                     <TableHead numeric>Markup</TableHead>
-                    <TableHead numeric>Total</TableHead>
+                    <TableHead numeric className="bg-primary/5 text-primary">Total</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -214,10 +215,10 @@ export default async function AgentReportsPage({
                       <TableCell numeric className="text-muted-foreground">
                         {entry.rate_applied}%
                       </TableCell>
-                      <TableCell numeric>{usd(Number(entry.commission_amount))}</TableCell>
-                      <TableCell numeric>{usd(Number(entry.markup_amount))}</TableCell>
-                      <TableCell numeric className="font-medium">
-                        {usd(Number(entry.amount))}
+                      <TableCell numeric>{<AgentMoney value={usd(Number(entry.commission_amount))} />}</TableCell>
+                      <TableCell numeric>{<AgentMoney value={usd(Number(entry.markup_amount))} />}</TableCell>
+                      <TableCell numeric className="bg-primary/5 font-semibold">
+                        {<AgentMoney value={usd(Number(entry.amount))} />}
                       </TableCell>
                       <TableCell>
                         <Badge variant={statusBadgeVariant(entry.status, ENTRY_STATUS_VARIANT)} className="capitalize">
@@ -267,7 +268,7 @@ export default async function AgentReportsPage({
                         : "—"}
                     </TableCell>
                     <TableCell numeric className="font-medium">
-                      {usd(Number(payout.amount))}
+                      {<AgentMoney value={usd(Number(payout.amount))} />}
                     </TableCell>
                   </TableRow>
                 ))}

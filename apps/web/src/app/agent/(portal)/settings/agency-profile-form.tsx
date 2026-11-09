@@ -39,7 +39,7 @@ export function AgencyProfileForm({
             <FieldLabel htmlFor="name">
               Agency name <span className="text-destructive">*</span>
             </FieldLabel>
-            <Input id="name" name="name" defaultValue={name} required />
+            <Input id="name" name="name" autoComplete="organization" defaultValue={name} className="font-semibold" required />
           </Field>
           <Field>
             <FieldLabel htmlFor="legalName">Legal name</FieldLabel>
@@ -47,7 +47,7 @@ export function AgencyProfileForm({
           </Field>
           <Field>
             <FieldLabel htmlFor="registrationNumber">Registration number</FieldLabel>
-            <Input id="registrationNumber" name="registrationNumber" defaultValue={registrationNumber ?? ""} />
+            <Input id="registrationNumber" name="registrationNumber" defaultValue={registrationNumber ?? ""} className="font-mono tracking-wide" />
           </Field>
           <Field>
             <FieldLabel htmlFor="countryCode">Country code</FieldLabel>
@@ -57,26 +57,27 @@ export function AgencyProfileForm({
               defaultValue={countryCode ?? ""}
               placeholder="e.g. SO"
               maxLength={2}
-              className="uppercase"
+              autoComplete="country"
+              className="font-semibold tracking-widest uppercase"
             />
           </Field>
           <Field>
             <FieldLabel htmlFor="contactEmail">
               Contact email <span className="text-destructive">*</span>
             </FieldLabel>
-            <Input id="contactEmail" name="contactEmail" type="email" defaultValue={contactEmail} required />
+            <Input id="contactEmail" name="contactEmail" type="email" autoComplete="email" defaultValue={contactEmail} required />
           </Field>
           <Field>
             <FieldLabel htmlFor="contactPhone">Contact phone</FieldLabel>
-            <Input id="contactPhone" name="contactPhone" type="tel" defaultValue={contactPhone ?? ""} />
+            <Input id="contactPhone" name="contactPhone" type="tel" autoComplete="tel" defaultValue={contactPhone ?? ""} />
           </Field>
           <Field>
             <FieldLabel htmlFor="website">Website</FieldLabel>
-            <Input id="website" name="website" type="url" defaultValue={website ?? ""} placeholder="https://" />
+            <Input id="website" name="website" type="url" autoComplete="url" defaultValue={website ?? ""} placeholder="https://" />
           </Field>
           <Field>
             <FieldLabel htmlFor="address">Office address</FieldLabel>
-            <Input id="address" name="address" defaultValue={address ?? ""} />
+            <Input id="address" name="address" autoComplete="street-address" defaultValue={address ?? ""} />
           </Field>
           <Field className="sm:col-span-2">
             <FieldLabel htmlFor="about">About the agency</FieldLabel>

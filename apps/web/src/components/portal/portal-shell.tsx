@@ -323,7 +323,7 @@ export function PortalShell({
   profileName: string | null;
   profileEmail: string | null;
   /** Every other partner identity (and "Personal Account") this profile can switch into — same list everywhere, see getMyPartnerContexts(). */
-  contexts?: PartnerContext[];
+  contexts?: PartnerContext[] | Promise<PartnerContext[]>;
   /** Short identifier shown with the role in the account menu — the agent portal shows "agent code · username". */
   accountCode?: string | null;
   /** Adds an "Admin Console" switch item — is_platform_admin is a separate flag from `contexts`, which only covers business/partner kinds. */

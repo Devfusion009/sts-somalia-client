@@ -1,3 +1,4 @@
+import { resolveWaafiConfig, waafiDeployment, type WaafiConfig } from "@sts/shared-types/dist/waafi-server";
 import { createAdminClient } from "./supabase/supabase-clients";
 import { decryptCredentials } from "./provider-credentials/crypto";
 import { env } from "../config/env";
@@ -13,14 +14,7 @@ import { env } from "../config/env";
 
 export type StripeGateway = { secretKey: string; webhookSecret: string | null };
 export type RazorpayGateway = { keyId: string; keySecret: string; webhookSecret: string | null };
-export type WaafiGateway = {
-  merchantUid: string;
-  apiUserId: string;
-  apiKey: string;
-  apiUrl: string;
-  /** Hosted payment page credentials. Null when only the direct wallet API is configured. */
-  hpp: { storeId: string; hppKey: string } | null;
-};
+export type WaafiGateway = WaafiConfig;
 export type EdahabGateway = { apiKey: string; agentCode: string; apiUrl: string };
 /** Sifalo Pay: Somali mobile money (EVC Plus, ZAAD, Sahal, eDahab, Premier Wallet) and Visa/Mastercard behind one hosted checkout. */
 export type SifaloGateway = {
@@ -47,20 +41,21 @@ export type PaymentGateways = {
 
 const bool = (v: string | undefined) => v === "true" || v === "1";
 
-async function activeCredentials(): Promise<Record<string, Record<string, string>>> {
+async function activeCredentials(): Promise<Record<string, Record<string, string> | null>> {
   const admin = createAdminClient();
-  const { data } = await admin
+  const { data, error } = await admin
     .from("platform_api_integrations")
-    .select("provider_key, credentials_encrypted")
-    .eq("category", "payments")
-    .eq("is_active", true);
+    .select("provider_key, credentials_encrypted, is_active")
+    .eq("category", "payments").abortSignal(AbortSignal.timeout(5000));
+  if (error) throw new Error("Payment credentials are unavailable.");
 
-  const out: Record<string, Record<string, string>> = {};
+  const out: Record<string, Record<string, string> | null> = {};
   for (const row of data ?? []) {
-    if (!row.credentials_encrypted) continue;
+    if (!row.is_active || !row.credentials_encrypted) { out[row.provider_key] = null; continue; }
     try {
       out[row.provider_key] = decryptCredentials(row.credentials_encrypted);
     } catch {
+      out[row.provider_key] = null;
       // Treated as not connected rather than failing checkout.
     }
   }
@@ -89,7 +84,7 @@ async function bankTransfer(): Promise<BankTransferDetails> {
 
 export async function getPaymentGateways(): Promise<PaymentGateways> {
   const [db, bank] = await Promise.all([
-    activeCredentials().catch((): Record<string, Record<string, string>> => ({})),
+    activeCredentials().catch((): Record<string, Record<string, string> | null> => ({ waafi: null })),
     bankTransfer(),
   ]);
   const config = env();
@@ -100,14 +95,6 @@ export async function getPaymentGateways(): Promise<PaymentGateways> {
   const sifaloDb = db.sifalo;
   const waafiDb = db.waafi;
   const edahabDb = db.edahab;
-  const waafi = {
-    merchantUid: waafiDb?.merchant_uid ?? config.WAAFI_MERCHANT_UID,
-    apiUserId: waafiDb?.api_user_id ?? config.WAAFI_API_USER_ID,
-    apiKey: waafiDb?.api_key ?? config.WAAFI_API_KEY,
-    storeId: waafiDb?.store_id,
-    hppKey: waafiDb?.hpp_key,
-    sandbox: waafiDb?.environment === "sandbox",
-  };
   const edahab = {
     apiKey: edahabDb?.api_key ?? config.EDAHAB_API_KEY,
     agentCode: edahabDb?.agent_code ?? config.EDAHAB_AGENT_CODE,
@@ -142,22 +129,40 @@ export async function getPaymentGateways(): Promise<PaymentGateways> {
             webhookBaseUrl: apiPublicUrl && apiPublicUrl.startsWith("https://") ? apiPublicUrl.replace(/\/$/, "") : null,
           }
         : null,
-    waafi:
-      waafi.merchantUid && waafi.apiUserId && waafi.apiKey
-        ? {
-            merchantUid: waafi.merchantUid,
-            apiUserId: waafi.apiUserId,
-            apiKey: waafi.apiKey,
-            apiUrl: config.WAAFI_API_URL ?? (waafi.sandbox ? "https://sandbox.waafipay.net/asm" : "https://api.waafipay.net/asm"),
-            hpp: waafi.storeId && waafi.hppKey ? { storeId: waafi.storeId, hppKey: waafi.hppKey } : null,
-          }
-        : null,
+    waafi: resolveWaafiConfig(waafiDb, config, true),
     edahab:
       edahab.apiKey && edahab.agentCode
         ? { apiKey: edahab.apiKey, agentCode: edahab.agentCode, apiUrl: config.EDAHAB_API_URL ?? "https://edahab.net/api/api/issueinvoice" }
         : null,
-    testMode: explicitTestMode !== undefined ? bool(explicitTestMode) : config.NODE_ENV !== "production",
+    testMode: waafiDeployment(config) === "development" && (explicitTestMode !== undefined ? bool(explicitTestMode) : config.NODE_ENV !== "production"),
     siteUrl: config.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
     bankTransfer: bank,
   };
+}
+
+/** Admin-only preflight: proves the API can decrypt the same row written by the web app. */
+export async function getWaafiReadiness(): Promise<{ ready: boolean; message?: string }> {
+  const config = env();
+  if (!config.INTEGRATIONS_ENCRYPTION_KEY) return { ready: false, message: "Credential storage is not configured on the payment API." };
+  const db = createAdminClient();
+  const { data, error } = await db.from("platform_api_integrations").select("credentials_encrypted").eq("provider_key", "waafi").maybeSingle();
+  if (error || !data?.credentials_encrypted) return { ready: false, message: "The payment API cannot read the WaafiPay credentials." };
+  try {
+    const credentials = decryptCredentials(data.credentials_encrypted);
+    if (!resolveWaafiConfig(credentials, config, true)) return { ready: false, message: "The payment API environment or webhook configuration is incomplete." };
+  } catch { return { ready: false, message: "The web app and payment API cannot decrypt the same credentials." }; }
+  const { error: schemaError } = await db.from("waafi_payment_attempts").select("reference_id").limit(1);
+  if (schemaError) return { ready: false, message: "Apply the WaafiPay database migration on the payment API." };
+  return { ready: true };
+}
+
+/** Disabling new checkout must not stop confirmations for attempts already in flight. */
+export async function getWaafiForSettlement(): Promise<WaafiGateway | null> {
+  try {
+    const { data, error } = await createAdminClient().from("platform_api_integrations")
+      .select("credentials_encrypted").eq("provider_key", "waafi").abortSignal(AbortSignal.timeout(5000)).maybeSingle();
+    if (error) return null;
+    const saved = data ? (data.credentials_encrypted ? decryptCredentials(data.credentials_encrypted) : null) : undefined;
+    return resolveWaafiConfig(saved, env(), true);
+  } catch { return null; }
 }

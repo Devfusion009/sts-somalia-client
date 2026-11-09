@@ -3,7 +3,8 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/types/database.types";
 import { enumerateBuckets, hourlyBucketKey, roundMoney } from "@/lib/date-range";
-import { ADMIN_PAGE_SIZE, pageRange } from "@/lib/pagination";
+import { ADMIN_PAGE_SIZE, pageRange, searchTerm } from "@/lib/pagination";
+import type { BookingFilters } from "./booking-filters";
 
 /**
  * Agency orders with their items joined to every vertical — the same embed
@@ -82,34 +83,53 @@ export async function getAgencyOrder(agencyId: string, orderId: string) {
  */
 export async function getAgencyOrders(
   agencyId: string,
-  { page, type }: { page: number; type?: Database["public"]["Enums"]["order_item_type"] }
+  { page, type, queue, q, from: dateFrom, to: dateTo, sort }: BookingFilters & { page: number },
+  pageSize = ADMIN_PAGE_SIZE
 ) {
   const supabase = await createClient();
-  const { from, to } = pageRange(page);
+  const { from, to } = pageRange(page, pageSize);
   let query = supabase
     .from("orders")
     .select(
       `id, order_number, status, total, currency, created_at, customer_id, booked_by,
-       agency_customer:agency_customer_id (full_name, phone),
-       payments (status, method_label),
+       agency_customer:agency_customer_id (id, full_name, phone),
+       customer_match:agency_customer_id (),
+       payments (status, method_label, amount, provider),
        order_items (
          id, item_type,
          hotel_booking:hotel_booking_id (status, check_in, check_out, num_rooms, hotel:hotel_id (name)),
          flight_booking:flight_booking_id (origin_iata, destination_iata, depart_at),
          visa_application:visa_application_id (id, application_ref, visa_type:visa_type_id (name, destination_country_code)),
          umrah_booking:umrah_booking_id (num_pilgrims, booking_kind, package:package_id (name), custom_request:custom_request_id (reference)),
-         hall_booking:hall_booking_id (event_type, start_date, end_date, venue:venue_id (name))
+         hall_booking:hall_booking_id (status, event_type, start_date, end_date, venue:venue_id (name))
        ),
        type_match:order_items (item_type)`,
       { count: "exact" }
     )
     .eq("agency_id", agencyId);
   if (type) query = query.eq("type_match.item_type", type).not("type_match", "is", null);
+  const term = searchTerm(q)?.trim();
+  if (term) {
+    // Quote filter values so punctuation cannot become PostgREST operators.
+    const pattern = `"*${term.replace(/"/g, '\\"')}*"`;
+    query = query.or(`full_name.ilike.${pattern},phone.ilike.${pattern}`, { referencedTable: "customer_match" })
+      .or(`order_number.ilike.${pattern},customer_match.not.is.null`);
+  }
+  if (queue === "payment_due") query = query.in("status", ["pending_payment", "held", "partially_paid"]).gt("total", 0);
+  else if (queue === "awaiting_price") query = query.in("status", ["pending_payment", "held", "partially_paid"]).eq("total", 0);
+  else if (queue && queue !== "all") query = query.eq("status", queue);
+  if (dateFrom) query = query.gte("created_at", `${dateFrom}T00:00:00.000Z`);
+  if (dateTo) {
+    const nextDay = new Date(`${dateTo}T00:00:00.000Z`);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    query = query.lt("created_at", nextDay.toISOString());
+  }
 
-  const { data, count } = await query
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
+  const { data, count, error } = await query
+    .order("created_at", { ascending: sort === "oldest" })
+    .order("id", { ascending: sort === "oldest" })
     .range(from, to);
+  if (error) throw new Error("Bookings could not be loaded.");
   return { orders: data ?? [], total: count ?? 0 };
 }
 
@@ -166,21 +186,38 @@ export type AgencyWalletTransaction = Awaited<
   ReturnType<typeof getAgencyWallet>
 >["transactions"][number];
 
-/** All-time outstanding balance — a lightweight count+sum, not the full nested-join getAgencyOrders. */
-export async function getAgencyPendingPayments(agencyId: string): Promise<{ count: number; amount: number; currency: string }> {
+/** Outstanding balances match the payment queue; currencies are never added together. */
+export async function getAgencyPendingPayments(agencyId: string): Promise<{ count: number; amounts: { amount: number; currency: string }[] }> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("orders")
-    .select("total, currency")
-    .eq("agency_id", agencyId)
-    .eq("status", "pending_payment");
+  const { data, error } = await supabase.rpc("agency_payment_queue_summary", { p_agency_id: agencyId });
+  if (!error) {
+    const summary = data as { count: number; amounts: { amount: number; currency: string }[] };
+    return { count: Number(summary.count), amounts: summary.amounts.map((item) => ({ amount: Number(item.amount), currency: item.currency })) };
+  }
+  // Allows QA code and migration to roll out separately; outages never become a zero balance.
+  if (error.code !== "PGRST202") throw new Error("Payment balances could not be loaded.");
+  return getAgencyPendingPaymentsFallback(agencyId);
+}
 
-  const rows = data ?? [];
-  return {
-    count: rows.length,
-    amount: rows.reduce((sum, o) => sum + Number(o.total), 0),
-    currency: rows[0]?.currency ?? "USD",
-  };
+async function getAgencyPendingPaymentsFallback(agencyId: string) {
+  const supabase = await createClient();
+  const amounts = new Map<string, number>();
+  let count = 0;
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await supabase.from("orders")
+      .select("total, currency, payments (amount, status)")
+      .eq("agency_id", agencyId).in("status", ["pending_payment", "held", "partially_paid"]).gt("total", 0)
+      .order("id").range(offset, offset + 999);
+    if (error) throw new Error("Payment balances could not be loaded.");
+    for (const order of data ?? []) {
+      count++;
+      const paid = order.payments.filter((p) => p.status === "succeeded").reduce((sum, p) => sum + Number(p.amount), 0);
+      const due = Math.max(Number(order.total) - paid, 0);
+      amounts.set(order.currency, (amounts.get(order.currency) ?? 0) + due);
+    }
+    if (!data || data.length < 1000) break;
+  }
+  return { count, amounts: [...amounts].filter(([, amount]) => amount > 0).sort(([a], [b]) => a.localeCompare(b)).map(([currency, amount]) => ({ currency, amount: roundMoney(amount) })) };
 }
 
 export type CommissionFilters = {

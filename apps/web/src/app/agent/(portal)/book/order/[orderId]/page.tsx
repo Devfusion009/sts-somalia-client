@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -172,7 +173,7 @@ export default async function DeskOrderPage({
                       {awaitingPrice ? (
                         <span className="font-normal text-muted-foreground">On request</span>
                       ) : (
-                        money(Number(item.total_price), order.currency)
+                        <AgentMoney value={money(Number(item.total_price), order.currency)} />
                       )}
                     </span>
                   </li>
@@ -189,19 +190,19 @@ export default async function DeskOrderPage({
             </CardHeader>
             <CardContent>
               <dl className="space-y-2 text-sm">
-                <SummaryRow label="Net" value={money(Number(order.subtotal), order.currency)} />
-                <SummaryRow label="Your margin" value={money(margin, order.currency)} />
+                <SummaryRow label="Net" value={<AgentMoney value={money(Number(order.subtotal), order.currency)} />} />
+                <SummaryRow label="Your margin" value={<AgentMoney value={money(margin, order.currency)} />} />
                 <SummaryRow
                   label="Customer pays"
-                  value={awaitingPrice ? "On request" : money(total, order.currency)}
+                  value={awaitingPrice ? "On request" : <AgentMoney value={money(total, order.currency)} />}
                   strong
                   divided
                 />
-                {paid > 0 ? <SummaryRow label="Paid" value={money(paid, order.currency)} /> : null}
+                {paid > 0 ? <SummaryRow label="Paid" value={<AgentMoney value={money(paid, order.currency)} />} /> : null}
                 {!awaitingPrice ? (
                   <SummaryRow
                     label="Balance due"
-                    value={money(balance, order.currency)}
+                    value={<AgentMoney value={money(balance, order.currency)} />}
                     strong
                     divided={paid > 0}
                     tone={balance > 0 ? "warn" : undefined}
@@ -242,7 +243,7 @@ function SummaryRow({
   tone,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   strong?: boolean;
   divided?: boolean;
   tone?: "warn";
