@@ -73,7 +73,7 @@ export function PayFromWalletForm({
 
         <dl className="space-y-2 text-sm">
           <div className="flex items-baseline justify-between gap-3">
-            <dt className="text-muted-foreground">Agency balance now</dt>
+            <dt className="text-muted-foreground">Available to spend</dt>
             <dd className="tabular-nums">{money(available, currency)}</dd>
           </div>
           <div className="flex items-baseline justify-between gap-3">
@@ -81,7 +81,7 @@ export function PayFromWalletForm({
             <dd className="tabular-nums">− {money(amount, currency)}</dd>
           </div>
           <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2">
-            <dt className="font-medium">Balance after</dt>
+            <dt className="font-medium">Available after</dt>
             <dd className="font-heading text-base font-semibold tabular-nums text-primary">
               {money(remaining, currency)}
             </dd>

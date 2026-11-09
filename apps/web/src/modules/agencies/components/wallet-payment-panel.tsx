@@ -50,7 +50,7 @@ export async function WalletPaymentPanel({
       <CardContent className="space-y-4">
         <dl className="space-y-2 text-sm">
           <div className="flex items-baseline justify-between gap-3">
-            <dt className="text-muted-foreground">Agency balance</dt>
+            <dt className="text-muted-foreground">Available to spend</dt>
             <dd className="tabular-nums">{money(available, currency)}</dd>
           </div>
           <div className="flex items-baseline justify-between gap-3">
@@ -67,7 +67,7 @@ export async function WalletPaymentPanel({
               </>
             ) : (
               <>
-                <dt className="font-medium">Balance after payment</dt>
+                <dt className="font-medium">Available after payment</dt>
                 <dd className="font-heading text-base font-semibold tabular-nums">
                   {money(remaining, currency)}
                 </dd>

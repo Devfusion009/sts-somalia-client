@@ -35,7 +35,7 @@ export function EarningsPipeline({
     { label: "Total earned", amount: totalEarned, tone: "muted" },
     { label: "In review by STS", amount: inReview, tone: "review" },
     { label: "Available to withdraw", amount: available, tone: "available" },
-    { label: "Paid out", amount: paidOut, tone: "paid" },
+    { label: "Withdrawn or transferred", amount: paidOut, tone: "paid" },
   ];
 
   return (

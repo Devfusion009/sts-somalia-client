@@ -37,7 +37,7 @@ export default async function AgentDashboardPage({ searchParams }: {
     getAgencyPendingPayments(membership.agency.id),
   ]);
   const currency = metrics.revenue.currency;
-  const commissionConfigured = membership.agency.commission_rate_set_at !== null;
+  const commissionConfigured = membership.agency.commission_rate_set_at !== null || Number(membership.agency.commission_rate) > 0;
 
   return (
     <div className="space-y-6">
