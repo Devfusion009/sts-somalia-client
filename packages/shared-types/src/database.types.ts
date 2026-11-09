@@ -34,6 +34,112 @@ export type Database = {
   }
   public: {
     Tables: {
+      waafi_payment_attempts: {
+        Row: {
+          reference_id: string
+          order_id: string | null
+          topup_id: string | null
+          environment: string
+          merchant_uid: string
+          amount: number
+          currency: string
+          status: string
+          result: Json | null
+          created_at: string
+          checked_at: string | null
+          review_alerted_at: string | null
+        }
+        Insert: {
+          reference_id?: string
+          order_id?: string | null
+          topup_id?: string | null
+          environment?: string
+          merchant_uid?: string
+          amount?: number
+          currency?: string
+          status?: string
+          result?: Json | null
+          created_at?: string
+          checked_at?: string | null
+          review_alerted_at?: string | null
+        }
+        Update: {
+          reference_id?: string
+          order_id?: string | null
+          topup_id?: string | null
+          environment?: string
+          merchant_uid?: string
+          amount?: number
+          currency?: string
+          status?: string
+          result?: Json | null
+          created_at?: string
+          checked_at?: string | null
+          review_alerted_at?: string | null
+        }
+        Relationships: []
+      }
+      waafi_receipts: {
+        Row: {
+          reference_id: string
+          environment: string
+          merchant_uid: string
+          transaction_id: string
+          amount: number
+          currency: string
+          settled_at: string
+        }
+        Insert: {
+          reference_id?: string
+          environment?: string
+          merchant_uid?: string
+          transaction_id?: string
+          amount?: number
+          currency?: string
+          settled_at?: string
+        }
+        Update: {
+          reference_id?: string
+          environment?: string
+          merchant_uid?: string
+          transaction_id?: string
+          amount?: number
+          currency?: string
+          settled_at?: string
+        }
+        Relationships: []
+      }
+      waafi_webhook_events: {
+        Row: {
+          environment: string
+          merchant_uid: string
+          event_id: string
+          event_name: string
+          reference_id: string | null
+          transaction_id: string | null
+          received_at: string
+        }
+        Insert: {
+          environment?: string
+          merchant_uid?: string
+          event_id?: string
+          event_name?: string
+          reference_id?: string | null
+          transaction_id?: string | null
+          received_at?: string
+        }
+        Update: {
+          environment?: string
+          merchant_uid?: string
+          event_id?: string
+          event_name?: string
+          reference_id?: string | null
+          transaction_id?: string | null
+          received_at?: string
+        }
+        Relationships: []
+      }
+
       manager_login_credentials: {
         Row: {
           id: string
@@ -1197,6 +1303,7 @@ export type Database = {
       }
       agency_topup_requests: {
         Row: {
+          idempotency_key: string | null
           agency_id: string
           amount: number
           created_at: string
@@ -1219,6 +1326,7 @@ export type Database = {
           wallet_transaction_id: string | null
         }
         Insert: {
+          idempotency_key?: string | null
           agency_id: string
           amount: number
           created_at?: string
@@ -1241,6 +1349,7 @@ export type Database = {
           wallet_transaction_id?: string | null
         }
         Update: {
+          idempotency_key?: string | null
           agency_id?: string
           amount?: number
           created_at?: string
@@ -7085,6 +7194,15 @@ export type Database = {
       }
     }
     Functions: {
+      flag_waafi_reconciliation: { Args: { p_reference_id: string }; Returns: undefined }
+      record_waafi_review_event: { Args: { p_environment: string; p_merchant_uid: string; p_event_id: string; p_event_name: string; p_reference_id: string; p_transaction_id: string }; Returns: undefined }
+      begin_waafi_attempt: { Args: { p_reference_id: string; p_order_id: string | null; p_topup_id: string | null; p_environment: string; p_merchant_uid: string }; Returns: Json }
+      record_waafi_attempt: { Args: { p_reference_id: string; p_result: Json }; Returns: undefined }
+      settle_waafi_transaction: { Args: { p_reference_id: string; p_environment: string; p_merchant_uid: string; p_transaction_id: string; p_amount: number; p_currency: string; p_event_id?: string }; Returns: undefined }
+      fail_waafi_attempt: { Args: { p_reference_id: string }; Returns: undefined }
+      request_waafi_topup: { Args: { p_agency_id: string; p_amount: number; p_method: string; p_idempotency_key: string }; Returns: string }
+
+
       transfer_agency_earnings_to_wallet: {
         Args: { p_agency_id: string; p_amount: number; p_transfer_id: string }
         Returns: string
@@ -7553,6 +7671,10 @@ export type Database = {
       }
       agency_period_activity: {
         Args: { p_agency_id: string; p_from: string; p_to: string }
+        Returns: Json
+      }
+      agency_payment_queue_summary: {
+        Args: { p_agency_id: string }
         Returns: Json
       }
       applicant_can_edit: {

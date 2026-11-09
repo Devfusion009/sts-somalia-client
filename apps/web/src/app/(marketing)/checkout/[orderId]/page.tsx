@@ -1,3 +1,4 @@
+import { WaafiPaymentStatus } from "@/modules/payments/components/waafi-payment-status";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { CalendarClock, Hourglass, X } from "lucide-react";
@@ -47,7 +48,7 @@ export default async function CheckoutPage({
   if (!order) notFound();
   // A customer who paid on WaafiPay's page but never came back still has a
   // processing payment; re-reading its result settles it.
-  const unsettledWaafi = order.payments.filter((p) => p.provider === "waafi" && p.status === "processing");
+  const unsettledWaafi = order.payments.filter((p) => p.provider === "waafi" && ["processing", "requires_action"].includes(p.status));
   if (unsettledWaafi.length > 0) {
     await Promise.all(unsettledWaafi.map((p) => trpc.payments.confirmWaafi.mutate({ paymentId: p.id }).catch(() => null)));
     order = (await trpc.payments.orderForCheckout.query({ orderId })) as unknown as CheckoutOrderRow | null;
@@ -115,7 +116,7 @@ export default async function CheckoutPage({
     }
   }
 
-  const pendingPayment = order.payments.find((p) => p.status === "requires_action");
+  const pendingPayment = order.payments.find((p) => p.status === "requires_action" || (p.provider === "waafi" && p.status === "processing"));
   const availableMethods = await trpc.payments.methods.query({ agencyWallet });
   const methods: CheckoutMethod[] = availableMethods.map(
     ({ id, label, description, kind, group, badges, requiresPhone, simulated }) => ({
@@ -239,7 +240,7 @@ export default async function CheckoutPage({
                 <p className="mt-4 text-sm leading-relaxed whitespace-pre-line">{pendingPayment.instructions}</p>
               ) : null}
               <div className="mt-4">
-                <CancelPendingPaymentButton paymentId={pendingPayment.id} />
+                {pendingPayment.provider === "waafi" ? <WaafiPaymentStatus kind="payment" referenceId={pendingPayment.id} /> : <CancelPendingPaymentButton paymentId={pendingPayment.id} />}
               </div>
             </section>
           ) : awaitingQuote ? (

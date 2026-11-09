@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import { format } from "date-fns";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { money } from "@/lib/money";
@@ -14,7 +15,7 @@ export function SignedMoney({ amount, currency = "USD" }: { amount: number; curr
     <span className={cn("font-medium whitespace-nowrap tabular-nums", negative ? "text-destructive" : "text-primary")}>
       <span aria-hidden="true">{negative ? "− " : "+ "}</span>
       <span className="sr-only">{negative ? "Debit " : "Credit "}</span>
-      {money(Math.abs(amount), currency)}
+      {<AgentMoney value={money(Math.abs(amount), currency)} />}
     </span>
   );
 }

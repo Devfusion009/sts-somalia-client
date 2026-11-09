@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
@@ -106,7 +107,7 @@ export default async function AgentUmrahDeskPage() {
                       )}
                     </TableCell>
                     <TableCell numeric className="text-sm font-medium">
-                      {money(Number(pkg.base_price), pkg.currency)}
+                      {<AgentMoney value={money(Number(pkg.base_price), pkg.currency)} />}
                     </TableCell>
                     <TableCell numeric>
                       <Button

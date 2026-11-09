@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import type { Metadata } from "next";
 import { Fragment } from "react";
 import { redirect } from "next/navigation";
@@ -124,7 +125,7 @@ export default async function AgentBillingPage({
                       {invoice.issued_at ? format(new Date(invoice.issued_at), "d MMM yyyy") : "—"}
                     </TableCell>
                     <TableCell numeric className="font-medium">
-                      {money(Number(invoice.total), invoice.currency)}
+                      {<AgentMoney value={money(Number(invoice.total), invoice.currency)} />}
                     </TableCell>
                     <TableCell>
                       <Badge variant={statusBadgeVariant(invoice.status, INVOICE_STATUS_OVERRIDES)} className="capitalize">
@@ -203,7 +204,7 @@ export default async function AgentBillingPage({
                           </TableCell>
                           <TableCell numeric className="text-muted-foreground">
                             {balance < 0 ? "−" : ""}
-                            {money(Math.abs(balance), "USD")}
+                            {<AgentMoney value={money(Math.abs(balance), "USD")} />}
                           </TableCell>
                         </TableRow>
                       );

@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -154,13 +155,13 @@ export default async function AgentWithdrawalsPage() {
       <PageHeader title="Withdraw earnings" />
 
       <StatStrip cols={3}>
-        <StatStripItem label="Available to withdraw" value={money(earnings.available, "USD")} tone="primary" />
+        <StatStripItem label="Available to withdraw" value={<AgentMoney value={money(earnings.available, "USD")} />} tone="primary" />
         <StatStripItem
           label="In review by STS"
-          value={money(earnings.inReview, "USD")}
+          value={<AgentMoney value={money(earnings.inReview, "USD")} />}
           tone={earnings.inReview > 0 ? "warn" : undefined}
         />
-        <StatStripItem label="Already requested" value={money(earnings.requested, "USD")} />
+        <StatStripItem label="Already requested" value={<AgentMoney value={money(earnings.requested, "USD")} />} />
       </StatStrip>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -251,7 +252,7 @@ export default async function AgentWithdrawalsPage() {
                     <div className="flex items-start justify-between gap-2 sm:flex-col sm:justify-start">
                       <div className="space-y-1.5">
                         <p className="font-heading text-lg font-semibold tabular-nums">
-                          {money(Number(request.amount), "USD")}
+                          {<AgentMoney value={money(Number(request.amount), "USD")} />}
                         </p>
                         <Badge variant={statusBadgeVariant(request.status, STATUS_VARIANT)}>
                           {STATUS_LABEL[request.status] ?? request.status}

@@ -9,6 +9,8 @@ rolls back to the previous `.env` (and so the previous image tags).
 Stack: Caddy (80/443), web, api, Redis. Redis sits on an internal network with
 a password, 256 MB `allkeys-lru`, no persistence. It is a cache only.
 
+Payment setup: [WaafiPay](../WAAFI-PAYMENTS.md).
+
 ## One-time server setup
 
 1. A sudo-capable account on the server (`asack02` has none and no home directory).

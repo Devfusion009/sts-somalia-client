@@ -54,6 +54,10 @@ jobs:
       - name: Write env file
         run: |
           ssh -i ~/.ssh/ec2.pem ubuntu@${{ secrets.EC2_HOST }} "cat > /home/ubuntu/app/apps/api/.env.local" <<EOF
+          NODE_ENV=production
+          DEPLOYMENT_ENV=qa
+          WAAFI_ENVIRONMENT=sandbox
+          PAYMENTS_TEST_MODE=false
           PORT=4000
           SUPABASE_URL=${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
@@ -129,6 +133,9 @@ jobs:
       - name: Write env file
         run: |
           ssh -i ~/.ssh/lightsail.pem ubuntu@${{ secrets.LIGHTSAIL_HOST }} "cat > /home/ubuntu/app/apps/web/.env.local" <<EOF
+          DEPLOYMENT_ENV=qa
+          WAAFI_ENVIRONMENT=sandbox
+          PAYMENTS_TEST_MODE=false
           PORT=3000
           NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
+import { getPaymentGateways } from "@/lib/provider-runtime/payments";
 import { getPaymentMethod } from "@/modules/payments/registry";
 import { initiateTopupWithProvider, type InitiationResult } from "@/modules/payments/providers";
 import { isOfflineTopupMethod } from "@/modules/payments/topup";
@@ -123,11 +124,13 @@ export async function startOnlineTopup(
       amount: amountField,
       method: z.string().min(1, "Choose how you want to pay."),
       payerPhone: z.string().trim().max(30).optional(),
+      idempotencyKey: z.string().uuid("Reload the payment form and try again."),
       returnTo: z.string().optional(),
     })
     .safeParse({
       amount: formData.get("amount"),
       method: formData.get("method"),
+      idempotencyKey: formData.get("idempotencyKey"),
       payerPhone: formData.get("payerPhone")?.toString().trim() || undefined,
       returnTo: formData.get("returnTo")?.toString() || undefined,
     });
@@ -153,13 +156,14 @@ export async function startOnlineTopup(
 
   const amount = Math.round(parsed.data.amount * 100) / 100;
   const supabase = await createClient();
-  const { data: topupId, error } = await supabase.rpc("request_agency_topup", {
-    p_agency_id: membership.agency.id,
-    p_amount: amount,
-    p_rail: "online",
-    p_method: method.id,
-    p_provider: method.provider,
-  });
+  const { data: topupId, error } = method.provider === "waafi"
+    ? await supabase.rpc("request_waafi_topup", {
+        p_agency_id: membership.agency.id, p_amount: amount, p_method: method.id,
+        p_idempotency_key: parsed.data.idempotencyKey,
+      })
+    : await supabase.rpc("request_agency_topup", {
+        p_agency_id: membership.agency.id, p_amount: amount, p_rail: "online", p_method: method.id, p_provider: method.provider,
+      });
   if (error || !topupId) return { error: error?.message ?? "Could not start the payment." };
 
   let result: InitiationResult;
@@ -180,11 +184,15 @@ export async function startOnlineTopup(
 
   switch (result.type) {
     case "success": {
-      const { error: settlementError } = await admin.rpc("settle_agency_topup", {
-        p_request_id: topupId,
-        p_provider_ref: result.providerRef,
-      });
-      if (settlementError) return { error: "Payment received; wallet credit pending reconciliation." };
+      const gateway = method.provider === "waafi" ? (await getPaymentGateways()).waafi : null;
+      if (method.provider === "waafi" && !gateway) return { error: "Payment received; wallet credit pending reconciliation.", paymentAttemptStatus: "pending" };
+      const { error: settlementError } = gateway
+        ? await admin.rpc("settle_waafi_transaction", {
+            p_reference_id: topupId, p_environment: gateway.environment, p_merchant_uid: gateway.merchantUid,
+            p_transaction_id: result.providerRef ?? "", p_amount: amount, p_currency: "USD",
+          })
+        : await admin.rpc("settle_agency_topup", { p_request_id: topupId, p_provider_ref: result.providerRef });
+      if (settlementError) return { error: "Payment received; wallet credit pending reconciliation.", paymentAttemptStatus: "pending" };
       revalidatePath("/agent");
       revalidatePath("/admin");
       revalidatePath("/agent/finance");
@@ -192,31 +200,32 @@ export async function startOnlineTopup(
         revalidatePath("/agent/book", "layout");
         return { error: null, destination: `${returnTo}?topup=success` };
       }
-      redirect("/agent/finance/top-up?status=success");
+      redirect(`/agent/finance/top-up?status=success&topupId=${topupId}`);
       break;
     }
     case "redirect":
       await admin
         .from("agency_topup_requests")
         .update({ provider_ref: result.providerRef ?? null })
-        .eq("id", topupId);
+        .eq("id", topupId).eq("status", "pending");
       redirect(result.url);
       break;
     case "instructions":
       await admin
         .from("agency_topup_requests")
         .update({ provider_ref: result.providerRef ?? null, note: result.instructions })
-        .eq("id", topupId);
+        .eq("id", topupId).eq("status", "pending");
       revalidatePath("/agent/finance/top-up");
       if (returnTo) {
         revalidatePath("/agent/book", "layout");
         return { error: null, destination: `${returnTo}?topup=pending` };
       }
-      redirect("/agent/finance/top-up?status=pending");
+      redirect(`/agent/finance/top-up?status=pending&topupId=${topupId}`);
       break;
     case "error":
+      if (method.provider === "waafi") await admin.rpc("fail_waafi_attempt", { p_reference_id: topupId });
       await admin.rpc("fail_agency_topup", { p_request_id: topupId, p_reason: result.message });
-      return { error: result.message };
+      return { error: result.message, paymentAttemptStatus: "failed" };
   }
   return null;
 }

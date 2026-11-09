@@ -1,5 +1,8 @@
 "use client";
 
+import { AgentMoney } from "@/components/portal/agent-money";
+
+
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -30,7 +33,7 @@ export function TransferEarningsForm({ amount, transferId, disabled }: { amount:
       <DialogContent className="sm:max-w-sm">
         <DialogHeader><DialogTitle>Transfer earnings to wallet</DialogTitle></DialogHeader>
         <dl className="flex items-center justify-between text-sm">
-          <dt>Approved earnings</dt><dd className="font-semibold tabular-nums">{money(amount, "USD")}</dd>
+          <dt>Approved earnings</dt><dd className="font-semibold tabular-nums">{<AgentMoney value={money(amount, "USD")} />}</dd>
         </dl>
         <form action={action} className="space-y-4">
           <input type="hidden" name="amount" value={amount} />

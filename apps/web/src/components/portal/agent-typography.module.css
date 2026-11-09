@@ -1,0 +1,71 @@
+.amount {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .25em;
+  white-space: nowrap;
+  font-family: var(--font-sans), sans-serif;
+  font-weight: 650;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: -.025em;
+  line-height: inherit;
+}
+.currency {
+  font-size: max(.75rem, .7em);
+  font-weight: 500;
+  letter-spacing: .045em;
+}
+.portal { min-width: 0; }
+.portal :global([data-slot="table-head"]) {
+  font-size: .6875rem;
+  font-weight: 600;
+  letter-spacing: .035em;
+}
+.portal :global([data-slot="table-cell"]) {
+  padding-block: .875rem;
+}
+.portal :global([data-slot="table-cell"]:first-child:not(:has([role="checkbox"]))) {
+  font-weight: 600;
+}
+.portal :global([data-slot="table-row"][data-state="selected"]) {
+  background: var(--accent);
+  box-shadow: inset 3px 0 var(--primary);
+}
+.portal :global([data-slot="label"]),
+.portal :global([data-slot="field-label"]) {
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .01em;
+  color: var(--muted-foreground);
+}
+.portal :global([data-slot="input"]),
+.portal :global([data-slot="input-group-control"]),
+.portal :global([data-slot="textarea"]),
+.portal :global([data-slot="select-trigger"]) {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.portal :global([data-slot="input"]),
+.portal :global([data-slot="textarea"]),
+.portal :global([data-slot="select-trigger"]) {
+  background-color: color-mix(in oklch, var(--secondary) 35%, var(--card));
+}
+.portal :global([data-slot="input"]:focus-visible),
+.portal :global([data-slot="textarea"]:focus-visible),
+.portal :global([data-slot="select-trigger"]:focus-visible) {
+  background-color: var(--card);
+}
+.portal :global([data-slot="field"]:focus-within > [data-slot="field-label"]) {
+  color: var(--primary);
+}
+.portal :global(input[autocomplete="organization"]),
+.portal :global(input[autocomplete="country"]) {
+  font-weight: 600;
+}
+.portal :global(input::placeholder), .portal :global(textarea::placeholder) {
+  font-weight: 400;
+}
+.portal :global(dt) { font-weight: 500; }
+.portal :global([data-slot="badge"]) { font-weight: 600; }
+@media (max-width: 639px) {
+  .portal :global([data-slot="table-cell"]) { padding-block: .75rem; }
+}

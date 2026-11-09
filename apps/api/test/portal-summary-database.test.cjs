@@ -1,0 +1,47 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+const { execFileSync } = require('node:child_process');
+const { resolve } = require('node:path');
+const container = process.env.STS_TEST_POSTGRES_CONTAINER;
+const root = resolve(__dirname, '../../..');
+
+test('live agency summary: >1000 orders, partial payments, currencies and authorization', { skip: !container, timeout: 30000 }, () => {
+  assert.equal(container, 'sts-waafi-payment-tests');
+  const db = `portal_summary_tests_${Date.now()}`;
+  execFileSync('docker', ['exec', container, 'createdb', '-U', 'postgres', db]);
+  const run = (sql) => execFileSync('docker', ['exec', '-i', container, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-At', '-U', 'postgres', '-d', db], { input: sql, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  run(`create schema auth;
+    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+    create table profiles(id uuid primary key, is_admin boolean);
+    create table agencies(id uuid primary key,status text);
+    create table agency_members(agency_id uuid,profile_id uuid,status text);
+    create table orders(id uuid primary key default gen_random_uuid(),agency_id uuid,total numeric,currency text,status text);
+    create table payments(order_id uuid,amount numeric,status text);
+    create function is_admin() returns boolean language sql stable security definer set search_path=public as $$ select coalesce((select is_admin from profiles where id=auth.uid()),false) $$;`);
+  const original = readFileSync(resolve(root, 'supabase/migrations/20260101000003_agencies.sql'), 'utf8');
+  const start = original.indexOf('create or replace function public.is_agency_member(');
+  run(original.slice(start, original.indexOf('$$;', start) + 3));
+  run(readFileSync(resolve(root, 'supabase/migrations/20261109000002_portal_payment_queue_summary.sql'), 'utf8'));
+  const agency = '00000000-0000-4000-8000-000000000010', owner = '00000000-0000-4000-8000-000000000001', partial = '00000000-0000-4000-8000-000000000020';
+  run(`insert into agencies values('${agency}','active'),('00000000-0000-4000-8000-000000000011','active');
+    insert into agency_members values('${agency}','${owner}','active');
+    insert into orders(agency_id,total,currency,status) select '${agency}',10,'USD','pending_payment' from generate_series(1,1005);
+    insert into orders values('${partial}','${agency}',100,'USD','partially_paid');
+    insert into payments values('${partial}',30,'succeeded'),('${partial}',20,'processing');
+    insert into orders(agency_id,total,currency,status) values('${agency}',25,'EUR','held'),('${agency}',0,'USD','held'),('${agency}',500,'USD','paid'),('${agency}',200,'USD','cancelled'),('00000000-0000-4000-8000-000000000011',99999,'USD','pending_payment');`);
+  const summary = () => JSON.parse(run(`begin; set local role authenticated; set local request.jwt.claim.sub='${owner}'; select agency_payment_queue_summary('${agency}'); commit;`).split('\n').find((line) => line.startsWith('{')));
+  assert.deepEqual(summary(), { count: 1007, amounts: [{ currency: 'EUR', amount: 25 }, { currency: 'USD', amount: 10120 }] });
+  run(`update payments set status='succeeded' where amount=20;`);
+  assert.equal(summary().amounts[1].amount, 10100, 'the next read reflects a payment immediately');
+  assert.equal(run(`select has_function_privilege('anon','public.agency_payment_queue_summary(uuid)','execute');`), 'f');
+  assert.equal(run(`select has_function_privilege('authenticated','public.agency_payment_queue_summary(uuid)','execute');`), 't');
+  const rejected = (user) => run(`begin; set local role authenticated; set local request.jwt.claim.sub='${user}'; do $$ begin
+    perform agency_payment_queue_summary('${agency}'); raise exception 'isolation failed';
+    exception when others then if sqlerrm <> 'not authorised' then raise; end if; end $$; commit;`);
+  rejected('00000000-0000-4000-8000-000000000002');
+  run(`update agency_members set status='inactive';`);
+  rejected(owner);
+  run(`update agency_members set status='active'; update agencies set status='suspended' where id='${agency}';`);
+  rejected(owner);
+});

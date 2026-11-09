@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import { Suspense } from "react";
 import { FinancePriorities } from "@/modules/agencies/components/finance-priorities";
 import Link from "next/link";
@@ -64,15 +65,15 @@ export default async function AgentDashboardPage({ searchParams }: {
         <section className={styles.wallet} aria-label="Agency wallet">
           <dl>
             <dt className={styles.walletLabel}><Wallet className="size-4" aria-hidden="true" />Available to spend</dt>
-            <dd className={styles.walletAmount}>{money(wallet.available, "USD")}</dd>
+            <dd className={styles.walletAmount}>{<AgentMoney value={money(wallet.available, "USD")} />}</dd>
           </dl>
           <div className={styles.walletActions}>
             <Link href="/agent/finance/top-up"><Plus className="size-3.5" aria-hidden="true" />Add funds</Link>
             <Link href="/agent/finance">View wallet<ArrowRight className="size-3.5" aria-hidden="true" /></Link>
           </div>
           <dl className={styles.walletFacts}>
-            <div><dt>{wallet.balance < 0 ? "Owed to STS" : "Wallet balance"}</dt><dd>{money(Math.abs(wallet.balance), "USD")}</dd></div>
-            <div><dt>Credit limit</dt><dd>{money(wallet.creditLimit, "USD")}</dd></div>
+            <div><dt>{wallet.balance < 0 ? "Owed to STS" : "Wallet balance"}</dt><dd>{<AgentMoney value={money(Math.abs(wallet.balance), "USD")} />}</dd></div>
+            <div><dt>Credit limit</dt><dd>{<AgentMoney value={money(wallet.creditLimit, "USD")} />}</dd></div>
           </dl>
         </section>
       </div>
@@ -82,15 +83,17 @@ export default async function AgentDashboardPage({ searchParams }: {
       </Suspense>
 
       <div className={styles.contentGrid}>
-        <Suspense fallback={<Skeleton className="h-[360px] rounded-2xl" />}>
-          <Performance metricsP={metricsP} granularity={range.granularity} />
-        </Suspense>
-        <div className="space-y-5">
+        <div className="order-2 min-w-0 xl:order-1">
+          <Suspense fallback={<Skeleton className="h-[360px] rounded-2xl" />}>
+            <Performance metricsP={metricsP} granularity={range.granularity} />
+          </Suspense>
+        </div>
+        <div className="order-1 space-y-5 xl:order-2">
           <section className={styles.actionPanel} aria-labelledby="workspace-actions-title">
             <h2 id="workspace-actions-title">Action centre</h2>
             <Suspense fallback={<Skeleton className="h-12" />}><PendingPayments pendingP={pendingP} /></Suspense>
             <Link href="/agent/customers" className={styles.actionRow}><span><UsersRound className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />Customer directory</span><ArrowRight className="size-3.5" aria-hidden="true" /></Link>
-            <Link href="/agent/calendar" className={styles.actionRow}><span><CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />Event calendar</span><ArrowRight className="size-3.5" aria-hidden="true" /></Link>
+            <Link href="/agent/calendar" className={styles.actionRow}><span><CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />Booking calendar</span><ArrowRight className="size-3.5" aria-hidden="true" /></Link>
             <Link href="/agent/markups" className={styles.actionRow}><span><CircleDollarSign className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />Markup rates</span><ArrowRight className="size-3.5" aria-hidden="true" /></Link>
           </section>
           <Suspense fallback={null}><Onboarding onboardingP={onboardingP} /></Suspense>
@@ -118,8 +121,8 @@ async function Metrics({ metricsP, rangeLabel, commissionFact }: {
   return (
     <div className={styles.metrics}>
       <Metric label="Bookings" value={metrics.bookings.current.toLocaleString("en-US")} href="/agent/bookings" change={percentChange(metrics.bookings.current, metrics.bookings.previous)} fact={rangeLabel} />
-      <Metric label="Sales" value={money(metrics.revenue.current, currency)} href="/agent/reports" change={percentChange(metrics.revenue.current, metrics.revenue.previous)} fact="Paid orders" />
-      <Metric label="Earnings" value={money(metrics.earned.current, currency)} href="/agent/reports" change={percentChange(metrics.earned.current, metrics.earned.previous)} fact={commissionFact} />
+      <Metric label="Sales" value={<AgentMoney value={money(metrics.revenue.current, currency)} />} href="/agent/reports" change={percentChange(metrics.revenue.current, metrics.revenue.previous)} fact="Paid orders" />
+      <Metric label="Earnings" value={<AgentMoney value={money(metrics.earned.current, currency)} />} href="/agent/reports" change={percentChange(metrics.earned.current, metrics.earned.previous)} fact={commissionFact} />
     </div>
   );
 }
@@ -141,11 +144,11 @@ async function PendingPayments({ pendingP }: { pendingP: ReturnType<typeof getAg
   const pending = await pendingP;
   return (
     <>
-      <Link href="/agent/bookings" className={styles.actionRow}>
+      <Link href="/agent/bookings?queue=payment_due" className={styles.actionRow}>
         <span><Ticket className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />Awaiting payment</span>
         <strong>{pending.count}</strong>
       </Link>
-      {pending.count > 0 ? <Link href="/agent/bookings" className={styles.actionRow}><span>Amount due</span><strong className="text-primary">{money(pending.amount, pending.currency)}</strong></Link> : null}
+      {pending.amounts.map(({ amount, currency }) => <Link key={currency} href="/agent/bookings?queue=payment_due" className={styles.actionRow}><span>Amount due</span><strong className="text-primary"><AgentMoney value={money(amount, currency)} /></strong></Link>)}
     </>
   );
 }
@@ -159,7 +162,7 @@ async function RecentActivity({ activityP }: { activityP: ReturnType<typeof getA
 }
 
 function Metric({ label, value, href, change, fact }: {
-  label: string; value: string; href: string; change: number | null; fact: string;
+  label: string; value: React.ReactNode; href: string; change: number | null; fact: string;
 }) {
   return (
     <Link href={href} className={styles.metric}>

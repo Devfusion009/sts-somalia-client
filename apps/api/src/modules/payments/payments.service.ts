@@ -1,10 +1,11 @@
+import { getPaymentGateways } from "../../infra/payment-config";
 import { Injectable } from "@nestjs/common";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RlsSupabaseService } from "../../infra/supabase/rls-supabase.service";
 import { AdminSupabaseService } from "../../infra/supabase/admin-supabase.service";
 import { OrdersService } from "../orders/orders.service";
 import { SifaloService, type SifaloSettlement } from "./sifalo.service";
-import { WaafiService } from "./waafi.service";
+import { WaafiService, type WaafiSettlement } from "./waafi.service";
 import { getPaymentMethod } from "./registry";
 import { initiateWithProvider } from "./providers";
 import type { InitiationResult, InitiatePaymentInput, RecordPaymentInput } from "@sts/shared-types";
@@ -145,20 +146,32 @@ export class PaymentsService {
 
     switch (result.type) {
       case "success": {
-        await admin.from("payments").update({ status: "succeeded", provider_ref: result.providerRef ?? null }).eq("id", payment.id);
+        if (method.provider === "waafi") {
+          const gateway = (await getPaymentGateways()).waafi;
+          if (!gateway) return { error: "Payment received; confirmation pending." };
+          const { error } = await admin.rpc("settle_waafi_transaction", {
+            p_reference_id: payment.id, p_environment: gateway.environment, p_merchant_uid: gateway.merchantUid,
+            p_transaction_id: result.providerRef ?? "", p_amount: amount, p_currency: order.currency,
+          });
+          if (error) return { error: "Payment received; confirmation pending." };
+        } else {
+          const { error } = await admin.from("payments").update({ status: "succeeded", provider_ref: result.providerRef ?? null }).eq("id", payment.id);
+          if (error) return { error: "Payment received; confirmation pending." };
+        }
         return { error: null, result, orderId: order.id };
       }
       case "redirect":
-        await admin.from("payments").update({ provider_ref: result.providerRef ?? null }).eq("id", payment.id);
+        await admin.from("payments").update({ provider_ref: result.providerRef ?? null }).eq("id", payment.id).in("status", ["processing", "requires_action"]);
         return { error: null, result, orderId: order.id };
       case "instructions":
         await admin
           .from("payments")
           .update({ status: "requires_action", instructions: result.instructions, provider_ref: result.providerRef ?? null })
-          .eq("id", payment.id);
+          .eq("id", payment.id).in("status", ["processing", "requires_action"]);
         return { error: null, result, orderId: order.id };
       case "error":
-        await admin.from("payments").update({ status: "failed" }).eq("id", payment.id);
+        if (method.provider === "waafi") await admin.rpc("fail_waafi_attempt", { p_reference_id: payment.id });
+        await admin.from("payments").update({ status: "failed" }).eq("id", payment.id).in("status", ["processing", "requires_action"]);
         return { error: result.message };
     }
   }
@@ -209,11 +222,26 @@ export class PaymentsService {
     return { status: await this.waafi.settle(payment.id), orderId: payment.order_id };
   }
 
+  async waafiStatus(referenceId: string, kind: "payment" | "topup") {
+    const { data: row } = await this.rls.get().from(kind === "payment" ? "payments" : "agency_topup_requests")
+      .select("id, provider").eq("id", referenceId).maybeSingle();
+    if (!row || row.provider !== "waafi") return { status: "ignored" as const };
+    return this.waafi.getStatus(referenceId);
+  }
+
+  async confirmWaafiTopupReturn(topupId: string, agencyId: string): Promise<WaafiSettlement> {
+    const { data: topup } = await this.rls.get().from("agency_topup_requests").select("id, status")
+      .eq("id", topupId).eq("agency_id", agencyId).eq("provider", "waafi").eq("rail", "online").maybeSingle();
+    if (!topup) return "ignored";
+    if (topup.status === "approved") return "paid";
+    return this.waafi.settle(topup.id);
+  }
+
   async cancelPendingPayment(paymentId: string) {
     const supabase = this.rls.get();
     // Visibility through RLS proves the caller may act on this payment.
-    const { data: payment } = await supabase.from("payments").select("id, order_id, status").eq("id", paymentId).maybeSingle();
-    if (!payment || payment.status !== "requires_action") return { ok: true };
+    const { data: payment } = await supabase.from("payments").select("id, order_id, status, provider").eq("id", paymentId).maybeSingle();
+    if (!payment || payment.status !== "requires_action" || payment.provider === "waafi") return { ok: true };
 
     await this.admin.get().from("payments").update({ status: "failed" }).eq("id", payment.id);
     return { ok: true };
@@ -221,7 +249,9 @@ export class PaymentsService {
 
   /** Admin marks a manual payment (bank transfer / cash) as received. Caller enforces admin via protectedAdminProcedure. */
   async adminConfirmPayment(paymentId: string) {
-    await this.admin.get().from("payments").update({ status: "succeeded" }).eq("id", paymentId);
+    const { data, error } = await this.admin.get().from("payments").update({ status: "succeeded" })
+      .eq("id", paymentId).eq("provider", "manual").eq("status", "requires_action").select("id");
+    if (error || !data?.length) throw new Error("Only pending manual payments can be confirmed here.");
     return { ok: true };
   }
 
@@ -236,6 +266,9 @@ export class PaymentsService {
     const { data: order } = await admin.from("orders").select("id, currency, total").eq("id", input.orderId).maybeSingle();
     if (!order) return { error: "We could not find this order." };
 
+    const { data: pendingWaafi, error: pendingError } = await admin.from("waafi_payment_attempts").select("reference_id")
+      .eq("order_id", order.id).in("status", ["initiating", "pending"]).limit(1);
+    if (!pendingError && pendingWaafi?.length) return { error: "A WaafiPay payment is awaiting confirmation." };
     const paidTotal = await this.getPaidTotal(admin, order.id);
     const remaining = Number(order.total) - paidTotal;
     if (input.amount > remaining + 0.01) {

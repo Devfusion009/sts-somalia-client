@@ -1,14 +1,12 @@
+import { createHash, randomUUID } from "node:crypto";
 import "server-only";
 import Redis from "ioredis";
 
 /**
  * Redis cache for public, viewer-independent reads (catalog, settings).
  *
- * Why it exists: the database is hosted in us-east-1 while the app runs in
- * Mogadishu, so every Supabase round trip costs 0.2 to 1 s of pure network.
- * A cache hit on the same host costs well under a millisecond. Redis here is
- * only ever a cache: every value can be rebuilt from Supabase, so any Redis
- * failure degrades to "slower", never "broken".
+ * Shared catalogs avoid repeated database round trips. Redis is optional:
+ * commands have bounded deadlines and failures fall back to Supabase.
  *
  * Rules for what may be cached:
  * - Public data that every visitor sees the same (published catalog, site
@@ -18,8 +16,8 @@ import Redis from "ioredis";
  *   orders or anything per user.
  *
  * Invalidation: every key written through cachedRead() can carry tags. A
- * tag is a Redis set of the keys under it; invalidateCache("visa") deletes
- * them all. apps/api uses the same key and tag layout against the same
+ * tag carries a random generation; invalidation changes it atomically.
+ * Fills started before an edit cannot publish into the new generation. apps/api uses the same key and tag layout against the same
  * Redis, so an admin edit made in either app clears both. The TTL is the
  * safety net when an invalidation is missed.
  */
@@ -29,7 +27,38 @@ const CONNECT_TIMEOUT_MS = 1000;
 /** After this many consecutive failures Redis is skipped for BREAKER_MS. */
 const BREAKER_THRESHOLD = 3;
 const BREAKER_MS = 30_000;
-const TAG_PREFIX = "tag:";
+
+// Both apps share this wire format. Random tag generations remain safe after eviction.
+const READ_CACHE = `
+local out = { redis.call('GET', KEYS[1]) or '' }
+for i = 2, #KEYS do
+  local version = redis.call('GET', KEYS[i])
+  if not version then
+    version = ARGV[1] .. ':' .. i
+    redis.call('SET', KEYS[i], version)
+  end
+  out[#out + 1] = version
+end
+return out`;
+const WRITE_CACHE = `
+for i = 2, #KEYS do
+  if redis.call('GET', KEYS[i]) ~= ARGV[i + 1] then return 0 end
+end
+redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+return 1`;
+const INVALIDATE_CACHE = `
+for i = 1, #KEYS do redis.call('SET', KEYS[i], ARGV[1] .. ':' .. i) end
+return 1`;
+
+function cacheScope(): string {
+  const source = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? 'local';
+  const project = createHash('sha256').update(source.replace(/\/$/, '')).digest('hex').slice(0, 12);
+  return `sts:cache:v2:${process.env.DEPLOYMENT_ENV ?? 'development'}:${project}:`;
+}
+
+
+/** Namespace raw-reference caches with the same environment/project boundary. */
+export function redisCacheKey(key: string): string { return `${cacheScope()}raw:${key}`; }
 
 let client: Redis | undefined;
 let failures = 0;
@@ -84,16 +113,12 @@ function getClient(): Redis | null {
     client.on("error", (err) => recordFailure(`connection error: ${err.message}`));
     client.on("ready", recordSuccess);
   }
-  return client;
+  if (client.status === 'wait') void client.connect().catch(() => {});
+  return client.status === 'ready' ? client : null;
 }
 
 /** Fills already in flight on this instance, so a burst of misses runs one query. */
 const inFlight = new Map<string, Promise<unknown>>();
-
-/** ±10% so keys written together do not all expire together. */
-function jitter(ttlSeconds: number): number {
-  return Math.max(1, Math.round(ttlSeconds * (0.9 + Math.random() * 0.2)));
-}
 
 export type CacheOptions = {
   /** Tags the key can be invalidated under, e.g. ["visa"]. */
@@ -115,56 +140,66 @@ export async function cachedRead<T>(
   fetchFresh: () => Promise<T>,
   options: CacheOptions = {}
 ): Promise<T> {
+  const tags = [...new Set(options.tags ?? [])].sort();
+  const prefix = cacheScope();
+  const keys = [`${prefix}data:${key}`, ...tags.map((tag) => `${prefix}tag:${tag}`)];
   const redis = getClient();
-
+  let versions: string[] | null = null;
   if (redis) {
     try {
-      const hit = await redis.get(key);
-      recordSuccess();
-      if (hit !== null) return JSON.parse(hit) as T;
+      const [raw, ...current] = await redis.eval(READ_CACHE, keys.length, ...keys, randomUUID()) as string[];
+      versions = current;
+      if (raw) {
+        try {
+          const entry = JSON.parse(raw) as { tags: string[]; versions: string[]; value: T };
+          if (Object.prototype.hasOwnProperty.call(entry, "value") && JSON.stringify(entry.tags) === JSON.stringify(tags) && JSON.stringify(entry.versions) === JSON.stringify(versions)) {
+            recordSuccess();
+            return entry.value;
+          }
+        } catch { /* Corrupt entries are replaced by a fresh read. */ }
+      }
     } catch (err) {
-      recordFailure(`read failed for "${key}": ${(err as Error).message}`);
+      recordFailure(`cache read failed: ${(err as Error).message}`);
     }
   }
-
-  const pending = inFlight.get(key) as Promise<T> | undefined;
+  // A read after invalidation must not join a fill from an older generation.
+  const flightKey = `${keys[0]}:${JSON.stringify(tags)}:${JSON.stringify(versions)}`;
+  const pending = inFlight.get(flightKey) as Promise<T> | undefined;
   if (pending) return pending;
-
   const fill = (async () => {
     const value = await fetchFresh();
-    const writer = getClient();
-    if (writer && value !== undefined && (options.cacheIf?.(value) ?? true)) {
-      const ttl = jitter(ttlSeconds);
+    // Never retry Redis after a failed read or publish an unversioned fill.
+    if (redis && versions && value !== undefined && (options.cacheIf?.(value) ?? true)) {
+      const ttl = Math.max(1, Math.round(ttlSeconds * (0.9 + Math.random() * 0.2)));
       try {
-        const pipeline = writer.multi().set(key, JSON.stringify(value), "EX", ttl);
-        for (const tag of options.tags ?? []) {
-          pipeline.sadd(`${TAG_PREFIX}${tag}`, key).expire(`${TAG_PREFIX}${tag}`, ttlSeconds * 2);
-        }
-        await pipeline.exec();
-      } catch (err) {
-        recordFailure(`write failed for "${key}": ${(err as Error).message}`);
-      }
-    }
+        await redis.eval(WRITE_CACHE, keys.length, ...keys,
+          JSON.stringify({ tags, versions, value }), ttl, ...versions);
+        recordSuccess();
+      } catch (err) { recordFailure(`cache write failed: ${(err as Error).message}`); }
+    } else if (redis && versions) { recordSuccess(); }
     return value;
-  })().finally(() => inFlight.delete(key));
-
-  inFlight.set(key, fill);
+  })().finally(() => inFlight.delete(flightKey));
+  inFlight.set(flightKey, fill);
   return fill;
 }
 
-/** Deletes every cached key stored under these tags, in this app and in apps/api. */
+/** Advances shared tag generations without enumerating keys or racing active fills. */
 export async function invalidateCache(...tags: string[]): Promise<void> {
-  const redis = getClient();
+  if (tags.length === 0) return;
+  let redis = getClient();
+  if (!redis && client && Date.now() >= breakerOpenUntil) {
+    const connecting = client;
+    await new Promise<void>((resolve) => {
+      const finish = () => { clearTimeout(timer); connecting.off('ready', finish); connecting.off('error', finish); resolve(); };
+      const timer = setTimeout(finish, COMMAND_TIMEOUT_MS);
+      connecting.once('ready', finish).once('error', finish);
+    });
+    redis = getClient();
+  }
   if (!redis || tags.length === 0) return;
   try {
-    for (const tag of tags) {
-      const setKey = `${TAG_PREFIX}${tag}`;
-      const keys = await redis.smembers(setKey);
-      if (keys.length > 0) await redis.del(...keys);
-      await redis.del(setKey);
-    }
-  } catch (err) {
-    // The TTL still expires the entries; an invalidation miss only delays an edit.
-    recordFailure(`invalidate failed for ${tags.join(", ")}: ${(err as Error).message}`);
-  }
+    const keys = [...new Set(tags)].sort().map((tag) => `${cacheScope()}tag:${tag}`);
+    await redis.eval(INVALIDATE_CACHE, keys.length, ...keys, randomUUID());
+    recordSuccess();
+  } catch (err) { recordFailure(`cache invalidation failed: ${(err as Error).message}`); }
 }

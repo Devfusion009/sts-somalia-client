@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { cachedRead, getRedisClient } from "@/lib/redis";
+import { cachedRead, invalidateCache } from "@/lib/redis";
 import { SOCIAL_PLATFORMS, type SocialLink, type SocialPlatform } from "@/lib/social-platforms";
 
 /**
@@ -28,7 +28,8 @@ const BANK_FALLBACK: BankTransferDetails = {
 
 async function readSetting(key: string): Promise<unknown> {
   const admin = createAdminClient();
-  const { data } = await admin.from("platform_settings").select("value").eq("key", key).maybeSingle();
+  const { data, error } = await admin.from("platform_settings").select("value").eq("key", key).maybeSingle();
+  if (error) throw error;
   return data?.value ?? null;
 }
 
@@ -44,7 +45,7 @@ export async function getSocialLinks(): Promise<SocialLink[]> {
       const e = entry as { platform?: unknown; url?: unknown };
       return isPlatform(e.platform) && typeof e.url === "string" && e.url ? [{ platform: e.platform, url: e.url }] : [];
     });
-  }).catch(() => []);
+  }, { tags: [`settings:${SOCIAL_KEY}`] }).catch(() => []);
 }
 
 export async function getBankTransfer(): Promise<BankTransferDetails> {
@@ -55,14 +56,10 @@ export async function getBankTransfer(): Promise<BankTransferDetails> {
       accountName: raw?.accountName || BANK_FALLBACK.accountName,
       accountNumber: raw?.accountNumber || BANK_FALLBACK.accountNumber,
     };
-  }).catch(() => BANK_FALLBACK);
+  }, { tags: [`settings:${BANK_KEY}`] }).catch(() => BANK_FALLBACK);
 }
 
 /** Drops the cached copy so the next read, on any page, sees the saved value. */
 export async function invalidateSetting(key: "social_links" | "bank_transfer"): Promise<void> {
-  try {
-    await getRedisClient()?.del(`settings:${key}`);
-  } catch {
-    // Cache is an optimisation; the TTL covers a missed delete.
-  }
+  await invalidateCache(`settings:${key}`);
 }

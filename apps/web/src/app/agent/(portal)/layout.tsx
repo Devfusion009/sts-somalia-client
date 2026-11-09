@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { AGENT_SERVICES } from "@/modules/agencies/services";
 import styles from "@/components/portal/operations-shell.module.css";
+import typography from "@/components/portal/agent-typography.module.css";
 
 /** Portal-scoped title — see the admin portal layout for why this lives on the layout. */
 export const metadata: Metadata = {
@@ -36,6 +37,8 @@ const NAV_GROUPS: PortalNavGroup[] = [
       { href: "/agent/customers", label: "Customers", icon: "profile" },
       { href: "/agent/finance", label: "Wallet", icon: "payouts" },
       { href: "/agent/reports", label: "Commissions & earnings", icon: "earnings" },
+      { href: "/agent/calendar", label: "Booking calendar", icon: "calendar" },
+      { href: "/agent/finance/transactions", label: "Transactions", icon: "payments" },
     ],
   },
   {
@@ -46,9 +49,7 @@ const NAV_GROUPS: PortalNavGroup[] = [
   {
     label: "Operations",
     items: [
-      { href: "/agent/calendar", label: "Event calendar", icon: "calendar" },
       { href: "/agent/finance/top-up", label: "Top up wallet", icon: "bank" },
-      { href: "/agent/finance/transactions", label: "Transactions", icon: "payments" },
       { href: "/agent/finance/withdrawals", label: "Withdraw earnings", icon: "bank" },
       { href: "/agent/finance/billing", label: "Billing", icon: "invoice" },
       { href: "/agent/markups", label: "Markups", icon: "catalog" },
@@ -103,7 +104,8 @@ export default async function AgentLayout({ children }: { children: React.ReactN
     return <PortalSuspendedNotice portalLabel="Agent Portal" />;
   }
 
-  const contexts = await getMyPartnerContexts(profile.id, profile.full_name);
+  // Account discovery is optional shell content; it must not block bookings or the wallet.
+  const contexts = getMyPartnerContexts(profile.id, profile.full_name).catch(() => []);
 
   return (
     <PortalShell
@@ -128,14 +130,14 @@ export default async function AgentLayout({ children }: { children: React.ReactN
       brandLogoUrl={agencyLogoUrl(membership.agency.logo_path)}
       brandName={membership.agency.name}
       headerExtra={<>
-        <Button size="sm" render={<Link href="/agent/book" />}><Plus className="size-3.5" aria-hidden="true" /><span className="max-sm:sr-only">New booking</span></Button>
+        {["owner", "admin", "booking_staff"].includes(membership.roleInAgency) ? <Button size="sm" render={<Link href="/agent/book" />}><Plus className="size-3.5" aria-hidden="true" /><span className="max-sm:sr-only">New booking</span></Button> : null}
         <AgentNotificationBell />
       </>}
     >
       <Suspense fallback={null}>
         <AgencyOnboarding agency={membership.agency} />
       </Suspense>
-      {children}
+      <div className={typography.portal}>{children}</div>
     </PortalShell>
   );
 }

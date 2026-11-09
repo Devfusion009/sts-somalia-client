@@ -20,9 +20,7 @@ import { PaymentsModule } from "./modules/payments/payments.module";
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
-    // No jobs registered yet — this is the shape that later replaces
-    // apps/web's Vercel Cron + admin-layout page-load fallback with a real
-    // in-process @Cron() on this always-on service.
+    // WaafiPay reconciliation runs independently of browser visits.
     ScheduleModule.forRoot(),
     SupabaseModule,
     RedisModule,

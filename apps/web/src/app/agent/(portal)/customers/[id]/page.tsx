@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -79,7 +80,7 @@ export default async function AgentCustomerDetailPage({
 
       <StatRail>
         <StatRailItem label="Bookings" value={orders.length} />
-        <StatRailItem label="Total spent" value={spent > 0 ? money(spent, currency) : "—"} />
+        <StatRailItem label="Total spent" value={spent > 0 ? <AgentMoney value={money(spent, currency)} /> : "—"} />
         <StatRailItem
           label="Last booking"
           value={lastBookingAt ? format(new Date(lastBookingAt), "d MMM yyyy") : "—"}
@@ -147,7 +148,7 @@ export default async function AgentCustomerDetailPage({
                       </Badge>
                     </TableCell>
                     <TableCell numeric className="text-sm font-medium">
-                      {money(Number(order.total), order.currency)}
+                      {<AgentMoney value={money(Number(order.total), order.currency)} />}
                     </TableCell>
                     <TableCell numeric className="text-sm text-muted-foreground">
                       {format(new Date(order.created_at), "d MMM yyyy")}

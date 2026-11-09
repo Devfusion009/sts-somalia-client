@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
@@ -162,7 +163,7 @@ export default async function BatchBookingPage({
                         {orderAwaitingPrice ? (
                           <span className="font-normal text-muted-foreground">On request</span>
                         ) : (
-                          money(Number(order.total), order.currency)
+                          <AgentMoney value={money(Number(order.total), order.currency)} />
                         )}
                       </TableCell>
                       <TableCell numeric>
@@ -191,22 +192,22 @@ export default async function BatchBookingPage({
               <dl className="space-y-2 text-sm">
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-muted-foreground">Net</dt>
-                  <dd className="tabular-nums">{money(total - margin, currency)}</dd>
+                  <dd className="tabular-nums">{<AgentMoney value={money(total - margin, currency)} />}</dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-muted-foreground">Your margin</dt>
-                  <dd className="tabular-nums">{money(margin, currency)}</dd>
+                  <dd className="tabular-nums">{<AgentMoney value={money(margin, currency)} />}</dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2 font-medium">
                   <dt>Customers pay</dt>
                   <dd className="font-heading text-base font-semibold tabular-nums">
-                    {awaitingPrice ? "On request" : money(total, currency)}
+                    {awaitingPrice ? "On request" : <AgentMoney value={money(total, currency)} />}
                   </dd>
                 </div>
                 {paidTotal > 0 ? (
                   <div className="flex items-baseline justify-between gap-3">
                     <dt className="text-muted-foreground">Paid</dt>
-                    <dd className="tabular-nums">{money(paidTotal, currency)}</dd>
+                    <dd className="tabular-nums">{<AgentMoney value={money(paidTotal, currency)} />}</dd>
                   </div>
                 ) : null}
                 {!awaitingPrice ? (
@@ -223,7 +224,7 @@ export default async function BatchBookingPage({
                         balance > 0 && "text-[color-mix(in_oklch,var(--brand-gold),black_30%)] dark:text-brand-gold"
                       )}
                     >
-                      {money(balance, currency)}
+                      {<AgentMoney value={money(balance, currency)} />}
                     </dd>
                   </div>
                 ) : null}

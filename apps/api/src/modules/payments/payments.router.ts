@@ -1,3 +1,4 @@
+import { getWaafiReadiness } from "../../infra/payment-config";
 import { z } from "zod";
 import { router, protectedProcedure, protectedAdminProcedure } from "../../trpc/trpc";
 import {
@@ -43,6 +44,20 @@ export const paymentsRouter = router({
       return svc.confirmWaafiReturn(input.paymentId);
     }),
 
+  waafiStatus: protectedProcedure
+    .input(z.object({ referenceId: z.string().uuid(), kind: z.enum(["payment", "topup"]) }))
+    .query(async ({ ctx, input }) => {
+      const svc = await ctx.resolve(PaymentsService);
+      return svc.waafiStatus(input.referenceId, input.kind);
+    }),
+
+  confirmWaafiTopup: protectedProcedure
+    .input(z.object({ topupId: z.string().uuid(), agencyId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const svc = await ctx.resolve(PaymentsService);
+      return svc.confirmWaafiTopupReturn(input.topupId, input.agencyId);
+    }),
+
   cancelPending: protectedProcedure.input(cancelPendingPaymentSchema).mutation(async ({ ctx, input }) => {
     const svc = await ctx.resolve(PaymentsService);
     return svc.cancelPendingPayment(input.paymentId);
@@ -83,6 +98,7 @@ export const paymentsRouter = router({
   }),
 
   admin: router({
+    waafiReadiness: protectedAdminProcedure.query(() => getWaafiReadiness()),
     confirmPayment: protectedAdminProcedure.input(adminConfirmPaymentSchema).mutation(async ({ ctx, input }) => {
       const svc = await ctx.resolve(PaymentsService);
       return svc.adminConfirmPayment(input.paymentId);

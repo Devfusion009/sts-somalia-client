@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import type { Metadata } from "next";
 import { Fragment } from "react";
 import { format } from "date-fns";
@@ -122,11 +123,11 @@ export default async function AgentTransactionsPage({
         <StatStripItem label="Money out" value={<SignedMoney amount={-totals.moneyOut} />} />
         <StatStripItem
           label="Net"
-          value={`${totals.net < 0 ? "−" : ""}${money(Math.abs(totals.net), "USD")}`}
+          value={<>{totals.net < 0 ? "−" : ""}<AgentMoney value={money(Math.abs(totals.net), "USD")} /></>}
         />
         <StatStripItem
           label="In flight"
-          value={money(totals.inFlight, "USD")}
+          value={<AgentMoney value={money(totals.inFlight, "USD")} />}
           tone={totals.inFlight > 0 ? "warn" : undefined}
         />
       </StatStrip>
@@ -193,7 +194,7 @@ export default async function AgentTransactionsPage({
                         <TableCell numeric className="text-muted-foreground">
                           {row.balanceAfter === null
                             ? "—"
-                            : `${row.balanceAfter < 0 ? "−" : ""}${money(Math.abs(row.balanceAfter), "USD")}`}
+                            : <>{row.balanceAfter < 0 ? "−" : ""}<AgentMoney value={money(Math.abs(row.balanceAfter), "USD")} /></>}
                         </TableCell>
                       </TableRow>
                     );

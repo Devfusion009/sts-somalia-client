@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { after } from "next/server";
 import { requireAdminPortalAccess } from "@/lib/auth/session";
 import { hasVerifiedFactor } from "@/lib/auth/mfa";
-import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { createClient } from "@/lib/supabase/server";
 import { PortalShell } from "@/components/portal/portal-shell";
 import { MfaSettings } from "@/modules/auth/components/mfa-settings";
@@ -51,14 +50,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // cookies() from within after().
   after(() => fireDueEventReminders(supabase));
 
-  const [mfaEnabled, contexts, { data: navCountsRaw }] = await Promise.all([
+  const [mfaEnabled, { data: navCountsRaw }] = await Promise.all([
     // Mandatory TOTP enrollment for the admin console: an account can hold
     // is_platform_admin and still have zero verified factors (enrollment is
     // opt-in everywhere else). Block every /admin route behind an inline
     // enrollment prompt rather than redirecting to /admin/security — that
     // route lives under this same layout, so a redirect would loop.
     hasVerifiedFactor(),
-    getMyPartnerContexts(profile.id, profile.full_name),
     supabase.rpc("admin_nav_counts"),
   ]);
 
@@ -73,7 +71,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       navGroups={navGroups}
       profileName={profile.full_name}
       profileEmail={profile.email}
-      contexts={contexts}
       isPlatformAdmin={profile.is_platform_admin}
       accent="admin"
       headerExtra={<AdminNotificationBell />}
