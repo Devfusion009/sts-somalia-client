@@ -21,6 +21,7 @@ import { commaList, parseLinks, replacePropertyLinks } from "@/modules/hotels/li
 import { sanitizeKey, parseDocumentSlotsJson } from "./visa-type-utils";
 import { COUNTRY_NAMES } from "@/lib/countries";
 import { invalidateCache } from "@/lib/redis";
+import { departureInput } from "@/modules/umrah/departure-input";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type ListingStatus = Database["public"]["Enums"]["listing_status"];
@@ -349,33 +350,6 @@ export async function updateUmrahPackage(_prev: ActionState, formData: FormData)
   revalidatePath("/admin/catalog/umrah");
   return { error: null };
 }
-
-function departureInput(formData: FormData) {
-  const text = (key: string) => String(formData.get(key) ?? "").trim();
-  const orNull = (key: string) => text(key) || null;
-  return {
-    departureId: text("departureId") || undefined,
-    packageId: text("packageId"),
-    departureDate: text("departureDate"),
-    returnDate: text("returnDate"),
-    totalSeats: Number(text("totalSeats")),
-    offlineSeats: Number(text("offlineSeats") || 0),
-    priceOverride: text("priceOverride") === "" ? null : Number(text("priceOverride")),
-    outboundAirline: orNull("outboundAirline"),
-    outboundFlightNumber: orNull("outboundFlightNumber"),
-    outboundDepartsAt: orNull("outboundDepartsAt"),
-    outboundArrivesAt: orNull("outboundArrivesAt"),
-    returnAirline: orNull("returnAirline"),
-    returnFlightNumber: orNull("returnFlightNumber"),
-    returnDepartsAt: orNull("returnDepartsAt"),
-    returnArrivesAt: orNull("returnArrivesAt"),
-    baggageNote: orNull("baggageNote"),
-    salesCloseDays: Number(text("salesCloseDays") || 0),
-    // A cancelled departure posts no status (the field is disabled) and stays cancelled.
-    status: (text("status") || null) as "open" | null,
-  };
-}
-
 function revalidateUmrahPackage(packageId: string) {
   revalidatePath("/admin/catalog/umrah");
   revalidatePath(`/admin/catalog/umrah/${packageId}`);

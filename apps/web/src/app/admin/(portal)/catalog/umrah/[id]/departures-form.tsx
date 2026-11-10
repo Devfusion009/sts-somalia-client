@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { SubmitButton } from "@/components/submit-button";
-import { useRestoreOnError } from "@/lib/use-restore-on-error";
 import type { ActionState } from "@/lib/auth/actions";
-import { createUmrahDeparture, deleteUmrahDeparture, updateUmrahDeparture } from "@/modules/admin/actions";
+import { deleteUmrahDeparture } from "@/modules/admin/actions";
 import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
+import { trpc } from "@/lib/trpc/react";
+import { trpcErrorMessage } from "@/lib/trpc/errors";
+import { departureInput } from "@/modules/umrah/departure-input";
 
 export type DepartureRow = {
   id: string;
@@ -136,10 +138,13 @@ export function DepartureDialog({
 }) {
   const airlinesListId = `airlines-${departure?.id ?? "new"}`;
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useActionState(departure ? updateUmrahDeparture : createUmrahDeparture, null);
-  const formRef = useRef<HTMLFormElement>(null);
-  useRestoreOnError(formRef, state);
-  useCloseAndRefresh(state, () => setOpen(false));
+  const router = useRouter();
+  const save = trpc.umrah.admin.packages.saveDeparture.useMutation({
+    onSuccess() {
+      setOpen(false);
+      router.refresh();
+    },
+  });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -156,12 +161,15 @@ export function DepartureDialog({
         <DialogHeader>
           <DialogTitle>{departure ? "Edit departure" : "Add departure"}</DialogTitle>
         </DialogHeader>
-        <form ref={formRef} action={formAction} className="space-y-5">
+        <form onSubmit={(event) => {
+          event.preventDefault();
+          if (!save.isPending) save.mutate(departureInput(new FormData(event.currentTarget)));
+        }} className="space-y-5">
           <input type="hidden" name="packageId" value={packageId} />
           {departure ? <input type="hidden" name="departureId" value={departure.id} /> : null}
-          {state?.error ? (
+          {save.error ? (
             <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
+              <AlertDescription>{trpcErrorMessage(save.error, "The departure could not be saved.")}</AlertDescription>
             </Alert>
           ) : null}
 
@@ -275,7 +283,9 @@ export function DepartureDialog({
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <SubmitButton pendingText="Saving…">{departure ? "Save changes" : "Add departure"}</SubmitButton>
+            <Button type="submit" disabled={save.isPending} loading={save.isPending}>
+              {save.isPending ? "Saving…" : departure ? "Save changes" : "Add departure"}
+            </Button>
           </div>
         </form>
       </DialogContent>

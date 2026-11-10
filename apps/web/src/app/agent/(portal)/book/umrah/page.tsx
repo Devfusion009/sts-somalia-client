@@ -61,7 +61,7 @@ export default async function AgentUmrahDeskPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Package</TableHead>
-                <TableHead numeric>Nights</TableHead>
+                <TableHead numeric>Days</TableHead>
                 <TableHead numeric>Next departure</TableHead>
                 <TableHead numeric>Seats left</TableHead>
                 <TableHead numeric>From</TableHead>

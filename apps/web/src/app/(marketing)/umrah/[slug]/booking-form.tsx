@@ -112,7 +112,9 @@ export function BookingForm({
   desk?: DeskContext;
 }) {
   const [state, formAction] = useActionState(action ?? createUmrahBooking, null);
-  const [selectedId, setSelectedId] = useState<string | null>(departures[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    departures.find((departure) => seatsLeftOn(departure) > 0)?.id ?? null
+  );
   const [numPilgrims, setNumPilgrims] = useState(1);
   const rates = useMemo(
     () =>
@@ -151,6 +153,7 @@ export function BookingForm({
   const orderMargin = desk ? marginOn(orderNet, desk.markup) : 0;
   const totalPrice = (orderNet + orderMargin) * orderCount;
   const needsSharing = rates.length > 0 && !selectedRate;
+  const cannotBook = !selected || needsSharing || seatsLeft < pilgrimsPerOrder * orderCount;
   const pilgrimStep = rates.length > 0 ? 3 : 2;
 
   if (departures.length === 0) {
@@ -175,7 +178,7 @@ export function BookingForm({
           {departures.map((d) => {
             const left = seatsLeftOn(d);
             const full = left <= 0;
-            const active = selectedId === d.id;
+            const active = selected?.id === d.id;
             return (
               <button
                 key={d.id}
@@ -207,7 +210,7 @@ export function BookingForm({
             );
           })}
         </div>
-        <input type="hidden" name="departure_id" value={selectedId ?? ""} />
+        <input type="hidden" name="departure_id" value={selected?.id ?? ""} />
       </section>
 
       {rates.length > 0 ? (
@@ -329,13 +332,13 @@ export function BookingForm({
               value="hold"
               size="lg"
               variant="outline"
-              disabled={!selectedId || needsSharing}
+              disabled={cannotBook}
               pendingText="Holding…"
             >
               Hold 24h
             </SubmitButton>
           ) : null}
-          <SubmitButton size="lg" disabled={!selectedId || needsSharing} pendingText="Creating booking…">
+          <SubmitButton size="lg" disabled={cannotBook} pendingText="Creating booking…">
             Continue to payment <ArrowRight data-icon="inline-end" aria-hidden="true" />
           </SubmitButton>
         </div>
