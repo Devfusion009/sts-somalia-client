@@ -8,5 +8,8 @@
       "path": "/api/cron/umrah-housekeeping",
       "schedule": "0 4 * * *"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": false
+  }
 }
