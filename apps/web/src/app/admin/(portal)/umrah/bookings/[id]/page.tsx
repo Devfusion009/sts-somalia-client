@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 import { getUmrahBookingAdmin } from "@/modules/umrah/fulfillment-admin-queries";
 import { formatMoney } from "@/modules/umrah/pricing";
+import { PriceAdjustment } from "@/modules/umrah/components/price-adjustment";
 import {
   ORDER_STATUS_LABELS,
   UMRAH_DOC_TYPE_LABELS,
@@ -292,6 +293,7 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
                     <span className="tabular-nums">{formatMoney(Number(line.line_total), booking.currency)}</span>
                   </li>
                 ))}
+                <PriceAdjustment total={Number(booking.total_price)} lines={booking.serviceLines} currency={booking.currency} className="px-5 py-3" />
               </ul>
             ) : (
               <p className="px-5 py-6 text-sm text-muted-foreground">No services</p>

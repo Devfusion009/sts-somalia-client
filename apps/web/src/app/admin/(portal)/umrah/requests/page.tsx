@@ -10,6 +10,7 @@ import { getSubmittedUmrahRequests } from "@/modules/umrah/custom-queries";
 import { categoryLabel, ROOM_SHARING_LABELS, UMRAH_TIER_LABELS } from "@/modules/umrah/services";
 import { formatMoney, tripDurationDays, tripReturnDate } from "@/modules/umrah/pricing";
 import { UmrahRequestActions, UmrahPriceQuoteForm } from "./request-actions";
+import { PriceAdjustment } from "@/modules/umrah/components/price-adjustment";
 
 export const metadata = { title: "Private Umrah Requests" };
 
@@ -114,7 +115,7 @@ export default async function AdminUmrahRequestsPage() {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {customer?.full_name ?? customer?.email ?? "Customer"}
-                          {customer?.phone ? ` · ${customer.phone}` : ""} · Submitted{" "}
+                          {customer?.phone ? ` · ${customer.phone}` : ""} · Created{" "}
                           {formatDistanceToNow(new Date(request.created_at), { addSuffix: true })}
                         </p>
                       </div>
@@ -140,6 +141,7 @@ export default async function AdminUmrahRequestsPage() {
                           <span className="shrink-0 tabular-nums">{formatMoney(line.line_total, currency)}</span>
                         </li>
                       ))}
+                      <PriceAdjustment total={price} lines={request.services} currency={currency} />
                     </ul>
                     {request.notes ? (
                       <p className="mt-2 rounded-lg bg-secondary/40 px-3 py-2 text-sm">

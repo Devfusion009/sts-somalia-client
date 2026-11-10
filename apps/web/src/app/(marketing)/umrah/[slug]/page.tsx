@@ -43,6 +43,10 @@ export default async function UmrahPackagePage({
   if (!pkg) notFound();
 
   const upcomingDepartures = bookableDepartures(pkg.umrah_package_departures ?? []);
+  const hasSeats = upcomingDepartures.some((departure) =>
+    departure.total_seats - departure.booked_seats - departure.offline_seats > 0
+  );
+  const bookingLabel = hasSeats ? "Book now" : upcomingDepartures.length > 0 ? "Fully booked" : "No departures";
 
   const includes: string[] = Array.isArray(pkg.includes) ? (pkg.includes as string[]) : [];
   const tier = packageTier(pkg);
@@ -145,8 +149,8 @@ export default async function UmrahPackagePage({
                 </span>
                 <span className="text-xs text-muted-foreground"> / pilgrim</span>
               </p>
-              <Button render={upcomingDepartures.length > 0 ? <a href="#book" /> : undefined} disabled={upcomingDepartures.length === 0} size="lg" className="shrink-0">
-                {upcomingDepartures.length > 0 ? "Book now" : "No departures"}
+              <Button render={hasSeats ? <a href="#book" /> : undefined} disabled={!hasSeats} size="lg" className="shrink-0">
+                {bookingLabel}
               </Button>
             </div>
           </header>
@@ -334,8 +338,8 @@ export default async function UmrahPackagePage({
                 <dd className="font-semibold">{tier.label}</dd>
               </div>
             </dl>
-            <Button render={upcomingDepartures.length > 0 ? <a href="#book" /> : undefined} disabled={upcomingDepartures.length === 0} size="lg" className="mt-5 hidden w-full lg:inline-flex">
-              {upcomingDepartures.length > 0 ? "Book now" : "No departures"}
+            <Button render={hasSeats ? <a href="#book" /> : undefined} disabled={!hasSeats} size="lg" className="mt-5 hidden w-full lg:inline-flex">
+              {bookingLabel}
             </Button>
           </div>
 

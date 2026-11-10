@@ -52,7 +52,7 @@ export default async function AgentUmrahBookingPage({
       />
 
       <StatRail>
-        <StatRailItem label="Nights" value={pkg.duration_days} />
+        <StatRailItem label="Days" value={pkg.duration_days} />
         <StatRailItem label="From / pilgrim" value={<AgentMoney value={money(Number(pkg.base_price), pkg.currency)} />} />
         <StatRailItem label="Departures" value={upcomingDepartures.length} />
         <StatRailItem label="Seats left" value={seatsOnSale} tone={seatsOnSale === 0 ? "warn" : undefined} />

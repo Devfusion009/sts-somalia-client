@@ -15,8 +15,10 @@ export type BookedForCustomer = { id: string; full_name: string; phone: string |
  * Native <select> on purpose: it's inside a dialog on every vertical, and
  * the Base UI Select trigger/label pitfalls aren't worth it for this.
  */
-export function BookedForFields({ customers }: { customers: BookedForCustomer[] }) {
-  const [selection, setSelection] = useState("self");
+export function BookedForFields({ customers, initialCustomerId }: { customers: BookedForCustomer[]; initialCustomerId?: string }) {
+  const [selection, setSelection] = useState(() =>
+    customers.find((customer) => customer.id === initialCustomerId)?.id ?? "self"
+  );
 
   return (
     <div role="group" aria-labelledby="agency-booking-heading" className="space-y-3 rounded-xl bg-secondary/40 p-4">
