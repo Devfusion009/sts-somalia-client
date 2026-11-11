@@ -24,11 +24,11 @@ export default async function BookingDeskLayout({
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <Suspense fallback={<div className="h-13 rounded-xl bg-card" />}><ServiceTabs hasCustomer={customers.length > 0} /></Suspense>
         <DeskSteps hasCustomer={customers.length > 0} />
         {customers.length > 0 ? (
           <BookingContextBar customers={customers} available={available} />
         ) : null}
+        <Suspense fallback={<div className="h-13 rounded-xl bg-card" />}><ServiceTabs hasCustomer={customers.length > 0} /></Suspense>
       </div>
       {children}
     </div>

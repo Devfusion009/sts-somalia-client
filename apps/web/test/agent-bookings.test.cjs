@@ -56,7 +56,7 @@ test('invalid dates and filters cannot reach the database; reversed ranges are c
 
 function queriesFor(response, rpcPayload) {
   const requests = [];
-  const db = createClient('https://sts-test.invalid', 'test-anon-key', { global: { fetch: async (url, init) => {
+  const db = createClient('https://sts-test.invalid', 'test-anon-key', { global: { fetch: async (url) => {
     requests.push(new URL(String(url)));
     if (String(url).includes('/rpc/agency_payment_queue_summary')) return new Response(JSON.stringify(rpcPayload instanceof Error ? { code: 'P0001', message: rpcPayload.message } : rpcPayload ?? { code: 'PGRST202' }), { status: rpcPayload instanceof Error ? 403 : rpcPayload ? 200 : 404, headers: { 'Content-Type': 'application/json' } });
     return new Response(JSON.stringify(typeof response === 'function' ? response(requests.length) : response), { status: 200, headers: { 'Content-Type': 'application/json', 'Content-Range': '0-0/1' } });
@@ -118,6 +118,7 @@ const moneyComponent = load('apps/web/src/components/portal/agent-money.tsx', {}
 async function renderPage(orders, role = 'booking_staff', params = {}) {
   let received;
   const { default: Page } = load(portal + 'page.tsx', {
+    '../service-palette': load('apps/web/src/app/agent/(portal)/service-palette.ts', {'@/components/portal/umrah-icon': load('apps/web/src/components/portal/umrah-icon.tsx')}),
     'next/link': link,
     'next/navigation': { redirect: (url) => { throw Object.assign(new Error('redirect'), { destination: url }); } },
     '@/lib/auth/session': { requireUser: async () => ({ id: 'agent' }) },

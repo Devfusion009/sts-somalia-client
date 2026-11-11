@@ -224,6 +224,7 @@ export type CommissionFilters = {
   from?: string;
   to?: string;
   itemType?: Database["public"]["Enums"]["order_item_type"];
+  statuses?: Database["public"]["Enums"]["commission_entry_status"][];
 };
 
 /**
@@ -253,6 +254,7 @@ function commissionEntriesQuery(
   if (filters?.from) query = query.gte("created_at", filters.from);
   if (filters?.to) query = query.lte("created_at", filters.to);
   if (filters?.itemType) query = query.eq("order.order_items.item_type", filters.itemType);
+  if (filters?.statuses?.length) query = query.in("status", filters.statuses);
 
   return query.order("created_at", { ascending: false }).order("id", { ascending: false });
 }
@@ -1188,7 +1190,7 @@ export async function getAgencyCustomerDetail(agencyId: string, customerId: stri
   const [{ data: customer }, { data: orders }, { data: flightQuotes }] = await Promise.all([
     supabase
       .from("agency_customers")
-      .select("id, full_name, email, phone, notes, profile_id, created_at, created_by")
+      .select("*")
       .eq("agency_id", agencyId)
       .eq("id", customerId)
       .maybeSingle(),
@@ -1212,3 +1214,22 @@ export async function getAgencyCustomerDetail(agencyId: string, customerId: stri
 }
 
 export type AgencyCustomerDetail = NonNullable<Awaited<ReturnType<typeof getAgencyCustomerDetail>>>;
+
+export type AgencyServiceMix = Record<Database["public"]["Enums"]["order_item_type"], number>;
+
+/** Order items per product in the period; matches the Bookings metric, which also counts items. */
+export async function getAgencyServiceMix(agencyId: string, from: Date, to: Date): Promise<AgencyServiceMix> {
+  const supabase = await createClient();
+  const types = ["flight", "hotel", "visa", "umrah", "hall"] as const;
+  const counts = await Promise.all(types.map(async (type) => {
+    const { count } = await supabase
+      .from("order_items")
+      .select("id, orders!inner(agency_id, created_at)", { count: "exact", head: true })
+      .eq("item_type", type)
+      .eq("orders.agency_id", agencyId)
+      .gte("orders.created_at", from.toISOString())
+      .lte("orders.created_at", to.toISOString());
+    return [type, count ?? 0] as const;
+  }));
+  return Object.fromEntries(counts) as AgencyServiceMix;
+}

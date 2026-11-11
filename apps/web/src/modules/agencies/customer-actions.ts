@@ -1,19 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
-import { phoneSchema } from "@/modules/partner-applications/schemas";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
 import { getActiveAgencyId } from "@/modules/orders/helpers";
-
-const customerSchema = z.object({
-  fullName: z.string().min(2, "Enter the customer's full name."),
-  email: z.string().email("Enter a valid email.").optional().or(z.literal("")),
-  phone: phoneSchema.optional(),
-  notes: z.string().optional(),
-});
+import { buildCustomerProfile } from "./customer-profile";
 
 export async function createAgencyCustomer(
   _prevState: ActionState,
@@ -27,26 +19,12 @@ export async function createAgencyCustomer(
     return { error: "You are not an active member of an agency." };
   }
 
-  const parsed = customerSchema.safeParse({
-    fullName: formData.get("fullName"),
-    email: formData.get("email") || "",
-    phone: formData.get("phone") || undefined,
-    notes: formData.get("notes") || undefined,
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
-  }
+  const built = await buildCustomerProfile(supabase, agencyId, profile.id, formData);
+  if ("error" in built) return { error: built.error };
 
-  const { error } = await supabase.from("agency_customers").insert({
-    agency_id: agencyId,
-    full_name: parsed.data.fullName,
-    email: parsed.data.email || null,
-    phone: parsed.data.phone ?? null,
-    notes: parsed.data.notes ?? null,
-    created_by: profile.id,
-  });
-
+  const { error } = await supabase.from("agency_customers").insert(built.row);
   if (error) {
+    if (built.uploadedPath) await supabase.storage.from("customer-documents").remove([built.uploadedPath]);
     return { error: error.message };
   }
 
@@ -71,33 +49,23 @@ export async function updateAgencyCustomer(
     return { error: "Invalid customer." };
   }
 
-  const parsed = customerSchema.safeParse({
-    fullName: formData.get("fullName"),
-    email: formData.get("email") || "",
-    phone: formData.get("phone") || undefined,
-    notes: formData.get("notes") || undefined,
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
-  }
+  const { data: existing } = await supabase.from("agency_customers")
+    .select("id, passport_file_path").eq("id", customerId).eq("agency_id", agencyId).maybeSingle();
+  if (!existing) return { error: "Customer not found." };
 
-  const { error } = await supabase
-    .from("agency_customers")
-    .update({
-      full_name: parsed.data.fullName,
-      email: parsed.data.email || null,
-      phone: parsed.data.phone ?? null,
-      notes: parsed.data.notes ?? null,
-    })
-    .eq("id", customerId)
-    .eq("agency_id", agencyId);
+  const built = await buildCustomerProfile(supabase, agencyId, profile.id, formData, existing.passport_file_path);
+  if ("error" in built) return { error: built.error };
 
+  const { error } = await supabase.from("agency_customers")
+    .update(built.fields).eq("id", customerId).eq("agency_id", agencyId);
   if (error) {
+    if (built.uploadedPath) await supabase.storage.from("customer-documents").remove([built.uploadedPath]);
     return { error: error.message };
   }
 
   revalidatePath("/agent/customers");
   revalidatePath(`/agent/customers/${customerId}`);
+  revalidatePath("/agent/book", "layout");
   return { error: null };
 }
 

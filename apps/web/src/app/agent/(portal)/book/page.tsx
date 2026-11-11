@@ -58,24 +58,27 @@ export default async function BookingDeskPage({ searchParams }: {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="New booking" status={service ? <Badge variant="info">{service.label}</Badge> : undefined} actions={<NewBookingCustomerDialog redirectTo={service?.href} />} />
+      <PageHeader title="New booking" status={service ? <Badge className="h-7 rounded-lg px-3">{service.label}</Badge> : undefined} actions={<NewBookingCustomerDialog redirectTo={service?.href} />} />
       <section className={`${styles.customerArea} space-y-5`} aria-labelledby="customer-picker-title">
         <div className={styles.sectionHead}>
-          <h2 id="customer-picker-title">Select a customer</h2>
-          <span className="text-xs text-muted-foreground tabular-nums">{total} customer{total === 1 ? "" : "s"}</span>
+          <div className="flex items-center gap-3">
+            <span className={styles.customerHeadingIcon}><UsersRound className="size-5" aria-hidden="true" /></span>
+            <h2 id="customer-picker-title">Select a customer</h2>
+          </div>
+          <Badge variant="secondary" className="h-6 px-2.5 tabular-nums">{total} customer{total === 1 ? "" : "s"}</Badge>
         </div>
-        <form role="search" className="flex flex-wrap items-center gap-2">
+        <form role="search" className={styles.customerSearch}>
           {service ? <input type="hidden" name="service" value={service.key} /> : null}
-          <InputGroup className="min-w-0 flex-1 sm:max-w-80">
+          <InputGroup className="min-w-0 flex-1 bg-card sm:max-w-96">
             <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
             <InputGroupInput type="search" name="q" defaultValue={q ?? ""} placeholder="Name or phone" aria-label="Search customers" />
           </InputGroup>
-          <Button type="submit" variant="outline">Search</Button>
+          <Button type="submit" variant="secondary" className="text-accent-foreground">Search</Button>
         </form>
         {ordered.length === 0 ? (
           <Empty><EmptyMedia variant="icon"><UsersRound /></EmptyMedia><EmptyTitle>{q ? `No customers match “${q}”` : "No customers"}</EmptyTitle></Empty>
         ) : (
-          <CustomerPickerTable redirectTo={service?.href} rows={ordered.map((row) => ({
+          <CustomerPickerTable redirectTo={service?.href} continueLabel={service?.action ?? "Choose service"} rows={ordered.map((row) => ({
             id: row.id, full_name: row.full_name, phone: row.phone, email: row.email,
             profile_id: row.profile_id, bookings: row.bookings, lastBookingAt: row.lastBookingAt,
           }))} />

@@ -12,22 +12,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { FieldError } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
 import { deleteAgencyCustomer, updateAgencyCustomer } from "@/modules/agencies/customer-actions";
-import { PhoneField } from "@/modules/partner-applications/components/phone-field";
+import { CustomerProfileFields, type CustomerProfile } from "@/modules/agencies/components/customer-profile-fields";
+import styles from "@/modules/agencies/components/customer-profile.module.css";
 
-type Customer = {
-  id: string;
-  full_name: string;
-  email: string | null;
-  phone: string | null;
-  notes: string | null;
-};
-
-export function EditCustomerDialog({ customer }: { customer: Customer }) {
+export function EditCustomerDialog({ customer }: { customer: CustomerProfile }) {
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(updateAgencyCustomer, null);
   const submitted = useRef(false);
@@ -42,45 +33,26 @@ export function EditCustomerDialog({ customer }: { customer: Customer }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        render={<Button variant="outline" size="icon" aria-label="Edit customer" title="Edit customer" />}
+        render={<Button variant="outline" />}
       >
-        <Pencil aria-hidden="true" />
+        <Pencil className="size-4" aria-hidden="true" />Edit profile
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Edit customer</DialogTitle>
+      <DialogContent className={styles.dialog}>
+        <DialogHeader className={styles.dialogHeader}>
+          <DialogTitle>Edit customer profile</DialogTitle>
         </DialogHeader>
         <form
           action={(formData) => {
             submitted.current = true;
             formAction(formData);
           }}
-          className="space-y-5"
+          className={styles.dialogForm}
         >
           <input type="hidden" name="customerId" value={customer.id} />
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="edit-fullName">
-                Full name <span className="text-destructive">*</span>
-              </FieldLabel>
-              <Input id="edit-fullName" name="fullName" defaultValue={customer.full_name} required />
-            </Field>
-            <Field>
-              <FieldLabel>Phone</FieldLabel>
-              <PhoneField name="phone" defaultValue={customer.phone ?? ""} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="edit-email">Email</FieldLabel>
-              <Input id="edit-email" name="email" type="email" defaultValue={customer.email ?? ""} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="edit-notes">Notes</FieldLabel>
-              <Textarea id="edit-notes" name="notes" rows={2} defaultValue={customer.notes ?? ""} />
-            </Field>
-            <FieldError>{state?.error}</FieldError>
-          </FieldGroup>
+          <div className={styles.dialogBody}><CustomerProfileFields customer={customer} withNotes /></div>
 
-          <DialogFooter>
+          <DialogFooter className={styles.dialogFooter}>
+            <FieldError className={styles.formError}>{state?.error}</FieldError>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>

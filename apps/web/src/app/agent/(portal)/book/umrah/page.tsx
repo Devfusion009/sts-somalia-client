@@ -64,7 +64,7 @@ export default async function AgentUmrahDeskPage() {
                 <TableHead numeric>Days</TableHead>
                 <TableHead numeric>Next departure</TableHead>
                 <TableHead numeric>Seats left</TableHead>
-                <TableHead numeric>From</TableHead>
+                <TableHead numeric>From / person</TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
                 </TableHead>
@@ -115,7 +115,7 @@ export default async function AgentUmrahDeskPage() {
                         variant="outline"
                         render={<Link href={`/agent/book/umrah/${pkg.slug}`} />}
                       >
-                        Select
+                        View package
                       </Button>
                     </TableCell>
                   </TableRow>

@@ -14,7 +14,6 @@ import { AgentNotificationBell } from "@/components/portal/agent-notification-be
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { AGENT_SERVICES } from "@/modules/agencies/services";
 import styles from "@/components/portal/operations-shell.module.css";
 import typography from "@/components/portal/agent-typography.module.css";
 
@@ -40,11 +39,6 @@ const NAV_GROUPS: PortalNavGroup[] = [
       { href: "/agent/calendar", label: "Booking calendar", icon: "calendar" },
       { href: "/agent/finance/transactions", label: "Transactions", icon: "payments" },
     ],
-  },
-  {
-    label: "Book travel",
-    alwaysOpen: true,
-    items: AGENT_SERVICES.map((service) => ({ href: service.href, label: service.label, icon: service.icon })),
   },
   {
     label: "Operations",

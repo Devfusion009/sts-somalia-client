@@ -2,8 +2,6 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
-import { phoneSchema } from "@/modules/partner-applications/schemas";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
@@ -13,6 +11,7 @@ import {
   BOOKING_CUSTOMER_MAX_AGE,
   MAX_BATCH_CUSTOMERS,
 } from "./booking-context";
+import { buildCustomerProfile } from "./customer-profile";
 
 /**
  * None of these redirect. A Server Action redirect() to a portal path is
@@ -22,12 +21,6 @@ import {
  * under /agent. Callers navigate client-side instead; see
  * signInToPortalAction for the same workaround on the login path.
  */
-
-const newCustomerSchema = z.object({
-  fullName: z.string().min(2, "Enter the customer's full name."),
-  phone: phoneSchema.optional(),
-  email: z.string().email("Enter a valid email.").optional().or(z.literal("")),
-});
 
 async function setCookie(customerIds: string[]) {
   const store = await cookies();
@@ -106,28 +99,17 @@ export async function createBookingCustomer(
     return { error: "You are not an active member of an agency." };
   }
 
-  const parsed = newCustomerSchema.safeParse({
-    fullName: formData.get("fullName"),
-    phone: formData.get("phone") || undefined,
-    email: formData.get("email") || "",
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
-  }
+  const built = await buildCustomerProfile(supabase, agencyId, profile.id, formData);
+  if ("error" in built) return { error: built.error };
 
   const { data, error } = await supabase
     .from("agency_customers")
-    .insert({
-      agency_id: agencyId,
-      full_name: parsed.data.fullName,
-      phone: parsed.data.phone ?? null,
-      email: parsed.data.email || null,
-      created_by: profile.id,
-    })
+    .insert(built.row)
     .select("id")
     .single();
 
   if (error || !data) {
+    if (built.uploadedPath) await supabase.storage.from("customer-documents").remove([built.uploadedPath]);
     return { error: error?.message ?? "Could not save this customer." };
   }
 

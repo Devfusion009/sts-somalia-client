@@ -1,14 +1,14 @@
+import { UmrahIcon } from "@/components/portal/umrah-icon";
 import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import {
   AlertCircle,
-  Building2,
+  BedDouble,
   CheckCircle2,
   Download,
   FileText,
-  Landmark,
   PartyPopper,
   Plane,
   type LucideIcon,
@@ -28,10 +28,10 @@ import { PayFromWalletForm } from "./pay-from-wallet-form";
 import { hallAwaitingQuote } from "@sts/shared-types";
 
 const ITEM_ICON: Record<string, LucideIcon> = {
-  hotel: Building2,
+  hotel: BedDouble,
   flight: Plane,
   visa: FileText,
-  umrah: Landmark,
+  umrah: UmrahIcon,
   hall: PartyPopper,
 };
 

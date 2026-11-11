@@ -843,6 +843,29 @@ export type Database = {
       }
       agency_customers: {
         Row: {
+          residence_country: string | null
+          city: string | null
+          postal_code: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
+          preferred_cabin: string | null
+          travel_preferences: string | null
+          address: string | null
+          birth_place: string | null
+          date_of_birth: string | null
+          first_name: string | null
+          gender: string | null
+          last_name: string | null
+          middle_name: string | null
+          nationality: string | null
+          passport_expiry_date: string | null
+          passport_file_path: string | null
+          passport_issuance_location: string | null
+          passport_issue_date: string | null
+          passport_issuing_country: string | null
+          passport_number: string | null
+          whatsapp: string | null
           agency_id: string
           created_at: string
           created_by: string | null
@@ -855,6 +878,29 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          residence_country?: string | null
+          city?: string | null
+          postal_code?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
+          preferred_cabin?: string | null
+          travel_preferences?: string | null
+          address?: string | null
+          birth_place?: string | null
+          date_of_birth?: string | null
+          first_name?: string | null
+          gender?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          nationality?: string | null
+          passport_expiry_date?: string | null
+          passport_file_path?: string | null
+          passport_issuance_location?: string | null
+          passport_issue_date?: string | null
+          passport_issuing_country?: string | null
+          passport_number?: string | null
+          whatsapp?: string | null
           agency_id: string
           created_at?: string
           created_by?: string | null
@@ -867,6 +913,29 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          residence_country?: string | null
+          city?: string | null
+          postal_code?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
+          preferred_cabin?: string | null
+          travel_preferences?: string | null
+          address?: string | null
+          birth_place?: string | null
+          date_of_birth?: string | null
+          first_name?: string | null
+          gender?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          nationality?: string | null
+          passport_expiry_date?: string | null
+          passport_file_path?: string | null
+          passport_issuance_location?: string | null
+          passport_issue_date?: string | null
+          passport_issuing_country?: string | null
+          passport_number?: string | null
+          whatsapp?: string | null
           agency_id?: string
           created_at?: string
           created_by?: string | null

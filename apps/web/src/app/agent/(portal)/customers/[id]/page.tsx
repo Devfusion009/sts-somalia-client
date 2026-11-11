@@ -7,7 +7,7 @@ import { BackLink } from "@/components/back-link";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyCustomerDetail } from "@/modules/agencies/queries";
 import { Badge, statusBadgeVariant } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 import { money } from "@/lib/money";
@@ -19,6 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CustomerProfileOverview } from "@/modules/agencies/components/customer-profile-overview";
+import { SelectCustomerButton } from "@/modules/agencies/components/select-customer-button";
+import styles from "@/modules/agencies/components/customer-profile.module.css";
 import { EditCustomerDialog, DeleteCustomerButton } from "./customer-actions-ui";
 
 export const metadata = { title: "Customer" };
@@ -52,26 +55,34 @@ export default async function AgentCustomerDetailPage({
     .reduce((sum, o) => sum + Number(o.total), 0);
   const currency = orders[0]?.currency ?? "USD";
   const lastBookingAt = orders[0]?.created_at ?? null;
+  const profileComplete = [customer.first_name, customer.last_name, customer.gender, customer.date_of_birth,
+    customer.nationality, customer.phone, customer.passport_number, customer.passport_issuing_country,
+    customer.passport_issue_date, customer.passport_expiry_date, customer.passport_file_path].every(Boolean);
 
   return (
     <div className="space-y-6">
       <div className="space-y-4">
         <BackLink href="/agent/customers" label="Customers" />
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-              <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">
-                {customer.full_name}
-              </h1>
-              {customer.profile_id ? <Badge variant="info">STS account</Badge> : null}
+        <header className={styles.profileHero}>
+          <div className={styles.identity}>
+            <span className={styles.avatar} aria-hidden="true">{customer.full_name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")}</span>
+            <div className="min-w-0 space-y-2">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">
+                  {customer.full_name}
+                </h1>
+                {customer.profile_id ? <Badge variant="info">STS account</Badge> : null}
+                <Badge variant={profileComplete ? "success" : "warning"}>{profileComplete ? "Profile complete" : "Details missing"}</Badge>
+              </div>
+              <div className="text-xs break-words text-muted-foreground">
+                {[customer.email, customer.phone, `Added ${format(new Date(customer.created_at), "d MMM yyyy")}`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </div>
             </div>
-            <p className="text-sm break-words text-muted-foreground">
-              {[customer.email, customer.phone, `Added ${format(new Date(customer.created_at), "d MMM yyyy")}`]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <SelectCustomerButton customerId={customer.id} label="New booking" redirectTo="/agent/book" variant="default" />
             <EditCustomerDialog customer={customer} />
             <DeleteCustomerButton customerId={customer.id} hasBookings={orders.length > 0} />
           </div>
@@ -88,16 +99,7 @@ export default async function AgentCustomerDetailPage({
         <StatRailItem label="Flight quotes" value={flightQuotes.length} />
       </StatRail>
 
-      {customer.notes ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Notes</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm whitespace-pre-line text-muted-foreground">
-            {customer.notes}
-          </CardContent>
-        </Card>
-      ) : null}
+      <CustomerProfileOverview customer={customer} />
 
       <section className="space-y-3">
         <div className="flex items-center gap-2">

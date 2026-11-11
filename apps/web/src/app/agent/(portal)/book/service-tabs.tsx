@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Hotel, Landmark, PartyPopper, Plane, Stamp } from "lucide-react";
+import { BedDouble, PartyPopper, Plane, Stamp } from "lucide-react";
+import { UmrahIcon } from "@/components/portal/umrah-icon";
 import { stripPortalPrefix } from "@/lib/subdomain";
 import { AGENT_SERVICES, agentServiceStartHref } from "@/modules/agencies/services";
 import styles from "../workspace.module.css";
 
-const ICONS = { flights: Plane, hotels: Hotel, visa: Stamp, umrah: Landmark, events: PartyPopper };
+const ICONS = { flights: Plane, hotels: BedDouble, visa: Stamp, umrah: UmrahIcon, events: PartyPopper };
 
 export function ServiceTabs({ hasCustomer }: { hasCustomer: boolean }) {
   const pathname = stripPortalPrefix(usePathname()) ?? "/";

@@ -93,7 +93,7 @@ export default async function AgentHotelDeskPage({
                     <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin className="size-3.5" aria-hidden="true" />{hotel.city}</div>
                     <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t border-border pt-4">
                       <dl><dt className="text-[10px] text-muted-foreground">From / night</dt><dd className="mt-1 font-heading text-base font-semibold tabular-nums">{hotel.minPrice !== null && hotel.minPrice > 0 ? <AgentMoney value={money(Number(hotel.minPrice), hotel.currency)} /> : "On request"}</dd></dl>
-                      <Button size="sm" variant="outline" render={<Link href={href} />}>Rooms<ArrowRight className="size-3.5" aria-hidden="true" /></Button>
+                      <Button size="sm" variant="outline" render={<Link href={href} />}>Rooms & rates<ArrowRight className="size-3.5" aria-hidden="true" /></Button>
                     </div>
                   </div>
                 </article>

@@ -64,7 +64,7 @@ export default async function AgentVisaWizardPage({
 
       <VisaTypeBanner visaType={visaType} />
 
-      <div className="grid gap-6 lg:grid-cols-[270px_1fr] xl:grid-cols-[270px_1fr_310px]">
+      <div className="grid items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[220px_minmax(0,1fr)_280px]">
         <WizardStepper
           applicationId={application.id}
           currentStep={step}
@@ -72,7 +72,7 @@ export default async function AgentVisaWizardPage({
           basePath="/agent/book/visa/apply"
         />
 
-        <section className="min-w-0 rounded-xl bg-card p-5 shadow-xs ring-1 ring-foreground/[0.08] sm:p-7">
+        <section aria-label="Application step" className="@container/visa-form min-w-0 rounded-xl bg-card p-5 shadow-xs ring-1 ring-foreground/[0.08] sm:p-7">
           {step === 1 ? (
             <StepApplicantType application={application} backHref="/agent/book/visa" desk />
           ) : step === 2 ? (
@@ -86,7 +86,7 @@ export default async function AgentVisaWizardPage({
           )}
         </section>
 
-        <div className="hidden xl:block">
+        <div className="min-w-0 lg:col-start-2 2xl:col-start-auto 2xl:sticky 2xl:top-24">
           <ApplicationSummary application={application} priceLabel="Price" />
         </div>
       </div>

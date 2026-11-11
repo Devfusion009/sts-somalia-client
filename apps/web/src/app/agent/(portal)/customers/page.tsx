@@ -23,6 +23,7 @@ import {
 import { SelectCustomerButton } from "@/modules/agencies/components/select-customer-button";
 import { Pager } from "@/components/dashboard/pager";
 import { parsePage } from "@/lib/pagination";
+import styles from "@/modules/agencies/components/customer-profile.module.css";
 import { AddCustomerForm } from "./add-customer-form";
 
 export const metadata = { title: "Customers" };
@@ -124,15 +125,10 @@ export default async function AgentCustomersPage({
               {customers.map((customer) => (
                 <TableRow key={customer.id}>
                   <TableCell>
-                    <div className="flex items-center gap-3">
-                    <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-primary">{customer.full_name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("")}</span>
-                    <Link
-                      href={`/agent/customers/${customer.id}`}
-                      className="rounded-sm font-semibold outline-none hover:text-primary hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-                    >
-                      {customer.full_name}
+                    <Link href={`/agent/customers/${customer.id}`} className={styles.directoryIdentity}>
+                      <span aria-hidden="true" className={styles.directoryAvatar}>{customer.full_name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("")}</span>
+                      <span><span className="font-semibold">{customer.full_name}</span><span className={styles.directoryLabel}>View profile →</span></span>
                     </Link>
-                    </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {customer.phone ?? customer.email ?? "—"}
