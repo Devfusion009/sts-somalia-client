@@ -1,8 +1,9 @@
 import { AgentMoney } from "@/components/portal/agent-money";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { format } from "date-fns";
-import { Banknote, CalendarDays, Download, FileText, Receipt } from "lucide-react";
+import Link from "next/link";
+import { format, startOfMonth } from "date-fns";
+import { Banknote, CalendarDays, CircleCheck, Clock3, Download, FileText, Receipt, Wallet, type LucideIcon } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
   getMyAgency,
@@ -18,7 +19,8 @@ import { Card } from "@/components/ui/card";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FilterChips, StatStrip, StatStripItem } from "@/components/dashboard/filter-chips";
+import { FilterChips } from "@/components/dashboard/filter-chips";
+import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
 import { parsePage } from "@/lib/pagination";
 import { Pager } from "@/components/dashboard/pager";
@@ -53,12 +55,22 @@ const ENTRY_STATUS_LABELS: Record<string, string> = {
 
 const usd = (amount: number) => money(amount, "USD");
 
+type EntryStatus = Database["public"]["Enums"]["commission_entry_status"];
+const VIEWS = {
+  total: { title: "All earnings", statuses: ["pending", "confirmed", "paid_out"] as EntryStatus[] },
+  month: { title: "Earned this month", statuses: ["pending", "confirmed", "paid_out"] as EntryStatus[] },
+  review: { title: "In review by STS", statuses: ["pending"] as EntryStatus[] },
+  available: { title: "Available to withdraw", statuses: ["confirmed"] as EntryStatus[] },
+} as const;
+type ViewKey = keyof typeof VIEWS;
+
 export default async function AgentReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; type?: string; page?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; type?: string; page?: string; view?: string }>;
 }) {
-  const { from, to, type, page: pageParam } = await searchParams;
+  const { from, to, type, page: pageParam, view: viewParam } = await searchParams;
+  const view = viewParam && viewParam in VIEWS ? (viewParam as ViewKey) : undefined;
   const itemType =
     type && type in VERTICAL_LABELS ? (type as OrderItemType) : undefined;
   const profile = await requireUser();
@@ -67,8 +79,13 @@ export default async function AgentReportsPage({
 
   const page = parsePage(pageParam);
   const filters = { from, to, itemType };
+  const entryFilters = {
+    ...filters,
+    ...(view === "month" ? { from: startOfMonth(new Date()).toISOString() } : {}),
+    statuses: view ? [...VIEWS[view].statuses] : undefined,
+  };
   const [{ rows: entries, total: entryTotal }, report, payouts, summary] = await Promise.all([
-    getAgencyCommissionEntries(membership.agency.id, filters, page),
+    getAgencyCommissionEntries(membership.agency.id, entryFilters, page),
     getAgencyCommissionReport(membership.agency.id, filters),
     getAgencyCommissionPayouts(membership.agency.id),
     getAgencyEarningsSummary(membership.agency.id),
@@ -78,6 +95,7 @@ export default async function AgentReportsPage({
       ...(from ? { from } : {}),
       ...(to ? { to } : {}),
       ...(type ? { type } : {}),
+      ...(view ? { view } : {}),
       ...(target > 1 ? { page: String(target) } : {}),
     });
     const qs = params.toString();
@@ -125,20 +143,12 @@ export default async function AgentReportsPage({
         <ReportFilters defaultFrom={from} defaultTo={to} defaultType={type} />
       </div>
 
-      <StatStrip>
-        <StatStripItem
-          label="Total earned"
-          value={<AgentMoney value={usd(report.earnedTotal)} />}
-          sub={`${report.earnedCount} settled ${report.earnedCount === 1 ? "booking" : "bookings"}`}
-        />
-        <StatStripItem label="Earned this month" value={<AgentMoney value={usd(report.earnedThisMonth)} />} sub={format(new Date(), "MMMM yyyy")} />
-        <StatStripItem
-          label="In review by STS"
-          value={<AgentMoney value={usd(summary.inReview)} />}
-          tone={summary.inReview > 0 ? "warn" : undefined}
-        />
-        <StatStripItem label="Available to withdraw" value={<AgentMoney value={usd(summary.available)} />} tone="primary" />
-      </StatStrip>
+      <nav aria-label="Earnings views" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <ViewCard href={withQuery(query({ view: view === "total" ? undefined : "total" }))} active={view === "total"} icon={Wallet} tone="var(--chart-1)" label="Total earned" value={<AgentMoney value={usd(report.earnedTotal)} />} sub={`${report.earnedCount} settled ${report.earnedCount === 1 ? "booking" : "bookings"}`} />
+        <ViewCard href={withQuery(query({ view: view === "month" ? undefined : "month" }))} active={view === "month"} icon={CalendarDays} tone="var(--chart-3)" label="Earned this month" value={<AgentMoney value={usd(report.earnedThisMonth)} />} sub={format(new Date(), "MMMM yyyy")} />
+        <ViewCard href={withQuery(query({ view: view === "review" ? undefined : "review" }))} active={view === "review"} icon={Clock3} tone="var(--chart-5)" label="In review by STS" value={<AgentMoney value={usd(summary.inReview)} />} />
+        <ViewCard href={withQuery(query({ view: view === "available" ? undefined : "available" }))} active={view === "available"} icon={CircleCheck} tone="var(--primary)" label="Available to withdraw" value={<AgentMoney value={usd(summary.available)} />} />
+      </nav>
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <section className="space-y-3">
@@ -178,12 +188,13 @@ export default async function AgentReportsPage({
 
         <section className="min-w-0 space-y-3">
           <div className="flex items-center gap-2">
-            <h2 className="font-heading text-base font-semibold">All entries</h2>
+            <h2 id="entries" className="font-heading text-base font-semibold">{view ? VIEWS[view].title : "All entries"}</h2>
             {entryTotal > 0 ? (
               <Badge variant="neutral" className="tabular-nums">
                 {entryTotal}
               </Badge>
             ) : null}
+            {view ? <Link href={withQuery(query({ view: undefined }))} className="ml-auto text-xs font-semibold text-primary hover:underline">Show all</Link> : null}
           </div>
           <Card className="overflow-hidden py-0">
             {entries.length === 0 ? (
@@ -195,38 +206,42 @@ export default async function AgentReportsPage({
               </Empty>
             ) : (
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-muted/60 [&_th]:text-[0.6875rem] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-muted-foreground">
                   <TableRow>
-                    <TableHead>Order</TableHead>
-                    <TableHead numeric>Rate</TableHead>
-                    <TableHead numeric>Commission</TableHead>
-                    <TableHead numeric>Markup</TableHead>
-                    <TableHead numeric className="bg-primary/5 text-primary">Total</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="pl-5">Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead numeric>Amount</TableHead>
+                    <TableHead className="pr-5">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {entries.map((entry: AgencyCommissionEntry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>
-                        <p className="font-mono text-xs font-medium">{entry.order?.order_number ?? "—"}</p>
-                        <p className="text-xs text-muted-foreground">{format(new Date(entry.created_at), "d MMM yyyy")}</p>
-                      </TableCell>
-                      <TableCell numeric className="text-muted-foreground">
-                        {entry.rate_applied}%
-                      </TableCell>
-                      <TableCell numeric>{<AgentMoney value={usd(Number(entry.commission_amount))} />}</TableCell>
-                      <TableCell numeric>{<AgentMoney value={usd(Number(entry.markup_amount))} />}</TableCell>
-                      <TableCell numeric className="bg-primary/5 font-semibold">
-                        {<AgentMoney value={usd(Number(entry.amount))} />}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusBadgeVariant(entry.status, ENTRY_STATUS_VARIANT)} className="capitalize">
-                          {ENTRY_STATUS_LABELS[entry.status] ?? entry.status.replace(/_/g, " ")}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {entries.map((entry: AgencyCommissionEntry) => {
+                    const reversed = entry.status === "reversed";
+                    const types = [...new Set((entry.order?.order_items ?? []).map((item) => VERTICAL_LABELS[item.item_type]))];
+                    const commission = Number(entry.commission_amount);
+                    const markup = Number(entry.markup_amount);
+                    return (
+                      <TableRow key={entry.id} className="hover:bg-muted/40">
+                        <TableCell className="whitespace-nowrap pl-5 tabular-nums text-muted-foreground">{format(new Date(entry.created_at), "d MMM yyyy")}</TableCell>
+                        <TableCell className="font-medium">{types.join(", ") || "Booking"}</TableCell>
+                        <TableCell>
+                          <span className="font-mono text-xs font-semibold text-primary">{entry.order?.order_number ?? "—"}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {[commission > 0 ? `${entry.rate_applied}% commission ${usd(commission)}` : null, markup > 0 ? `markup ${usd(markup)}` : null].filter(Boolean).join(" · ") || "No earning"}
+                          </span>
+                        </TableCell>
+                        <TableCell numeric className={cn("font-semibold tabular-nums", reversed ? "text-destructive" : "text-foreground")}>
+                          {reversed ? "−" : "+"}<AgentMoney value={usd(Number(entry.amount))} />
+                        </TableCell>
+                        <TableCell className="pr-5">
+                          <Badge variant={statusBadgeVariant(entry.status, ENTRY_STATUS_VARIANT)} className="capitalize">
+                            {ENTRY_STATUS_LABELS[entry.status] ?? entry.status.replace(/_/g, " ")}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
@@ -278,5 +293,29 @@ export default async function AgentReportsPage({
         </Card>
       </section>
     </div>
+  );
+}
+
+function ViewCard({ href, active, icon: Icon, tone, label, value, sub }: {
+  href: string; active: boolean; icon: LucideIcon; tone: string; label: string; value: React.ReactNode; sub?: string;
+}) {
+  return (
+    <Link
+      href={`${href}#entries`}
+      scroll={false}
+      aria-current={active ? "true" : undefined}
+      className={cn(
+        "group min-w-0 rounded-xl border bg-card p-4 transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-ring",
+        active ? "border-transparent ring-2" : "border-border"
+      )}
+      style={{ ["--tw-ring-color" as string]: tone, ...(active ? { background: `color-mix(in oklch, ${tone} 8%, var(--card))` } : {}) }}
+    >
+      <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <span className="flex size-7 items-center justify-center rounded-lg text-white" style={{ background: tone }}><Icon className="size-3.5" aria-hidden="true" /></span>
+        {label}
+      </span>
+      <span className="mt-3 block truncate font-heading text-xl font-semibold tracking-tight tabular-nums sm:text-2xl" style={{ color: active ? tone : undefined }}>{value}</span>
+      {sub ? <span className="mt-0.5 block truncate text-xs text-muted-foreground tabular-nums">{sub}</span> : null}
+    </Link>
   );
 }

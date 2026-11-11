@@ -1,13 +1,13 @@
+import { UmrahIcon } from "@/components/portal/umrah-icon";
 import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import {
   ArrowRight,
-  Building2,
+  BedDouble,
   CreditCard,
   Download,
-  Landmark,
   PartyPopper,
   Plane,
   Stamp,
@@ -45,10 +45,10 @@ import { umrahVoucherAvailable } from "@/modules/umrah/voucher-gate";
 import type { PilgrimReadiness } from "@/modules/umrah/readiness";
 
 const TYPE_ICON = {
-  hotel: Building2,
+  hotel: BedDouble,
   flight: Plane,
   visa: Stamp,
-  umrah: Landmark,
+  umrah: UmrahIcon,
   hall: PartyPopper,
 } as const;
 
