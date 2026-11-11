@@ -36,11 +36,13 @@ export function CountrySearchSelect({
   id,
   defaultValue,
   placeholder,
+  required = false,
 }: {
   name: string;
   id?: string;
   defaultValue?: string;
   placeholder: string;
+  required?: boolean;
 }) {
   const [value, setValue] = useState<string | null>(defaultValue || null);
 
@@ -52,10 +54,11 @@ export function CountrySearchSelect({
       value={value}
       onValueChange={setValue}
       autoHighlight
+      required={required}
     >
       <input type="hidden" name={name} value={value ?? ""} />
       <ComboboxInputGroup>
-        <ComboboxInput id={id} placeholder={placeholder} className="h-12 text-base font-medium" />
+        <ComboboxInput id={id} placeholder={placeholder} aria-required={required || undefined} className="h-12 text-base font-medium" />
       </ComboboxInputGroup>
       <ComboboxPortal>
         <ComboboxPositioner>
@@ -63,7 +66,7 @@ export function CountrySearchSelect({
             <ComboboxEmpty>No country found.</ComboboxEmpty>
             <ComboboxList>
               {(code: string) => (
-                <ComboboxItem key={code} value={code}>
+                <ComboboxItem key={code} value={code} className="min-h-11 py-2.5">
                   {labelOf(code)}
                 </ComboboxItem>
               )}

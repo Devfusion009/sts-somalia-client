@@ -11,12 +11,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { FieldError } from "@/components/ui/field";
+import styles from "@/modules/agencies/components/customer-profile.module.css";
+import { CustomerProfileFields } from "@/modules/agencies/components/customer-profile-fields";
 import { SubmitButton } from "@/components/submit-button";
 import { createAgencyCustomer } from "@/modules/agencies/customer-actions";
-import { PhoneField } from "@/modules/partner-applications/components/phone-field";
 
 export function AddCustomerForm() {
   const [open, setOpen] = useState(false);
@@ -36,8 +35,8 @@ export function AddCustomerForm() {
       <DialogTrigger render={<Button />}>
         <Plus data-icon="inline-start" aria-hidden="true" /> Add customer
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className={styles.dialog}>
+        <DialogHeader className={styles.dialogHeader}>
           <DialogTitle>New customer</DialogTitle>
         </DialogHeader>
         <form
@@ -45,31 +44,12 @@ export function AddCustomerForm() {
             submitted.current = true;
             formAction(formData);
           }}
-          className="space-y-5"
+          className={styles.dialogForm}
         >
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="fullName">
-                Full name <span className="text-destructive">*</span>
-              </FieldLabel>
-              <Input id="fullName" name="fullName" required autoComplete="off" />
-            </Field>
-            <Field>
-              <FieldLabel>Phone</FieldLabel>
-              <PhoneField name="phone" />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="email">Email</FieldLabel>
-              <Input id="email" name="email" type="email" />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="notes">Notes</FieldLabel>
-              <Textarea id="notes" name="notes" rows={2} placeholder="Preferences, passport info…" />
-            </Field>
-            <FieldError>{state?.error}</FieldError>
-          </FieldGroup>
+          <div className={styles.dialogBody}><CustomerProfileFields withNotes /></div>
 
-          <DialogFooter>
+          <DialogFooter className={styles.dialogFooter}>
+            <FieldError className={styles.formError}>{state?.error}</FieldError>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
