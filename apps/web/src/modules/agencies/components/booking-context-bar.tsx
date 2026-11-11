@@ -1,4 +1,5 @@
-import { UserRound, Users } from "lucide-react";
+import { UserRound, Users, Wallet } from "lucide-react";
+import { AgentMoney } from "@/components/portal/agent-money";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { money } from "@/lib/money";
@@ -20,55 +21,56 @@ export function BookingContextBar({
   currency?: string;
 }) {
   const [first] = customers;
+  if (!first) return null;
   const isGroup = customers.length > 1;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl bg-secondary/40 px-4 py-3">
-      <div className="flex min-w-0 items-center gap-3">
+    <section aria-label="Booking customer and wallet" className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4 rounded-xl border border-border bg-card px-4 py-4 sm:px-5">
+      <div className="flex min-w-0 max-w-full items-center gap-3">
         <span
           aria-hidden="true"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card text-foreground ring-1 ring-foreground/10"
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary"
         >
           {isGroup ? <Users className="size-4" /> : <UserRound className="size-4" />}
         </span>
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">Booking for</p>
+        <dl className="min-w-0 space-y-1">
+          <dt className="text-xs text-muted-foreground">Booking for</dt>
           {isGroup ? (
             <>
-              <p className="font-medium leading-tight">{customers.length} customers</p>
-              <p className="truncate text-xs text-muted-foreground">
+              <dd className="font-semibold leading-tight">{customers.length} customers</dd>
+              <dd className="truncate text-xs text-muted-foreground">
                 {customers.map((customer) => customer.full_name).join(" · ")}
-              </p>
+              </dd>
             </>
           ) : (
             <>
-              <p className="flex flex-wrap items-center gap-2 font-medium leading-tight">
+              <dd className="flex flex-wrap items-center gap-2 font-semibold leading-tight">
                 {first.full_name}
                 {first.profile_id ? <Badge variant="info">STS account</Badge> : null}
-              </p>
+              </dd>
               {first.phone || first.email ? (
-                <p className="truncate text-xs text-muted-foreground">
+                <dd className="truncate text-xs text-muted-foreground">
                   {[first.phone, first.email].filter(Boolean).join(" · ")}
-                </p>
+                </dd>
               ) : null}
             </>
           )}
-        </div>
+        </dl>
       </div>
 
-      <div className="flex items-center gap-5">
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">Available</p>
-          <p className="font-heading font-semibold tabular-nums leading-tight">
-            {money(available, currency)}
-          </p>
-        </div>
+      <div className="flex w-full flex-wrap items-center justify-between gap-3 border-t border-border pt-3 sm:w-auto sm:gap-5 sm:border-0 sm:pt-0">
+        <dl className="space-y-1">
+          <dt className="flex items-center gap-1.5 text-xs text-muted-foreground"><Wallet className="size-3.5" aria-hidden="true" />Available to spend</dt>
+          <dd className="font-heading font-semibold tabular-nums leading-tight text-foreground">
+            <AgentMoney value={money(available, currency)} />
+          </dd>
+        </dl>
         <form action={clearBookingCustomer}>
           <Button type="submit" variant="outline">
-            Change
+            {isGroup ? "Change customers" : "Change customer"}
           </Button>
         </form>
       </div>
-    </div>
+    </section>
   );
 }

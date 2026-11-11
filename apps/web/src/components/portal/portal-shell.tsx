@@ -13,7 +13,6 @@ import {
   Handshake,
   Users,
   Building2,
-  Hotel,
   BedDouble,
   Link2,
   Wallet,
@@ -73,6 +72,7 @@ import { rootOrigin, stripPortalPrefix } from "@/lib/subdomain";
 import { cn } from "@/lib/utils";
 import type { PartnerContext } from "@/modules/identity/queries";
 import { filterNavigationGroups } from "./navigation-search";
+import { UmrahIcon } from "./umrah-icon";
 
 // Icons are resolved from a string key (not passed as component references)
 // because PortalShell is a Client Component: Server Component layouts can
@@ -84,14 +84,14 @@ export const PORTAL_ICONS = {
   "become-partner": Handshake,
   team: Users,
   agency: Building2,
-  hotels: Hotel,
+  hotels: BedDouble,
   rooms: BedDouble,
   links: Link2,
   payouts: Wallet,
   applications: ClipboardCheck,
   orders: ShoppingCart,
   catalog: BookOpenCheck,
-  umrah: Landmark,
+  umrah: UmrahIcon,
   admin: ShieldCheck,
   visa: Stamp,
   flights: Plane,

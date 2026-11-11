@@ -106,7 +106,7 @@ function StepHeading({ title }: { index?: number; title: string }) {
 
 /** Back on the left, primary on the right; stacked full-width on phones (primary first). */
 const STEP_FOOTER =
-  "flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between max-sm:[&>*]:w-full";
+  "flex flex-col-reverse gap-3 border-t border-border pt-6 [&>*]:w-full [&_[data-slot=button]]:min-h-12 [&_[data-slot=button]]:px-5 [&_[data-slot=button]]:text-base @min-[30rem]/visa-form:flex-row @min-[30rem]/visa-form:items-center @min-[30rem]/visa-form:justify-between @min-[30rem]/visa-form:[&>*]:w-auto";
 
 function ErrorAlert({ state }: { state: ActionState }) {
   if (!state?.error) return null;
@@ -140,8 +140,8 @@ function Field({
   className?: string;
 }) {
   return (
-    <div className={cn("space-y-2 [&_input]:min-h-11 [&_input]:rounded-lg [&_[data-slot=select-trigger]]:min-h-11", className)}>
-      <Label htmlFor={htmlFor}>
+    <div className={cn("min-w-0 space-y-2 [&_input]:min-h-12 [&_input]:rounded-lg [&_input]:px-3.5 [&_input]:text-base [&_textarea]:min-h-24 [&_textarea]:px-3.5 [&_textarea]:text-base [&_[data-slot=select-trigger]]:min-h-12 [&_[data-slot=select-trigger]]:px-3.5 [&_[data-slot=select-trigger]]:text-base [&_[data-slot=combobox-trigger]]:min-h-12", className)}>
+      <Label htmlFor={htmlFor} className="text-sm font-medium text-foreground">
         {label}
         {required ? <span className="text-destructive"> *</span> : null}
       </Label>
@@ -157,21 +157,23 @@ function LabeledSelect({
   placeholder,
   options,
   id,
+  required = false,
 }: {
   name: string;
   defaultValue?: string | null;
   placeholder: string;
   options: Array<{ value: string; label: string }>;
   id?: string;
+  required?: boolean;
 }) {
   return (
-    <Select name={name} defaultValue={defaultValue || undefined} items={options}>
+    <Select name={name} defaultValue={defaultValue || undefined} items={options} required={required}>
       <SelectTrigger id={id} className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
         {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
+          <SelectItem key={option.value} value={option.value} className="min-h-11 py-2.5">
             {option.label}
           </SelectItem>
         ))}
@@ -257,6 +259,7 @@ function MemberDialog({
             <LabeledSelect
               id={`member-rel-${member?.id ?? "new"}`}
               name="relationship"
+              required
               defaultValue={member?.relationship}
               placeholder="Select relationship"
               options={RELATIONSHIPS.filter((r) => r !== "self").map((rel) => ({
@@ -279,8 +282,9 @@ function MemberDialog({
             <CountrySearchSelect
               id={`member-nat-${member?.id ?? "new"}`}
               name="nationality"
+              required
               defaultValue={member?.nationality ?? undefined}
-              placeholder="Select nationality"
+              placeholder="Search nationality"
             />
           </Field>
           <Field label="Passport number" htmlFor={`member-passport-${member?.id ?? "new"}`} required>
@@ -308,7 +312,7 @@ function MemberDialog({
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <SubmitButton pendingText="Saving…">{member ? "Save changes" : "Add member"}</SubmitButton>
+            <SubmitButton pendingText="Saving…" className="min-h-12 px-5 text-base">{member ? "Save changes" : "Add member"}</SubmitButton>
           </div>
         </form>
       </DialogContent>
@@ -479,7 +483,7 @@ export function StepApplicantType({
         <div className={STEP_FOOTER}>
           <BackButton href={backHref} />
           <SubmitButton size="lg" pendingText="Saving…" className="min-w-36 gap-2 rounded-xl">
-            Continue <ArrowRight className="size-4" aria-hidden />
+            Continue to personal details <ArrowRight className="size-4" aria-hidden />
           </SubmitButton>
         </div>
       </form>
@@ -512,17 +516,18 @@ export function StepPersonalInfo({
       {desk ? <input type="hidden" name="desk" value="1" /> : null}
       <StepHeading index={2} title="Personal information" />
 
-      <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
-        <Field label="Full name (as in passport)" htmlFor="fullName" required className="sm:col-span-2">
-          <Input id="fullName" name="fullName" defaultValue={v.fullName ?? t.full_name ?? ""} placeholder="Enter full name" required />
+      <div className="grid grid-cols-1 gap-x-6 gap-y-6 @min-[30rem]/visa-form:grid-cols-2">
+        <Field label="Full name (as in passport)" htmlFor="fullName" required className="@min-[30rem]/visa-form:col-span-2">
+          <Input id="fullName" name="fullName" autoComplete="name" defaultValue={v.fullName ?? t.full_name ?? ""} placeholder="Enter full name" required />
         </Field>
         <Field label="Date of birth" htmlFor="dateOfBirth" required>
-          <Input id="dateOfBirth" name="dateOfBirth" type="date" max={todayIso()} defaultValue={v.dateOfBirth ?? t.date_of_birth ?? ""} required />
+          <Input id="dateOfBirth" name="dateOfBirth" type="date" autoComplete="bday" max={todayIso()} defaultValue={v.dateOfBirth ?? t.date_of_birth ?? ""} required />
         </Field>
         <Field label="Gender" htmlFor="gender" required>
           <LabeledSelect
             id="gender"
             name="gender"
+            required
             defaultValue={v.gender ?? t.gender}
             placeholder="Select gender"
             options={[
@@ -532,18 +537,18 @@ export function StepPersonalInfo({
           />
         </Field>
         <Field label="Nationality" htmlFor="nationality" required>
-          <CountrySearchSelect id="nationality" name="nationality" defaultValue={v.nationality ?? t.nationality ?? undefined} placeholder="Select nationality" />
+          <CountrySearchSelect id="nationality" name="nationality" defaultValue={v.nationality ?? t.nationality ?? undefined} placeholder="Search nationality" required />
         </Field>
         <Field label="Passport number" htmlFor="passportNumber" required>
-          <Input id="passportNumber" name="passportNumber" defaultValue={v.passportNumber ?? t.passport_number ?? ""} placeholder="Enter passport number" required />
+          <Input id="passportNumber" name="passportNumber" autoCapitalize="characters" spellCheck={false} defaultValue={v.passportNumber ?? t.passport_number ?? ""} placeholder="Enter passport number" required />
         </Field>
         <Field label="Passport expiry date" htmlFor="passportExpiry" required>
           <Input id="passportExpiry" name="passportExpiry" type="date" min={todayIso()} defaultValue={v.passportExpiry ?? t.passport_expiry ?? ""} required />
         </Field>
         <Field label="Email address" htmlFor="email" required>
-          <Input id="email" name="email" type="email" defaultValue={v.email ?? c.email ?? ""} placeholder="Enter email address" required />
+          <Input id="email" name="email" type="email" autoComplete="email" defaultValue={v.email ?? c.email ?? ""} placeholder="Enter email address" required />
         </Field>
-        <Field label="Mobile number" htmlFor="mobile" required className="sm:col-span-2">
+        <Field label="Mobile number" htmlFor="mobile" required className="@min-[30rem]/visa-form:col-span-2">
           <PhoneInput
             id="mobile"
             name="mobile"
@@ -560,7 +565,7 @@ export function StepPersonalInfo({
       <div className={STEP_FOOTER}>
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=1`} />
         <SubmitButton size="lg" pendingText="Saving…" className="min-w-36 gap-2 rounded-xl">
-          Continue <ArrowRight className="size-4" aria-hidden />
+          Continue to travel details <ArrowRight className="size-4" aria-hidden />
         </SubmitButton>
       </div>
     </form>
@@ -587,7 +592,7 @@ function YesNo({ name, label, defaultValue }: { name: string; label: string; def
             aria-checked={value === option}
             onClick={() => setValue(option)}
             className={cn(
-              "flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              "flex min-h-12 items-center gap-2 rounded-lg border px-4 text-base transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
               value === option ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
             )}
           >
@@ -632,17 +637,18 @@ export function StepTravelInfo({
       {desk ? <input type="hidden" name="desk" value="1" /> : null}
       <StepHeading index={3} title="Travel information" />
 
-      <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-6 @min-[30rem]/visa-form:grid-cols-2">
         <Field label={`Arrival in ${destination}`} htmlFor="arrivalDate" required>
           <Input id="arrivalDate" name="arrivalDate" type="date" min={todayIso()} defaultValue={v.arrivalDate ?? str("arrival_date")} required />
         </Field>
         <Field label={`Departure from ${destination}`} htmlFor="departureDate" required>
           <Input id="departureDate" name="departureDate" type="date" min={todayIso()} defaultValue={v.departureDate ?? str("departure_date")} required />
         </Field>
-        <Field label="Purpose of visit" htmlFor="purposeOfVisit" required className="sm:col-span-2">
+        <Field label="Purpose of visit" htmlFor="purposeOfVisit" required className="@min-[30rem]/visa-form:col-span-2">
           <LabeledSelect
             id="purposeOfVisit"
             name="purposeOfVisit"
+            required
             defaultValue={v.purposeOfVisit ?? str("purpose")}
             placeholder="Select purpose of visit"
             options={PURPOSE_OPTIONS}
@@ -664,7 +670,7 @@ export function StepTravelInfo({
       {questions.length > 0 ? (
         <div className="space-y-5 border-t border-border pt-5">
           <h3 className="font-heading text-base font-bold">Additional questions for {destination}</h3>
-          <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-6 @min-[30rem]/visa-form:grid-cols-2">
             {questions.map((q) => {
               const fieldName = `answer_${q.key}`;
               const existing = v[fieldName] ?? answers[q.key] ?? "";
@@ -684,6 +690,7 @@ export function StepTravelInfo({
                     <LabeledSelect
                       id={fieldName}
                       name={fieldName}
+                      required={q.required}
                       defaultValue={existing}
                       placeholder="Select an option"
                       options={(q.options ?? []).map((o) => ({ value: o, label: o }))}
@@ -706,7 +713,7 @@ export function StepTravelInfo({
       <div className={STEP_FOOTER}>
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=2`} />
         <SubmitButton size="lg" pendingText="Saving…" className="min-w-36 gap-2 rounded-xl">
-          Continue <ArrowRight className="size-4" aria-hidden />
+          Continue to documents <ArrowRight className="size-4" aria-hidden />
         </SubmitButton>
       </div>
     </form>
@@ -891,7 +898,7 @@ export function StepDocuments({
         {desk ? <input type="hidden" name="desk" value="1" /> : null}
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=3`} />
         <SubmitButton size="lg" pendingText="Checking…" className="min-w-36 gap-2 rounded-xl">
-          Continue <ArrowRight className="size-4" aria-hidden />
+          Review application <ArrowRight className="size-4" aria-hidden />
         </SubmitButton>
       </form>
     </div>
