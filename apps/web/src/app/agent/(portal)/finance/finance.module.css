@@ -1,0 +1,62 @@
+.financePage { display:grid; gap:1.75rem; }
+.walletOverview { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:1.25rem; }
+.balanceHero { position:relative; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; gap:1.75rem; padding:1.75rem 2rem; border:1px solid var(--sidebar-border); border-radius:1rem; background:var(--sidebar); color:var(--sidebar-accent-foreground); }
+.balanceHero::before { content:""; position:absolute; right:-5rem; top:-7rem; width:19rem; height:19rem; border:1px solid color-mix(in oklch,var(--sidebar-primary) 15%,transparent); border-radius:50%; box-shadow:0 0 0 3rem color-mix(in oklch,var(--sidebar-primary) 3%,transparent); pointer-events:none; }
+.balanceHero > * { position:relative; }
+.heroHeading { display:flex; align-items:center; justify-content:space-between; gap:1rem; font-size:.8125rem; }
+.heroHeading > span:first-child { display:inline-flex; align-items:center; gap:.625rem; font-weight:500; }
+.heroHeading svg { width:1.125rem; height:1.125rem; color:var(--sidebar-primary); }
+.currencyTag { padding:.25rem .5rem; border:1px solid var(--sidebar-border); border-radius:.375rem; color:var(--sidebar-foreground); font-size:.625rem; font-weight:600; letter-spacing:.08em; }
+.spendable dt { color:var(--sidebar-foreground); font-size:.75rem; }
+.spendable dd { margin-top:.5rem; font-family:var(--font-heading); font-size:clamp(1.75rem,3vw,2.75rem); font-weight:600; line-height:1.2; letter-spacing:-.04em; overflow-wrap:anywhere; }
+.spendable[data-negative] dd { color:var(--brand-gold); }
+.heroActions { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem 1.25rem; }
+.heroActions a { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; min-height:2.625rem; border-radius:.625rem; font-size:.75rem; font-weight:600; }
+.heroActions svg { width:1rem; height:1rem; flex-shrink:0; }
+.addMoney { padding:.625rem 1rem; background:var(--sidebar-primary); color:var(--sidebar-primary-foreground); border:1px solid var(--sidebar-primary); }
+.addMoney:hover { filter:brightness(1.08); }
+.supportLink { padding:.5rem .25rem; color:var(--sidebar-foreground); }
+.supportLink:hover { color:var(--sidebar-accent-foreground); }
+.heroActions a:focus-visible { outline:2px solid var(--sidebar-primary); outline-offset:4px; }
+.walletBreakdown { display:flex; flex-direction:column; min-width:0; overflow:hidden; border:1px solid var(--border); border-radius:1rem; background:var(--card); }
+.panelHeading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; padding:1.25rem 1.5rem; border-bottom:1px solid var(--border); }
+.panelHeading h2,.sectionHeading h2 { font-family:var(--font-heading); font-size:1rem; font-weight:600; letter-spacing:-.025em; }
+.walletFacts { flex:1; display:grid; grid-template-rows:1fr 1fr; padding:0 1.5rem; }
+.walletFacts > div { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem 1rem; padding:1.125rem 0; }
+.walletFacts > div + div { border-top:1px solid var(--border); }
+.walletFacts dt { font-size:.75rem; color:var(--muted-foreground); }
+.walletFacts dd { font-family:var(--font-heading); font-size:1.5rem; font-weight:600; letter-spacing:-.03em; overflow-wrap:anywhere; }
+.walletFacts [data-negative] dd { color:var(--destructive); }
+.earningsPanel { min-width:0; overflow:hidden; border:1px solid var(--border); border-radius:1rem; background:var(--card); }
+.textLink { display:inline-flex; align-items:center; gap:.5rem; min-height:2rem; border-radius:.375rem; font-size:.75rem; font-weight:500; color:var(--primary); }
+.textLink svg { width:.875rem; height:.875rem; }
+.textLink:hover { text-decoration:underline; text-underline-offset:3px; }
+.textLink:focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
+.earningsGrid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.earningMetric { min-width:0; padding:1.5rem; }
+.earningMetric + .earningMetric { border-left:1px solid var(--border); }
+.earningMetric dt { display:flex; align-items:center; gap:.5rem; font-size:.6875rem; font-weight:500; color:var(--muted-foreground); }
+.earningMetric dd { margin-top:.875rem; font-family:var(--font-heading); font-size:clamp(1.125rem,1.6vw,1.625rem); font-weight:600; letter-spacing:-.025em; overflow-wrap:anywhere; }
+.stageDot { width:.375rem; height:.375rem; flex-shrink:0; border-radius:50%; background:var(--foreground); }
+.earningMetric[data-tone="review"] .stageDot { background:var(--brand-gold); }
+.earningMetric[data-tone="review"] dd { color:color-mix(in oklch,var(--brand-gold) 55%,var(--foreground)); }
+.earningMetric[data-tone="available"] { background:color-mix(in oklch,var(--primary) 6%,var(--card)); }
+.earningMetric[data-tone="available"] dt,.earningMetric[data-tone="available"] dd { color:var(--accent-foreground); }
+.earningMetric[data-tone="available"] .stageDot { background:var(--primary); }
+.earningMetric[data-tone="paid"] .stageDot { background:var(--muted-foreground); }
+.earningMetric[data-tone="paid"] dd { color:var(--muted-foreground); }
+.earningsActions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:.75rem; padding:1rem 1.5rem; border-top:1px solid var(--border); background:color-mix(in oklch,var(--secondary) 45%,var(--card)); }
+.settlements { min-width:0; }
+.sectionHeading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.75rem; margin-bottom:.875rem; }
+.settlementGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); overflow:hidden; border:1px solid var(--border); border-radius:1rem; background:var(--card); }
+.settlementItem { min-width:0; padding:1.5rem; }
+.settlementItem + .settlementItem { border-left:1px solid var(--border); }
+.settlementLabel { display:flex; align-items:center; gap:.5rem; color:var(--muted-foreground); }
+.settlementLabel svg { width:1rem; height:1rem; flex-shrink:0; }
+.settlementLabel h3 { font-size:.75rem; font-weight:500; }
+.settlementValue { display:flex; align-items:center; flex-wrap:wrap; gap:.75rem; margin-top:.875rem; }
+.settlementValue strong { font-family:var(--font-heading); font-size:1.375rem; font-weight:600; letter-spacing:-.025em; }
+.settlementMeta { display:block; margin-top:.5rem; color:var(--muted-foreground); font-size:.6875rem; overflow-wrap:anywhere; }
+.emptyValue { display:block; margin-top:1rem; color:var(--muted-foreground); font-size:.875rem; }
+@media(max-width:1023px) { .walletOverview { grid-template-columns:1fr; } .walletFacts { grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:auto; gap:1.5rem; } .walletFacts > div { display:block; } .walletFacts > div + div { border-top:0; } .walletFacts dd { margin-top:.5rem; } .earningsGrid { grid-template-columns:repeat(2,minmax(0,1fr)); } .earningMetric:nth-child(3) { border-left:0; } .earningMetric:nth-child(n+3) { border-top:1px solid var(--border); } }
+@media(max-width:639px) { .financePage { gap:1.25rem; } .balanceHero { padding:1.5rem; } .panelHeading { padding:1rem; } .walletFacts { padding:0 1rem; gap:1rem; } .walletFacts dd { font-size:1.25rem; } .earningMetric { padding:1.25rem 1rem; } .earningMetric dt { align-items:flex-start; } .stageDot { margin-top:.3rem; } .earningsActions { padding:1rem; } .earningsActions > * { flex:1; } .settlementGrid { grid-template-columns:1fr; } .settlementItem { padding:1.25rem; } .settlementItem + .settlementItem { border-left:0; border-top:1px solid var(--border); } }
