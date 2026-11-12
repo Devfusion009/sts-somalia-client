@@ -40,11 +40,14 @@ export function FlightQuoteForm({
   agencyCustomerId,
   customerName,
   defaultPhone,
+  defaultCabin,
   isGroup = false,
 }: {
   agencyCustomerId: string;
   customerName: string;
   defaultPhone: string;
+  /** The customer's saved cabin preference. */
+  defaultCabin?: string | null;
   /** Several customers on the counter — raise one request per customer. */
   isGroup?: boolean;
 }) {
@@ -145,7 +148,7 @@ export function FlightQuoteForm({
           </Field>
           <Field>
             <FieldLabel htmlFor="cabinClass">Cabin</FieldLabel>
-            <select id="cabinClass" name="cabinClass" className={NATIVE_SELECT_CLASS} defaultValue="economy">
+            <select id="cabinClass" name="cabinClass" className={NATIVE_SELECT_CLASS} defaultValue={defaultCabin ?? "economy"}>
               <option value="economy">Economy</option>
               <option value="premium_economy">Premium economy</option>
               <option value="business">Business</option>

@@ -67,7 +67,7 @@ export default async function AgentUmrahBookingPage({
             departures={upcomingDepartures}
             pricing={pkg.umrah_package_pricing}
             action={isGroup ? createBatchBooking : undefined}
-            desk={{ customers: customers.map((c) => ({ id: c.id, full_name: c.full_name })), markup }}
+            desk={{ customers, markup }}
             bookedForSlot={
               <>
                 <input type="hidden" name="agencyCustomerId" value={customers[0].id} />

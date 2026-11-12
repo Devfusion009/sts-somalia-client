@@ -31,6 +31,7 @@ export default async function AgentFlightDeskPage() {
               customers.length > 1 ? `${customers.length} customers` : customer.full_name
             }
             defaultPhone={customer.phone ?? ""}
+            defaultCabin={customer.preferred_cabin}
             isGroup={customers.length > 1}
           />
         </CardContent>

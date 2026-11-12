@@ -41,6 +41,7 @@ export function DeskBookingForm({
   available,
   roomsLeft,
   defaults,
+  guests = [],
 }: {
   hotelId: string;
   room: { id: string; name: string; base_price: number; currency: string; max_occupancy: number };
@@ -54,6 +55,8 @@ export function DeskBookingForm({
   /** Units left for the dates the page loaded with — bounds the Rooms picker. */
   roomsLeft?: number;
   defaults?: { checkIn?: string; checkOut?: string; guests?: string };
+  /** Lead guest per selected customer, as printed in their passport. */
+  guests?: { id: string; name: string }[];
 }) {
   const isGroup = customerCount > 1;
   // Seeded manual hotels carry base_price 0 meaning "price on request" — STS
@@ -182,15 +185,31 @@ export function DeskBookingForm({
               </Field>
             </div>
 
-            <Field>
-              <FieldLabel htmlFor={`guestNames-${room.id}`}>Guest names</FieldLabel>
-              <Textarea
-                id={`guestNames-${room.id}`}
-                name="guestNames"
-                rows={2}
-                placeholder="One name per line"
-              />
-            </Field>
+            {isGroup ? (
+              <Field>
+                <FieldLabel>Lead guests</FieldLabel>
+                {/* Each customer's booking carries their own name. */}
+                {guests.map((guest) => (
+                  <input key={guest.id} type="hidden" name={`c_${guest.id}__guestNames`} value={guest.name} />
+                ))}
+                <ul className="flex flex-wrap gap-1.5">
+                  {guests.map((guest) => (
+                    <li key={guest.id} className="rounded-full border border-border bg-secondary px-2.5 py-1 text-xs font-medium">{guest.name}</li>
+                  ))}
+                </ul>
+              </Field>
+            ) : (
+              <Field>
+                <FieldLabel htmlFor={`guestNames-${room.id}`}>Guest names</FieldLabel>
+                <Textarea
+                  id={`guestNames-${room.id}`}
+                  name="guestNames"
+                  rows={2}
+                  defaultValue={guests[0]?.name}
+                  placeholder="One name per line"
+                />
+              </Field>
+            )}
 
             <Field>
               <FieldLabel htmlFor={`specialRequests-${room.id}`}>Special requests</FieldLabel>

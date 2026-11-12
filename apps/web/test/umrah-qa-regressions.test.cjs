@@ -136,6 +136,19 @@ test('booking skips a sold-out first departure and checks batch size against tot
   assert.equal(nodes(batch).find((node) => node.props.pendingText === 'Creating booking…').props.disabled, true);
 });
 
+test('desk bookings start each pilgrim from the saved customer profile', () => {
+  const amina = { id: 'amina', full_name: 'Amina Ali', gender: 'female', passport_number: 'P1234567' };
+  const yusuf = { id: 'yusuf', full_name: 'Yusuf Omar' };
+  const single = nodes(BookingForm({ ...formProps, departures: [available], desk: { customers: [amina], markup: null } }));
+  assert.equal(single.find((node) => node.props.lead === true).props.traveller, amina);
+  const group = nodes(BookingForm({ ...formProps, departures: [available], desk: { customers: [amina, yusuf], markup: null } }));
+  const pilgrims = group.filter((node) => node.props.traveller);
+  assert.deepEqual(pilgrims.map((node) => node.props.prefix), ['c_amina__pilgrim_0', 'c_yusuf__pilgrim_0']);
+  assert.deepEqual(pilgrims.map((node) => node.props.traveller), [amina, yusuf]);
+  const publicForm = nodes(BookingForm({ ...formProps, departures: [available] }));
+  assert.equal(publicForm.find((node) => node.props.lead === true).props.traveller, undefined);
+});
+
 test('both public booking CTAs are disabled for sold-out inventory', async () => {
   const { default: Page } = load('app/(marketing)/umrah/[slug]/page.tsx', {
     '@/modules/umrah/queries': { getPackageBySlug: async () => ({ id: 'p', name: 'QA', currency: 'USD', duration_days: 10, base_price: 1200, images: [], includes: [], umrah_package_departures: [full] }), bookableDepartures: (rows) => rows },

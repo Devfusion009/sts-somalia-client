@@ -13,12 +13,29 @@ import { PhoneField } from "@/modules/partner-applications/components/phone-fiel
 import styles from "./customer-profile.module.css";
 
 export type CustomerProfile = Database["public"]["Tables"]["agency_customers"]["Row"];
-const SECTIONS = ["Personal details", "Contact & address", "Passport & document", "Travel & emergency"];
+export const CUSTOMER_SECTIONS = ["Personal details", "Contact & address", "Passport & document", "Travel & emergency"];
+const SECTIONS = CUSTOMER_SECTIONS;
+
+/** One section at a time, for the full-page registration flow. */
+export type SteppedView = {
+  step: number;
+  /** Furthest step reached; earlier steps stay reachable from the nav. */
+  reached: number;
+  direction: "forward" | "back";
+  onStepSelect: (step: number) => void;
+};
 const today = () => new Date().toISOString().slice(0, 10);
 
-function Section({ id, number, children }: { id: string; number: number; children: ReactNode }) {
+function Section({ id, number, children, stepped }: { id: string; number: number; children: ReactNode; stepped?: SteppedView }) {
+  const active = !stepped || stepped.step === number - 1;
   return (
-    <fieldset id={id} className={styles.formSection}>
+    <fieldset
+      id={id}
+      data-step={number - 1}
+      hidden={!active}
+      data-direction={stepped && active ? stepped.direction : undefined}
+      className={stepped ? `${styles.formSection} ${styles.stepSection}` : styles.formSection}
+    >
       <legend><span aria-hidden="true">0{number}</span>{SECTIONS[number - 1]}</legend>
       <div className={styles.fieldGrid}>{children}</div>
     </fieldset>
@@ -26,7 +43,7 @@ function Section({ id, number, children }: { id: string; number: number; childre
 }
 
 /** Shared registration and edit fields, with a separate document replacement control. */
-export function CustomerProfileFields({ withNotes = false, customer }: { withNotes?: boolean; customer?: Partial<CustomerProfile> }) {
+export function CustomerProfileFields({ withNotes = false, customer, stepped }: { withNotes?: boolean; customer?: Partial<CustomerProfile>; stepped?: SteppedView }) {
   const prefix = useId();
   const id = (name: string) => `${prefix}-${name}`;
   const value = (key: keyof CustomerProfile) => String(customer?.[key] ?? "");
@@ -47,11 +64,31 @@ export function CustomerProfileFields({ withNotes = false, customer }: { withNot
   return (
     <div className={styles.fieldsLayout}>
       <nav className={styles.sectionNav} aria-label="Customer form sections">
-        {SECTIONS.map((label, index) => <a key={label} href={`#${id(`section-${index}`)}`}><span aria-hidden="true">0{index + 1}</span>{label}</a>)}
+        {stepped ? (
+          <ol className={styles.stepList}>
+            {SECTIONS.map((label, index) => {
+              const state = index === stepped.step ? "current" : index < stepped.reached || index < stepped.step ? "done" : "upcoming";
+              return (
+                <li key={label}>
+                  <button
+                    type="button"
+                    data-state={state}
+                    aria-current={state === "current" ? "step" : undefined}
+                    disabled={index > stepped.reached}
+                    onClick={() => stepped.onStepSelect(index)}
+                  >
+                    <span className={styles.stepMarker} aria-hidden="true">{state === "done" ? <Check /> : `0${index + 1}`}</span>
+                    {label}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        ) : SECTIONS.map((label, index) => <a key={label} href={`#${id(`section-${index}`)}`}><span aria-hidden="true">0{index + 1}</span>{label}</a>)}
         <span className={styles.requiredKey}><span aria-hidden="true">*</span> Required fields</span>
       </nav>
       <div className={styles.sections}>
-        <Section id={id("section-0")} number={1}>
+        <Section id={id("section-0")} number={1} stepped={stepped}>
           {input("firstName", "First name", "first_name", true, "text", { autoFocus: true, maxLength: 100, defaultValue: customer?.first_name ?? legacyName[0] ?? "" })}
           {input("lastName", "Last name", "last_name", true, "text", { maxLength: 100, defaultValue: customer?.last_name ?? legacyName.slice(1).join(" ") })}
           {input("middleName", "Middle name", "middle_name")}
@@ -60,7 +97,7 @@ export function CustomerProfileFields({ withNotes = false, customer }: { withNot
           {country("nationality", "Nationality", "nationality", true)}
           {input("birthPlace", "Place of birth", "birth_place")}
         </Section>
-        <Section id={id("section-1")} number={2}>
+        <Section id={id("section-1")} number={2} stepped={stepped}>
           {phone("phone", "Mobile number", "phone", true)}
           {phone("whatsapp", "WhatsApp number", "whatsapp")}
           {input("email", "Email address", "email", false, "email")}
@@ -69,7 +106,7 @@ export function CustomerProfileFields({ withNotes = false, customer }: { withNot
           {input("city", "City", "city")}
           {input("postalCode", "Postal code", "postal_code")}
         </Section>
-        <Section id={id("section-2")} number={3}>
+        <Section id={id("section-2")} number={3} stepped={stepped}>
           {input("passportNumber", "Passport number", "passport_number", true, "text", { className: "uppercase", maxLength: 20 })}
           {country("passportIssuingCountry", "Issuing country", "passport_issuing_country", true)}
           {input("passportIssuanceLocation", "Place of issue", "passport_issuance_location")}
@@ -81,7 +118,7 @@ export function CustomerProfileFields({ withNotes = false, customer }: { withNot
               <FileField id={id("passportCopy")} name="passportCopy" accept="image/jpeg,image/png,application/pdf" maxBytes={5 * 1024 * 1024} required={!customer?.passport_file_path} />, !customer?.passport_file_path)}
           </div>
         </Section>
-        <Section id={id("section-3")} number={4}>
+        <Section id={id("section-3")} number={4} stepped={stepped}>
           {input("emergencyContactName", "Emergency contact name", "emergency_contact_name")}
           {phone("emergencyContactPhone", "Emergency contact number", "emergency_contact_phone")}
           {input("emergencyContactRelationship", "Relationship to customer", "emergency_contact_relationship")}

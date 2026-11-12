@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { getBookingCustomers } from "@/modules/agencies/booking-context";
+import { travellerName } from "@/modules/agencies/traveller-profile";
 import { getAgencyMarkupRule } from "@/modules/agencies/markup";
 import { getHotelBySlug, getRoomAvailability } from "@/modules/hotels/queries";
 import { Badge } from "@/components/ui/badge";
@@ -163,6 +164,7 @@ export default async function AgentHotelRoomsPage({
                         bookingMode={bookingMode}
                         agencyCustomerId={customers[0].id}
                         customerCount={customers.length}
+                        guests={customers.map((customer) => ({ id: customer.id, name: travellerName(customer) }))}
                         markup={markup}
                         available={available}
                         roomsLeft={left}

@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, BedDouble, Check, PartyPopper, Plane, Search, St
 import { UmrahIcon } from "@/components/portal/umrah-icon";
 import design from "./booking-desk.module.css";
 import { requireUser } from "@/lib/auth/session";
-import { getMyAgency, getAgencyCustomersWithStats } from "@/modules/agencies/queries";
+import { getMyAgency, getAgencyCustomersWithStats, getAgencyCustomerTravelDocs } from "@/modules/agencies/queries";
 import { getAgentService } from "@/modules/agencies/services";
 import { NewBookingCustomerForm } from "./new-booking-customer-form";
 import { Badge } from "@/components/ui/badge";
@@ -84,13 +84,14 @@ export default async function BookingDeskPage({ searchParams }: {
     return params.size ? `/agent/book?${params}` : "/agent/book";
   };
   if (page > 1 && ordered.length === 0) redirect(hrefFor(1));
+  const docs = await getAgencyCustomerTravelDocs(membership.agency.id, ordered.map((row) => row.id));
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
       {heading}
       <section className={design.directory} aria-labelledby="customer-picker-title">
         <div className={design.directoryHeading}>
-          <h2 id="customer-picker-title">Select a customer</h2>
+          <h2 id="customer-picker-title">Select travellers</h2>
           <Badge variant="secondary" className="tabular-nums">{total} customer{total === 1 ? "" : "s"}</Badge>
         </div>
         <form role="search" className={design.searchArea}>
@@ -107,6 +108,7 @@ export default async function BookingDeskPage({ searchParams }: {
           <CustomerPickerTable redirectTo={service?.href} continueLabel="Continue" rows={ordered.map((row) => ({
             id: row.id, full_name: row.full_name, phone: row.phone, email: row.email,
             profile_id: row.profile_id, bookings: row.bookings, lastBookingAt: row.lastBookingAt,
+            ...docs.get(row.id),
           }))} />
         )}
         <Pager page={page} total={total} hrefFor={hrefFor} />
