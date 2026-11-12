@@ -46,7 +46,7 @@ export default async function AgentHotelRoomsPage({
 
   const supabase = await createClient();
   const customers = await getBookingCustomers(supabase, membership.agency.id);
-  if (customers.length === 0) redirect("/agent/book");
+  if (customers.length === 0) redirect("/agent/book?service=hotels");
 
   const hotel = await getHotelBySlug(slug);
   if (!hotel) notFound();

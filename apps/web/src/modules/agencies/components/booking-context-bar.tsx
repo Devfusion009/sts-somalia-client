@@ -1,3 +1,8 @@
+"use client";
+
+import { usePathname, useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { AGENT_SERVICES } from "@/modules/agencies/services";
 import { UserRound, Users, Wallet } from "lucide-react";
 import { AgentMoney } from "@/components/portal/agent-money";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +25,10 @@ export function BookingContextBar({
   available: number;
   currency?: string;
 }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const service = AGENT_SERVICES.find((item) => pathname.split("/").includes(item.key));
   const [first] = customers;
   if (!first) return null;
   const isGroup = customers.length > 1;
@@ -65,11 +74,14 @@ export function BookingContextBar({
             <AgentMoney value={money(available, currency)} />
           </dd>
         </dl>
-        <form action={clearBookingCustomer}>
-          <Button type="submit" variant="outline">
+        <div>
+          <Button type="button" variant="outline" disabled={pending} loading={pending} onClick={() => startTransition(async () => {
+            await clearBookingCustomer();
+            router.push(service ? `/agent/book?service=${service.key}` : "/agent/book");
+          })}>
             {isGroup ? "Change customers" : "Change customer"}
           </Button>
-        </form>
+        </div>
       </div>
     </section>
   );

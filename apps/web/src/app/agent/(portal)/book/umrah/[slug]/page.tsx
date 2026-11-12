@@ -25,7 +25,7 @@ export default async function AgentUmrahBookingPage({
 
   const supabase = await createClient();
   const customers = await getBookingCustomers(supabase, membership.agency.id);
-  if (customers.length === 0) redirect("/agent/book");
+  if (customers.length === 0) redirect("/agent/book?service=umrah");
   const isGroup = customers.length > 1;
 
   const pkg = await getPackageBySlug(slug);

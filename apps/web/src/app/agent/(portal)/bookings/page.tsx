@@ -84,7 +84,13 @@ export default async function AgentBookingsPage({ searchParams }: { searchParams
           </li>)}
         </ul>
         <Card className="hidden overflow-hidden py-0 lg:block">
-          <Table><TableHeader className="bg-muted/60 [&_th]:text-[0.6875rem] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-muted-foreground"><TableRow><TableHead className="pl-5">Order</TableHead><TableHead>Booking</TableHead><TableHead>Customer</TableHead><TableHead>Status</TableHead><TableHead numeric>Total</TableHead><TableHead numeric className="pr-5">Actions</TableHead></TableRow></TableHeader>
+          <div
+            role="region"
+            aria-label="Scrollable bookings list"
+            tabIndex={0}
+            className="max-h-[clamp(20rem,calc(100dvh-28rem),44rem)] overflow-x-auto overflow-y-scroll [scrollbar-gutter:stable] [scrollbar-color:var(--primary)_var(--muted)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring [&::-webkit-scrollbar]:w-3 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-primary/60 [&::-webkit-scrollbar-track]:bg-muted"
+          >
+          <Table containerClassName="overflow-visible"><TableHeader sticky className="bg-muted [&_th]:text-[0.6875rem] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-muted-foreground"><TableRow><TableHead className="pl-5">Order</TableHead><TableHead>Booking</TableHead><TableHead>Customer</TableHead><TableHead>Status</TableHead><TableHead numeric>Total</TableHead><TableHead numeric className="pr-5">Actions</TableHead></TableRow></TableHeader>
             <TableBody>{orders.map((order) => <TableRow key={order.id} className="transition-colors hover:bg-muted/40" style={{ boxShadow: `inset 3px 0 0 ${accentOf(order)}` }}>
               <TableCell className="py-4 pl-5 align-top"><BookingReference order={order} /></TableCell>
               <TableCell className="py-4 align-top"><BookingItems order={order} /></TableCell>
@@ -94,6 +100,7 @@ export default async function AgentBookingsPage({ searchParams }: { searchParams
               <TableCell numeric className="py-4 pr-5 align-top"><BookingActions order={order} canBook={canBook} /></TableCell>
             </TableRow>)}</TableBody>
           </Table>
+          </div>
         </Card>
       </>}
       <Pager page={page} total={total} hrefFor={hrefFor} />

@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/types/database.types";
-import { enumerateBuckets, hourlyBucketKey, roundMoney } from "@/lib/date-range";
+import { enumerateBuckets, hourlyBucketKey } from "@/lib/date-range";
 import { ADMIN_PAGE_SIZE, pageRange, searchTerm } from "@/lib/pagination";
 import type { BookingFilters } from "./booking-filters";
 
@@ -186,8 +186,14 @@ export type AgencyWalletTransaction = Awaited<
   ReturnType<typeof getAgencyWallet>
 >["transactions"][number];
 
-/** Outstanding balances match the payment queue; currencies are never added together. */
-export async function getAgencyPendingPayments(agencyId: string): Promise<{ count: number; amounts: { amount: number; currency: string }[] }> {
+type PendingPayments = { count: number; amounts: { amount: number; currency: string }[] };
+
+/** Outstanding balances match the payment queue; an optional window scopes order creation. */
+export async function getAgencyPendingPayments(
+  agencyId: string,
+  period?: { from: Date; to: Date }
+): Promise<PendingPayments> {
+  if (period) return getAgencyPendingPaymentsFallback(agencyId, period);
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("agency_payment_queue_summary", { p_agency_id: agencyId });
   if (!error) {
@@ -199,15 +205,16 @@ export async function getAgencyPendingPayments(agencyId: string): Promise<{ coun
   return getAgencyPendingPaymentsFallback(agencyId);
 }
 
-async function getAgencyPendingPaymentsFallback(agencyId: string) {
+async function getAgencyPendingPaymentsFallback(agencyId: string, period?: { from: Date; to: Date }) {
   const supabase = await createClient();
   const amounts = new Map<string, number>();
   let count = 0;
   for (let offset = 0; ; offset += 1000) {
-    const { data, error } = await supabase.from("orders")
+    let query = supabase.from("orders")
       .select("total, currency, payments (amount, status)")
-      .eq("agency_id", agencyId).in("status", ["pending_payment", "held", "partially_paid"]).gt("total", 0)
-      .order("id").range(offset, offset + 999);
+      .eq("agency_id", agencyId).in("status", ["pending_payment", "held", "partially_paid"]).gt("total", 0);
+    if (period) query = query.gte("created_at", period.from.toISOString()).lte("created_at", period.to.toISOString());
+    const { data, error } = await query.order("id").range(offset, offset + 999);
     if (error) throw new Error("Payment balances could not be loaded.");
     for (const order of data ?? []) {
       count++;
@@ -217,7 +224,7 @@ async function getAgencyPendingPaymentsFallback(agencyId: string) {
     }
     if (!data || data.length < 1000) break;
   }
-  return { count, amounts: [...amounts].filter(([, amount]) => amount > 0).sort(([a], [b]) => a.localeCompare(b)).map(([currency, amount]) => ({ currency, amount: roundMoney(amount) })) };
+  return { count, amounts: [...amounts].filter(([, amount]) => amount > 0).sort(([a], [b]) => a.localeCompare(b)).map(([currency, amount]) => ({ currency, amount: Number(amount.toFixed(2)) })) };
 }
 
 export type CommissionFilters = {
@@ -812,11 +819,12 @@ type AgencyActivityHour = [number, number, number, number, number];
 
 async function getAgencyActivity(agencyId: string, from: Date, to: Date) {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("agency_period_activity", {
+  const { data, error } = await supabase.rpc("agency_period_activity", {
     p_agency_id: agencyId,
     p_from: from.toISOString(),
     p_to: to.toISOString(),
   });
+  if (error) throw new Error("Agency metrics could not be loaded.");
   const raw = (data ?? {}) as { buckets?: Record<string, (number | string)[]>; currency?: string | null };
   return {
     hours: Object.entries(raw.buckets ?? {}).map(([hour, values]) => [hour, values.map(Number) as AgencyActivityHour] as const),
@@ -871,17 +879,17 @@ export async function getAgencyPeriodMetrics(
     buckets,
     bookings: { current: bookingsCurrent, previous: bookingsPrevious, series: bookingsSeries },
     revenue: {
-      current: roundMoney(revenueCurrent),
-      previous: roundMoney(revenuePrevious),
+      current: Number(revenueCurrent.toFixed(2)),
+      previous: Number(revenuePrevious.toFixed(2)),
       series: revenueSeries,
-      currency: current.currency ?? "USD",
+      currency: current.currency ?? previous.currency ?? "USD",
     },
     earned: {
-      current: roundMoney(earnedCurrent),
-      previous: roundMoney(earnedPrevious),
+      current: Number(earnedCurrent.toFixed(2)),
+      previous: Number(earnedPrevious.toFixed(2)),
       series: earnedSeries,
-      markupEarned: roundMoney(markupEarned),
-      commissionEarned: roundMoney(commissionEarned),
+      markupEarned: Number(markupEarned.toFixed(2)),
+      commissionEarned: Number(commissionEarned.toFixed(2)),
     },
   };
 }

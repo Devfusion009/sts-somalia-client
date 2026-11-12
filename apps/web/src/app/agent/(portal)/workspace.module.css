@@ -55,7 +55,10 @@
 .metric:focus-visible { outline:3px solid var(--ring); outline-offset:3px; }
 .metricLabel { display:flex; align-items:center; justify-content:space-between; gap:.75rem; color:var(--muted-foreground); font-size:.75rem; }
 .metricValue { display:block; overflow:hidden; margin-top:.75rem; font-family:var(--font-heading); font-size:1.75rem; font-weight:600; letter-spacing:-.04em; text-overflow:ellipsis; font-variant-numeric:tabular-nums; }
-.metricFooter { display:flex; flex-wrap:wrap; align-items:center; gap:.375rem .875rem; margin-top:.625rem; color:var(--muted-foreground); font-size:.6875rem; }
+.metricAmount { display:block; }
+.metricFooter { display:flex; flex-direction:column; align-items:flex-start; gap:.375rem; margin-top:.625rem; color:var(--muted-foreground); font-size:.6875rem; }
+.metricChanges { display:flex; flex-wrap:wrap; gap:.375rem; }
+.neutral { display:inline-flex; align-items:center; gap:.125rem; padding:.125rem .5rem; border-radius:999px; background:var(--muted); color:var(--muted-foreground); font-weight:600; }
 .up { display:inline-flex; align-items:center; gap:.125rem; padding:.125rem .5rem; border-radius:999px; background:color-mix(in oklch,var(--primary) 14%,transparent); color:var(--primary); font-weight:600; }
 .down { display:inline-flex; align-items:center; gap:.125rem; padding:.125rem .5rem; border-radius:999px; background:color-mix(in oklch,var(--destructive) 12%,transparent); color:var(--destructive); font-weight:600; }
 .contentGrid { display:grid; grid-template-columns:minmax(0,1fr) 19rem; align-items:start; gap:1.25rem; }
@@ -109,3 +112,15 @@
 @media(max-width:767px) { .bookingOperations { grid-template-columns:1fr; } .operation { min-height:3.5rem; } .operation + .operation { border-left:0; border-top:1px solid var(--border); } }
 @media(max-width:639px) { .shell :global([data-slot="sidebar-inset"]) > header { height:3.75rem; } .launcher,.chart,.customerArea { padding:1rem; } .serviceGrid { grid-template-columns:repeat(2,minmax(0,1fr)); } .service,.photoLauncher .service { min-height:8.25rem; gap:.75rem; padding:.875rem; } .serviceName { font-size:.8125rem; } .serviceAction { font-size:.6875rem; } .workflow { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem 1rem; padding:1rem; } .workflowArrow { display:none; } .serviceIcon { width:2.25rem; height:2.25rem; } .wallet { display:flex; align-items:stretch; } .walletAmount { font-size:1.75rem; } .walletActions { justify-content:flex-start; } .metrics { gap:.625rem; } .metric { padding:1rem .75rem; } .metricValue { font-size:1.125rem; } .metricLabel { font-size:.6875rem; } .metricLabel svg { display:none; } .metricIcon { width:2.25rem; height:2.25rem; } .metric { flex-direction:column; gap:.625rem; } .metricFooter { font-size:.625rem; } .steps { padding:.875rem .5rem; gap:.25rem; } .step { flex-direction:column; gap:.5rem; font-size:.625rem; text-align:center; } .stepNumber { width:1.75rem; height:1.75rem; } .serviceTab { padding-inline:.75rem; } }
 @media(prefers-reduced-motion:reduce) { .service,.metric,.operation { transition:none; } .service:hover,.metric:hover { transform:none; } }
+
+.deskServices { grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
+.deskServices .service { min-height:13rem; padding:1.75rem; gap:1.25rem; background:var(--card); }
+.deskServices .serviceName { font-size:1.125rem; }
+.deskServices .serviceIcon { width:3.25rem; height:3.25rem; }
+.deskServices .serviceAction { margin-top:auto; }
+.customerModes { display:flex; gap:.25rem; width:fit-content; padding:.3rem; border:1px solid var(--border); border-radius:.75rem; background:var(--muted); }
+.customerModes a { padding:.625rem 1.125rem; border-radius:.5rem; font-size:.875rem; font-weight:500; color:var(--muted-foreground); }
+.customerModes a[aria-current="page"] { background:var(--card); color:var(--foreground); box-shadow:0 1px 4px color-mix(in oklch,var(--foreground) 10%,transparent); }
+.customerModes a:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+@media(max-width:767px) { .deskServices { grid-template-columns:repeat(2,minmax(0,1fr)); } .deskServices .service { min-height:11rem; padding:1.25rem; } }
+@media(max-width:399px) { .deskServices { grid-template-columns:1fr; } }

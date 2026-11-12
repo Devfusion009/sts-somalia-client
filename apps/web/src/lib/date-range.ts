@@ -40,7 +40,7 @@ export function resolveDateRange(params: { range?: string; from?: string; to?: s
       label: RANGE_LABELS.custom,
       from,
       to,
-      previousFrom: new Date(from.getTime() - spanMs),
+      previousFrom: new Date(from.getTime() - spanMs - 1),
       previousTo: new Date(from.getTime() - 1),
       granularity: spanMs > 45 * 86_400_000 ? "week" : "day",
     };

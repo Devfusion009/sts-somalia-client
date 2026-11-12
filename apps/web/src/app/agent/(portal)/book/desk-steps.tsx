@@ -1,23 +1,24 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { CheckIcon } from "lucide-react";
-import { AGENT_BOOKING_STEPS } from "@/modules/agencies/services";
-import styles from "../workspace.module.css";
+import { AGENT_BOOKING_STEPS, getAgentService } from "@/modules/agencies/services";
+import styles from "./booking-desk.module.css";
 
-function currentStep(pathname: string, hasCustomer: boolean) {
+function currentStep(pathname: string, serviceSelected: boolean) {
   const segments = pathname.split("/").filter(Boolean);
   const rest = segments.slice(segments.indexOf("book") + 1).join("/");
   if (rest.startsWith("order/") || rest.startsWith("batch/")) return 3;
   if (rest) return 2;
-  return hasCustomer ? 1 : 0;
+  return serviceSelected ? 1 : 0;
 }
 
-export function DeskSteps({ hasCustomer }: { hasCustomer: boolean }) {
+export function DeskSteps() {
   const pathname = usePathname();
-  const step = currentStep(pathname, hasCustomer);
+  const service = getAgentService(useSearchParams().get("service"));
+  const step = currentStep(pathname, Boolean(service));
   const steps = [...AGENT_BOOKING_STEPS] as string[];
-  if (/(?:^|\/)book\/flights(?:\/|$)/.test(pathname)) steps[3] = "Request quote";
+  if (service?.key === "flights" || /(?:^|\/)book\/flights(?:\/|$)/.test(pathname)) steps[3] = "Request quote";
   if (/(?:^|\/)book\/umrah\/private(?:\/|$)/.test(pathname)) steps[3] = "Review request";
   return (
     <nav aria-label="Booking steps">
