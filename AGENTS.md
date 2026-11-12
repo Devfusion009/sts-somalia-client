@@ -50,14 +50,23 @@ touch.
   concrete and specific, never generic travel-marketing cliché
   ("unlock your dream journey", "experience the magic of...").
 - Internal consoles (admin, partner, agent, affiliate, venue, account)
-  follow the stricter, more detailed standard in
-  `.claude/skills/sts-admin-ui/SKILL.md` (zero `CardDescription`/`<p>`
-  helper text under headings or fields, no exceptions) — that skill
-  auto-loads when editing those paths; invoke it explicitly if it doesn't.
+  follow a stricter standard: zero `CardDescription`/`<p>` helper text
+  under headings or fields, no exceptions.
 
 Read any new sentence back and ask whether the surrounding UI already
 makes it obvious. It almost always does — cut it rather than keep it.
 <!-- CUSTOM:copy-standard:END -->
+
+<!-- CUSTOM:skills-disabled:START -->
+## Project skills are deactivated (since 2026-11-12)
+
+Do not load, invoke or follow any project skill — this applies to Codex,
+Claude Code and every other agent. The skill folders were moved out of
+the discovery paths to `.agents/skills.disabled/` and
+`.claude/skills.disabled/`. Do not move them back, read them for
+instructions, or recreate `.agents/skills/` or `.claude/skills/` unless
+the user explicitly asks to reactivate skills.
+<!-- CUSTOM:skills-disabled:END -->
 
 <!-- CUSTOM:git-attribution:START -->
 ## Git commit / PR attribution
