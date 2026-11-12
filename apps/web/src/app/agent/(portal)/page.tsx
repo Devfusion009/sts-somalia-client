@@ -121,12 +121,12 @@ async function TeamCount({ countP }: { countP: ReturnType<typeof getAgencyTeamCo
 async function Metrics({ metricsP, rangeKey }: { metricsP: MetricsPromise; rangeKey: string }) {
   const metrics = await metricsP;
   const currency = metrics.revenue.currency;
-  const period = rangeKey === "custom" ? "vs previous period" : `vs previous ${rangeKey === "24h" ? "24 hours" : `${rangeKey.slice(0, -1)} days`}`;
+  const period = rangeKey === "custom" ? "from previous period" : `from previous ${rangeKey === "24h" ? "24 hours" : `${rangeKey.slice(0, -1)} days`}`;
   return (
     <>
-      <Metric label="Total bookings" icon={CalendarDays} tone="var(--chart-1)" value={metrics.bookings.current.toLocaleString("en-US")} href="/agent/bookings" current={metrics.bookings.current} previous={metrics.bookings.previous} previousText={metrics.bookings.previous.toLocaleString("en-US")} period={period} />
-      <Metric label="Sales value" icon={Coins} tone="var(--chart-3)" value={<AgentMoney value={money(metrics.revenue.current, currency)} />} href="/agent/reports" current={metrics.revenue.current} previous={metrics.revenue.previous} previousText={money(metrics.revenue.previous, currency)} period={period} />
-      <Metric label="My commission" icon={ChartNoAxesColumnIncreasing} tone="var(--chart-2)" value={<AgentMoney value={money(metrics.earned.current, currency)} />} href="/agent/reports" current={metrics.earned.current} previous={metrics.earned.previous} previousText={money(metrics.earned.previous, currency)} period={period} />
+      <Metric label="Total bookings" icon={CalendarDays} tone="var(--chart-1)" value={metrics.bookings.current.toLocaleString("en-US")} href="/agent/bookings" current={metrics.bookings.current} previous={metrics.bookings.previous} previousText={metrics.bookings.previous.toLocaleString("en-US")} deltaText={(metrics.bookings.current - metrics.bookings.previous).toLocaleString("en-US")} period={period} />
+      <Metric label="Sales value" icon={Coins} tone="var(--chart-3)" value={<AgentMoney value={money(metrics.revenue.current, currency)} />} href="/agent/reports" current={metrics.revenue.current} previous={metrics.revenue.previous} previousText={money(metrics.revenue.previous, currency)} deltaText={money(metrics.revenue.current - metrics.revenue.previous, currency)} period={period} />
+      <Metric label="My commission" icon={ChartNoAxesColumnIncreasing} tone="var(--chart-2)" value={<AgentMoney value={money(metrics.earned.current, currency)} />} href="/agent/reports" current={metrics.earned.current} previous={metrics.earned.previous} previousText={money(metrics.earned.previous, currency)} deltaText={money(metrics.earned.current - metrics.earned.previous, currency)} period={period} />
     </>
   );
 }
@@ -229,12 +229,13 @@ async function RecentActivity({ activityP }: { activityP: ReturnType<typeof getA
   return <RecentActivityCard items={await activityP} />;
 }
 
-function Metric({ label, icon: Icon, tone, value, href, current, previous, previousText, period }: {
+function Metric({ label, icon: Icon, tone, value, href, current, previous, previousText, deltaText, period }: {
   label: string; icon: LucideIcon; tone: string; value: React.ReactNode; href: string;
-  current: number; previous: number; previousText: string; period: string;
+  current: number; previous: number; previousText: string; deltaText: string; period: string;
 }) {
   const change = percentChange(current, previous);
-  const text = change === null ? "New" : `${change > 0 ? "+" : ""}${change}%`;
+  // No activity last period leaves no base for a percentage, so the rise is shown as an amount.
+  const text = change === null ? `${deltaText} up` : change > 0 ? `${change}% up` : change < 0 ? `${Math.abs(change)}% down` : "No change";
   const tone_ = change === null ? styles.up : change < 0 ? styles.down : change > 0 ? styles.up : styles.neutral;
   return (
     <Link href={href} className={styles.metric} style={{ "--tone": tone } as CSSProperties}>

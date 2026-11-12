@@ -171,6 +171,7 @@ export async function updateAgencyBankDetailsAction(_prevState: ActionState, for
   if (error) return { error: error.message };
 
   revalidatePath("/agent/bank-details");
+  revalidatePath("/agent/finance/withdrawals");
   return { error: null };
 }
 

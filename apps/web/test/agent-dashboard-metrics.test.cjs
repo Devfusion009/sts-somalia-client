@@ -86,10 +86,10 @@ test('preset and custom comparisons use adjacent windows of exactly equal durati
 test('three metric cards display real comparisons beside the wallet card', async () => {
   const { cards, wallet } = await dashboardCards();
   assert.equal(cards.length, 3);
-  for (const card of cards) assert.match(card, /vs previous 30 days/);
-  assert.match(cards[0], /\+50%/);
+  for (const card of cards) assert.match(card, /from previous 30 days/);
+  assert.match(cards[0], /50% up/);
   assert.match(cards[1], /USD 6495\.75/);
-  assert.match(cards[1], /\+29\.9%/);
+  assert.match(cards[1], /29\.9% up/);
   assert.match(cards[2], /USD 650\.25/);
   assert.match(wallet, /Wallet balance/);
   assert.match(wallet, /USD 505\.00/);
@@ -100,16 +100,16 @@ test('three metric cards display real comparisons beside the wallet card', async
 test('new activity is visible and unchanged metrics use a neutral indicator', async () => {
   const metrics = { ...totals, bookings: series(12, 0), revenue: { ...series(0, 0), currency: 'USD' }, earned: series(5, 5) };
   const { cards } = await dashboardCards({ metrics });
-  assert.match(cards[0], /New/);
+  assert.match(cards[0], /12 up/);
   assert.match(cards[0], /Previous period: 0/);
-  for (const card of cards.slice(1)) assert.match(card, /class="neutral"[^>]*[^]*0%/);
+  for (const card of cards.slice(1)) assert.match(card, /class="neutral"[^>]*[^]*No change/);
   for (const card of cards) assert.doesNotMatch(card, /NaN|Infinity/);
 });
 
 test('comparison captions follow the chosen date range', async () => {
   for (const [params, label] of [[{ range: '7d' }, '7 days'], [{ range: '24h' }, '24 hours'], [{ range: 'custom', from: '2026-10-01', to: '2026-10-31' }, 'period']]) {
     const { cards } = await dashboardCards({ selectedRange: dates.resolveDateRange(params) });
-    for (const card of cards) assert.ok(card.includes(`vs previous ${label}`));
+    for (const card of cards) assert.ok(card.includes(`from previous ${label}`));
   }
 });
 

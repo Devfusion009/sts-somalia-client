@@ -2,7 +2,7 @@ import { AgentMoney } from "@/components/portal/agent-money";
 import { WaafiPaymentStatus } from "@/modules/payments/components/waafi-payment-status";
 import type { Metadata } from "next";
 import { format } from "date-fns";
-import { AlertCircle, CheckCircle2, CreditCard, Undo2, Wallet } from "lucide-react";
+import { AlertCircle, CheckCircle2, Undo2, Wallet } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyTopupRequests } from "@/modules/agencies/queries";
 import { cancelTopupRequest } from "@/modules/agencies/topup-actions";
@@ -12,12 +12,12 @@ import { BackLink } from "@/components/back-link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { money } from "@/lib/money";
-import { BankTransferDetails, OfflineTopupForm, OnlineTopupForm } from "./top-up-forms";
+import { TopUpPanel } from "./top-up-panel";
 
 export const metadata: Metadata = { title: "Add Money" };
 
@@ -85,40 +85,18 @@ export default async function AgentTopUpPage({ searchParams }: { searchParams: P
           <AlertDescription>Only the agency owner or an admin can add money.</AlertDescription>
         </Alert>
       ) : (
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>I sent money to STS</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <BankTransferDetails bankTransfer={options.bankTransfer} />
-              <OfflineTopupForm methods={options.offline} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Pay now</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {options.online.length === 0 ? (
-                <Empty>
-                  <EmptyMedia variant="icon">
-                    <CreditCard />
-                  </EmptyMedia>
-                  <EmptyTitle>No online payment method</EmptyTitle>
-                </Empty>
-              ) : (
-                <OnlineTopupForm methods={options.online} />
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <TopUpPanel
+          balance={Number(membership.agency.credit_balance ?? 0)}
+          available={Number(membership.agency.credit_balance ?? 0) + Number(membership.agency.credit_limit ?? 0)}
+          online={options.online}
+          offline={options.offline}
+          bankTransfer={options.bankTransfer}
+        />
       )}
 
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <h2 className="font-heading text-base font-semibold">Top-ups</h2>
+          <h2 className="font-heading text-base font-semibold">Top-up history</h2>
           {requests.length > 0 ? (
             <Badge variant="neutral" className="tabular-nums">
               {requests.length}
