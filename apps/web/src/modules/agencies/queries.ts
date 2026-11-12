@@ -1188,6 +1188,26 @@ export async function getAgencyCustomersWithStats(
   };
 }
 
+/** Traveller identity for one page of the desk picker, keyed by customer id. */
+export async function getAgencyCustomerTravelDocs(agencyId: string, customerIds: string[]) {
+  if (customerIds.length === 0) return new Map<string, TravelDocs>();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agency_customers")
+    .select("id, gender, date_of_birth, nationality, passport_number, passport_expiry_date")
+    .eq("agency_id", agencyId)
+    .in("id", customerIds);
+  return new Map((data ?? []).map(({ id, ...docs }) => [id, docs as TravelDocs]));
+}
+
+export type TravelDocs = {
+  gender: string | null;
+  date_of_birth: string | null;
+  nationality: string | null;
+  passport_number: string | null;
+  passport_expiry_date: string | null;
+};
+
 /**
  * One client with their full history: every order the agency placed for
  * them (labelled per vertical) plus flight quote requests, which have no

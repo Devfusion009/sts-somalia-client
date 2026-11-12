@@ -2,7 +2,7 @@ import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { Plane, Receipt } from "lucide-react";
+import { CalendarDays, Mail, Phone, Plane, Receipt } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyCustomerDetail } from "@/modules/agencies/queries";
@@ -67,6 +67,7 @@ export default async function AgentCustomerDetailPage({
           <div className={styles.identity}>
             <span className={styles.avatar} aria-hidden="true">{customer.full_name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")}</span>
             <div className="min-w-0 space-y-2">
+              <span className={styles.profileEyebrow}>Customer profile</span>
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                 <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">
                   {customer.full_name}
@@ -74,14 +75,14 @@ export default async function AgentCustomerDetailPage({
                 {customer.profile_id ? <Badge variant="info">STS account</Badge> : null}
                 <Badge variant={profileComplete ? "success" : "warning"}>{profileComplete ? "Profile complete" : "Details missing"}</Badge>
               </div>
-              <div className="text-xs break-words text-muted-foreground">
-                {[customer.email, customer.phone, `Added ${format(new Date(customer.created_at), "d MMM yyyy")}`]
-                  .filter(Boolean)
-                  .join(" · ")}
+              <div className={styles.profileMeta}>
+                {customer.phone ? <a href={`tel:${encodeURIComponent(customer.phone)}`}><Phone aria-hidden="true" />{customer.phone}</a> : null}
+                {customer.email ? <a href={`mailto:${encodeURIComponent(customer.email)}`}><Mail aria-hidden="true" />{customer.email}</a> : null}
+                <span><CalendarDays aria-hidden="true" />Added {format(new Date(customer.created_at), "d MMM yyyy")}</span>
               </div>
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div className={styles.profileActions}>
             <SelectCustomerButton customerId={customer.id} label="New booking" redirectTo="/agent/book" variant="default" />
             <EditCustomerDialog customer={customer} />
             <DeleteCustomerButton customerId={customer.id} hasBookings={orders.length > 0} />
@@ -89,9 +90,9 @@ export default async function AgentCustomerDetailPage({
         </header>
       </div>
 
-      <StatRail>
+      <StatRail className={styles.profileStats}>
         <StatRailItem label="Bookings" value={orders.length} />
-        <StatRailItem label="Total spent" value={spent > 0 ? <AgentMoney value={money(spent, currency)} /> : "—"} />
+        <StatRailItem tone="primary" label="Total spent" value={spent > 0 ? <AgentMoney value={money(spent, currency)} /> : "—"} />
         <StatRailItem
           label="Last booking"
           value={lastBookingAt ? format(new Date(lastBookingAt), "d MMM yyyy") : "—"}
@@ -99,9 +100,16 @@ export default async function AgentCustomerDetailPage({
         <StatRailItem label="Flight quotes" value={flightQuotes.length} />
       </StatRail>
 
+      <nav className={styles.profileNavigation} aria-label="Customer profile sections">
+        <a href="#personal-details">Personal details</a>
+        <a href="#contact-details">Contact & address</a>
+        <a href="#passport-details">Passport</a>
+        <a href="#travel-details">Travel & emergency</a>
+        <a href="#customer-bookings">Bookings<span>{orders.length}</span></a>
+      </nav>
       <CustomerProfileOverview customer={customer} />
 
-      <section className="space-y-3">
+      <section id="customer-bookings" className={`space-y-3 ${styles.historySection}`}>
         <div className="flex items-center gap-2">
           <h2 className="font-heading text-base font-semibold">Bookings</h2>
           {orders.length > 0 ? (

@@ -1,9 +1,11 @@
 import { AgentMoney } from "@/components/portal/agent-money";
+import type { CSSProperties } from "react";
+import styles from "./reports.module.css";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { format, startOfMonth } from "date-fns";
-import { Banknote, CalendarDays, CircleCheck, Clock3, Download, FileText, Receipt, Wallet, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, Check, Banknote, CalendarDays, CircleCheck, Clock3, Download, FileText, Receipt, Wallet, type LucideIcon } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
   getMyAgency,
@@ -15,7 +17,6 @@ import {
 } from "@/modules/agencies/queries";
 import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -112,7 +113,7 @@ export default async function AgentReportsPage({
   const withQuery = (qs: string) => (qs ? `/agent/reports?${qs}` : "/agent/reports");
 
   return (
-    <div className="space-y-6">
+    <div className={styles.reportPage}>
       <PageHeader
         title="Commissions & earnings"
         actions={
@@ -127,7 +128,9 @@ export default async function AgentReportsPage({
         }
       />
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <section className={styles.filters} aria-label="Report filters">
+        <div className={styles.productFilters}>
+          <span className={styles.filterLabel}>Service</span>
         <FilterChips
           label="Filter by product"
           active={itemType ?? ""}
@@ -140,54 +143,20 @@ export default async function AgentReportsPage({
             })),
           ]}
         />
-        <ReportFilters defaultFrom={from} defaultTo={to} defaultType={type} />
-      </div>
+        </div>
+        <ReportFilters key={`${from ?? ""}:${to ?? ""}`} defaultFrom={from} defaultTo={to} defaultType={type} />
+      </section>
 
-      <nav aria-label="Earnings views" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <nav aria-label="Earnings views" className={styles.summaryGrid}>
         <ViewCard href={withQuery(query({ view: view === "total" ? undefined : "total" }))} active={view === "total"} icon={Wallet} tone="var(--chart-1)" label="Total earned" value={<AgentMoney value={usd(report.earnedTotal)} />} sub={`${report.earnedCount} settled ${report.earnedCount === 1 ? "booking" : "bookings"}`} />
         <ViewCard href={withQuery(query({ view: view === "month" ? undefined : "month" }))} active={view === "month"} icon={CalendarDays} tone="var(--chart-3)" label="Earned this month" value={<AgentMoney value={usd(report.earnedThisMonth)} />} sub={format(new Date(), "MMMM yyyy")} />
-        <ViewCard href={withQuery(query({ view: view === "review" ? undefined : "review" }))} active={view === "review"} icon={Clock3} tone="var(--chart-5)" label="In review by STS" value={<AgentMoney value={usd(summary.inReview)} />} />
-        <ViewCard href={withQuery(query({ view: view === "available" ? undefined : "available" }))} active={view === "available"} icon={CircleCheck} tone="var(--primary)" label="Available to withdraw" value={<AgentMoney value={usd(summary.available)} />} />
+        <ViewCard href={withQuery(query({ view: view === "review" ? undefined : "review" }))} active={view === "review"} icon={Clock3} tone="var(--chart-5)" label="In review by STS" value={<AgentMoney value={usd(summary.inReview)} />} sub="All products · All dates" />
+        <ViewCard href={withQuery(query({ view: view === "available" ? undefined : "available" }))} active={view === "available"} icon={CircleCheck} tone="var(--primary)" label="Available to withdraw" value={<AgentMoney value={usd(summary.available)} />} sub="All products · All dates" />
       </nav>
 
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <section className="space-y-3">
-          <h2 className="font-heading text-base font-semibold">By month</h2>
-          <Card className="overflow-hidden py-0">
-            {months.length === 0 ? (
-              <Empty>
-                <EmptyMedia variant="icon">
-                  <CalendarDays />
-                </EmptyMedia>
-                <EmptyTitle>No earnings</EmptyTitle>
-              </Empty>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Month</TableHead>
-                    <TableHead numeric>Bookings</TableHead>
-                    <TableHead numeric>Earned</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {months.map((row) => (
-                    <TableRow key={row.month}>
-                      <TableCell className="font-medium">{format(new Date(`${row.month}-01`), "MMM yyyy")}</TableCell>
-                      <TableCell numeric>{row.bookings}</TableCell>
-                      <TableCell numeric className="font-medium">
-                        {<AgentMoney value={usd(row.total)} />}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </Card>
-        </section>
-
-        <section className="min-w-0 space-y-3">
-          <div className="flex items-center gap-2">
+      <div className={styles.contentGrid}>
+        <section className={styles.ledgerPanel} aria-labelledby="entries">
+          <div className={styles.panelHeading}>
             <h2 id="entries" className="font-heading text-base font-semibold">{view ? VIEWS[view].title : "All entries"}</h2>
             {entryTotal > 0 ? (
               <Badge variant="neutral" className="tabular-nums">
@@ -196,7 +165,7 @@ export default async function AgentReportsPage({
             ) : null}
             {view ? <Link href={withQuery(query({ view: undefined }))} className="ml-auto text-xs font-semibold text-primary hover:underline">Show all</Link> : null}
           </div>
-          <Card className="overflow-hidden py-0">
+          <div className={styles.ledgerBody}>
             {entries.length === 0 ? (
               <Empty>
                 <EmptyMedia variant="icon">
@@ -205,12 +174,12 @@ export default async function AgentReportsPage({
                 <EmptyTitle>No commission entries</EmptyTitle>
               </Empty>
             ) : (
-              <Table>
-                <TableHeader className="bg-muted/60 [&_th]:text-[0.6875rem] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-muted-foreground">
+              <Table className={styles.ledgerTable} containerClassName={styles.ledgerScroll}>
+                <TableHeader sticky className="bg-muted [&_th]:text-[0.6875rem] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-muted-foreground">
                   <TableRow>
                     <TableHead className="pl-5">Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead>Service</TableHead>
+                    <TableHead>Booking</TableHead>
                     <TableHead numeric>Amount</TableHead>
                     <TableHead className="pr-5">Status</TableHead>
                   </TableRow>
@@ -222,12 +191,12 @@ export default async function AgentReportsPage({
                     const commission = Number(entry.commission_amount);
                     const markup = Number(entry.markup_amount);
                     return (
-                      <TableRow key={entry.id} className="hover:bg-muted/40">
+                      <TableRow key={entry.id} className={styles.entryRow} data-reversed={reversed || undefined}>
                         <TableCell className="whitespace-nowrap pl-5 tabular-nums text-muted-foreground">{format(new Date(entry.created_at), "d MMM yyyy")}</TableCell>
-                        <TableCell className="font-medium">{types.join(", ") || "Booking"}</TableCell>
+                        <TableCell><span className={styles.serviceTag}>{types.join(", ") || "Booking"}</span></TableCell>
                         <TableCell>
-                          <span className="font-mono text-xs font-semibold text-primary">{entry.order?.order_number ?? "—"}</span>
-                          <span className="block text-xs text-muted-foreground">
+                          {entry.order_id ? <Link href={`/agent/bookings/${entry.order_id}`} className={styles.orderLink}>{entry.order?.order_number ?? "View booking"}<ArrowUpRight aria-hidden="true" /></Link> : <span className="text-muted-foreground">—</span>}
+                          <span className={styles.entryDetails}>
                             {[commission > 0 ? `${entry.rate_applied}% commission ${usd(commission)}` : null, markup > 0 ? `markup ${usd(markup)}` : null].filter(Boolean).join(" · ") || "No earning"}
                           </span>
                         </TableCell>
@@ -245,14 +214,26 @@ export default async function AgentReportsPage({
                 </TableBody>
               </Table>
             )}
-          </Card>
-          <Pager page={page} total={entryTotal} hrefFor={hrefFor} />
+          </div>
+          <div className={styles.pagination}><Pager page={page} total={entryTotal} hrefFor={hrefFor} /></div>
         </section>
+        <section className={styles.monthlyPanel} aria-labelledby="monthly-title">
+          <div className={styles.panelHeading}><h2 id="monthly-title">Monthly summary</h2></div>
+          {months.length === 0 ? <Empty><EmptyMedia variant="icon"><CalendarDays /></EmptyMedia><EmptyTitle>No earnings</EmptyTitle></Empty> : (
+            <dl className={styles.monthlyList}>
+              {months.map((row) => <div key={row.month}>
+                <dt>{format(new Date(`${row.month}-01`), "MMM yyyy")}<span>{row.bookings} {row.bookings === 1 ? "booking" : "bookings"}</span></dt>
+                <dd><AgentMoney value={usd(row.total)} /></dd>
+              </div>)}
+            </dl>
+          )}
+        </section>
+
       </div>
 
-      <section className="space-y-3">
-        <h2 className="font-heading text-base font-semibold">Payout history</h2>
-        <Card className="overflow-hidden py-0">
+      <section className={styles.payoutPanel} aria-labelledby="payout-history-title">
+        <div className={styles.panelHeading}><h2 id="payout-history-title">Payout history</h2><Badge variant="neutral">{payouts.length}</Badge></div>
+        <div className={styles.ledgerBody}>
           {payouts.length === 0 ? (
             <Empty>
               <EmptyMedia variant="icon">
@@ -290,7 +271,7 @@ export default async function AgentReportsPage({
               </TableBody>
             </Table>
           )}
-        </Card>
+        </div>
       </section>
     </div>
   );
@@ -304,18 +285,13 @@ function ViewCard({ href, active, icon: Icon, tone, label, value, sub }: {
       href={`${href}#entries`}
       scroll={false}
       aria-current={active ? "true" : undefined}
-      className={cn(
-        "group min-w-0 rounded-xl border bg-card p-4 transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-ring",
-        active ? "border-transparent ring-2" : "border-border"
-      )}
-      style={{ ["--tw-ring-color" as string]: tone, ...(active ? { background: `color-mix(in oklch, ${tone} 8%, var(--card))` } : {}) }}
+      className={styles.summaryCard}
+      style={{ "--metric-color": tone } as CSSProperties}
     >
-      <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <span className="flex size-7 items-center justify-center rounded-lg text-white" style={{ background: tone }}><Icon className="size-3.5" aria-hidden="true" /></span>
-        {label}
-      </span>
-      <span className="mt-3 block truncate font-heading text-xl font-semibold tracking-tight tabular-nums sm:text-2xl" style={{ color: active ? tone : undefined }}>{value}</span>
-      {sub ? <span className="mt-0.5 block truncate text-xs text-muted-foreground tabular-nums">{sub}</span> : null}
+      <span className={styles.metricHeader}><Icon aria-hidden="true" /><span>{label}</span>{active ? <Check aria-hidden="true" /> : <ArrowUpRight aria-hidden="true" />}</span>
+      <span className={styles.metricValue}>{value}</span>
+      {sub ? <span className={styles.metricMeta}>{sub}</span> : null}
+
     </Link>
   );
 }

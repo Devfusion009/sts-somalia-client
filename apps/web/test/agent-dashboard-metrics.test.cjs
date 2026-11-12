@@ -40,7 +40,7 @@ function nodes(node) {
 async function dashboardCards({ metrics = totals, current = { count: 1, amounts: [{ currency: 'USD', amount: 50.25 }] }, previous = { count: 1, amounts: [{ currency: 'USD', amount: 100.5 }] }, selectedRange = range } = {}) {
   const periods = [];
   const queries = {
-    getMyAgency: async () => ({ agency: { id: 'own', credit_balance: 505, credit_limit: 5000 } }),
+    getMyAgency: async () => ({ roleInAgency: 'owner', agency: { id: 'own', credit_balance: 505, credit_limit: 5000 } }),
     getAgencyPeriodMetrics: async () => metrics,
     getAgencyPendingPayments: async (agencyId, period) => {
       assert.equal(agencyId, 'own');
@@ -60,8 +60,10 @@ async function dashboardCards({ metrics = totals, current = { count: 1, amounts:
   }).default;
   const page = await Page({ searchParams: Promise.resolve({}) });
   const metricsNode = nodes(page).find(node => node.type?.name === 'Metrics');
-  const cards = nodes(await metricsNode.type(metricsNode.props)).filter(node => node.type?.name === 'Metric');
-  return { cards: cards.map(card => renderToStaticMarkup(card.type(card.props))), periods };
+  const rendered = await metricsNode.type(metricsNode.props);
+  const cards = nodes(rendered).filter(node => node.type?.name === 'Metric');
+  const walletNode = nodes(page).find(node => node.type?.name === 'WalletCard');
+  return { cards: cards.map(card => renderToStaticMarkup(card.type(card.props))), wallet: renderToStaticMarkup(walletNode.type(walletNode.props)), periods };
 }
 
 test('percent changes retain their sign and never invent a percentage for a zero baseline', () => {
@@ -81,39 +83,27 @@ test('preset and custom comparisons use adjacent windows of exactly equal durati
   }
 });
 
-test('all four cards display real comparisons; lower payment due is favorable', async () => {
-  const { cards, periods } = await dashboardCards();
-  assert.equal(cards.length, 4);
+test('three metric cards display real comparisons beside the wallet card', async () => {
+  const { cards, wallet } = await dashboardCards();
+  assert.equal(cards.length, 3);
   for (const card of cards) assert.match(card, /vs previous 30 days/);
   assert.match(cards[0], /\+50%/);
   assert.match(cards[1], /USD 6495\.75/);
   assert.match(cards[1], /\+29\.9%/);
   assert.match(cards[2], /USD 650\.25/);
-  assert.match(cards[3], /USD 50\.25/);
-  assert.match(cards[3], /class="up"[^>]*[^]*-50%/);
-  assert.match(cards[3], /queue=payment_due&amp;from=/);
-  assert.deepEqual(periods, [undefined, range, { from: range.previousFrom, to: range.previousTo }]);
+  assert.match(wallet, /Wallet balance/);
+  assert.match(wallet, /USD 505\.00/);
+  assert.match(wallet, /USD 5505\.00/);
+  assert.match(wallet, /href="\/agent\/finance\/top-up"/);
 });
 
 test('new activity is visible and unchanged metrics use a neutral indicator', async () => {
   const metrics = { ...totals, bookings: series(12, 0), revenue: { ...series(0, 0), currency: 'USD' }, earned: series(5, 5) };
-  const { cards } = await dashboardCards({ metrics, current: { count: 0, amounts: [] }, previous: { count: 0, amounts: [] } });
+  const { cards } = await dashboardCards({ metrics });
   assert.match(cards[0], /New/);
   assert.match(cards[0], /Previous period: 0/);
   for (const card of cards.slice(1)) assert.match(card, /class="neutral"[^>]*[^]*0%/);
   for (const card of cards) assert.doesNotMatch(card, /NaN|Infinity/);
-});
-
-test('payment due comparisons keep each currency separate, including fully cleared balances', async () => {
-  const { cards } = await dashboardCards({
-    current: { count: 1, amounts: [{ currency: 'EUR', amount: 20 }] },
-    previous: { count: 2, amounts: [{ currency: 'EUR', amount: 10 }, { currency: 'USD', amount: 100 }] },
-  });
-  assert.match(cards[3], /EUR 20\.00/);
-  assert.match(cards[3], /USD 0\.00/);
-  assert.match(cards[3], /EUR \+100%/);
-  assert.match(cards[3], /USD -100%/);
-  assert.match(cards[3], /class="down"/);
 });
 
 test('comparison captions follow the chosen date range', async () => {

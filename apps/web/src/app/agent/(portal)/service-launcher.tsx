@@ -7,9 +7,9 @@ import styles from "./workspace.module.css";
 
 const ITEM_TYPE = { flights: "flight", hotels: "hotel", visa: "visa", umrah: "umrah", events: "hall" } as const;
 
-export function ServiceLauncher({ hasCustomer = false, desk = false }: { hasCustomer?: boolean; desk?: boolean }) {
+export function ServiceLauncher({ hasCustomer = false, desk = false, row = false }: { hasCustomer?: boolean; desk?: boolean; row?: boolean }) {
   return (
-    <nav aria-label="Book travel services" className={desk ? `${styles.serviceGrid} ${styles.deskServices}` : styles.serviceGrid}>
+    <nav aria-label="Book travel services" className={desk ? `${styles.serviceGrid} ${styles.deskServices}` : row ? `${styles.serviceGrid} ${styles.serviceRow}` : styles.serviceGrid}>
       {AGENT_SERVICES.map((service) => {
         const { icon: Icon, color } = SERVICE_STYLE[ITEM_TYPE[service.key]];
         return (

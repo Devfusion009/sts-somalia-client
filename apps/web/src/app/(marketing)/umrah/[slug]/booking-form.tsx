@@ -20,7 +20,9 @@ import { SubmitButton } from "@/components/submit-button";
 import { createUmrahBooking } from "@/modules/umrah/actions";
 import { sharingLabel } from "@/modules/umrah/images";
 import { cn } from "@/lib/utils";
+import { countryName } from "@/lib/countries";
 import type { AgencyMarkupRule } from "@/modules/agencies/markup";
+import { travellerName, type TravellerProfile } from "@/modules/agencies/traveller-profile";
 
 type Departure = {
   id: string;
@@ -34,9 +36,12 @@ type Departure = {
 
 type SharingRate = { sharing: number; price: number | string };
 
+/** A desk customer with whatever traveller identity their profile holds. */
+type DeskTraveller = { id: string; full_name: string } & Partial<TravellerProfile>;
+
 /** Agent desk context: the selected customers and the agency's Umrah markup. */
 type DeskContext = {
-  customers: { id: string; full_name: string }[];
+  customers: DeskTraveller[];
   markup: AgencyMarkupRule | null;
 };
 
@@ -260,7 +265,7 @@ export function BookingForm({
                   prefix={`c_${customer.id}__pilgrim_0`}
                   index={i}
                   title={customer.full_name}
-                  defaultName={customer.full_name}
+                  traveller={customer}
                 />
               ))}
             </div>
@@ -289,6 +294,7 @@ export function BookingForm({
               index={i}
               title={`Pilgrim ${i + 1}`}
               lead={i === 0}
+              traveller={i === 0 ? desk?.customers[0] : undefined}
             />
           ))}
         </div>
@@ -352,13 +358,14 @@ function PilgrimFields({
   index,
   title,
   lead,
-  defaultName,
+  traveller,
 }: {
   prefix: string;
   index: number;
   title: string;
   lead?: boolean;
-  defaultName?: string;
+  /** Desk bookings start from the customer's saved profile. */
+  traveller?: DeskTraveller;
 }) {
   return (
     <fieldset className="min-w-0 space-y-4 py-5 first:pt-2 last:pb-0">
@@ -373,10 +380,10 @@ function PilgrimFields({
       </legend>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Full name (as in passport)" htmlFor={`${prefix}_full_name`} required className="sm:col-span-2">
-          <Input id={`${prefix}_full_name`} name={`${prefix}_full_name`} placeholder="Enter full name" defaultValue={defaultName} required />
+          <Input id={`${prefix}_full_name`} name={`${prefix}_full_name`} placeholder="Enter full name" defaultValue={traveller ? travellerName(traveller) : undefined} required />
         </Field>
         <Field label="Gender" htmlFor={`${prefix}_gender`} required>
-          <Select name={`${prefix}_gender`} defaultValue="male">
+          <Select name={`${prefix}_gender`} defaultValue={traveller?.gender === "female" ? "female" : "male"}>
             <SelectTrigger id={`${prefix}_gender`} className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -387,16 +394,16 @@ function PilgrimFields({
           </Select>
         </Field>
         <Field label="Date of birth" htmlFor={`${prefix}_date_of_birth`}>
-          <Input id={`${prefix}_date_of_birth`} name={`${prefix}_date_of_birth`} type="date" />
+          <Input id={`${prefix}_date_of_birth`} name={`${prefix}_date_of_birth`} type="date" defaultValue={traveller?.date_of_birth ?? undefined} />
         </Field>
         <Field label="Nationality" htmlFor={`${prefix}_nationality`}>
-          <Input id={`${prefix}_nationality`} name={`${prefix}_nationality`} placeholder="e.g. Somali" />
+          <Input id={`${prefix}_nationality`} name={`${prefix}_nationality`} placeholder="e.g. Somali" defaultValue={traveller?.nationality ? countryName(traveller.nationality) : undefined} />
         </Field>
         <Field label="Passport number" htmlFor={`${prefix}_passport_number`}>
-          <Input id={`${prefix}_passport_number`} name={`${prefix}_passport_number`} placeholder="Enter passport number" />
+          <Input id={`${prefix}_passport_number`} name={`${prefix}_passport_number`} placeholder="Enter passport number" defaultValue={traveller?.passport_number ?? undefined} />
         </Field>
         <Field label="Passport expiry" htmlFor={`${prefix}_passport_expiry`}>
-          <Input id={`${prefix}_passport_expiry`} name={`${prefix}_passport_expiry`} type="date" />
+          <Input id={`${prefix}_passport_expiry`} name={`${prefix}_passport_expiry`} type="date" defaultValue={traveller?.passport_expiry_date ?? undefined} />
         </Field>
         <Field label="Mahram name (if applicable)" htmlFor={`${prefix}_mahram_name`}>
           <Input id={`${prefix}_mahram_name`} name={`${prefix}_mahram_name`} />

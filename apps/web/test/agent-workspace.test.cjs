@@ -18,6 +18,7 @@ function load(relative, mocks={}) {
   return mod.exports;
 }
 const services=load('apps/web/src/modules/agencies/services.ts');
+const travellerProfile=load('apps/web/src/modules/agencies/traveller-profile.ts');
 function nodes(element) {
   if(!element || typeof element!=='object')return [];
   return [element,...React.Children.toArray(element.props?.children).flatMap(nodes)];
@@ -28,7 +29,7 @@ function deskMocks(selected=[]) {
   'next/navigation':{redirect},
   '@/lib/auth/session':{requireUser:async()=>({id:'agent'})},
   '@/lib/supabase/server':{createClient:async()=>({})},
-  '@/modules/agencies/queries':{getMyAgency:async()=>({agency:{id:'own-agency'}}),getAgencyCustomersWithStats:async id=>{assert.equal(id,'own-agency');return {customers:[{id:'client',full_name:'Amina',bookings:2}],total:31};}},
+  '@/modules/agencies/queries':{getMyAgency:async()=>({agency:{id:'own-agency'}}),getAgencyCustomersWithStats:async id=>{assert.equal(id,'own-agency');return {customers:[{id:'client',full_name:'Amina',bookings:2}],total:31};},getAgencyCustomerTravelDocs:async(id,ids)=>{assert.equal(id,'own-agency');return new Map(ids.map(key=>[key,{passport_number:'P1234567'}]));}},
   '@/modules/agencies/booking-context':{getBookingCustomers:async()=>selected,getBookingCustomer:async()=>selected[0]??null},
   '@/modules/agencies/services':services,
   '@/lib/pagination':{parsePage:value=>Number(value)||1},
@@ -96,15 +97,20 @@ for(const service of services.AGENT_SERVICES) {
  });
 }
 
+function pickerTable({selection=[],select,destinations,notices=[],jobs}) {
+ return load(portal+'book/customer-picker-table.tsx',{
+  react:{...React,useState:v=>[v,()=>{}],useSyncExternalStore:()=>selection,useTransition:()=>[false,fn=>jobs.push(fn())]},
+  'next/navigation':{useRouter:()=>({push:url=>destinations.push(url),refresh:()=>destinations.push('refresh')})},
+  '@/modules/agencies/booking-context-actions':{selectBookingCustomers:select},
+  '@/modules/agencies/traveller-profile':travellerProfile,
+  sonner:{toast:{error:message=>notices.push(message)}},
+ }).CustomerPickerTable;
+}
+
 test('customer selection advances to the chosen service only after the action succeeds',async()=>{
  for(const error of [null,'Customer not found.']) {
   const jobs=[], destinations=[], notices=[];
-  const Table=load(portal+'book/customer-picker-table.tsx',{
-   react:{...React,useState:v=>[v,()=>{}],useTransition:()=>[false,fn=>jobs.push(fn())]},
-   'next/navigation':{useRouter:()=>({push:url=>destinations.push(url),refresh:()=>destinations.push('refresh')})},
-   '@/modules/agencies/booking-context-actions':{selectBookingCustomers:async ids=>{assert.deepEqual(ids,['client']);return {error};}},
-   sonner:{toast:{error:message=>notices.push(message)}},
-  }).CustomerPickerTable;
+  const Table=pickerTable({jobs,destinations,notices,select:async ids=>{assert.deepEqual(ids,['client']);return {error};}});
   const tree=Table({rows:[{id:'client',full_name:'Amina',bookings:2}],redirectTo:'/agent/book/flights'});
   const select=nodes(tree).find(n=>typeof n.props?.onClick==='function' && n.props?.['aria-label']==='Continue for Amina');
   select.props.onClick(); await Promise.all(jobs);
@@ -113,22 +119,51 @@ test('customer selection advances to the chosen service only after the action su
  }
 });
 
-test('group booking submits the selected customers together and preserves the service',async()=>{
+test('every row has a selection box and ticked travellers continue together',async()=>{
  const jobs=[],destinations=[];
- const Table=load(portal+'book/customer-picker-table.tsx',{
-  react:{...React,useState:v=>[typeof v==='boolean'?true:v instanceof Set?new Set(['first','second']):v,()=>{}],useTransition:()=>[false,fn=>jobs.push(fn())]},
-  'next/navigation':{useRouter:()=>({push:url=>destinations.push(url),refresh:()=>destinations.push('refresh')})},
-  '@/modules/agencies/booking-context-actions':{selectBookingCustomers:async ids=>{assert.deepEqual(ids,['first','second']);return {error:null};}},
-  sonner:{toast:{error:assert.fail}},
- }).CustomerPickerTable;
- const tree=Table({rows:[{id:'first',full_name:'Amina'},{id:'second',full_name:'Yusuf'}],redirectTo:'/agent/book/hotels'});
+ const selection=[{id:'first',name:'Amina',ready:true},{id:'second',name:'Yusuf',ready:false}];
+ const Table=pickerTable({selection,jobs,destinations,select:async ids=>{assert.deepEqual(ids,['first','second']);return {error:null};}});
+ const tree=Table({rows:[{id:'first',full_name:'Amina'},{id:'third',full_name:'Omar'}],redirectTo:'/agent/book/hotels'});
  const all=nodes(tree);
- assert.ok(!all.some(n=>n.props?.['aria-label']==='Continue for Amina'));
- const bar=all.find(n=>n.props?.['aria-label']==='Selected customers');
- const next=nodes(bar).find(n=>typeof n.props?.onClick==='function' && Array.isArray(n.props.children));
- assert.ok(next);
+ assert.equal(all.find(n=>n.props?.['aria-label']==='Select Amina').props.checked,true);
+ assert.equal(all.find(n=>n.props?.['aria-label']==='Select Omar').props.checked,false);
+ assert.ok(all.some(n=>n.props?.['aria-label']==='Continue for Omar'));
+ const bar=all.find(n=>n.props?.['aria-label']==='Selected travellers');
+ assert.ok(nodes(bar).some(n=>n.props?.['aria-label']==='Remove Yusuf'));
+ // Amina is on screen without passport details; Yusuf was stored incomplete.
+ assert.ok(nodes(bar).some(n=>Array.isArray(n.props?.children) && n.props.children.includes(2) && n.props.children.includes(' incomplete')));
+ const next=nodes(bar).find(n=>typeof n.props?.onClick==='function' && Array.isArray(n.props.children) && n.props.children.includes('Continue with '));
  next.props.onClick();await Promise.all(jobs);
  assert.deepEqual(destinations,['/agent/book/hotels']);
+});
+
+test('the picker never exceeds the group limit',()=>{
+ const notices=[];
+ const selection=Array.from({length:travellerProfile.MAX_BATCH_CUSTOMERS},(_,i)=>({id:`c${i}`,name:`C${i}`,ready:true}));
+ const Table=pickerTable({selection,jobs:[],destinations:[],notices,select:assert.fail});
+ const all=nodes(Table({rows:[{id:'extra',full_name:'Extra'}]}));
+ assert.equal(all.find(n=>n.props?.['aria-label']==='Select Extra').props.disabled,true);
+ assert.equal(all.find(n=>n.props?.['aria-label']==='Select all on this page').props.disabled,true);
+});
+
+test('passport readiness flags missing, expired and soon-to-expire passports',()=>{
+ const today=new Date('2026-11-12T00:00:00Z');
+ assert.equal(travellerProfile.passportStatus(null,today),'missing');
+ assert.equal(travellerProfile.passportStatus('2026-11-12',today),'expired');
+ assert.equal(travellerProfile.passportStatus('2027-05-01',today),'expiring');
+ assert.equal(travellerProfile.passportStatus('2028-01-01',today),'valid');
+ const full={gender:'male',date_of_birth:'1990-01-01',nationality:'SO',passport_number:'P1',passport_expiry_date:'2030-01-01'};
+ assert.equal(travellerProfile.travellerReady(full,today),true);
+ assert.equal(travellerProfile.travellerReady({...full,passport_expiry_date:'2026-01-01'},today),false);
+ assert.deepEqual(travellerProfile.travellerGaps({...full,nationality:null}),['Nationality']);
+ assert.equal(travellerProfile.travellerName({full_name:'Amina',first_name:'Amina',middle_name:'H',last_name:'Ali'}),'Amina H Ali');
+});
+
+test('the directory forwards passport details to the picker rows',async()=>{
+ const Page=load(portal+'book/page.tsx',deskMocks()).default;
+ const tree=await Page({searchParams:Promise.resolve({service:'visa'})});
+ const table=nodes(tree).find(n=>Array.isArray(n.props?.rows));
+ assert.equal(table.props.rows[0].passport_number,'P1234567');
 });
 
 test('booking progress identifies the active step on canonical and rewritten portal paths',()=>{

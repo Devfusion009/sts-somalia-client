@@ -2,20 +2,20 @@ import { AgentMoney } from "@/components/portal/agent-money";
 import type { Metadata } from "next";
 import { Fragment } from "react";
 import { format } from "date-fns";
-import { ArrowDownLeft, Banknote, Download, Receipt, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Banknote, Clock3, Download, FileSpreadsheet, Receipt, Wallet } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency } from "@/modules/agencies/queries";
-import { getAgencyLedger, ledgerTotals, type LedgerGroup } from "@/modules/agencies/ledger";
+import { getAgencyLedger, ledgerTotals, type AgencyLedgerEntry, type LedgerGroup } from "@/modules/agencies/ledger";
 import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FilterChips, StatStrip, StatStripItem } from "@/components/dashboard/filter-chips";
+import { FilterChips } from "@/components/dashboard/filter-chips";
 import { money } from "@/lib/money";
-import { cn } from "@/lib/utils";
-import { groupByMonth, MonthRow, SignedMoney } from "../ledger-ui";
+import { groupByMonth, SignedMoney } from "../ledger-ui";
+
+import styles from "./transactions.module.css";
 
 export const metadata: Metadata = { title: "Transactions" };
 
@@ -81,130 +81,96 @@ export default async function AgentTransactionsPage({
   const months = groupByMonth(rows, (row) => row.createdAt);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Transactions"
-        meta={
-          <span className="tabular-nums">
-            {totals.count} {totals.count === 1 ? "transaction" : "transactions"}
-          </span>
-        }
-        actions={
-          <>
-            <Button variant="outline" nativeButton={false} render={<a href={`/agent/finance/transactions/export?format=xlsx&${query}`} />}>
-              <Download data-icon="inline-start" aria-hidden="true" /> Excel
-            </Button>
-            <Button variant="outline" nativeButton={false} render={<a href={`/agent/finance/transactions/export?format=csv&${query}`} />}>
-              <Download data-icon="inline-start" aria-hidden="true" /> CSV
-            </Button>
-          </>
-        }
-      />
+    <div className={styles.transactionsPage}>
+      <PageHeader title="Transactions" actions={<>
+        <Button variant="outline" nativeButton={false} render={<a href={`/agent/finance/transactions/export?format=xlsx&${query}`} />}>
+          <FileSpreadsheet data-icon="inline-start" aria-hidden="true" />Excel
+        </Button>
+        <Button variant="outline" nativeButton={false} render={<a href={`/agent/finance/transactions/export?format=csv&${query}`} />}>
+          <Download data-icon="inline-start" aria-hidden="true" />CSV
+        </Button>
+      </>} />
 
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <FilterChips
-          label="Filter by type"
-          active={group ?? ""}
-          items={GROUP_FILTERS.map((filter) => ({
-            key: filter.key,
-            label: filter.label,
-            href: hrefWith(filter.key, period.key),
-          }))}
-        />
-        <FilterChips
-          label="Filter by period"
-          active={period.key}
-          items={periods.map((p) => ({ key: p.key, label: p.label, href: hrefWith(group ?? "", p.key) }))}
-        />
-      </div>
+      <section className={styles.filters} aria-label="Transaction filters">
+        <div className={styles.filterGroup}>
+          <span className={styles.filterLabel}>Transaction type</span>
+          <FilterChips label="Filter by type" active={group ?? ""} items={GROUP_FILTERS.map((filter) => ({ key: filter.key, label: filter.label, href: hrefWith(filter.key, period.key) }))} />
+        </div>
+        <div className={styles.filterGroup}>
+          <span className={styles.filterLabel}>Period</span>
+          <FilterChips label="Filter by period" active={period.key} items={periods.map((p) => ({ key: p.key, label: p.label, href: hrefWith(group ?? "", p.key) }))} />
+        </div>
+      </section>
 
-      <StatStrip>
-        <StatStripItem label="Money in" value={<SignedMoney amount={totals.moneyIn} />} />
-        <StatStripItem label="Money out" value={<SignedMoney amount={-totals.moneyOut} />} />
-        <StatStripItem
-          label="Net"
-          value={<>{totals.net < 0 ? "−" : ""}<AgentMoney value={money(Math.abs(totals.net), "USD")} /></>}
-        />
-        <StatStripItem
-          label="In flight"
-          value={<AgentMoney value={money(totals.inFlight, "USD")} />}
-          tone={totals.inFlight > 0 ? "warn" : undefined}
-        />
-      </StatStrip>
+      <dl className={styles.summary}>
+        <div data-tone="incoming"><dt><ArrowDownLeft aria-hidden="true" />Money in</dt><dd><SignedMoney amount={totals.moneyIn} /></dd></div>
+        <div data-tone="outgoing"><dt><ArrowUpRight aria-hidden="true" />Money out</dt><dd><SignedMoney amount={-totals.moneyOut} /></dd></div>
+        <div data-tone="net"><dt><Wallet aria-hidden="true" />Net movement</dt><dd>{totals.net < 0 ? "−" : ""}<AgentMoney value={money(Math.abs(totals.net), "USD")} /></dd></div>
+        <div data-tone="pending"><dt><Clock3 aria-hidden="true" />In flight</dt><dd><AgentMoney value={money(totals.inFlight, "USD")} /></dd></div>
+      </dl>
 
-      <Card className="overflow-hidden py-0">
-        {rows.length === 0 ? (
-          <Empty>
-            <EmptyMedia variant="icon">
-              <Receipt />
-            </EmptyMedia>
-            <EmptyTitle>No transactions</EmptyTitle>
-          </Empty>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Details</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead numeric>Amount</TableHead>
-                <TableHead numeric>Balance</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {months.map((month) => (
-                <Fragment key={month.key}>
-                  <MonthRow label={month.label} colSpan={7} />
-                  {month.rows.map((row) => {
-                    const Icon = GROUP_ICONS[row.group];
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell className="text-muted-foreground">
-                          {format(new Date(row.createdAt), "d MMM")}
-                        </TableCell>
-                        <TableCell>
-                          <span className="flex items-center gap-2 font-medium">
-                            <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                            {row.type}
-                          </span>
-                        </TableCell>
-                        <TableCell className="max-w-[280px]">
-                          <p className="truncate" title={row.detail}>
-                            {row.detail}
-                          </p>
-                          {row.reference ? (
-                            <p className="font-mono text-xs text-muted-foreground">{row.reference}</p>
-                          ) : null}
-                        </TableCell>
-                        <TableCell className="max-w-[160px] truncate text-muted-foreground">
-                          {row.customer ?? "—"}
-                        </TableCell>
-                        <TableCell>
-                          {row.status ? (
-                            <Badge variant={statusBadgeVariant(row.status, STATUS_VARIANT)}>{row.status}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell numeric className={cn(!row.settled && "opacity-70")}>
-                          <SignedMoney amount={row.amount} />
-                        </TableCell>
-                        <TableCell numeric className="text-muted-foreground">
-                          {row.balanceAfter === null
-                            ? "—"
-                            : <>{row.balanceAfter < 0 ? "−" : ""}<AgentMoney value={money(Math.abs(row.balanceAfter), "USD")} /></>}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </Fragment>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+      <section className={styles.history} aria-labelledby="transaction-history-title">
+        <div className={styles.historyHeading}>
+          <div><h2 id="transaction-history-title">Transaction history</h2><Badge variant="neutral">{totals.count}</Badge></div>
+          <span className={styles.historyScope}>{GROUP_FILTERS.find((filter) => filter.key === (group ?? ""))?.label} · {period.label}</span>
+        </div>
+        {rows.length === 0 ? <Empty><EmptyMedia variant="icon"><Receipt /></EmptyMedia><EmptyTitle>No transactions</EmptyTitle></Empty> : <>
+          <div className={styles.desktopScroll} role="region" aria-label="Scrollable transaction history" tabIndex={0}>
+            <Table containerClassName="overflow-visible" className={styles.ledgerTable}>
+              <TableHeader sticky className={styles.tableHeading}>
+                <TableRow><TableHead>Date</TableHead><TableHead>Transaction</TableHead><TableHead>Customer</TableHead><TableHead>Status</TableHead><TableHead numeric>Amount</TableHead><TableHead numeric>Wallet balance</TableHead></TableRow>
+              </TableHeader>
+              <TableBody>
+                {months.map((month) => <Fragment key={month.key}>
+                  <TableRow className={styles.monthRow}><TableCell colSpan={6}><div className={styles.monthHeading}><span role="heading" aria-level={3}>{month.label}</span><span>{month.rows.length} {month.rows.length === 1 ? "entry" : "entries"}</span></div></TableCell></TableRow>
+                  {month.rows.map((row) => <TableRow key={row.id} className={styles.entryRow}>
+                    <TableCell className={styles.dateCell}><time dateTime={row.createdAt}>{format(new Date(row.createdAt), "d MMM")}</time></TableCell>
+                    <TableCell><TransactionIdentity row={row} /></TableCell>
+                    <TableCell className={styles.customerCell}>{row.customer ?? <span className={styles.missing}>—</span>}</TableCell>
+                    <TableCell><TransactionStatus row={row} /></TableCell>
+                    <TableCell numeric className={styles.amountCell}><SignedMoney amount={row.amount} /></TableCell>
+                    <TableCell numeric className={styles.balanceCell}><Balance value={row.balanceAfter} /></TableCell>
+                  </TableRow>)}
+                </Fragment>)}
+              </TableBody>
+            </Table>
+          </div>
+          <div className={styles.mobileHistory}>
+            {months.map((month) => <section key={month.key} aria-label={month.label}>
+              <div className={styles.monthHeading}><h3>{month.label}</h3><span>{month.rows.length} {month.rows.length === 1 ? "entry" : "entries"}</span></div>
+              <ul>{month.rows.map((row) => <li key={row.id} className={styles.mobileEntry}>
+                <div className={styles.mobileEntryTop}><time dateTime={row.createdAt}>{format(new Date(row.createdAt), "d MMM yyyy")}</time><TransactionStatus row={row} /></div>
+                <TransactionIdentity row={row} />
+                {row.customer ? <dl className={styles.mobileCustomer}><dt>Customer</dt><dd>{row.customer}</dd></dl> : null}
+                <dl className={styles.mobileAmounts}><div><dt>Amount</dt><dd><SignedMoney amount={row.amount} /></dd></div><div><dt>Wallet balance</dt><dd><Balance value={row.balanceAfter} /></dd></div></dl>
+              </li>)}</ul>
+            </section>)}
+          </div>
+        </>}
+      </section>
     </div>
   );
+}
+
+function TransactionIdentity({ row }: { row: AgencyLedgerEntry }) {
+  const Icon = GROUP_ICONS[row.group];
+  const showDetail = row.detail && row.detail !== row.reference && row.detail !== `Order ${row.reference}`;
+  return (
+    <div className={styles.transactionIdentity} data-group={row.group}>
+      <span className={styles.transactionIcon}><Icon aria-hidden="true" /></span>
+      <div className={styles.transactionDescription}>
+        <span className={styles.transactionType}>{row.type}</span>
+        {showDetail ? <span className={styles.transactionDetail}>{row.detail}</span> : null}
+        {row.reference ? <span className={styles.reference}>{row.reference}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function TransactionStatus({ row }: { row: AgencyLedgerEntry }) {
+  return row.status ? <Badge variant={statusBadgeVariant(row.status, STATUS_VARIANT)}>{row.status}</Badge> : <span className={styles.missing}>—</span>;
+}
+
+function Balance({ value }: { value: number | null }) {
+  return value === null ? <span className={styles.missing}>—</span> : <>{value < 0 ? "−" : ""}<AgentMoney value={money(Math.abs(value), "USD")} /></>;
 }

@@ -124,3 +124,38 @@
 .customerModes a:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
 @media(max-width:767px) { .deskServices { grid-template-columns:repeat(2,minmax(0,1fr)); } .deskServices .service { min-height:11rem; padding:1.25rem; } }
 @media(max-width:399px) { .deskServices { grid-template-columns:1fr; } }
+
+/* Dashboard banner + row services + compact metrics */
+.banner { position:relative; overflow:hidden; display:flex; align-items:center; min-height:11rem; border-radius:1rem; background:linear-gradient(100deg,#0b4f4a 0%,#0e6b63 38%,#118a7e 60%,transparent 100%),#0e6b63; color:#fff; }
+.bannerImage { left:auto !important; width:62% !important; object-fit:cover; object-position:center 40%; -webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 35%); mask-image:linear-gradient(90deg,transparent 0%,#000 35%); }
+.banner::after { content:""; position:absolute; right:-3rem; bottom:-2.5rem; width:22rem; height:5rem; border-radius:50%; background:linear-gradient(90deg,transparent,var(--chart-2)); opacity:.85; transform:rotate(-8deg); pointer-events:none; }
+.bannerContent { position:relative; z-index:1; max-width:28rem; padding:1.75rem 2rem; }
+.bannerContent h2 { font-family:var(--font-heading); font-size:1.875rem; font-weight:700; line-height:1.15; letter-spacing:-.03em; }
+.bannerContent p { margin-top:.5rem; color:rgb(255 255 255 / .85); font-size:.9375rem; }
+.bannerAction { display:inline-flex; align-items:center; gap:.5rem; margin-top:1rem; padding:.5rem .875rem; border:1px solid rgb(255 255 255 / .4); border-radius:.5rem; background:rgb(255 255 255 / .12); font-size:.8125rem; font-weight:600; backdrop-filter:blur(4px); }
+.bannerAction:hover { background:rgb(255 255 255 / .22); }
+.bannerAction:focus-visible { outline:2px solid #fff; outline-offset:3px; }
+.serviceRow .service { min-height:0; flex-direction:row; align-items:center; gap:.875rem; padding:1rem 1.125rem; background:var(--card); box-shadow:0 1px 2px color-mix(in oklch,var(--foreground) 5%,transparent); }
+.serviceRow .serviceIcon { width:3rem; height:3rem; flex-shrink:0; border-radius:.875rem; background:color-mix(in oklch,var(--svc) 14%,var(--card)); color:var(--svc); box-shadow:none; }
+.serviceRow .serviceIcon svg { width:1.5rem; height:1.5rem; }
+.serviceRow .serviceName { font-size:1rem; font-weight:700; }
+.serviceRow .service { display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-rows:auto auto; column-gap:.875rem; row-gap:.125rem; }
+.serviceRow .serviceIcon { grid-row:1 / span 2; }
+.serviceRow .serviceName { grid-column:2; align-self:end; }
+.serviceRow .serviceAction { display:contents; color:var(--muted-foreground); font-size:.75rem; }
+.serviceRow .serviceAction svg { grid-column:3; grid-row:1 / span 2; align-self:center; width:1.125rem; height:1.125rem; color:var(--foreground); }
+.metric { align-items:flex-start; padding:1.125rem 1.25rem; border-color:color-mix(in oklch,var(--tone) 18%,var(--border)); background:color-mix(in oklch,var(--tone) 9%,var(--card)); }
+.metric .metricIcon { width:2.5rem; height:2.5rem; background:transparent; color:var(--tone); box-shadow:none; }
+.metric .metricIcon svg { width:1.75rem; height:1.75rem; stroke-width:1.6; }
+.metric .metricLabel { color:var(--foreground); font-size:.8125rem; font-weight:500; }
+.metric .metricValue { margin-top:.375rem; font-size:1.5rem; font-weight:700; }
+.metric .up,.metric .down,.metric .neutral { margin-top:.5rem; padding:0; background:none; font-size:.8125rem; }
+.metricPeriod { display:block; margin-top:.25rem; color:var(--muted-foreground); font-size:.75rem; }
+.walletCardFooter { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:.5rem; margin-top:.5rem; }
+.walletCardFooter .metricPeriod { margin:0; }
+.walletCardFooter .metricPeriod:hover { color:var(--foreground); }
+.addFunds { display:inline-flex; align-items:center; gap:.375rem; padding:.5rem .875rem; border-radius:.5rem; background:var(--tone); color:#fff; font-size:.8125rem; font-weight:600; box-shadow:0 6px 14px -8px var(--tone); }
+.addFunds:hover { filter:brightness(1.08); }
+.addFunds:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+@media(max-width:1279px) { .serviceRow { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:767px) { .banner { min-height:9rem; } .bannerImage { width:100% !important; opacity:.35; } .bannerContent { padding:1.25rem; } .bannerContent h2 { font-size:1.375rem; } .serviceRow { grid-template-columns:repeat(2,minmax(0,1fr)); } .serviceRow .service { padding:.875rem; } .serviceRow .serviceIcon { width:2.5rem; height:2.5rem; } }

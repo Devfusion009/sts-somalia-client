@@ -1,0 +1,81 @@
+.transactionsPage { display:grid; gap:1.5rem; min-width:0; }
+.filters { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:1.25rem 2rem; padding:1.25rem; border:1px solid var(--border); border-radius:1rem; background:var(--card); }
+.filterGroup { display:grid; gap:.625rem; min-width:0; }
+.filterLabel { font-size:.6875rem; font-weight:600; color:var(--muted-foreground); }
+.summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; }
+.summary > div { min-width:0; padding:1.25rem; border:1px solid var(--border); border-radius:.875rem; background:var(--card); }
+.summary dt { display:flex; align-items:center; gap:.625rem; color:var(--muted-foreground); font-size:.75rem; }
+.summary dt svg { width:1rem; height:1rem; flex-shrink:0; }
+.summary dd { margin-top:1rem; overflow-x:auto; font-family:var(--font-heading); font-size:clamp(1.25rem,1.8vw,1.875rem); font-weight:600; letter-spacing:-.025em; font-variant-numeric:tabular-nums; }
+.summary [data-tone="incoming"] dt svg { color:var(--primary); }
+.summary [data-tone="outgoing"] dt svg { color:var(--destructive); }
+.summary [data-tone="net"] { background:var(--sidebar); border-color:var(--sidebar-border); color:var(--sidebar-accent-foreground); }
+.summary [data-tone="net"] dt { color:var(--sidebar-foreground); }
+.summary [data-tone="pending"] { background:color-mix(in oklch,var(--brand-gold) 5%,var(--card)); }
+.summary [data-tone="pending"] dt svg { color:color-mix(in oklch,var(--brand-gold) 65%,var(--foreground)); }
+.summary [data-tone="pending"] dd { color:color-mix(in oklch,var(--brand-gold) 55%,var(--foreground)); }
+.history { min-width:0; overflow:hidden; border:1px solid var(--border); border-radius:1rem; background:var(--card); }
+.historyHeading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem; border-bottom:1px solid var(--border); }
+.historyHeading > div { display:flex; align-items:center; gap:.625rem; }
+.historyHeading h2 { font-family:var(--font-heading); font-size:1rem; font-weight:600; letter-spacing:-.025em; }
+.historyScope { color:var(--muted-foreground); font-size:.6875rem; }
+.desktopScroll { max-height:42rem; overflow:auto; scrollbar-gutter:stable; scrollbar-color:var(--primary) var(--muted); }
+.desktopScroll:focus-visible { outline:2px solid var(--ring); outline-offset:-2px; }
+.ledgerTable { min-width:55rem; }
+.tableHeading { background:var(--muted); }
+.tableHeading th { height:3rem; color:var(--muted-foreground); font-size:.6875rem; font-weight:600; letter-spacing:.025em; }
+.ledgerTable td { padding-block:1.125rem; vertical-align:middle; }
+.ledgerTable th:first-child,.ledgerTable td:first-child { padding-left:1.25rem; }
+.ledgerTable th:last-child,.ledgerTable td:last-child { padding-right:1.25rem; }
+.ledgerTable .monthRow { background:color-mix(in oklch,var(--secondary) 70%,var(--card)); }
+.ledgerTable .monthRow:hover { background:var(--secondary); }
+.ledgerTable .monthRow td { padding-block:.625rem; }
+.monthHeading { display:flex; align-items:center; justify-content:space-between; gap:1rem; font-size:.6875rem; font-weight:600; color:var(--foreground); }
+.monthHeading > span:last-child { color:var(--muted-foreground); font-size:.625rem; font-weight:500; font-variant-numeric:tabular-nums; }
+.entryRow:hover { background:color-mix(in oklch,var(--accent) 40%,var(--card)); }
+.dateCell { width:6rem; color:var(--muted-foreground); font-size:.75rem; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.transactionIdentity { display:flex; align-items:flex-start; gap:.875rem; min-width:0; }
+.transactionIcon { display:flex; align-items:center; justify-content:center; flex-shrink:0; width:2.25rem; height:2.25rem; border:1px solid var(--border); border-radius:.625rem; background:var(--secondary); color:var(--muted-foreground); }
+.transactionIcon svg { width:1rem; height:1rem; }
+.transactionIdentity[data-group="earning"] .transactionIcon { background:var(--accent); border-color:var(--accent); color:var(--accent-foreground); }
+.transactionIdentity[data-group="withdrawal"] .transactionIcon { background:color-mix(in oklch,var(--chart-4) 8%,var(--card)); border-color:color-mix(in oklch,var(--chart-4) 18%,var(--border)); color:var(--chart-4); }
+.transactionDescription { min-width:0; max-width:28rem; }
+.transactionType { display:block; font-size:.8125rem; font-weight:600; color:var(--foreground); white-space:normal; }
+.transactionDetail { display:block; margin-top:.25rem; font-size:.6875rem; line-height:1.5; white-space:normal; overflow-wrap:anywhere; color:var(--muted-foreground); }
+.reference { display:block; margin-top:.375rem; font-family:var(--font-mono); font-size:.625rem; letter-spacing:.025em; color:var(--muted-foreground); white-space:normal; overflow-wrap:anywhere; }
+.customerCell { max-width:11rem; font-size:.75rem; font-weight:500; white-space:normal; overflow-wrap:anywhere; }
+.amountCell { font-size:.875rem; }
+.balanceCell { font-size:.75rem; color:var(--muted-foreground); }
+.missing { color:var(--muted-foreground); }
+.mobileHistory { display:none; }
+@media(max-width:1199px) { .summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:1023px) {
+  .desktopScroll { display:none; }
+  .mobileHistory { display:block; }
+  .mobileHistory .monthHeading { padding:.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--secondary); }
+  .mobileEntry { display:grid; gap:1rem; padding:1.25rem; border-bottom:1px solid var(--border); }
+  .mobileHistory > section:last-child .mobileEntry:last-child { border-bottom:0; }
+  .mobileEntryTop { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; color:var(--muted-foreground); font-size:.6875rem; font-variant-numeric:tabular-nums; }
+  .transactionDescription { max-width:none; }
+  .mobileCustomer { display:flex; align-items:baseline; gap:.75rem; padding-left:3.125rem; font-size:.75rem; }
+  .mobileCustomer dt { color:var(--muted-foreground); font-size:.6875rem; }
+  .mobileCustomer dd { overflow-wrap:anywhere; font-weight:500; }
+  .mobileAmounts { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding-top:.875rem; border-top:1px solid var(--border); }
+  .mobileAmounts > div { min-width:0; }
+  .mobileAmounts > div:last-child { text-align:right; }
+  .mobileAmounts dt { margin-bottom:.375rem; color:var(--muted-foreground); font-size:.625rem; }
+  .mobileAmounts dd { overflow-x:auto; font-size:.9375rem; }
+  .mobileAmounts > div:last-child dd { color:var(--muted-foreground); font-size:.8125rem; }
+}
+@media(max-width:639px) {
+  .filters { padding:1rem; gap:1rem; }
+  .filterGroup { width:100%; }
+  .filterGroup + .filterGroup { padding-top:1rem; border-top:1px solid var(--border); }
+  .summary { gap:.625rem; }
+  .summary > div { padding:1rem; }
+  .summary dt { font-size:.6875rem; gap:.375rem; }
+  .summary dd { font-size:1.125rem; }
+  .historyHeading { padding:1rem; }
+  .mobileEntry { padding:1rem; }
+  .mobileHistory .monthHeading { padding:.75rem 1rem; }
+}

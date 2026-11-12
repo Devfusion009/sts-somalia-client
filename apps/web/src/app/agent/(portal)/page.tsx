@@ -1,15 +1,16 @@
 import { AgentMoney } from "@/components/portal/agent-money";
 import { Suspense } from "react";
 import { FinancePriorities } from "@/modules/agencies/components/finance-priorities";
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowDownRight, ArrowRight, ArrowUpRight, BadgeDollarSign, CalendarDays, CircleDollarSign, Clock3, Minus, Plus, ReceiptText, Ticket, TrendingUp, UsersRound, Wallet, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, CalendarDays, ChartNoAxesColumnIncreasing, CircleDollarSign, Clock3, Coins, Minus, Plus, ReceiptText, Ticket, UsersRound, Wallet, type LucideIcon } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
   getMyAgency, getAgencyTeamCount, getAgencyPendingPayments,
   getAgencyPeriodMetrics, getAgencyOnboardingStatus, getAgencyRecentActivity,
   getAgencyOrders, getAgencyServiceMix,
 } from "@/modules/agencies/queries";
-import { resolveDateRange, percentChange, bucketLabel, type ResolvedDateRange } from "@/lib/date-range";
+import { resolveDateRange, percentChange, bucketLabel } from "@/lib/date-range";
 import { LowBalanceBanner } from "@/modules/notifications/components/low-balance-banner";
 import { BroadcastBanner } from "@/modules/notifications/components/broadcast-banner";
 import { AgencySupportCard } from "@/modules/agencies/components/agency-support-card";
@@ -22,9 +23,7 @@ import { PanelSkeleton } from "@/components/dashboard/skeletons";
 import { OnboardingChecklist } from "./onboarding-checklist";
 import { RecentActivityCard } from "./recent-activity-card";
 import { ServiceLauncher } from "./service-launcher";
-import { BookingWorkflow } from "./booking-workflow";
 import { AgentPerformance } from "./agent-performance";
-import { WorkspaceCover } from "@/components/portal/workspace-cover";
 import { RecentBookings } from "./recent-bookings";
 import { BookingMixChart } from "./booking-mix-chart";
 import { SERVICE_ORDER, SERVICE_STYLE } from "./service-palette";
@@ -64,38 +63,30 @@ export default async function AgentDashboardPage({ searchParams }: {
       <BroadcastBanner />
       <Suspense fallback={null}><FinancePriorities agencyId={agencyId} /></Suspense>
 
-      <div className={styles.heroGrid}>
-        <section className={`${styles.launcher} ${styles.photoLauncher}`} aria-label="Start a booking">
-          <WorkspaceCover compact headingLevel={2} image="/marketing/agent-booking-desk-v1.webp" title="Start a booking" actions={<Link href="/agent/book" className="inline-flex items-center gap-2 rounded-lg border border-white/35 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Booking desk<ArrowRight className="size-3.5" aria-hidden="true" /></Link>} />
-          <ServiceLauncher />
-          <BookingWorkflow />
-        </section>
-        <section className={styles.wallet} aria-label="Agency wallet">
-          <dl>
-            <dt className={styles.walletLabel}><Wallet className="size-4" aria-hidden="true" />Available to spend</dt>
-            <dd className={styles.walletAmount}>{<AgentMoney value={money(wallet.available, "USD")} />}</dd>
-          </dl>
-          <div className={styles.walletActions}>
-            <Link href="/agent/finance/top-up"><Plus className="size-3.5" aria-hidden="true" />Add funds</Link>
-            <Link href="/agent/finance">View wallet<ArrowRight className="size-3.5" aria-hidden="true" /></Link>
-          </div>
-          <dl className={styles.walletFacts}>
-            <div><dt>{wallet.balance < 0 ? "Owed to STS" : "Wallet balance"}</dt><dd>{<AgentMoney value={money(Math.abs(wallet.balance), "USD")} />}</dd></div>
-            <div><dt>Credit limit</dt><dd>{<AgentMoney value={money(wallet.creditLimit, "USD")} />}</dd></div>
-          </dl>
-        </section>
+      <section className={styles.banner} aria-labelledby="dashboard-banner-title">
+        <Image src="/marketing/umrah-hero.webp" alt="" fill priority unoptimized sizes="(min-width: 1024px) 60vw, 100vw" className={styles.bannerImage} />
+        <div className={styles.bannerContent}>
+          <h2 id="dashboard-banner-title">Book &amp; manage travel services</h2>
+          <p>Flights, hotels, visas, Umrah and events for your customers.</p>
+          <Link href="/agent/book" className={styles.bannerAction}>Open booking desk<ArrowRight className="size-4" aria-hidden="true" /></Link>
+        </div>
+      </section>
+
+      <ServiceLauncher row />
+
+      <div className={styles.metrics}>
+        <Suspense fallback={<>{[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}</>}>
+          <Metrics metricsP={metricsP} rangeKey={range.key} />
+        </Suspense>
+        <WalletCard wallet={wallet} canTopUp={membership.roleInAgency === "owner" || membership.roleInAgency === "admin"} />
       </div>
-
-      <Suspense fallback={<Skeleton className="h-20 rounded-2xl" />}><BookingOperations pendingP={pendingP} /></Suspense>
-
-      <Suspense fallback={<div className={styles.metrics}>{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}</div>}>
-        <Metrics metricsP={metricsP} agencyId={agencyId} range={range} />
-      </Suspense>
 
       <div className={styles.overviewGrid}>
         <Suspense fallback={<PanelSkeleton rows={6} />}><LatestBookings ordersP={ordersP} /></Suspense>
         <Suspense fallback={<Skeleton className="h-[360px] rounded-2xl" />}><BookingMix mixP={mixP} rangeLabel={range.label} /></Suspense>
       </div>
+
+      <Suspense fallback={<Skeleton className="h-20 rounded-2xl" />}><BookingOperations pendingP={pendingP} /></Suspense>
 
       <div className={styles.contentGrid}>
         <div className="order-2 min-w-0 xl:order-1">
@@ -127,32 +118,38 @@ async function TeamCount({ countP }: { countP: ReturnType<typeof getAgencyTeamCo
   return <>{count} team member{count === 1 ? "" : "s"}</>;
 }
 
-async function Metrics({ metricsP, agencyId, range }: {
-  metricsP: MetricsPromise; agencyId: string; range: ResolvedDateRange;
-}) {
-  // Compare today's outstanding balances for orders created in each window,
-  // rather than claiming to reconstruct a historical payment-queue snapshot.
-  const [metrics, pending, previousPending] = await Promise.all([
-    metricsP,
-    getAgencyPendingPayments(agencyId, range),
-    getAgencyPendingPayments(agencyId, { from: range.previousFrom, to: range.previousTo }),
-  ]);
+async function Metrics({ metricsP, rangeKey }: { metricsP: MetricsPromise; rangeKey: string }) {
+  const metrics = await metricsP;
   const currency = metrics.revenue.currency;
-  const comparisonLabel = range.key === "custom" ? "vs previous period" : `vs previous ${range.key === "24h" ? "24 hours" : `${range.key.slice(0, -1)} days`}`;
-  const dueCurrencies = [...new Set([...pending.amounts, ...previousPending.amounts].map((item) => item.currency))].sort();
-  if (dueCurrencies.length === 0) dueCurrencies.push(currency);
-  const dueChanges = dueCurrencies.map((currency) => ({
-    currency,
-    current: pending.amounts.find((item) => item.currency === currency)?.amount ?? 0,
-    previous: previousPending.amounts.find((item) => item.currency === currency)?.amount ?? 0,
-  }));
-  const dueHref = `/agent/bookings?queue=payment_due&from=${range.from.toISOString().slice(0, 10)}&to=${range.to.toISOString().slice(0, 10)}`;
+  const period = rangeKey === "custom" ? "vs previous period" : `vs previous ${rangeKey === "24h" ? "24 hours" : `${rangeKey.slice(0, -1)} days`}`;
   return (
-    <div className={styles.metrics}>
-      <Metric label="Bookings" icon={Ticket} tone="var(--chart-1)" value={metrics.bookings.current.toLocaleString("en-US")} href="/agent/bookings" changes={[metrics.bookings]} comparisonLabel={comparisonLabel} />
-      <Metric label="Sales" icon={TrendingUp} tone="var(--chart-3)" value={<AgentMoney value={money(metrics.revenue.current, currency)} />} href="/agent/reports" changes={[metrics.revenue]} comparisonLabel={comparisonLabel} />
-      <Metric label="Earnings" icon={BadgeDollarSign} tone="var(--chart-2)" value={<AgentMoney value={money(metrics.earned.current, currency)} />} href="/agent/reports" changes={[{ ...metrics.earned, currency }]} comparisonLabel={comparisonLabel} />
-      <Metric label="Payment due" icon={Clock3} tone="var(--chart-4)" value={dueChanges.map((due) => <span key={due.currency} className={styles.metricAmount}><AgentMoney value={money(due.current, due.currency)} /></span>)} href={dueHref} changes={dueChanges} comparisonLabel={comparisonLabel} inverse title={`Outstanding balances · bookings created ${range.from.toLocaleDateString("en-GB")} – ${range.to.toLocaleDateString("en-GB")}`} />
+    <>
+      <Metric label="Total bookings" icon={CalendarDays} tone="var(--chart-1)" value={metrics.bookings.current.toLocaleString("en-US")} href="/agent/bookings" current={metrics.bookings.current} previous={metrics.bookings.previous} previousText={metrics.bookings.previous.toLocaleString("en-US")} period={period} />
+      <Metric label="Sales value" icon={Coins} tone="var(--chart-3)" value={<AgentMoney value={money(metrics.revenue.current, currency)} />} href="/agent/reports" current={metrics.revenue.current} previous={metrics.revenue.previous} previousText={money(metrics.revenue.previous, currency)} period={period} />
+      <Metric label="My commission" icon={ChartNoAxesColumnIncreasing} tone="var(--chart-2)" value={<AgentMoney value={money(metrics.earned.current, currency)} />} href="/agent/reports" current={metrics.earned.current} previous={metrics.earned.previous} previousText={money(metrics.earned.previous, currency)} period={period} />
+    </>
+  );
+}
+
+/** Rendered with the shell: the balance is already loaded, so it never waits on analytics. */
+function WalletCard({ wallet, canTopUp = false }: {
+  wallet: { balance: number; creditLimit: number; available: number }; canTopUp?: boolean;
+}) {
+  return (
+    <div className={styles.metric} style={{ "--tone": "var(--chart-4)" } as CSSProperties}>
+      <span className={styles.metricIcon}><Wallet aria-hidden="true" /></span>
+      <div className={styles.metricBody}>
+        <dl>
+          <dt className={styles.metricLabel}>{wallet.balance < 0 ? "Owed to STS" : "Wallet balance"}</dt>
+          <dd className={styles.metricValue}><AgentMoney value={money(Math.abs(wallet.balance), "USD")} /></dd>
+        </dl>
+        <div className={styles.walletCardFooter}>
+          <Link href="/agent/finance" className={styles.metricPeriod}>Available <AgentMoney value={money(wallet.available, "USD")} /></Link>
+          {canTopUp
+            ? <Link href="/agent/finance/top-up" className={styles.addFunds}><Plus className="size-3.5" aria-hidden="true" />Add funds</Link>
+            : <Link href="/agent/finance" className={styles.addFunds}>View wallet<ArrowRight className="size-3.5" aria-hidden="true" /></Link>}
+        </div>
+      </div>
     </div>
   );
 }
@@ -232,35 +229,26 @@ async function RecentActivity({ activityP }: { activityP: ReturnType<typeof getA
   return <RecentActivityCard items={await activityP} />;
 }
 
-function Metric({ label, icon: Icon, tone, value, href, changes, comparisonLabel, inverse = false, title }: {
+function Metric({ label, icon: Icon, tone, value, href, current, previous, previousText, period }: {
   label: string; icon: LucideIcon; tone: string; value: React.ReactNode; href: string;
-  changes: { current: number; previous: number; currency?: string }[]; comparisonLabel: string; inverse?: boolean; title?: string;
+  current: number; previous: number; previousText: string; period: string;
 }) {
+  const change = percentChange(current, previous);
+  const text = change === null ? "New" : `${change > 0 ? "+" : ""}${change}%`;
+  const tone_ = change === null ? styles.up : change < 0 ? styles.down : change > 0 ? styles.up : styles.neutral;
   return (
-    <Link href={href} className={styles.metric} style={{ "--tone": tone } as CSSProperties} title={title}>
+    <Link href={href} className={styles.metric} style={{ "--tone": tone } as CSSProperties}>
       <span className={styles.metricIcon}><Icon aria-hidden="true" /></span>
       <div className={styles.metricBody}>
         <dl>
-          <dt className={styles.metricLabel}>{label}<ArrowRight className="size-3.5" aria-hidden="true" /></dt>
+          <dt className={styles.metricLabel}>{label}</dt>
           <dd className={styles.metricValue}>{value}</dd>
         </dl>
-        <div className={styles.metricFooter}>
-          <div className={styles.metricChanges}>
-            {changes.map(({ current, previous, currency }, index) => {
-              const change = percentChange(current, previous);
-              const neutral = change === null || change === 0;
-              const positive = change !== null && (inverse ? change < 0 : change > 0);
-              const text = change === null ? "New" : `${change > 0 ? "+" : ""}${change}%`;
-              const prefix = changes.length > 1 ? `${currency} ` : "";
-              const previousValue = currency ? money(previous, currency) : previous.toLocaleString("en-US");
-              return <span key={currency ?? index} className={neutral ? styles.neutral : positive ? styles.up : styles.down} title={`Previous period: ${previousValue}`} aria-label={`${label}: ${prefix}${text} ${comparisonLabel}; previous period: ${previousValue}`}>
-                {change === null ? null : change === 0 ? <Minus className="size-3" aria-hidden="true" /> : change < 0 ? <ArrowDownRight className="size-3" aria-hidden="true" /> : <ArrowUpRight className="size-3" aria-hidden="true" />}
-                {prefix}{text}
-              </span>;
-            })}
-          </div>
-          <span>{comparisonLabel}</span>
-        </div>
+        <span className={tone_} title={`Previous period: ${previousText}`} aria-label={`${label}: ${text} ${period}; previous period: ${previousText}`}>
+          {change === null || change > 0 ? <ArrowUp className="size-3" aria-hidden="true" /> : change < 0 ? <ArrowDown className="size-3" aria-hidden="true" /> : <Minus className="size-3" aria-hidden="true" />}
+          {text}
+        </span>
+        <span className={styles.metricPeriod}>{period}</span>
       </div>
     </Link>
   );

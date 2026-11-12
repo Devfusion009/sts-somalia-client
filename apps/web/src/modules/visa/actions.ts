@@ -11,6 +11,8 @@ import {
   getActiveAgencyId,
   deskOrderPath,
 } from "@/modules/orders/helpers";
+import { getBookingCustomers } from "@/modules/agencies/booking-context";
+import { travellerName } from "@/modules/agencies/traveller-profile";
 import {
   APPLICANT_TYPES,
   applicationDocumentSlots,
@@ -170,20 +172,58 @@ export async function startDeskVisaApplication(_prev: ActionState, formData: For
     .maybeSingle();
   if (!visaType) return { error: "This visa product is no longer available." };
 
+  // The wizard starts from the saved profiles: the primary applicant's
+  // identity and contact, and one member row per other selected customer.
+  const customers = await getBookingCustomers(supabase, agencyId);
+  const primary = customers.find((customer) => customer.id === parsed.data.agencyCustomerId);
+  if (!primary) return { error: "Choose the customer again." };
+  const others = customers.filter((customer) => customer.id !== primary.id);
+  const destination = visaType.destination_country_code.toUpperCase();
+  const nationality = (code: string | null) =>
+    code && code.toUpperCase() !== destination ? code.toUpperCase() : null;
+  const filled = (values: Record<string, string | null>) =>
+    Object.fromEntries(Object.entries(values).filter(([, value]) => value));
+
   const { data: application, error } = await supabase
     .from("visa_applications")
     .insert({
       visa_type_id: visaType.id,
       submitted_by: user.id,
       agency_id: agencyId,
-      agency_customer_id: parsed.data.agencyCustomerId,
+      agency_customer_id: primary.id,
       status: "draft",
       price: visaType.price,
       currency: visaType.currency,
+      applicant_type: others.length > 0 ? "group" : "single",
+      traveler_details: filled({
+        full_name: travellerName(primary),
+        date_of_birth: primary.date_of_birth,
+        gender: primary.gender,
+        nationality: nationality(primary.nationality),
+        passport_number: primary.passport_number,
+        passport_expiry: primary.passport_expiry_date,
+      }),
+      contact_details: filled({ email: primary.email, mobile: primary.phone }),
     })
     .select("id")
     .single();
   if (error || !application) return { error: error?.message ?? "Could not start the application." };
+
+  if (others.length > 0) {
+    const { error: membersError } = await supabase.from("visa_members").insert(
+      others.map((customer, index) => ({
+        application_id: application.id,
+        full_name: travellerName(customer),
+        relationship: "other",
+        date_of_birth: customer.date_of_birth,
+        nationality: nationality(customer.nationality),
+        passport_number: customer.passport_number,
+        passport_expiry: customer.passport_expiry_date,
+        sort_order: index,
+      }))
+    );
+    if (membersError) return { error: membersError.message };
+  }
 
   return { error: null, destination: deskWizardPath(application.id, 1) };
 }
