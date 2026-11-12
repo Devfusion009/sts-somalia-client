@@ -40,16 +40,18 @@ function deferred() {
 const UI = new Proxy({}, { get: () => ({ children }) => React.createElement("div", null, children) });
 
 test("agent booking controls and wallet stream before slow analytics and finance reads", { timeout: 5000 }, async () => {
-  const metrics = deferred(), activity = deferred(), onboarding = deferred(), team = deferred(), pending = deferred(), finance = deferred();
+  const metrics = deferred(), activity = deferred(), onboarding = deferred(), team = deferred(), pending = deferred(), finance = deferred(), orders = deferred(), mix = deferred();
   const { default: Page } = load("app/agent/(portal)/page.tsx", {
     "@/lib/auth/session": { requireUser: async () => ({ id: "u1", agent_code: "AGT-1" }) },
     "@/modules/agencies/queries": {
-      getMyAgency: async () => ({ agency: { id: "a1", name: "Test agency", status: "active", credit_balance: 505, credit_limit: 5000, commission_rate: 10, commission_rate_set_at: "2026-01-01" } }),
+      getMyAgency: async () => ({ roleInAgency: "owner", agency: { id: "a1", name: "Test agency", status: "active", credit_balance: 505, credit_limit: 5000, commission_rate: 10, commission_rate_set_at: "2026-01-01" } }),
       getAgencyPeriodMetrics: () => metrics.promise,
       getAgencyOnboardingStatus: () => onboarding.promise,
       getAgencyRecentActivity: () => activity.promise,
       getAgencyTeamCount: () => team.promise,
       getAgencyPendingPayments: () => pending.promise,
+      getAgencyOrders: () => orders.promise,
+      getAgencyServiceMix: () => mix.promise,
       // Intentionally no wallet-history or team-roster reader: neither is needed.
     },
     "@/lib/date-range": { resolveDateRange: () => ({ key: "30d", label: "Last 30 days", granularity: "day" }), percentChange: () => null, bucketLabel: (key) => key },
@@ -58,6 +60,7 @@ test("agent booking controls and wallet stream before slow analytics and finance
     "@/modules/agencies/components/finance-priorities": { FinancePriorities: async () => { await finance.promise; return "Finance loaded"; } },
     "@/components/ui/page-header": { PageHeader: ({ title, meta }) => React.createElement("header", null, title, meta) },
     "@/components/portal/workspace-cover": { WorkspaceCover: ({ title }) => React.createElement("h2", null, title) },
+    "./service-palette": load("app/agent/(portal)/service-palette.ts", {}, () => UI),
     "next/link": { __esModule: true, default: ({ href, children }) => React.createElement("a", { href }, children) },
   }, (id) => id.endsWith(".css") ? { __esModule: true, default: {} } : UI);
 
@@ -75,15 +78,16 @@ test("agent booking controls and wallet stream before slow analytics and finance
   });
   try {
     await shell.promise;
-    assert.match(html, /Start a booking/);
+    assert.match(html, /Open booking desk/);
     assert.match(html.replace(/<[^>]*>/g, ""), /USD 5505/);
     assert.match(html, /href="\/agent\/finance\/top-up"/);
     assert.doesNotMatch(html, /Finance loaded/);
     metrics.resolve({ revenue: { current: 120, previous: 0, series: [120], currency: "USD" }, bookings: { current: 2, previous: 0, series: [2] }, earned: { current: 12, previous: 0 }, buckets: ["2026-11-09"] });
     activity.resolve([]); onboarding.resolve({}); team.resolve(1); pending.resolve({ count: 1, amounts: [{ amount: 75, currency: "USD" }] }); finance.resolve();
+    orders.resolve({ orders: [], total: 0 }); mix.resolve({ flight: 1, hotel: 1, visa: 0, umrah: 0, hall: 0 });
     await ended;
     assert.match(html.replace(/<[^>]*>/g, ""), /USD 120/);
-    assert.match(html.replace(/<[^>]*>/g, ""), /USD 75/);
+    assert.match(html.replace(/<[^>]*>/g, ""), /Payments due1/);
     assert.match(html, /Finance loaded/);
     assert.deepEqual(errors, []);
   } finally {
