@@ -108,6 +108,20 @@ test('outstanding balances deduct only successful payments and keep currencies s
   assert.match(requests[1].searchParams.get('status'), /partially_paid/);
 });
 
+test('period payment balances scope order creation and preserve cents after partial payments', async () => {
+  const { queries, requests } = queriesFor([
+    { total: 100.75, currency: 'USD', payments: [{ amount: 30.25, status: 'succeeded' }, { amount: 50, status: 'failed' }] },
+    { total: 20.49, currency: 'EUR', payments: [] },
+    { total: 10, currency: 'USD', payments: [{ amount: 15, status: 'succeeded' }] },
+  ]);
+  const period = { from: new Date('2026-10-13T12:34:56.000Z'), to: new Date('2026-11-12T12:34:56.000Z') };
+  const summary = await queries.getAgencyPendingPayments('own', period);
+  assert.deepEqual(summary.amounts, [{ currency: 'EUR', amount: 20.49 }, { currency: 'USD', amount: 70.5 }]);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].searchParams.get('agency_id'), 'eq.own');
+  assert.deepEqual(requests[0].searchParams.getAll('created_at'), ['gte.2026-10-13T12:34:56.000Z', 'lte.2026-11-12T12:34:56.000Z']);
+});
+
 const order = (patch = {}) => ({ id: 'order-1', order_number: 'STS-2026-000061', status: 'paid', total: 280, currency: 'USD', created_at: '2026-11-08T10:00:00Z', customer_id: 'customer', booked_by: 'agent', agency_customer: { id: 'customer-1', full_name: 'Amina', phone: '+252611111111' }, order_items: [{ id: 'item-1', item_type: 'hotel', hotel_booking: { status: 'confirmed' } }], payments: [{ provider: 'wallet', status: 'succeeded', amount: 280, method_label: 'Agency balance' }], ...patch });
 const Widget = ({ children, className }) => h('div', { className }, children);
 const widgets = new Proxy({}, { get: () => Widget });

@@ -2,12 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
 import { toast } from "sonner";
 import { ArrowRight, Check, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
@@ -19,6 +17,11 @@ import {
 } from "@/components/ui/table";
 import { selectBookingCustomers } from "@/modules/agencies/booking-context-actions";
 import styles from "../workspace.module.css";
+import design from "./booking-desk.module.css";
+
+function initials(name: string) {
+  return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+}
 
 export type PickerRow = {
   id: string;
@@ -69,7 +72,8 @@ export function CustomerPickerTable({ rows, redirectTo, continueLabel = "Continu
 
   return (
     <>
-      <div className="flex justify-end">
+      <div className={design.listToolbar}>
+        <span>{groupBooking ? "Select customers" : "Customer details"}</span>
         <Button
           variant={groupBooking ? "secondary" : "outline"}
           aria-pressed={groupBooking}
@@ -79,26 +83,27 @@ export function CustomerPickerTable({ rows, redirectTo, continueLabel = "Continu
           <UsersRound className="size-4" aria-hidden="true" />Group booking
         </Button>
       </div>
-      <div className="sm:hidden">
+      <div className={`${design.mobileList} sm:hidden`}>
         {groupBooking ? <label className="mb-2 flex min-h-10 items-center gap-3 text-xs text-muted-foreground">
           <Checkbox aria-label="Select all customers" disabled={pending} checked={allChecked} onCheckedChange={() => setSelected(allChecked ? new Set() : new Set(rows.map((row) => row.id)))} />
           Select all
         </label> : null}
         <ul className="divide-y divide-border border-y border-border">
           {rows.map((row) => (
-            <li key={row.id} className={styles.customerMobileRow} data-state={selected.has(row.id) ? "selected" : undefined}>
+            <li key={row.id} className={`${styles.customerMobileRow} ${design.customerRow}`} data-state={selected.has(row.id) ? "selected" : undefined}>
               {groupBooking ? <Checkbox aria-label={`Select ${row.full_name}`} disabled={pending} checked={selected.has(row.id)} onCheckedChange={() => toggle(row.id)} /> : null}
+              <span className={design.avatar} aria-hidden="true">{initials(row.full_name)}</span>
               <div className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold">{row.full_name}</span>
-                <span className="mt-1 block truncate text-xs text-muted-foreground">{row.phone ?? row.email ?? "—"}</span>
+                <span className="mt-1 block truncate text-xs text-muted-foreground">{row.phone || row.email || "No contact on file"}</span>
               </div>
-              {!groupBooking ? <Button size="sm" className={styles.customerSelect} aria-label={`${continueLabel} for ${row.full_name}`} disabled={pending} loading={pending && pendingId === row.id} onClick={() => commit([row.id], row.id)}>{continueLabel}<ArrowRight className="size-3.5" aria-hidden="true" /></Button> : null}
+              {!groupBooking ? <Button size="sm" className={`${styles.customerSelect} ${design.continueButton}`} aria-label={`${continueLabel} for ${row.full_name}`} disabled={pending} loading={pending && pendingId === row.id} onClick={() => commit([row.id], row.id)}>{continueLabel}<ArrowRight className="size-3.5" aria-hidden="true" /></Button> : null}
             </li>
           ))}
         </ul>
       </div>
-      <Card className="hidden overflow-hidden py-0 sm:block">
-        <Table className={styles.customerTable}>
+      <div className={`${design.tableWrap} hidden overflow-hidden sm:block`}>
+        <Table className={`${styles.customerTable} ${design.customerTable}`}>
           <TableHeader>
             <TableRow>
               {groupBooking ? <TableHead className="w-10">
@@ -113,9 +118,7 @@ export function CustomerPickerTable({ rows, redirectTo, continueLabel = "Continu
               </TableHead> : null}
               <TableHead>Name</TableHead>
               <TableHead>Contact</TableHead>
-              <TableHead numeric className="hidden lg:table-cell">Bookings</TableHead>
-              <TableHead numeric className="hidden lg:table-cell">Last booking</TableHead>
-              {!groupBooking ? <TableHead className={styles.customerActionHead}>Next step</TableHead> : null}
+              {!groupBooking ? <TableHead className={styles.customerActionHead}>Continue booking</TableHead> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -130,24 +133,21 @@ export function CustomerPickerTable({ rows, redirectTo, continueLabel = "Continu
                   />
                 </TableCell> : null}
                 <TableCell>
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">{row.full_name}</span>
-                    {row.profile_id ? <Badge variant="info">STS account</Badge> : null}
+                  <span className={design.customerIdentity}>
+                    <span className={design.avatar} aria-hidden="true">{initials(row.full_name)}</span>
+                    <span className={design.customerName}>
+                      <span className="font-semibold">{row.full_name}</span>
+                      {row.profile_id ? <Badge variant="info">STS account</Badge> : null}
+                    </span>
                   </span>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {row.phone ?? row.email ?? "—"}
-                </TableCell>
-                <TableCell numeric className="hidden text-sm lg:table-cell">
-                  <Badge variant="neutral" className="tabular-nums">{row.bookings}</Badge>
-                </TableCell>
-                <TableCell numeric className="hidden text-sm text-muted-foreground lg:table-cell">
-                  {row.lastBookingAt ? format(new Date(row.lastBookingAt), "d MMM yyyy") : "—"}
+                  {row.phone || row.email || "No contact on file"}
                 </TableCell>
                 {!groupBooking ? <TableCell className={styles.customerActionCell}>
                   <Button
                     size="sm"
-                    className={styles.customerSelect}
+                    className={`${styles.customerSelect} ${design.continueButton}`}
                     aria-label={`${continueLabel} for ${row.full_name}`}
                     disabled={pending}
                     loading={pending && pendingId === row.id}
@@ -160,7 +160,7 @@ export function CustomerPickerTable({ rows, redirectTo, continueLabel = "Continu
             ))}
           </TableBody>
         </Table>
-      </Card>
+      </div>
 
       {groupBooking && selected.size > 0 ? (
         <div className={styles.customerSelectionBar} role="region" aria-label="Selected customers">

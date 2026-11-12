@@ -32,7 +32,7 @@ function deskMocks(selected=[]) {
   '@/modules/agencies/booking-context':{getBookingCustomers:async()=>selected,getBookingCustomer:async()=>selected[0]??null},
   '@/modules/agencies/services':services,
   '@/lib/pagination':{parsePage:value=>Number(value)||1},
-  './customer-picker-table':{CustomerPickerTable:Widget},'../service-launcher':{ServiceLauncher:Widget},
+  './new-booking-customer-form':{NewBookingCustomerForm:Widget},'./customer-picker-table':{CustomerPickerTable:Widget},'../service-launcher':{ServiceLauncher:Widget},
   './flight-quote-form':{FlightQuoteForm:Widget},'./start-application-button':{StartApplicationButton:Widget},
  };
 }
@@ -45,6 +45,36 @@ test('all five service choices use known portal routes; untrusted values cannot 
  }
 });
 
+test('new booking always starts with services, including when a previous customer is selected',async()=>{
+ for(const selected of [[],[{id:'previous-client'}]]) {
+  const mocks=deskMocks(selected);
+  mocks['@/modules/agencies/queries'].getAgencyCustomersWithStats=async()=>assert.fail('The service step must not load the directory');
+  const Page=load(portal+'book/page.tsx',mocks).default;
+  const tree=await Page({searchParams:Promise.resolve({})});
+  assert.ok(nodes(tree).some(n=>n.props?.desk===true));
+  assert.ok(!nodes(tree).some(n=>n.props?.rows));
+ }
+});
+
+test('new customer registration stays within the chosen service without loading the directory',async()=>{
+ const mocks=deskMocks();
+ mocks['@/modules/agencies/queries'].getAgencyCustomersWithStats=async()=>assert.fail('Registration must not load the directory');
+ const Page=load(portal+'book/page.tsx',mocks).default;
+ const tree=await Page({searchParams:Promise.resolve({service:'hotels',customer:'new'})});
+ const form=nodes(tree).find(n=>n.props?.cancelHref);
+ assert.equal(form.props.redirectTo,'/agent/book/hotels');
+ assert.equal(form.props.cancelHref,'/agent/book?service=hotels');
+});
+
+test('a selected service marks Customer as the second step on both portal paths',()=>{
+ for(const pathname of ['/agent/book','/book']) {
+  const Steps=load(portal+'book/desk-steps.tsx',{'next/navigation':{usePathname:()=>pathname,useSearchParams:()=>new URLSearchParams('service=hotels')},'@/modules/agencies/services':services}).DeskSteps;
+  const current=nodes(Steps()).find(n=>n.props?.['aria-current']==='step');
+  assert.equal(current.props.children[1].props.children,'Customer');
+ }
+ assert.deepEqual(services.AGENT_BOOKING_STEPS,['Service','Customer','Travel details','Review & pay']);
+});
+
 for(const service of services.AGENT_SERVICES) {
  test(`${service.label}: preserves service intent during customer search, pagination and selection`,async()=>{
   const Page=load(portal+'book/page.tsx',deskMocks()).default;
@@ -55,9 +85,10 @@ for(const service of services.AGENT_SERVICES) {
   const pager=all.find(n=>typeof n.props?.hrefFor==='function');
   assert.equal(pager.props.hrefFor(2),`/agent/book?q=Amina&service=${service.key}&page=2`);
  });
- test(`${service.label}: an already selected customer opens the chosen service`,async()=>{
+ test(`${service.label}: a previous customer does not skip explicit customer selection`,async()=>{
   const Page=load(portal+'book/page.tsx',deskMocks([{id:'client'}])).default;
-  await assert.rejects(()=>Page({searchParams:Promise.resolve({service:service.key})}),e=>e.destination===service.href);
+  const tree=await Page({searchParams:Promise.resolve({service:service.key})});
+  assert.ok(nodes(tree).some(n=>n.props?.redirectTo===service.href));
  });
  test(`${service.label}: opening the service without a customer returns to its customer selection`,async()=>{
   const Page=load(portal+`book/${service.key}/page.tsx`,deskMocks()).default;
@@ -101,8 +132,8 @@ test('group booking submits the selected customers together and preserves the se
 });
 
 test('booking progress identifies the active step on canonical and rewritten portal paths',()=>{
- for(const [pathname,hasCustomer,expected] of [['/agent/book',false,'Customer'],['/book',true,'Service'],['/book/hotels',true,'Travel details'],['/agent/book/order/id',true,'Review & pay'],['/book/batch/id',true,'Review & pay']]) {
-  const Steps=load(portal+'book/desk-steps.tsx',{'next/navigation':{usePathname:()=>pathname},'@/modules/agencies/services':services}).DeskSteps;
+ for(const [pathname,hasCustomer,expected] of [['/agent/book',false,'Service'],['/book',true,'Service'],['/book/hotels',true,'Travel details'],['/agent/book/order/id',true,'Review & pay'],['/book/batch/id',true,'Review & pay']]) {
+  const Steps=load(portal+'book/desk-steps.tsx',{'next/navigation':{usePathname:()=>pathname,useSearchParams:()=>new URLSearchParams()},'@/modules/agencies/services':services}).DeskSteps;
   const current=nodes(Steps({hasCustomer})).find(n=>n.props?.['aria-current']==='step');
   assert.equal(current.props.children[1].props.children,expected);
  }
@@ -110,7 +141,7 @@ test('booking progress identifies the active step on canonical and rewritten por
 
 test('quote and private-request steps do not imply immediate payment',()=>{
  for(const pathname of ['/agent/book/flights','/book/flights','/agent/book/umrah/private','/book/umrah/private/request-id']) {
-  const Steps=load(portal+'book/desk-steps.tsx',{'next/navigation':{usePathname:()=>pathname},'@/modules/agencies/services':services}).DeskSteps;
+  const Steps=load(portal+'book/desk-steps.tsx',{'next/navigation':{usePathname:()=>pathname,useSearchParams:()=>new URLSearchParams()},'@/modules/agencies/services':services}).DeskSteps;
   const labels=nodes(Steps({hasCustomer:true})).filter(n=>n.type==='li').map(n=>n.props.children[1].props.children);
   assert.equal(labels.at(-1),pathname.includes('flights')?'Request quote':'Review request');
   assert.ok(!labels.includes('Review & pay'));

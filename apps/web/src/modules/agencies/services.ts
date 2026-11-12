@@ -7,7 +7,7 @@ export const AGENT_SERVICES = [
   { key: "events", label: "Events & halls", action: "Find venue", href: "/agent/book/events", icon: "events" },
 ] as const;
 
-export const AGENT_BOOKING_STEPS = ["Customer", "Service", "Travel details", "Review & pay"] as const;
+export const AGENT_BOOKING_STEPS = ["Service", "Customer", "Travel details", "Review & pay"] as const;
 
 export function getAgentService(key: string | null | undefined) {
   return AGENT_SERVICES.find((service) => service.key === key);

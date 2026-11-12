@@ -2,14 +2,14 @@ import { AgentMoney } from "@/components/portal/agent-money";
 import { Suspense } from "react";
 import { FinancePriorities } from "@/modules/agencies/components/finance-priorities";
 import Link from "next/link";
-import { ArrowDownRight, ArrowRight, ArrowUpRight, BadgeDollarSign, CalendarDays, CircleDollarSign, Clock3, Plus, ReceiptText, Ticket, TrendingUp, UsersRound, Wallet, type LucideIcon } from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, BadgeDollarSign, CalendarDays, CircleDollarSign, Clock3, Minus, Plus, ReceiptText, Ticket, TrendingUp, UsersRound, Wallet, type LucideIcon } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
   getMyAgency, getAgencyTeamCount, getAgencyPendingPayments,
   getAgencyPeriodMetrics, getAgencyOnboardingStatus, getAgencyRecentActivity,
   getAgencyOrders, getAgencyServiceMix,
 } from "@/modules/agencies/queries";
-import { resolveDateRange, percentChange, bucketLabel } from "@/lib/date-range";
+import { resolveDateRange, percentChange, bucketLabel, type ResolvedDateRange } from "@/lib/date-range";
 import { LowBalanceBanner } from "@/modules/notifications/components/low-balance-banner";
 import { BroadcastBanner } from "@/modules/notifications/components/broadcast-banner";
 import { AgencySupportCard } from "@/modules/agencies/components/agency-support-card";
@@ -50,7 +50,6 @@ export default async function AgentDashboardPage({ searchParams }: {
   const balance = Number(membership.agency.credit_balance);
   const creditLimit = Number(membership.agency.credit_limit);
   const wallet = { balance, creditLimit, available: balance + creditLimit };
-  const commissionConfigured = membership.agency.commission_rate_set_at !== null || Number(membership.agency.commission_rate) > 0;
 
   return (
     <div className="space-y-6">
@@ -90,7 +89,7 @@ export default async function AgentDashboardPage({ searchParams }: {
       <Suspense fallback={<Skeleton className="h-20 rounded-2xl" />}><BookingOperations pendingP={pendingP} /></Suspense>
 
       <Suspense fallback={<div className={styles.metrics}>{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}</div>}>
-        <Metrics metricsP={metricsP} pendingP={pendingP} rangeLabel={range.label} commissionFact={commissionConfigured ? `${membership.agency.commission_rate}% commission` : "Rate not assigned"} />
+        <Metrics metricsP={metricsP} agencyId={agencyId} range={range} />
       </Suspense>
 
       <div className={styles.overviewGrid}>
@@ -128,18 +127,32 @@ async function TeamCount({ countP }: { countP: ReturnType<typeof getAgencyTeamCo
   return <>{count} team member{count === 1 ? "" : "s"}</>;
 }
 
-async function Metrics({ metricsP, pendingP, rangeLabel, commissionFact }: {
-  metricsP: MetricsPromise; pendingP: ReturnType<typeof getAgencyPendingPayments>; rangeLabel: string; commissionFact: string;
+async function Metrics({ metricsP, agencyId, range }: {
+  metricsP: MetricsPromise; agencyId: string; range: ResolvedDateRange;
 }) {
-  const [metrics, pending] = await Promise.all([metricsP, pendingP]);
+  // Compare today's outstanding balances for orders created in each window,
+  // rather than claiming to reconstruct a historical payment-queue snapshot.
+  const [metrics, pending, previousPending] = await Promise.all([
+    metricsP,
+    getAgencyPendingPayments(agencyId, range),
+    getAgencyPendingPayments(agencyId, { from: range.previousFrom, to: range.previousTo }),
+  ]);
   const currency = metrics.revenue.currency;
-  const due = pending.amounts[0];
+  const comparisonLabel = range.key === "custom" ? "vs previous period" : `vs previous ${range.key === "24h" ? "24 hours" : `${range.key.slice(0, -1)} days`}`;
+  const dueCurrencies = [...new Set([...pending.amounts, ...previousPending.amounts].map((item) => item.currency))].sort();
+  if (dueCurrencies.length === 0) dueCurrencies.push(currency);
+  const dueChanges = dueCurrencies.map((currency) => ({
+    currency,
+    current: pending.amounts.find((item) => item.currency === currency)?.amount ?? 0,
+    previous: previousPending.amounts.find((item) => item.currency === currency)?.amount ?? 0,
+  }));
+  const dueHref = `/agent/bookings?queue=payment_due&from=${range.from.toISOString().slice(0, 10)}&to=${range.to.toISOString().slice(0, 10)}`;
   return (
     <div className={styles.metrics}>
-      <Metric label="Bookings" icon={Ticket} tone="var(--chart-1)" value={metrics.bookings.current.toLocaleString("en-US")} href="/agent/bookings" change={percentChange(metrics.bookings.current, metrics.bookings.previous)} fact={rangeLabel} />
-      <Metric label="Sales" icon={TrendingUp} tone="var(--chart-3)" value={<AgentMoney value={money(metrics.revenue.current, currency)} />} href="/agent/reports" change={percentChange(metrics.revenue.current, metrics.revenue.previous)} fact="Paid orders" />
-      <Metric label="Earnings" icon={BadgeDollarSign} tone="var(--chart-2)" value={<AgentMoney value={money(metrics.earned.current, currency)} />} href="/agent/reports" change={percentChange(metrics.earned.current, metrics.earned.previous)} fact={commissionFact} />
-      <Metric label="Payment due" icon={Clock3} tone="var(--chart-4)" value={due ? <AgentMoney value={money(due.amount, due.currency)} /> : pending.count.toLocaleString("en-US")} href="/agent/bookings?queue=payment_due" change={null} fact={`${pending.count} booking${pending.count === 1 ? "" : "s"}`} />
+      <Metric label="Bookings" icon={Ticket} tone="var(--chart-1)" value={metrics.bookings.current.toLocaleString("en-US")} href="/agent/bookings" changes={[metrics.bookings]} comparisonLabel={comparisonLabel} />
+      <Metric label="Sales" icon={TrendingUp} tone="var(--chart-3)" value={<AgentMoney value={money(metrics.revenue.current, currency)} />} href="/agent/reports" changes={[metrics.revenue]} comparisonLabel={comparisonLabel} />
+      <Metric label="Earnings" icon={BadgeDollarSign} tone="var(--chart-2)" value={<AgentMoney value={money(metrics.earned.current, currency)} />} href="/agent/reports" changes={[{ ...metrics.earned, currency }]} comparisonLabel={comparisonLabel} />
+      <Metric label="Payment due" icon={Clock3} tone="var(--chart-4)" value={dueChanges.map((due) => <span key={due.currency} className={styles.metricAmount}><AgentMoney value={money(due.current, due.currency)} /></span>)} href={dueHref} changes={dueChanges} comparisonLabel={comparisonLabel} inverse title={`Outstanding balances · bookings created ${range.from.toLocaleDateString("en-GB")} – ${range.to.toLocaleDateString("en-GB")}`} />
     </div>
   );
 }
@@ -219,11 +232,12 @@ async function RecentActivity({ activityP }: { activityP: ReturnType<typeof getA
   return <RecentActivityCard items={await activityP} />;
 }
 
-function Metric({ label, icon: Icon, tone, value, href, change, fact }: {
-  label: string; icon: LucideIcon; tone: string; value: React.ReactNode; href: string; change: number | null; fact: string;
+function Metric({ label, icon: Icon, tone, value, href, changes, comparisonLabel, inverse = false, title }: {
+  label: string; icon: LucideIcon; tone: string; value: React.ReactNode; href: string;
+  changes: { current: number; previous: number; currency?: string }[]; comparisonLabel: string; inverse?: boolean; title?: string;
 }) {
   return (
-    <Link href={href} className={styles.metric} style={{ "--tone": tone } as CSSProperties}>
+    <Link href={href} className={styles.metric} style={{ "--tone": tone } as CSSProperties} title={title}>
       <span className={styles.metricIcon}><Icon aria-hidden="true" /></span>
       <div className={styles.metricBody}>
         <dl>
@@ -231,8 +245,21 @@ function Metric({ label, icon: Icon, tone, value, href, change, fact }: {
           <dd className={styles.metricValue}>{value}</dd>
         </dl>
         <div className={styles.metricFooter}>
-          {change !== null ? <span className={change < 0 ? styles.down : styles.up} aria-label={`${change}% versus the previous period`}>{change < 0 ? <ArrowDownRight className="size-3" aria-hidden="true" /> : <ArrowUpRight className="size-3" aria-hidden="true" />}{change > 0 ? "+" : ""}{change}%</span> : null}
-          <span>{fact}</span>
+          <div className={styles.metricChanges}>
+            {changes.map(({ current, previous, currency }, index) => {
+              const change = percentChange(current, previous);
+              const neutral = change === null || change === 0;
+              const positive = change !== null && (inverse ? change < 0 : change > 0);
+              const text = change === null ? "New" : `${change > 0 ? "+" : ""}${change}%`;
+              const prefix = changes.length > 1 ? `${currency} ` : "";
+              const previousValue = currency ? money(previous, currency) : previous.toLocaleString("en-US");
+              return <span key={currency ?? index} className={neutral ? styles.neutral : positive ? styles.up : styles.down} title={`Previous period: ${previousValue}`} aria-label={`${label}: ${prefix}${text} ${comparisonLabel}; previous period: ${previousValue}`}>
+                {change === null ? null : change === 0 ? <Minus className="size-3" aria-hidden="true" /> : change < 0 ? <ArrowDownRight className="size-3" aria-hidden="true" /> : <ArrowUpRight className="size-3" aria-hidden="true" />}
+                {prefix}{text}
+              </span>;
+            })}
+          </div>
+          <span>{comparisonLabel}</span>
         </div>
       </div>
     </Link>
