@@ -12,6 +12,7 @@ import {
   ComboboxPortal,
   ComboboxPositioner,
 } from "@/components/ui/combobox";
+import { cn } from "@/lib/utils";
 import { COUNTRY_OPTIONS, countryFlag, countrySearchText, normalizeSearchTerm } from "@/lib/countries";
 
 const CODES = COUNTRY_OPTIONS.map(([code]) => code);
@@ -37,12 +38,14 @@ export function CountrySearchSelect({
   defaultValue,
   placeholder,
   required = false,
+  className,
 }: {
   name: string;
   id?: string;
   defaultValue?: string;
   placeholder: string;
   required?: boolean;
+  className?: string;
 }) {
   const [value, setValue] = useState<string | null>(defaultValue || null);
 
@@ -58,7 +61,7 @@ export function CountrySearchSelect({
     >
       <input type="hidden" name={name} value={value ?? ""} />
       <ComboboxInputGroup>
-        <ComboboxInput id={id} placeholder={placeholder} aria-required={required || undefined} className="h-12 text-base font-medium" />
+        <ComboboxInput id={id} placeholder={placeholder} aria-required={required || undefined} className={cn("h-12 text-base font-medium", className)} />
       </ComboboxInputGroup>
       <ComboboxPortal>
         <ComboboxPositioner>
