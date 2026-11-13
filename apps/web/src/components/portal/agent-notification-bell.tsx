@@ -13,39 +13,7 @@ import { cn } from "@/lib/utils";
 import { useBellAlert } from "@/components/portal/use-bell-alert";
 import { usePortalNotifications } from "@/components/portal/use-portal-notifications";
 import { ACTIONABLE_TYPES } from "@/lib/notifications/actionable-types";
-
-type NotificationRow = {
-  id: string;
-  type: string;
-  title: string;
-  body: string | null;
-  data?: unknown;
-  created_at: string;
-};
-
-function targetHref(n: NotificationRow): string | null {
-  if (n.type === "low_balance") return "/agent/finance";
-  if (n.type === "earnings_reviewed") return "/agent/finance";
-  if (n.type === "payout_request_reviewed" || n.type === "payout_paid") return "/agent/finance/withdrawals";
-  if (n.type === "topup_reviewed") return "/agent/finance/top-up";
-  if (n.type === "markup_request_reviewed") return "/agent/markups";
-  if (n.type === "partner_onboarding_reminder") return "/agent";
-  // The agent portal has no per-application visa view yet (that arrives with
-  // the desk in M7), so this lands on the filtered agency bookings list.
-  if (n.type === "visa_status_changed") return "/agent/bookings?type=visa";
-  // Every umrah_* notification (stage, cancellation, quote, documents,
-  // reminders, travel changes) carries the order it belongs to.
-  if (n.type.startsWith("umrah_")) {
-    const data = n.data as { orderId?: string } | null;
-    return data?.orderId ? `/agent/bookings/${data.orderId}` : "/agent/bookings?type=umrah";
-  }
-  if (n.type === "wallet_booking_payment") {
-    const data = n.data as { orderId?: string } | null;
-    return data?.orderId ? `/agent/book/order/${data.orderId}` : "/agent/bookings";
-  }
-  if (ACTIONABLE_TYPES.has(n.type) || n.type === "application_documents_verified") return "/account/become";
-  return null;
-}
+import { agentNotificationHref } from "@/lib/notifications/links";
 
 /** Notification reads and dismissals update only the shared client query. */
 export function AgentNotificationBell() {
@@ -63,7 +31,7 @@ export function AgentNotificationBell() {
     if (seenIds.current) {
       const newlyArrived = data.filter((n) => !seenIds.current!.has(n.id));
       for (const n of newlyArrived) {
-        const href = targetHref(n);
+        const href = agentNotificationHref(n);
         toast.info(n.title, {
           description: n.body ?? undefined,
           action: href ? { label: "Open", onClick: () => router.push(href) } : undefined,
@@ -118,9 +86,9 @@ export function AgentNotificationBell() {
             {notifications.map((n) => (
               <div key={n.id} className="flex items-start justify-between gap-2 px-3 py-2.5">
                 <div className="min-w-0">
-                  {targetHref(n) ? (
+                  {agentNotificationHref(n) ? (
                     <Link
-                      href={targetHref(n)!}
+                      href={agentNotificationHref(n)!}
                       className={cn(
                         "block truncate rounded-sm text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50",
                         n.type === "low_balance" || ACTIONABLE_TYPES.has(n.type) ? "text-destructive" : "text-primary"

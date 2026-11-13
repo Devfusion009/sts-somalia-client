@@ -14,10 +14,9 @@ import { cn } from "@/lib/utils";
 const MAX_SHOWN = 3;
 
 /** Where a new-order alert opens: the Orders page, scrolled to that order. */
-export function newOrderHref(n: { data?: unknown }): string | null {
-  const orderId = (n.data as { order_id?: string } | null)?.order_id;
-  return orderId ? `/admin/orders?order=${orderId}#order-${orderId}` : null;
-}
+import { newOrderHref } from "@/lib/notifications/links";
+
+export { newOrderHref };
 
 /**
  * Unread new-order alerts as one collapsed bar on the dashboard; expanding it
