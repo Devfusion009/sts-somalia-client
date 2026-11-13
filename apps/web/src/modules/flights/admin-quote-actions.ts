@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dispatchToCustomer } from "@/lib/notifications/dispatch";
 import { portalOrigin, rootOrigin } from "@/lib/subdomain";
+import { renderNotice } from "@/lib/notifications/email-layout";
 import { createOrderForBooking, repriceQuotedOrder } from "@/modules/orders/helpers";
 import { money } from "@/lib/money";
 
@@ -21,10 +22,6 @@ const quoteSchema = z.object({
   airline: z.string().trim().max(120).optional(),
   note: z.string().trim().max(500).optional(),
 });
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-}
 
 /** In-app + email/WhatsApp to whoever placed the request (customer, or the agency's contact). */
 async function notifyRequester(
@@ -75,7 +72,15 @@ async function notifyRequester(
       content: {
         en: {
           subject: `${title} — ${route}`,
-          html: `<p><strong>${escapeHtml(route)}</strong></p><p>${escapeHtml(line)}</p><p><a href="${escapeHtml(url)}">Open your booking</a></p>`,
+          html: renderNotice({
+            label: type === "flight_ticketed" ? "Ticket issued" : type === "flight_quote_declined" ? "Quote declined" : "Quote ready",
+            tone: type === "flight_quote_declined" ? "neutral" : "success",
+            heading: title,
+            line,
+            reference: { label: "Route", value: route },
+            button: { label: "Open your booking", href: url },
+            audience: booking.agency_id ? "Agent Portal" : "Flights",
+          }),
           text: `${route}: ${line}\n${url}`,
         },
       },

@@ -25,7 +25,7 @@ const profileSchema = z.object({
   birthPlace: optionalText,
   phone: phoneSchema,
   whatsapp: phoneSchema.optional(),
-  email: z.string().trim().email("Enter a valid email.").optional().or(z.literal("")),
+  email: z.string().trim().min(1, "Enter an email address.").email("Enter a valid email."),
   address: optionalText,
   passportNumber: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{5,20}$/, "Enter a valid passport number."),
   passportIssuingCountry: country("Select the issuing country."),

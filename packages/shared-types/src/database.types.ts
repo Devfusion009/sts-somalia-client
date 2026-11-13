@@ -3619,6 +3619,10 @@ export type Database = {
           body: string | null
           created_at: string
           data: Json
+          email_attempts: number
+          email_claimed_at: string | null
+          email_status: string | null
+          emailed_at: string | null
           id: string
           profile_id: string
           read_at: string | null
@@ -3629,6 +3633,10 @@ export type Database = {
           body?: string | null
           created_at?: string
           data?: Json
+          email_attempts?: number
+          email_claimed_at?: string | null
+          email_status?: string | null
+          emailed_at?: string | null
           id?: string
           profile_id: string
           read_at?: string | null
@@ -3639,6 +3647,10 @@ export type Database = {
           body?: string | null
           created_at?: string
           data?: Json
+          email_attempts?: number
+          email_claimed_at?: string | null
+          email_status?: string | null
+          emailed_at?: string | null
           id?: string
           profile_id?: string
           read_at?: string | null
@@ -7284,6 +7296,10 @@ export type Database = {
       claim_manager_password_recovery: { Args: { p_manager_code: string }; Returns: { login_email: string; contact_email: string }[] }
 
       claim_agent_password_recovery: { Args: { p_agent_id: string }; Returns: { login_email: string; contact_email: string }[] }
+      claim_notification_emails: {
+        Args: { p_limit?: number }
+        Returns: Database["public"]["Tables"]["notifications"]["Row"][]
+      }
       agent_login_identity: { Args: { p_agent_id: string }; Returns: string }
       my_agent_application_login: { Args: { p_application_id: string }; Returns: { agent_id: string; contact_email: string }[] }
 

@@ -24,7 +24,7 @@ function load(relative, mocks = {}) {
 const path = 'apps/web/src/modules/agencies/customer-profile.ts';
 function form(overrides = {}, passport = true) {
  const data = new FormData();
- const fields = {firstName:'Amina',lastName:'Mohamed',gender:'female',dateOfBirth:'1990-02-20',nationality:'SO',phone:'+252610000001',passportNumber:'p1234567',passportIssuingCountry:'SO',passportIssueDate:'2020-01-01',passportExpiryDate:'2035-01-01',residenceCountry:'SO',city:'Mogadishu',emergencyContactName:'Yusuf',emergencyContactPhone:'+252610000002',emergencyContactRelationship:'Brother',preferredCabin:'economy',travelPreferences:'Aisle seat',...overrides};
+ const fields = {firstName:'Amina',lastName:'Mohamed',gender:'female',dateOfBirth:'1990-02-20',nationality:'SO',email:'amina@example.com',phone:'+252610000001',passportNumber:'p1234567',passportIssuingCountry:'SO',passportIssueDate:'2020-01-01',passportExpiryDate:'2035-01-01',residenceCountry:'SO',city:'Mogadishu',emergencyContactName:'Yusuf',emergencyContactPhone:'+252610000002',emergencyContactRelationship:'Brother',preferredCabin:'economy',travelPreferences:'Aisle seat',...overrides};
  for(const [key,value] of Object.entries(fields))data.set(key,value);
  if(passport)data.set('passportCopy',new File(['%PDF-1.7'], 'passport.pdf',{type:'application/pdf'}));
  return data;
@@ -95,3 +95,12 @@ for(const document of ['other/private.pdf','own/passport.pdf']) {
   else{assert.equal(response.status,404);assert.equal(signed.length,0);}
  });
 }
+
+ test('missing or invalid contact details fail before any passport upload', async () => {
+  for (const overrides of [{email:''}, {email:'invalid'}, {phone:''}, {phone:'123'}, {email:'   '}]) {
+   const db=storageDb();
+   const result=await load(path).buildCustomerProfile(db,'own','agent',form(overrides));
+   assert.ok(result.error);
+   assert.equal(db.uploads.length,0);
+  }
+ });

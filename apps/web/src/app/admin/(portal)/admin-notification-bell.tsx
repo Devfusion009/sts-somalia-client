@@ -12,43 +12,13 @@ import { trpc } from "@/lib/trpc/react";
 import { cn } from "@/lib/utils";
 import { useBellAlert } from "@/components/portal/use-bell-alert";
 import { usePortalNotifications } from "@/components/portal/use-portal-notifications";
-import { newOrderHref } from "./new-order-banner";
-
-type NotificationRow = {
-  id: string;
-  type: string;
-  title: string;
-  body: string | null;
-  data?: unknown;
-  created_at: string;
-};
+import { adminNotificationHref } from "@/lib/notifications/links";
 
 /**
  * Where a notification's title should take the admin. Everything else stays
  * plain text — a link that lands on a list the admin then has to search is
  * worse than no link.
  */
-function targetHref(n: NotificationRow): string | null {
-  if (n.type === "new_order") return newOrderHref(n) ?? "/admin/orders";
-  if (n.type === "flight_quote_request") return "/admin/flights";
-  if (n.type === "payout_request") return "/admin/finance/withdrawals?status=pending";
-  if (n.type === "visa_application_submitted" || n.type === "visa_status_changed" || n.type === "visa_case_attention") {
-    const applicationId = (n.data as { applicationId?: string } | null)?.applicationId;
-    if (applicationId) return `/admin/visa/${applicationId}`;
-  }
-  if (n.type === "markup_request" || n.type === "wallet_booking_payment") {
-    const data = n.data as { agencyId?: string } | null;
-    if (data?.agencyId) return `/admin/agencies/${data.agencyId}`;
-  }
-  if (n.type === "application_document_resubmitted" || n.type === "application_submitted" || n.type === "application_updated") {
-    const data = n.data as { applicationType?: string; applicationId?: string } | null;
-    if (data?.applicationType && data?.applicationId) {
-      return `/admin/applications/${data.applicationType.replace("_", "-")}/${data.applicationId}`;
-    }
-  }
-  return null;
-}
-
 /** Notification reads and dismissals update only the shared client query. */
 export function AdminNotificationBell() {
   const { data, isPending, isError } = usePortalNotifications();
@@ -65,7 +35,7 @@ export function AdminNotificationBell() {
     if (seenIds.current) {
       const newlyArrived = data.filter((n) => !seenIds.current!.has(n.id));
       for (const n of newlyArrived) {
-        const href = targetHref(n);
+        const href = adminNotificationHref(n);
         toast.info(n.title, {
           description: n.body ?? undefined,
           action: href ? { label: "Open", onClick: () => router.push(href) } : undefined,
@@ -115,9 +85,9 @@ export function AdminNotificationBell() {
             {notifications.map((n) => (
               <div key={n.id} className="flex items-start justify-between gap-2 px-3 py-2.5">
                 <div className="min-w-0">
-                  {targetHref(n) ? (
+                  {adminNotificationHref(n) ? (
                     <Link
-                      href={targetHref(n)!}
+                      href={adminNotificationHref(n)!}
                       className={cn(
                         "block truncate rounded-sm text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50",
                         n.type === "new_order" ? "text-destructive" : "text-primary"

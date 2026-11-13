@@ -1,0 +1,56 @@
+.progress {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  padding: 1rem 0 .25rem;
+}
+.step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .75rem;
+  min-width: 0;
+  text-align: center;
+}
+.step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: .8125rem;
+  left: calc(50% + 1.125rem);
+  width: calc(100% - 2.25rem);
+  height: 2px;
+  background: var(--border);
+}
+.step[data-connected="done"]::after { background: var(--primary); }
+.marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: .6875rem;
+  font-weight: 600;
+}
+.step[data-state="done"] .marker { border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
+.step[data-state="failed"] .marker { border-color: var(--destructive); background: var(--destructive); color: white; }
+.step[aria-current="step"] .marker { outline: 4px solid color-mix(in oklch, var(--primary) 14%, transparent); }
+.step[data-state="failed"][aria-current="step"] .marker { outline-color: color-mix(in oklch, var(--destructive) 14%, transparent); }
+.stepContent { display: flex; flex-direction: column; gap: .375rem; padding: 0 .25rem; }
+.stepLabel { font-size: .75rem; font-weight: 600; }
+.step[data-state="idle"] .stepLabel { font-weight: 500; color: var(--muted-foreground); }
+.step[data-state="failed"] .stepLabel { color: var(--destructive); }
+.stepDate { color: var(--muted-foreground); font-size: .6875rem; font-variant-numeric: tabular-nums; }
+@media (max-width: 639px) {
+  .progress { grid-auto-flow: row; grid-template-columns: 1fr; padding: .25rem 0; }
+  .step { flex-direction: row; align-items: flex-start; gap: .875rem; min-height: 4.25rem; text-align: left; }
+  .step:last-child { min-height: 1.75rem; }
+  .step:not(:last-child)::after { top: 2rem; left: .8125rem; width: 2px; height: calc(100% - 2.25rem); }
+  .stepContent { padding: .25rem 0 1rem; }
+  .step:last-child .stepContent { padding-bottom: 0; }
+}
