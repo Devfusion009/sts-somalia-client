@@ -1,0 +1,17 @@
+.page { display: grid; gap: 1.25rem; min-width: 0; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; padding: 1rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--card); }
+.sort { display: flex; align-items: center; flex-wrap: wrap; gap: .625rem; margin-left: auto; color: var(--muted-foreground); font-size: .75rem; }
+.select { min-height: 2.5rem; padding: .5rem 2rem .5rem .75rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--card); color: var(--foreground); }
+.select:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.sectionHeading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+.sectionHeading h2 { display: flex; align-items: center; gap: .625rem; font-size: .875rem; font-weight: 600; }
+.sectionHeading h2 > svg { width: 1rem; height: 1rem; color: var(--primary); }
+.sectionHeading > span { font-size: .75rem; color: var(--muted-foreground); }
+.contacts { display: grid; gap: .5rem; font-size: .75rem; }
+.contacts a { display: flex; align-items: center; gap: .5rem; width: fit-content; border-radius: .25rem; }
+.contacts svg { flex-shrink: 0; width: .875rem; height: .875rem; color: var(--muted-foreground); }
+.contacts a:hover { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
+.contacts a:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.contacts .missing { color: var(--primary); }
+.account { display: block; margin-top: .5rem; color: var(--muted-foreground); font-size: .6875rem; }
+@media (max-width: 639px) { .sort { width: 100%; margin-left: 0; justify-content: space-between; } }

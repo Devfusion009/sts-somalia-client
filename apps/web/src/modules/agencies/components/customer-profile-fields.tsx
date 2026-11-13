@@ -100,7 +100,7 @@ export function CustomerProfileFields({ withNotes = false, customer, stepped }: 
         <Section id={id("section-1")} number={2} stepped={stepped}>
           {phone("phone", "Mobile number", "phone", true)}
           {phone("whatsapp", "WhatsApp number", "whatsapp")}
-          {input("email", "Email address", "email", false, "email")}
+          {input("email", "Email address", "email", true, "email")}
           {country("residenceCountry", "Country of residence", "residence_country")}
           {input("address", "Street address", "address")}
           {input("city", "City", "city")}
