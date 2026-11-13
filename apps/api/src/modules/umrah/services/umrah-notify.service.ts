@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { env } from "../../../config/env";
 import { dispatchToCustomer } from "../../../infra/notify/dispatch";
+import { renderNotice } from "../../../infra/notify/email-layout";
 import { createAdminClient } from "../../../infra/supabase/supabase-clients";
 
 /**
@@ -43,10 +44,6 @@ const DEFAULT_LINES: Partial<Record<UmrahNotifyKind, string>> = {
   request_quoted: "The price for your trip is ready to pay.",
   request_declined: "We could not arrange this trip.",
 };
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-}
 
 function one<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
@@ -102,7 +99,15 @@ export class UmrahNotifyService {
         en: {
           subject,
           text: `${order.order_number}: ${text}\n${url}`,
-          html: `<p><strong>${escapeHtml(order.order_number)}</strong></p><p>${escapeHtml(text)}</p><p><a href="${escapeHtml(url)}">Open your booking</a></p>`,
+          html: renderNotice({
+            label: "Umrah booking",
+            tone: kind === "booking_cancelled" || kind === "document_rejected" || kind === "balance_due" || kind === "flight_changed" ? "warning" : "success",
+            heading: SUBJECTS[kind],
+            line: text,
+            reference: { label: "Booking", value: order.order_number },
+            button: { label: "Open your booking", href: url },
+            audience: booking.agency_id ? "Agent Portal" : "Hajj & Umrah",
+          }),
         },
       },
       critical: kind === "booking_cancelled",

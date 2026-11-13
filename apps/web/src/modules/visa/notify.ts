@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dispatchToCustomer } from "@/lib/notifications/dispatch";
 import { rootOrigin } from "@/lib/subdomain";
+import { renderNotice, type EmailTone } from "@/lib/notifications/email-layout";
 
 /**
  * Email / WhatsApp for the moments an applicant has to act or wants to know
@@ -25,9 +26,13 @@ const SUBJECTS: Record<VisaNotifyKind, string> = {
   message: "New message about your visa application",
 };
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-}
+const LABELS: Record<VisaNotifyKind, { label: string; tone: EmailTone }> = {
+  documents_requested: { label: "Action needed", tone: "warning" },
+  appointment_booked: { label: "Appointment booked", tone: "success" },
+  decision_recorded: { label: "Decision recorded", tone: "neutral" },
+  passport_ready: { label: "Passport ready", tone: "success" },
+  message: { label: "New message", tone: "neutral" },
+};
 
 export async function notifyVisaCustomer(applicationId: string, kind: VisaNotifyKind, line: string) {
   try {
@@ -48,7 +53,14 @@ export async function notifyVisaCustomer(applicationId: string, kind: VisaNotify
     const url = `${rootOrigin()}/account/visa/${applicationId}`;
     const subject = `${SUBJECTS[kind]} — ${app.application_ref}`;
     const text = `${app.application_ref}: ${line}\n${url}`;
-    const html = `<p><strong>${escapeHtml(app.application_ref)}</strong></p><p>${escapeHtml(line)}</p><p><a href="${escapeHtml(url)}">Open your application</a></p>`;
+    const html = renderNotice({
+      ...LABELS[kind],
+      heading: SUBJECTS[kind],
+      line,
+      reference: { label: "Application", value: app.application_ref },
+      button: { label: "Open your application", href: url },
+      audience: "Visa services",
+    });
 
     await dispatchToCustomer({
       profileId,
