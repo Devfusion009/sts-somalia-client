@@ -22,6 +22,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { money } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { WithdrawForm } from "./withdraw-form";
+import styles from "./withdrawals.module.css";
 
 export const metadata: Metadata = { title: "Withdraw Earnings" };
 
@@ -82,31 +83,27 @@ function stepsFor(request: AgencyPayoutRequest): TimelineStep[] {
   return steps;
 }
 
-/** Four fixed checkpoints, left to right, so every request reads the same way. */
+/** Connect each checkpoint to the next without crossing its marker. */
 function RequestProgress({ request }: { request: AgencyPayoutRequest }) {
   const steps = stepsFor(request);
+  const currentIndex = steps.findLastIndex((step) => step.state !== "idle");
   return (
-    <ol className="grid grid-cols-4 gap-1" aria-label="Progress">
+    <ol className={styles.progress} aria-label="Withdrawal progress">
       {steps.map((step, index) => (
-        <li key={step.label} className="relative min-w-0" aria-current={step.state !== "idle" && steps[index + 1]?.state === "idle" ? "step" : undefined}>
-          {index > 0 ? (
-            <span
-              aria-hidden="true"
-              className={cn("absolute top-[9px] right-1/2 left-[-50%] h-0.5 rounded-full", step.state === "done" ? "bg-primary" : step.state === "failed" ? "bg-destructive/40" : "bg-border")}
-            />
-          ) : null}
-          <span className="relative flex flex-col items-center gap-1.5 text-center">
-            <span
-              aria-hidden="true"
-              className={cn(
-                "flex size-5 items-center justify-center rounded-full ring-4 ring-card",
-                step.state === "done" ? "bg-primary text-primary-foreground" : step.state === "failed" ? "bg-destructive text-white" : "border-2 border-border bg-card"
-              )}
-            >
-              {step.state === "done" ? <Check className="size-3" strokeWidth={3} /> : step.state === "failed" ? <X className="size-3" strokeWidth={3} /> : null}
-            </span>
-            <span className={cn("text-xs font-semibold", step.state === "idle" && "font-medium text-muted-foreground", step.state === "failed" && "text-destructive")}>{step.label}</span>
-            <span className="text-[0.6875rem] text-muted-foreground tabular-nums">{step.at ? format(new Date(step.at), "d MMM") : "\u00a0"}</span>
+        <li
+          key={step.label}
+          className={styles.step}
+          data-state={step.state}
+          data-connected={steps[index + 1]?.state === "done" ? "done" : undefined}
+          aria-current={index === currentIndex ? "step" : undefined}
+        >
+          <span className={styles.marker} aria-hidden="true">
+            {step.state === "done" ? <Check className="size-3.5" strokeWidth={3} /> : step.state === "failed" ? <X className="size-3.5" strokeWidth={3} /> : index + 1}
+          </span>
+          <span className={styles.stepContent}>
+            <span className={styles.stepLabel}>{step.label}</span>
+            <span className="sr-only">{step.state === "done" ? " — completed" : step.state === "failed" ? " — unsuccessful" : " — pending"}</span>
+            {step.at ? <time className={styles.stepDate} dateTime={step.at}>{format(new Date(step.at), "d MMM yyyy")}</time> : null}
           </span>
         </li>
       ))}
@@ -168,8 +165,8 @@ export default async function AgentWithdrawalsPage() {
         </div>
       </section>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
-        <Card className="lg:sticky lg:top-24 lg:order-2">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
+        <Card className="min-w-0 lg:sticky lg:top-24 lg:order-2">
           <CardHeader>
             <CardTitle className="font-heading text-base">New withdrawal</CardTitle>
           </CardHeader>
