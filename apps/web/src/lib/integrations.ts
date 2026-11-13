@@ -13,11 +13,15 @@ const bool = (v: string | undefined) => v === "true" || v === "1";
 
 /**
  * The connected email provider, or null when none is. EMAIL_PROVIDER names it
- * explicitly; a lone RESEND_API_KEY (the older setup) still counts as Resend.
- * A named provider without its credential counts as not connected.
+ * explicitly ("smtp" or "resend"); a lone RESEND_API_KEY (the older setup)
+ * still counts as Resend. A named provider without its credentials counts as
+ * not connected.
  */
-function emailProvider(): "resend" | null {
+function emailProvider(): "resend" | "smtp" | null {
   const named = (process.env.EMAIL_PROVIDER ?? "").trim().toLowerCase();
+  if (named === "smtp") {
+    return process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS ? "smtp" : null;
+  }
   if (named === "resend" || (!named && process.env.RESEND_API_KEY)) {
     return process.env.RESEND_API_KEY ? "resend" : null;
   }
