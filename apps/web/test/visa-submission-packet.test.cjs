@@ -11,7 +11,7 @@ const countries={countryName:code=>({SA:'Saudi Arabia',IN:'India'}[code]??code)}
 const schemas=load('modules/visa/schemas.ts',{'@/lib/countries':{COUNTRY_NAMES:{SA:'Saudi Arabia',IN:'India'}},zod:require('zod'),'@sts/shared-types':require('@sts/shared-types')});
 const packet=load('modules/visa/submission-packet.ts',{'@/lib/countries':countries,'./schemas':schemas});
 function fixture(){return {
- paymentState:'paid',readiness:[{key:'documents_complete',applies:true,ok:true},{key:'documents_reviewed',applies:true,ok:true}],
+ paymentState:'paid',readiness:[{key:'documents_complete',applies:true,ok:true},{key:'documents_reviewed',applies:true,ok:true},{key:'lodgement',label:'Submitted to centre',applies:true,ok:false}],
  documentSlots:[{label:'Passport',versions:[{id:'passport'}]},{label:'Driving licence',versions:[{id:'licence'}]}],
  application:{status:'ready_for_processing',application_ref:'STS-VISA-TEST',applicant_type:'family',agency_id:null,traveler_details:{full_name:'Test Primary',gender:'female'},contact_details:{email:'test@example.test',mobile:'+252611234567'},travel_details:{arrival_date:'2027-01-01',departure_date:'2027-01-10',purpose:'tourism',address:'Test Hotel'},visa_type:{name:'Umrah Visa',entry_type:'single',destination_country_code:'SA',application_sections:[]},members:[{id:'m1',full_name:'Test Primary',relationship:'self',date_of_birth:'1985-01-01',nationality:'IN',passport_number:'TEST001',passport_expiry:'2030-01-01',details:{}},{id:'m2',full_name:'Test Child',relationship:'child',date_of_birth:'2015-01-01',nationality:'IN',passport_number:'TEST002',passport_expiry:'2030-01-01',details:{}}],document_requests:[{id:'r1',status:'received'}],documents:[{id:'passport',is_current:true,document_type:'passport_bio',review_status:'accepted',file_name:'passport.pdf'},{id:'old',is_current:false,document_type:'passport_bio',review_status:'rejected',file_name:'old.pdf'},{id:'licence',is_current:true,document_type:'request:Driving licence',request_id:'r1',review_status:'accepted',file_name:'licence.pdf'},{id:'receipt',is_current:true,document_type:'submission_receipt',review_status:'accepted',file_name:'internal.pdf'}]}
 };}
@@ -23,6 +23,11 @@ test('submission is blocked for unpaid, incomplete, unreviewed or non-ready case
  assert.equal(packet.submissionBlocker(fixture()),null);
  for(const change of [f=>f.paymentState='pending',f=>f.application.status='submitted',f=>f.readiness[0].ok=false,f=>f.application.documents[0].review_status='pending']){
  const f=fixture();change(f);assert(packet.submissionBlocker(f));}
+});
+test('preparing a submission precedes lodgement but still requires applicable appointments',()=>{
+ const f=fixture();assert.equal(packet.submissionBlocker(f),null);
+ f.readiness.push({key:'appointment',label:'Appointment attended',applies:true,ok:false});
+ assert.equal(packet.submissionBlocker(f),'Appointment attended is outstanding.');
 });
 test('the email summary includes all travellers, passport details, travel, contact and requested documents',()=>{
  const text=packet.submissionEmailText(fixture());

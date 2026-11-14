@@ -14,7 +14,8 @@ export function submissionBlocker(data: VisaCase): string | null {
   if (data.application.status !== "ready_for_processing") return "Mark the application ready for submission first.";
   if (!["paid", "partially_paid"].includes(data.paymentState)) return "Confirm payment before preparing the submission.";
   if (!data.readiness.some(item => item.key === "documents_complete" && item.ok) || !data.readiness.some(item => item.key === "documents_reviewed" && item.ok)) return "Complete and verify the required documents first.";
-  const incomplete = data.readiness.find(item => item.applies && !item.ok);
+  // Lodgement is the outcome of sending this pack, not a prerequisite.
+  const incomplete = data.readiness.find(item => item.key !== "lodgement" && item.applies && !item.ok);
   if (incomplete) return `${incomplete.label} is outstanding.`;
   const docs = submissionDocuments(data);
   if (docs.some(doc => doc.review_status !== "accepted")) return "Verify all current submission documents first.";
