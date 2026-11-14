@@ -12,7 +12,7 @@ export function OrderPaymentsPanel({ order, proofs }: { order: AdminOrder; proof
   const history = order.payments.filter(p => !["requires_action", "processing"].includes(p.status));
   const payable = ["pending_payment", "held", "partially_paid"].includes(order.status);
   return (
-    <section aria-label={`Payments for ${order.order_number}`} className="space-y-3 border-t border-border px-4 py-4 sm:px-5">
+    <section aria-label={`Payments for ${order.order_number}`} className="space-y-3 border-t border-border px-4 py-3 sm:px-5">
       {active.length ? active.map(payment => {
         const bank = payment.provider === "manual" && payment.method_label === "Bank Transfer";
         const cash = payment.provider === "manual" && !bank;
@@ -21,10 +21,10 @@ export function OrderPaymentsPanel({ order, proofs }: { order: AdminOrder; proof
         const label = !payable ? "Order closed" : bank ? !latest ? "Waiting for customer proof" : latest.status === "rejected" ? "Waiting for corrected proof" : "Proof ready for review" : cash ? "Awaiting cash collection" : "Awaiting provider confirmation";
         const Icon = bank ? Landmark : cash ? Building2 : Clock3;
         return (
-          <div key={payment.id} className="flex flex-col gap-4 rounded-xl border border-border bg-muted/20 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div key={payment.id} className="flex flex-col gap-3 rounded-lg bg-muted/20 p-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-card"><Icon className="size-[18px] text-muted-foreground" aria-hidden /></span>
-              <div className="min-w-0 space-y-1">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card"><Icon className="size-4 text-muted-foreground" aria-hidden /></span>
+              <div className="min-w-0 space-y-0.5">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="text-sm font-semibold">{payment.method_label ?? "Online payment"}</span><span className="text-sm font-semibold tabular-nums">{money(payment.amount,payment.currency)}</span></div>
                 <div className="flex items-center gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-300"><span className="size-1.5 rounded-full bg-amber-500" aria-hidden />{label}</div>
                 <div className="text-xs text-muted-foreground">Requested {format(new Date(payment.created_at),"d MMM yyyy, HH:mm")}{latest ? ` · ${paymentProofs.length} proof${paymentProofs.length === 1 ? "" : "s"}` : ""}</div>

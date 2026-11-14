@@ -271,18 +271,21 @@ export type OrderQueue = {
 
 /**
  * Filter chip counts, stat tiles and the ids of one page of the Orders queue,
- * from admin_order_queue(). `today` is the local calendar date the "travelling
+ * from admin_order_workspace(). `today` is the local calendar date the "travelling
  * within 30 days" window starts from.
  */
-export async function getOrderQueue(filter: OrderQueueFilter, page: number, today: string): Promise<OrderQueue> {
+export async function getOrderQueue(filter: OrderQueueFilter, page: number, today: string, options: { sort?: "newest" | "oldest"; search?: string } = {}): Promise<OrderQueue> {
   const supabase = await createClient();
   const { from } = pageRange(page);
-  const { data } = await supabase.rpc("admin_order_queue", {
+  const { data, error } = await supabase.rpc("admin_order_workspace", {
     p_filter: filter,
+    p_sort: options.sort ?? "newest",
+    p_search: options.search ?? "",
     p_today: today,
     p_offset: from,
     p_limit: ADMIN_PAGE_SIZE,
   });
+  if (error) throw new Error("Orders could not be loaded. Refresh and try again.");
   const raw = (data ?? {}) as Partial<Record<keyof OrderQueue, unknown>>;
   const byStatus: Record<string, number> = {};
   for (const [status, n] of Object.entries((raw.byStatus ?? {}) as Record<string, number | string>)) byStatus[status] = Number(n);
@@ -314,13 +317,14 @@ export async function getOrderQueue(filter: OrderQueueFilter, page: number, toda
 export async function getOrdersByIds(ids: string[]) {
   if (ids.length === 0) return [];
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("orders")
     .select(
       "id, order_number, status, currency, subtotal, discount_total, total, created_at, paid_at, notes, customer:profiles!orders_customer_id_fkey(full_name, email, phone), agency:agencies(name), agency_customer:agency_customer_id(full_name, phone), payments(id, provider, method_label, amount, currency, status, payer_phone, created_at), invoices(invoice_number, status), order_items(id, item_type, quantity, total_price, hotel_booking:hotel_booking_id(check_in, check_out, num_rooms, num_adults, status, hotel:hotel_id(name, city)), flight_booking:flight_booking_id(origin_iata, destination_iata, depart_at, return_at, status, provider_booking_ref, ticketing_status), visa_application:visa_application_id(id, application_ref, status, travel_details, visa_type:visa_type_id(name, destination_country_code)), umrah_booking:umrah_booking_id(num_pilgrims, status, package:package_id(name, duration_days), departure:departure_id(departure_date, return_date)), hall_booking:hall_booking_id(event_type, start_date, end_date, status, venue:venue_id(name, city)))"
     )
     .in("id", ids);
 
+  if (error) throw new Error("Order details could not be loaded. Refresh and try again.");
   // `in` has no order of its own; keep the caller's (newest first) ordering.
   const position = new Map(ids.map((id, index) => [id, index]));
   return (data ?? []).sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));

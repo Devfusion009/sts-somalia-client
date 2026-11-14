@@ -1,9 +1,9 @@
 import { getPaymentProofs } from "@/modules/payments/proof-actions";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 import { OrderPaymentsPanel } from "./order-payments-panel";
 import { RefreshOrdersButton } from "./refresh-orders-button";
-import { findOrderReferences } from "@/modules/admin/order-reference-search";
 import { format } from "date-fns";
 import {
   Building2,
@@ -34,6 +34,7 @@ import { OrderStatusSelect } from "./order-status-select";
 import { RecordPaymentDialog } from "./record-payment-dialog";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
+import { countryName, countryFlag } from "@/lib/countries";
 
 export const metadata = { title: "Orders & Payments" };
 
@@ -58,22 +59,28 @@ const FILTERS = [
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string; page?: string; order?: string; q?: string }>;
+  searchParams: Promise<{ filter?: string; page?: string; order?: string; q?: string; sort?: string }>;
 }) {
-  const { filter: filterParam, page: pageParam, order: orderParam, q: queryParam } = await searchParams;
+  const { filter: filterParam, page: pageParam, order: orderParam, q: queryParam, sort: sortParam } = await searchParams;
   // Opened from a new-order alert: that order is pinned to the top and outlined.
   const focusId = orderParam && /^[0-9a-f-]{36}$/i.test(orderParam) ? orderParam : null;
-  const filter = queryParam?.trim() ? "all" : FILTERS.find((f) => f.key === filterParam)?.key ?? "action";
+  const filter = FILTERS.find((f) => f.key === filterParam)?.key ?? "all";
+  const sort = sortParam === "oldest" ? "oldest" : "newest";
   const page = parsePage(pageParam);
 
   // Filters, chip counts and the stat tiles are aggregated in the database;
   // only the page of orders actually shown loads its full booking and payment detail.
   const today = new Date().setHours(0, 0, 0, 0);
-  const queue = await getOrderQueue(filter, page, format(today, "yyyy-MM-dd"));
-  const search = (queryParam ?? "").trim().slice(0,80);
-  const found = search ? await findOrderReferences(search,page) : null;
+  const search = (queryParam ?? "").trim().slice(0, 100);
+  const queue = await getOrderQueue(filter, page, format(today, "yyyy-MM-dd"), { sort, search });
+  const ordersHref = (nextFilter: string, nextPage = 1) => {
+    const params = new URLSearchParams({ filter: nextFilter, sort });
+    if (search) params.set("q", search);
+    if (nextPage > 1) params.set("page", String(nextPage));
+    return `/admin/orders?${params}`;
+  };
   const [listed, focused] = await Promise.all([
-    getOrdersByIds(found?.ids ?? queue.ids),
+    getOrdersByIds(queue.ids),
     focusId ? getOrdersByIds([focusId]) : Promise.resolve([]),
   ]);
   const visible = [...focused, ...listed.filter((o) => o.id !== focusId)];
@@ -103,11 +110,12 @@ export default async function AdminOrdersPage({
       </div>
 
       <div className="space-y-4 rounded-xl border border-border bg-card p-4">
-      <form role="search" className="flex flex-wrap items-end gap-2">
-        <input type="hidden" name="filter" value="all" />
-        <div className="min-w-48 flex-1"><label htmlFor="order-search" className="mb-2 block text-xs font-medium text-muted-foreground">Find an order</label><Input id="order-search" name="q" defaultValue={search} placeholder="Order reference, e.g. STS-2026-000071" maxLength={80} /></div>
-        <Button type="submit" variant="outline">Search</Button>
-        {search ? <Button variant="ghost" render={<Link href="/admin/orders?filter=all" />}>Clear</Button> : null}
+      <form key={`${filter}:${sort}:${search}`} role="search" className="flex flex-wrap items-end gap-2">
+        <input type="hidden" name="filter" value={filter} />
+        <div className="min-w-48 flex-1"><label htmlFor="order-search" className="mb-2 block text-xs font-medium text-muted-foreground">Find an order</label><Input id="order-search" name="q" defaultValue={search} placeholder="Order, visa reference, name or email" maxLength={100} /></div>
+        <div className="space-y-2"><label htmlFor="order-sort" className="block text-xs font-medium text-muted-foreground">Sort orders</label><select id="order-sort" name="sort" defaultValue={sort} className={NATIVE_SELECT_CLASS}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></div>
+        <Button type="submit" variant="outline">Apply</Button>
+        {(search || filter !== "all" || sort !== "newest") ? <Button variant="ghost" render={<Link href="/admin/orders" />}>Reset</Button> : null}
       </form>
       <FilterChips
         label="Filter orders"
@@ -116,7 +124,7 @@ export default async function AdminOrdersPage({
         items={FILTERS.map((f) => ({
           key: f.key,
           label: f.label,
-          href: `/admin/orders?filter=${f.key}`,
+          href: ordersHref(f.key),
           count:
             f.key === "all"
               ? queue.total
@@ -128,7 +136,7 @@ export default async function AdminOrdersPage({
         }))}
       />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-semibold">{search ? `Results for “${search}”` : filter === "all" ? "All orders" : FILTERS.find(f=>f.key===filter)?.label}</h2><span className="text-xs text-muted-foreground tabular-nums">{found?.total ?? queue.matching} {(found?.total ?? queue.matching) === 1 ? "order" : "orders"}</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-semibold">{search ? `Results for “${search}”` : filter === "all" ? "All orders" : FILTERS.find(f=>f.key===filter)?.label}</h2><span className="text-xs text-muted-foreground tabular-nums">{queue.matching} {queue.matching === 1 ? "order" : "orders"} · {sort === "newest" ? "Newest first" : "Oldest first"}</span></div>
 
       {visible.length === 0 ? (
         <Card>
@@ -137,7 +145,7 @@ export default async function AdminOrdersPage({
               <EmptyMedia variant="icon">
                 <Receipt />
               </EmptyMedia>
-              <EmptyTitle>{search ? "No matching order references" : filter === "action" ? "No payment requests awaiting review" : queue.total === 0 ? "No orders" : "No orders match this filter"}</EmptyTitle>
+              <EmptyTitle>{search ? "No matching orders" : filter === "action" ? "No payment requests awaiting review" : queue.total === 0 ? "No orders" : "No orders match this filter"}</EmptyTitle>
               <Button variant="outline" render={<Link href="/admin/orders?filter=all" />}>View all orders</Button>
             </Empty>
           </CardContent>
@@ -166,18 +174,16 @@ export default async function AdminOrdersPage({
                 className={cn(
                   "scroll-mt-24 overflow-hidden py-0",
                   order.id === focusId && "ring-2 ring-primary",
-                  // A payment waiting on a human is the only reason to look at
-                  // this page urgently, so it gets a visible edge rather than
-                  // being one badge among many.
-                  awaiting.length > 0 && "ring-2 ring-brand-gold/50"
+                  awaiting.length > 0 && "border-l-4 border-l-brand-gold"
                 )}
               >
                 <CardContent className="p-0">
                   {/* Header: who, how much, what state */}
-                  <div className="flex flex-col gap-4 border-b border-border bg-muted/30 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
+                  <div className="flex flex-col gap-3 border-b border-border bg-muted/20 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:px-5">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-heading font-semibold tabular-nums">{order.order_number}</span>
+                        {order.id === focusId ? <Badge variant="info">Selected order</Badge> : null}
                         <Badge variant={statusBadgeVariant(order.status)} className="capitalize">
                           {order.status.replace(/_/g, " ")}
                         </Badge>
@@ -220,7 +226,7 @@ export default async function AdminOrdersPage({
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-start gap-2 sm:items-end">
+                    <div className="flex flex-col items-start gap-1 sm:items-end">
                       <p className="font-heading text-xl font-semibold tabular-nums">
                         {money(order.total, order.currency)}
                       </p>
@@ -235,12 +241,12 @@ export default async function AdminOrdersPage({
                         </p>
                       ) : null}
                       <p className="text-xs text-muted-foreground tabular-nums">
-                        Placed {format(new Date(order.created_at), "d MMM yyyy")}
+                        Placed {format(new Date(order.created_at), "d MMM yyyy, HH:mm")}
                         {order.paid_at
                           ? ` · paid ${format(new Date(order.paid_at), "d MMM")}`
                           : ""}
                       </p>
-                      <details className="relative text-xs"><summary className="cursor-pointer rounded-md px-2 py-1 text-muted-foreground hover:bg-muted">Manage order</summary><div className="mt-2"><OrderStatusSelect orderId={order.id} status={order.status} /></div></details>
+
                     </div>
                   </div>
 
@@ -260,7 +266,7 @@ export default async function AdminOrdersPage({
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                              {item.visa_application?.id ? <Link className="rounded-sm text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-primary" href={`/admin/visa/${item.visa_application.id}`}>{d.title}</Link> : d.title}
+                              {item.visa_application?.id ? <Link className="rounded-sm text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-primary" href={`/admin/visa/${item.visa_application.id}`}>{item.visa_application.visa_type?.destination_country_code ? <>{countryFlag(item.visa_application.visa_type.destination_country_code)} {countryName(item.visa_application.visa_type.destination_country_code)} · </> : null}{d.title}</Link> : d.title}
                               <Badge variant="neutral">{d.typeLabel}</Badge>
                               {d.status ? (
                                 <span className="text-xs text-muted-foreground capitalize">
@@ -289,6 +295,7 @@ export default async function AdminOrdersPage({
                             ) : null}
                           </div>
 
+                          {item.visa_application?.id ? <Button size="sm" variant="outline" render={<Link href={`/admin/visa/${item.visa_application.id}?tab=documents`} />}><FileText className="size-3.5" />Open documents</Button> : null}
                           <span className="ml-auto min-w-24 text-right text-sm font-medium tabular-nums">
                             {money(item.total_price, order.currency)}
                           </span>
@@ -308,6 +315,7 @@ export default async function AdminOrdersPage({
                           {daysToTravel === 0 ? "Departs today" : `Departs in ${daysToTravel}d`}
                         </Badge>
                       ) : null}
+                      <details className="relative text-xs"><summary className="cursor-pointer rounded-md px-2 py-1 text-muted-foreground hover:bg-muted">Manage order</summary><div className="mt-2"><OrderStatusSelect orderId={order.id} status={order.status} /></div></details>
                       {invoice ? (
                         <Button
                           size="sm"
@@ -335,7 +343,7 @@ export default async function AdminOrdersPage({
         </div>
       )}
 
-      <Pager page={page} total={found?.total ?? queue.matching} hrefFor={(n) => `/admin/orders?filter=${filter}&page=${n}${search ? `&q=${encodeURIComponent(search)}` : ""}`} />
+      <Pager page={page} total={queue.matching} hrefFor={(n) => ordersHref(filter, n)} />
     </div>
   );
 }
