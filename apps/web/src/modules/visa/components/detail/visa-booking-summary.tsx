@@ -27,11 +27,13 @@ export function VisaApplyForm({
       ) : null}
       <SubmitButton
         size={size}
+        disabled={!nationality}
         className="h-12 w-full gap-2 rounded-xl bg-brand-accent font-semibold text-brand-accent-foreground shadow-[0_5px_15px_-6px_rgba(249,115,22,0.5)] hover:bg-brand-accent/90"
         pendingText="Starting…"
       >
         Apply now <ArrowRight className="size-4" aria-hidden />
       </SubmitButton>
+      {!nationality ? <a href="#visa-nationality" className="mt-3 block text-center text-sm font-medium text-primary underline underline-offset-4">Select your passport nationality to continue</a> : null}
     </form>
   );
 }

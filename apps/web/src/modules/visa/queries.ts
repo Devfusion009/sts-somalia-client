@@ -79,7 +79,7 @@ export async function getResolvedVisaPricing(visaTypeId: string, nationalityCode
   ).catch(() => null);
 }
 
-/** The signed-in user's applications (any status), newest first. */
+/** The signed-in user's applications (any status), most recently submitted (or created draft) first. */
 export async function getMyVisaApplications() {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -97,7 +97,13 @@ export async function getMyVisaApplications() {
     .order("created_at", { ascending: false });
   // A failed read must not render as "No visa applications yet".
   if (error) throw error;
-  return data ?? [];
+  // Match the booking date shown in the list. Resuming an older draft must
+  // place its new submission ahead of applications created more recently.
+  return (data ?? []).sort((a, b) =>
+    (b.submitted_at ?? b.created_at).localeCompare(a.submitted_at ?? a.created_at)
+    || b.created_at.localeCompare(a.created_at)
+    || b.id.localeCompare(a.id)
+  );
 }
 
 /**
