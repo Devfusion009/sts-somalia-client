@@ -534,11 +534,10 @@ export async function savePersonalInfo(
     passport_expiry: d.passportExpiry,
     sort_order: -1,
   };
-  if (primary) {
-    await supabase.from("visa_members").update(primaryRow).eq("id", primary.id);
-  } else {
-    await supabase.from("visa_members").insert(primaryRow);
-  }
+  const primarySave = primary
+    ? await supabase.from("visa_members").update(primaryRow).eq("id", primary.id)
+    : await supabase.from("visa_members").insert(primaryRow);
+  if (primarySave.error) return { error: primarySave.error.message, values: formValues(formData) };
 
   return advanceWizard(formData, application.id, 3);
 }
@@ -606,7 +605,7 @@ export async function saveTravelInfo(
   if (passportExpiry && passportExpiry <= d.departureDate) {
     return { error: "The passport expires before the departure date.", values: travelFormValues(formData, sections, members) };
   }
-  await supabase
+  const { error: travelSaveError } = await supabase
     .from("visa_applications")
     .update({
       travel_details: {
@@ -616,12 +615,12 @@ export async function saveTravelInfo(
         address: d.addressAtDestination,
       },
       custom_answers: customAnswers,
-      current_step: Math.max(application.current_step, 4),
     })
     .eq("id", application.id);
+  if (travelSaveError) return { error: travelSaveError.message, values: travelFormValues(formData, sections, members) };
 
   if (sections.some((section) => section.scope === "traveller")) {
-    await Promise.all(
+    const memberSaves = await Promise.all(
       members.map((m) => {
         const details = m.details && typeof m.details === "object" && !Array.isArray(m.details) ? m.details : {};
         return supabase
@@ -631,8 +630,13 @@ export async function saveTravelInfo(
           .eq("application_id", application.id);
       })
     );
+    const memberSaveError = memberSaves.find((result) => result.error)?.error;
+    if (memberSaveError) return { error: memberSaveError.message, values: travelFormValues(formData, sections, members) };
   }
 
+  const { error: progressError } = await supabase.from("visa_applications")
+    .update({ current_step: Math.max(application.current_step, 4) }).eq("id", application.id);
+  if (progressError) return { error: progressError.message, values: travelFormValues(formData, sections, members) };
   return advanceWizard(formData, application.id, 4);
 }
 
