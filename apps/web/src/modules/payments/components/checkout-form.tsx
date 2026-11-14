@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CreditCard, Smartphone, Wallet, Landmark, Building2, Lock, ShieldCheck, Check } from "lucide-react";
+import { AlertCircle, CreditCard, Smartphone, Wallet, Landmark, Building2, Lock, ShieldCheck, Check, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
-import { trpc } from "@/lib/trpc/react";
+import { initiateCheckoutPayment } from "../checkout-actions";
 
 /** Serializable subset of PaymentMethodDef safe to pass into a client component. */
 export type CheckoutMethod = {
@@ -31,7 +31,7 @@ const GROUPS = [
 ] as const;
 
 const TILE =
-  "rounded-xl border bg-card text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
+  "rounded-lg border bg-card text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
 const KIND_ICONS = {
   card: CreditCard,
@@ -66,24 +66,9 @@ export function CheckoutForm({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const initiate = trpc.payments.initiate.useMutation({
-    onSuccess: (data) => {
-      if (data.error) {
-        setError(data.error);
-        return;
-      }
-      if (data.result?.type === "redirect") {
-        window.location.href = data.result.url;
-        return;
-      }
-      // "success" and "instructions" both land back on the checkout page: a
-      // fully-settled order redirects itself to /success on reload, a still-
-      // open balance or a requires_action banner just re-renders here.
-      router.push(`/checkout/${data.orderId ?? orderId}`);
-      router.refresh();
-    },
-    onError: (err) => setError(err.message),
-  });
+  const [isPending, setPending] = useState(false);
+  const [signInRequired, setSignInRequired] = useState(false);
+  const submitting = useRef(false);
   const [selectedId, setSelectedId] = useState(methods[0]?.id ?? "");
   const selected = methods.find((m) => m.id === selectedId);
   const onlineAvailable = methods.some(m => ["card", "mobile_money"].includes(m.kind));
@@ -119,18 +104,40 @@ export function CheckoutForm({
     tileRefs.current.get(id)?.focus();
   }
 
-  function handleSubmit(formData: FormData) {
+  async function handleSubmit(formData: FormData) {
+    if (submitting.current) return;
+    submitting.current = true;
+    setPending(true);
     setError(null);
-    initiate.mutate({
-      orderId,
-      methodId: selectedId,
-      payerPhone: (formData.get("payerPhone")?.toString().trim() || undefined) as string | undefined,
-      amount: payChoice === "full" ? undefined : amount,
-    });
+    setSignInRequired(false);
+    try {
+      const data = await initiateCheckoutPayment({
+        orderId,
+        methodId: selectedId,
+        payerPhone: formData.get("payerPhone")?.toString().trim() || undefined,
+        amount: payChoice === "full" ? undefined : amount,
+      });
+      if (data.error) {
+        setError(data.error);
+        setSignInRequired(Boolean(data.signInRequired));
+        return;
+      }
+      if (data.result?.type === "redirect") {
+        window.location.href = data.result.url;
+        return;
+      }
+      router.push(`/checkout/${data.orderId ?? orderId}`);
+      router.refresh();
+    } catch {
+      setError("Payment status could not be confirmed. Refresh checkout before trying again.");
+    } finally {
+      submitting.current = false;
+      setPending(false);
+    }
   }
 
   return (
-    <form action={handleSubmit} className="space-y-7">
+    <form action={handleSubmit} className="space-y-5">
       {!allowPartial || remaining < 1 - 0.005 || (isFirstPayment && minDeposit >= remaining) ? null : (
         <fieldset>
           <legend id="pay-amount-heading" className="font-heading text-lg font-semibold tracking-tight">
@@ -201,9 +208,10 @@ export function CheckoutForm({
       )}
 
       <div className="space-y-4">
-        <h2 id="payment-method-heading" className="font-heading text-lg font-semibold tracking-tight">
-          Payment method
-        </h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="payment-method-heading" className="font-heading text-lg font-semibold tracking-tight">Payment method</h2>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary"><Lock className="size-3" aria-hidden />Secure checkout</span>
+        </div>
 
         {groups.length > 1 ? (
           <div role="tablist" aria-label="Payment type" className="grid gap-1 rounded-xl bg-muted p-1" style={{ gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))` }}>
@@ -238,7 +246,7 @@ export function CheckoutForm({
           role="radiogroup"
           aria-labelledby="payment-method-heading"
           onKeyDown={onMethodKeyDown}
-          className={cn("grid gap-3", onlineAvailable && orderedMethods.length > 1 && "sm:grid-cols-2")}
+          className={cn("grid gap-3", orderedMethods.length > 1 && "sm:grid-cols-2")}
         >
           {orderedMethods.map((method) => {
             const Icon = KIND_ICONS[method.kind];
@@ -257,7 +265,7 @@ export function CheckoutForm({
                 onClick={() => setSelectedId(method.id)}
                 className={cn(
                   TILE,
-                  "relative flex w-full items-start gap-3 p-4",
+                  "relative flex min-h-32 w-full flex-col items-start gap-3 rounded-xl p-4",
                   active
                     ? "border-primary bg-primary/[0.04] shadow-[0_0_0_1px_var(--primary)]"
                     : "border-border hover:border-foreground/20 hover:shadow-sm"
@@ -266,7 +274,7 @@ export function CheckoutForm({
                 <span
                   aria-hidden
                   className={cn(
-                    "flex size-10 shrink-0 items-center justify-center rounded-xl border",
+                    "flex size-10 shrink-0 items-center justify-center rounded-lg border",
                     active ? "border-primary/20 bg-primary text-primary-foreground" : "border-border bg-muted/50 text-muted-foreground"
                   )}
                 >
@@ -278,18 +286,7 @@ export function CheckoutForm({
                     {method.description}
                     {method.simulated ? " · test mode" : ""}
                   </span>
-                  {method.badges.length > 0 ? (
-                    <span className="mt-2.5 flex flex-wrap gap-1.5">
-                      {method.badges.map((badge) => (
-                        <span
-                          key={badge}
-                          className="rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase"
-                        >
-                          {badge}
-                        </span>
-                      ))}
-                    </span>
-                  ) : null}
+
                 </span>
                 <span
                   aria-hidden
@@ -304,7 +301,7 @@ export function CheckoutForm({
             );
           })}
           {!onlineAvailable ? (
-            <button type="button" role="radio" aria-checked={false} disabled className={cn(TILE, "flex items-start gap-3 border-border bg-muted/30 p-4 text-muted-foreground opacity-75")}>
+            <button type="button" role="radio" aria-checked={false} disabled className={cn(TILE, "flex items-center gap-3 rounded-xl border-dashed border-border bg-muted/20 px-4 py-3 text-muted-foreground sm:col-span-2")}>
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted"><CreditCard className="size-[18px]" aria-hidden /></span>
               <span className="min-w-0"><span className="block text-sm font-semibold">Online payment</span><span className="mt-1 block text-xs">Not yet available</span></span>
             </button>
@@ -330,24 +327,28 @@ export function CheckoutForm({
       {error ? (
         <Alert variant="destructive">
           <AlertCircle />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{error}{signInRequired ? <Link className="ml-2 font-semibold underline underline-offset-4" href={`/login?redirect_to=${encodeURIComponent(`/checkout/${orderId}`)}`}>Sign in</Link> : null}</AlertDescription>
         </Alert>
       ) : null}
 
-      <div className="space-y-3 border-t border-border pt-6">
+      <div className="-mx-5 -mb-5 space-y-4 rounded-b-xl border-t border-border bg-muted/25 p-5 sm:-mx-6 sm:-mb-6 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="shrink-0"><span className="block text-xs text-muted-foreground">{selected?.kind === "cash" ? "Amount at office" : "Amount to pay"}</span><span className="mt-1 block text-xl font-semibold tabular-nums">{payLabel}</span></div>
         <Button
           type="submit"
           size="lg"
-          loading={initiate.isPending}
+          loading={isPending}
           disabled={
-            !selected ||
+            isPending || signInRequired || !selected ||
             (payChoice === "amount" && (!Number.isFinite(amount) || amount < amountFloor || amount > remaining))
           }
-          className="h-13 w-full gap-2 rounded-xl text-base font-semibold tabular-nums shadow-sm"
+          className="h-12 w-full gap-2 rounded-lg bg-brand-accent px-6 text-sm font-semibold text-brand-accent-foreground shadow-xs hover:bg-brand-accent/90 sm:w-auto"
         >
-          {initiate.isPending ? null : <Lock className="size-4" aria-hidden />}
-          {initiate.isPending ? "Processing…" : selected?.id === "cash_office" ? "Choose office payment" : selected?.id === "bank_transfer" ? "Get bank transfer details" : `Pay ${payLabel}`}
+          {isPending ? null : <Lock className="size-4" aria-hidden />}
+          {isPending ? "Processing…" : selected?.id === "cash_office" ? "Continue with office payment" : selected?.id === "bank_transfer" ? "Continue with bank transfer" : `Pay ${payLabel}`}
+          {!isPending ? <ArrowRight className="size-4" aria-hidden /> : null}
         </Button>
+        </div>
         <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
           <ShieldCheck className="size-3.5 shrink-0" aria-hidden />
           <span>
