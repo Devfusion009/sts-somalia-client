@@ -7856,6 +7856,17 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_order_workspace: {
+        Args: {
+          p_filter: string
+          p_limit: number
+          p_offset: number
+          p_today: string
+          p_sort: string
+          p_search: string
+        }
+        Returns: Json
+      }
       admin_payout_queue_totals: {
         Args: Record<PropertyKey, never>
         Returns: Json

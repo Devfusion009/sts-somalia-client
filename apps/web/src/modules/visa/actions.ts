@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { countryName } from "@/lib/countries";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/types/database.types";
 import { getCurrentProfile, requireUser } from "@/lib/auth/session";
@@ -182,10 +183,27 @@ function advanceWizard(formData: FormData, applicationId: string, step: number):
 // ---------------------------------------------------------------------------
 export async function startVisaApplication(formData: FormData): Promise<void> {
   const visaTypeId = z.string().uuid().parse(formData.get("visaTypeId"));
+  const chosen = formData.get("nationality")?.toString().trim().toUpperCase();
+  if (!chosen || !/^[A-Z]{2}$/.test(chosen) || countryName(chosen) === chosen) {
+    redirect(`/visa/${visaTypeId}#visa-nationality`);
+  }
   const user = await getCurrentProfile();
   // Send signed-out visitors through login and straight back to this visa.
-  if (!user) redirect(`/login?redirect_to=${encodeURIComponent(`/visa/${visaTypeId}`)}`);
+  if (!user) redirect(`/login?redirect_to=${encodeURIComponent(`/visa/${visaTypeId}?nationality=${chosen}`)}`);
   const supabase = await createClient();
+
+  const { data: visaType } = await supabase
+    .from("visa_types")
+    .select("*")
+    .eq("id", visaTypeId)
+    .eq("status", "published")
+    .maybeSingle();
+  if (!visaType) redirect("/visa");
+
+  // A nationality chosen on the detail page seeds the field; the quote for it
+  // (price, fee, documents) is stamped by visa_applications_draft_integrity.
+  if (chosen === visaType.destination_country_code.toUpperCase()) redirect(`/visa/${visaTypeId}#visa-nationality`);
+  const nationality = chosen;
 
   const { data: existingDraft } = await supabase
     .from("visa_applications")
@@ -199,18 +217,6 @@ export async function startVisaApplication(formData: FormData): Promise<void> {
 
   if (existingDraft) redirect(wizardPath(existingDraft.id, 1));
 
-  const { data: visaType } = await supabase
-    .from("visa_types")
-    .select("*")
-    .eq("id", visaTypeId)
-    .eq("status", "published")
-    .maybeSingle();
-  if (!visaType) redirect("/visa");
-
-  // A nationality chosen on the detail page seeds the field; the quote for it
-  // (price, fee, documents) is stamped by visa_applications_draft_integrity.
-  const chosen = formData.get("nationality")?.toString().trim().toUpperCase();
-  const nationality = chosen && chosen !== visaType.destination_country_code.toUpperCase() ? chosen : undefined;
 
   const { data: application, error } = await supabase
     .from("visa_applications")
@@ -602,8 +608,9 @@ export async function saveTravelInfo(
 
   const d = parsed.data;
   const passportExpiry = (application.traveler_details as Record<string, string> | null)?.passport_expiry;
-  if (passportExpiry && passportExpiry <= d.departureDate) {
-    return { error: "The passport expires before the departure date.", values: travelFormValues(formData, sections, members) };
+  const invalidMember = members.find((m) => m.passport_expiry && m.passport_expiry <= d.departureDate);
+  if ((passportExpiry && passportExpiry <= d.departureDate) || invalidMember) {
+    return { error: `${invalidMember?.full_name ?? "Primary applicant"}: passport must be valid after departure.`, values: travelFormValues(formData, sections, members) };
   }
   const { error: travelSaveError } = await supabase
     .from("visa_applications")

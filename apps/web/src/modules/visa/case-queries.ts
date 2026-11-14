@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getVisaOrderAdmin, getVisaProcessingWorkspace } from "@/modules/admin/queries";
 import { applicationDocumentSlots, parseRequirementSections, sectionFileSlots } from "./schemas";
 import type { PaymentState, ReadinessItem } from "./workflow";
-import type { VisaQueue } from "./queues";
+import { parseVisaSort, type VisaQueue, type VisaSort } from "./queues";
 
 const STAFF_DOC_LABELS: Record<string, string> = {
   visa_result: "Issued visa",
@@ -196,6 +196,7 @@ export const QUEUE_PAGE_SIZE = 25;
 
 export type QueueFilters = {
   queue: VisaQueue;
+  sort?: VisaSort;
   q?: string;
   destination?: string;
   owner?: string;
@@ -280,13 +281,19 @@ export async function getVisaCaseQueue(filters: QueueFilters, meId: string) {
   if (filters.urgent) query = query.eq("priority", "urgent");
 
   const from = (filters.page - 1) * QUEUE_PAGE_SIZE;
-  const closedQueue = ["approved", "refused", "issued", "cancelled", "all"].includes(filters.queue);
-  query = query.order("priority", { ascending: false });
-  query = closedQueue
-    ? query.order("submitted_at", { ascending: false, nullsFirst: false })
-    : query.order("sla_due_at", { ascending: true, nullsFirst: false });
+  const sort = parseVisaSort(filters.sort);
+  if (sort === "due") {
+    query = query.order("sla_due_at", { ascending: true, nullsFirst: false });
+  } else if (sort === "priority") {
+    query = query.order("priority", { ascending: false });
+  }
+  query = query
+    .order("submitted_at", { ascending: sort === "oldest", nullsFirst: false })
+    .order("created_at", { ascending: sort === "oldest" })
+    .order("id", { ascending: sort === "oldest" });
 
-  const { data, count } = await query.range(from, from + QUEUE_PAGE_SIZE - 1);
+  const { data, count, error } = await query.range(from, from + QUEUE_PAGE_SIZE - 1);
+  if (error) throw new Error("Visa applications could not be loaded. Refresh and try again.");
   return { rows: data ?? [], total: count ?? 0 };
 }
 
@@ -294,7 +301,8 @@ export type QueueRow = Awaited<ReturnType<typeof getVisaCaseQueue>>["rows"][numb
 
 export async function getVisaQueueCounts() {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("visa_queue_counts");
+  const { data, error } = await supabase.rpc("visa_queue_counts");
+  if (error) throw new Error("Visa queue counts are unavailable.");
   return (data ?? {}) as Record<string, number>;
 }
 

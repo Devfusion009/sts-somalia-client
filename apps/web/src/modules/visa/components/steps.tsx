@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { DocumentRequirementsGuide } from "./document-requirements-guide";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import {
@@ -789,6 +790,17 @@ export function StepTravelInfo({
     section.fields.some((f) => f.type !== "file")
   );
   const appAnswers = parseRequirementAnswers(application.custom_answers);
+  const [arrival, setArrival] = useState(str("arrival_date"));
+  const [departure, setDeparture] = useState(str("departure_date"));
+  const primaryExpiry = (application.traveler_details as Record<string, string> | null)?.passport_expiry;
+  const invalidPassport = [
+    ...(primaryExpiry ? [{ full_name: "Primary applicant", passport_expiry: primaryExpiry }] : []),
+    ...application.members,
+  ].find((m) => m.passport_expiry && departure && m.passport_expiry <= departure);
+  const dateError = arrival && departure && departure < arrival
+    ? "Departure must be on or after arrival."
+    : invalidPassport ? `${invalidPassport.full_name}: passport must be valid after departure.` : null;
+
 
   return (
     <form action={formAction} className="space-y-7">
@@ -798,11 +810,12 @@ export function StepTravelInfo({
 
       <div className="grid grid-cols-1 gap-x-6 gap-y-6 @min-[30rem]/visa-form:grid-cols-2">
         <Field label={`Arrival in ${destination}`} htmlFor="arrivalDate" required>
-          <Input id="arrivalDate" name="arrivalDate" type="date" min={todayIso()} defaultValue={v.arrivalDate ?? str("arrival_date")} required />
+          <Input id="arrivalDate" name="arrivalDate" type="date" min={todayIso()} value={arrival} onChange={(e) => setArrival(e.target.value)} required />
         </Field>
         <Field label={`Departure from ${destination}`} htmlFor="departureDate" required>
-          <Input id="departureDate" name="departureDate" type="date" min={todayIso()} defaultValue={v.departureDate ?? str("departure_date")} required />
+          <Input id="departureDate" name="departureDate" type="date" min={arrival > todayIso() ? arrival : todayIso()} value={departure} onChange={(e) => setDeparture(e.target.value)} aria-invalid={dateError ? true : undefined} aria-describedby={dateError ? "travel-date-error" : undefined} required />
         </Field>
+        {dateError ? <p id="travel-date-error" role="alert" className="text-sm text-destructive @min-[30rem]/visa-form:col-span-2">{dateError}</p> : null}
         <Field label="Purpose of visit" htmlFor="purposeOfVisit" required className="@min-[30rem]/visa-form:col-span-2">
           <LabeledSelect
             id="purposeOfVisit"
@@ -853,7 +866,7 @@ export function StepTravelInfo({
 
       <div className={STEP_FOOTER}>
         <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=2`} />
-        <SubmitButton size="lg" pendingText="Saving…" className="min-w-36 gap-2 rounded-xl">
+        <SubmitButton disabled={Boolean(dateError)} size="lg" pendingText="Saving…" className="min-w-36 gap-2 rounded-xl">
           Continue to documents <ArrowRight className="size-4" aria-hidden />
         </SubmitButton>
       </div>
@@ -917,7 +930,9 @@ function UploadSlot({
         {slot.label}
         {slot.required ? <span className="text-destructive"> *</span> : <span className="font-normal text-muted-foreground"> (optional)</span>}
       </div>
-      {slot.description ? (
+      {["photo", "passport_photo", "passport_size_photo", "passport_bio", "passport_scan", "passport"].includes(slot.key) ? (
+        <DocumentRequirementsGuide kind={["photo", "passport_photo", "passport_size_photo"].includes(slot.key) ? "photo" : "passport"} description={slot.description} maxMb={slot.max_mb ?? 5} />
+      ) : slot.description ? (
         <details className="text-xs text-muted-foreground">
           <summary className="w-fit cursor-pointer rounded-sm py-1 font-medium underline decoration-border underline-offset-4 focus-visible:outline-2 focus-visible:outline-primary">Document requirements</summary>
           <div className="pt-1 leading-relaxed">{slot.description}</div>

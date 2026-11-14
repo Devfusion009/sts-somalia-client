@@ -160,7 +160,6 @@ export default async function CheckoutPage({
   );
 
   const ROW = "flex items-baseline justify-between gap-4";
-  const hasBreakdown = Number(order.markup_amount) > 0 || Number(order.fee_total) > 0 || paidTotal > 0;
   const support = (
     <>
     <section aria-labelledby="checkout-help" className="flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-4 text-sm">
@@ -199,15 +198,15 @@ export default async function CheckoutPage({
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
-      <header className="mb-8 flex flex-col gap-5 lg:mb-10 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <header className="mb-6 flex flex-col gap-5 border-b border-border pb-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="space-y-1.5">
-          <h1 className="font-heading text-3xl font-bold tracking-tight lg:text-4xl">Checkout</h1>
+          <h1 className="font-heading text-2xl font-bold tracking-tight lg:text-3xl">Checkout</h1>
           <p className="text-sm text-muted-foreground">
             Order <span className="font-mono font-medium text-foreground">{order.order_number}</span>
           </p>
         </div>
-        <ol aria-label="Checkout progress" className="flex items-center gap-2 text-sm">
+        <ol aria-label="Checkout progress" className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
           {CHECKOUT_STEPS.map((label, i) => {
             const done = i < 1;
             const current = i === 1;
@@ -232,31 +231,12 @@ export default async function CheckoutPage({
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8">
         {/* Summary first in reading order (phones see what they pay before how);
             lg places it in the right column. */}
-        <aside aria-labelledby="order-summary-heading" className="space-y-4 lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1">
-          <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-            <h2 id="order-summary-heading" className="px-6 pt-6 font-heading text-lg font-semibold tracking-tight">
-              Order summary
+        <aside aria-labelledby="order-summary-heading" className="order-2 space-y-4 lg:sticky lg:top-24 lg:order-none lg:col-start-2 lg:row-start-1">
+          <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+            <h2 id="order-summary-heading" className="border-b border-border bg-muted/30 px-5 py-4 font-heading text-base font-semibold tracking-tight">
+              Price details
             </h2>
-            <ul className="space-y-4 px-6 pt-5 pb-6">
-              {order.order_items.map((item) => {
-                const info = describeOrderItem(item);
-                const ItemIcon = ITEM_ICONS[item.item_type] ?? Receipt;
-                return (
-                  <li key={item.id} className="flex items-start gap-3 text-sm">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <ItemIcon className="size-[18px]" aria-hidden />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold leading-snug">{info.title}</p>
-                      {info.subtitle ? <p className="mt-0.5 text-xs text-muted-foreground">{info.subtitle}</p> : null}
-                    </div>
-                    <p className="shrink-0 font-medium tabular-nums">{money(item.total_price, order.currency)}</p>
-                  </li>
-                );
-              })}
-            </ul>
-            {hasBreakdown ? (
-              <dl className="mx-6 space-y-3 border-t border-dashed border-border py-5 text-sm tabular-nums">
+              <dl className="space-y-4 px-5 py-5 text-sm tabular-nums">
                 <div className={ROW}>
                   <dt className="text-muted-foreground">Subtotal</dt>
                   <dd>{money(order.order_items.reduce((sum, item) => sum + Number(item.total_price), 0), order.currency)}</dd>
@@ -286,11 +266,10 @@ export default async function CheckoutPage({
                   </>
                 ) : null}
               </dl>
-            ) : null}
-            <div className="border-t border-border bg-muted/40 px-6 py-5">
+            <div className="border-t border-border bg-primary/5 px-5 py-5">
               <div className={ROW}>
                 <span className="text-sm font-semibold">{paidTotal > 0 ? "Balance due" : "Total due"}</span>
-                <span className="font-heading text-3xl font-bold tracking-tight tabular-nums">
+                <span className="font-heading text-2xl font-bold tracking-tight text-primary tabular-nums">
                   <span className="mr-1 align-top text-sm font-semibold text-muted-foreground">{order.currency}</span>
                   {Number(remaining).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
@@ -300,9 +279,9 @@ export default async function CheckoutPage({
                   Balance due by {format(parseISO(order.balance_due_at), "d MMM yyyy")}
                 </p>
               ) : null}
-              {/* Hotel, hall and Umrah refunds follow their own cancellation rules; only visa fees are never returned. */}
+              {/* Visa refund eligibility ends when STS files the application. */}
               {order.order_items.some((item) => item.item_type === "visa") ? (
-                <p className="mt-2 text-right text-xs text-muted-foreground">{order.order_items.some((item) => item.item_type === "visa") ? "Visa fees are refundable before STS files the application." : "All fees are non-refundable."}</p>
+                <p className="mt-2 text-right text-xs text-muted-foreground">Visa fees are refundable before STS files the application.</p>
               ) : null}
             </div>
           </section>
@@ -310,7 +289,36 @@ export default async function CheckoutPage({
           <div className="hidden space-y-4 lg:block">{support}</div>
         </aside>
 
-        <div className="min-w-0 space-y-6 lg:col-start-1 lg:row-start-1">
+        <div className="order-1 min-w-0 space-y-5 lg:order-none lg:col-start-1 lg:row-start-1">
+          <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
+              <h2 className="font-heading text-base font-semibold">Your booking</h2>
+              <span className="text-xs text-muted-foreground">{order.order_items.length} {order.order_items.length === 1 ? "service" : "services"}</span>
+            </div>
+            <ul className="divide-y divide-border px-5">
+              {order.order_items.map((item) => {
+                const info = describeOrderItem(item);
+                const ItemIcon = ITEM_ICONS[item.item_type] ?? Receipt;
+                return (
+                  <li key={item.id} className="flex items-start gap-3 py-4 text-sm">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <ItemIcon className="size-[18px]" aria-hidden />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold leading-snug">{info.title}</p>
+                      {info.subtitle ? <p className="mt-0.5 text-xs text-muted-foreground">{info.subtitle}</p> : null}
+                    </div>
+                    <p className="shrink-0 font-medium tabular-nums">{money(item.total_price, order.currency)}</p>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border bg-muted/20 px-5 py-3 text-xs">
+              <span className="font-semibold">Booking contact</span>
+              <span>{profile.full_name}</span><span className="break-all text-muted-foreground">{profile.email}</span>
+            </div>
+          </section>
           {holdExpired ? (
             <Alert variant="destructive">
               <X />
@@ -372,7 +380,7 @@ export default async function CheckoutPage({
                   </AlertTitle>
                 </Alert>
               ) : null}
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-8">
+              <section className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
                 <CheckoutForm
                   orderId={order.id}
                   methods={methods}

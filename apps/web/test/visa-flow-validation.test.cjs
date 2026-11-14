@@ -52,3 +52,11 @@ for (const failure of ['visa_applications','visa_members']) {
     assert(!updates.some(({row})=>row.current_step===4));
   });
 }
+
+test('travel dates reject departure before arrival and allow a valid trip', () => {
+  const trip = {arrivalDate:'2090-02-10',departureDate:'2090-02-01',purposeOfVisit:'tourism',addressAtDestination:'Test hotel'};
+  const invalid = schemas.travelInfoSchema.safeParse(trip);
+  assert.equal(invalid.success, false);
+  assert(invalid.error.issues.some(issue => issue.path.includes('departureDate')));
+  assert(schemas.travelInfoSchema.safeParse({...trip,departureDate:'2090-02-15'}).success);
+});
