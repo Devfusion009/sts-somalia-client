@@ -3,7 +3,6 @@
 import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { DocumentRequirementsGuide } from "./document-requirements-guide";
-import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import {
   AlertCircle,
@@ -1058,11 +1057,12 @@ export function StepDocuments({
   desk?: boolean;
 }) {
   const [state, formAction] = useActionState(continueFromDocuments, null);
-  const router = useRouter();
   const uploadQueue = useRef(createUploadQueue());
   const [pendingUploads, setPendingUploads] = useState(0);
   const pendingUploadsRef = useRef(0);
+  const uploadBatch = useRef({ saved: false, failed: false });
   const enqueueUpload = useCallback(async (data: FormData) => {
+    if (pendingUploadsRef.current === 0) uploadBatch.current = { saved: false, failed: false };
     pendingUploadsRef.current += 1;
     setPendingUploads(pendingUploadsRef.current);
     try {
@@ -1071,13 +1071,21 @@ export function StepDocuments({
           void uploadVisaDocument(null, data).then(resolve, reject);
         });
       }));
-      if (result && !result.error) router.refresh();
+      if (result && !result.error) uploadBatch.current.saved = true;
+      else uploadBatch.current.failed = true;
       return result;
+    } catch (error) {
+      uploadBatch.current.failed = true;
+      throw error;
     } finally {
       pendingUploadsRef.current -= 1;
       setPendingUploads(pendingUploadsRef.current);
+      // Refresh once every selected file has saved. Overlapping RSC refreshes
+      // can restore an older checklist while another queued action completes.
+      // Preserve inline errors when any file in the batch failed.
+      if (pendingUploadsRef.current === 0 && uploadBatch.current.saved && !uploadBatch.current.failed) window.location.reload();
     }
-  }, [router]);
+  }, []);
   useWizardNavigate(state);
   const slots = travellerDocumentSlots(application);
   const byKey = new Map(application.documents.filter(d => d.is_current).map((d) => [`${d.document_type}|${documentMemberId(application, d) ?? ""}`, d]));
