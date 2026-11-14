@@ -46,12 +46,12 @@ export default async function CheckoutSuccessPage({
     return <UnavailableNotice label="Payment Confirmation" />;
   }
   if (!order) notFound();
-  if (order.status === "pending_payment") redirect(`/checkout/${orderId}`);
+  if (["pending_payment", "held"].includes(order.status)) redirect(`/checkout/${orderId}`);
 
-  const paid = order.status !== "cancelled";
+  const successfulPayment = order.payments.find((p) => p.status === "succeeded");
+  const paid = Boolean(successfulPayment) && ["paid", "partially_paid", "processing", "completed"].includes(order.status);
   const invoiceAvailable =
     order.status === "paid" || order.status === "processing" || order.status === "completed";
-  const successfulPayment = order.payments.find((p) => p.status === "succeeded");
   const primaryItem = order.order_items[0];
   const primaryHref = primaryItem ? describeOrderItem(primaryItem).href : "/account/bookings";
 
@@ -130,14 +130,14 @@ export default async function CheckoutSuccessPage({
         <Button size="lg" variant="outline" render={<Link href="/account/bookings" />}>
           My bookings
         </Button>
-        {invoiceAvailable ? (
+        {invoiceAvailable && paid ? (
           <Button
             size="lg"
             variant="outline"
             className="gap-2"
             render={<a href={`/api/invoices/${order.id}`} target="_blank" rel="noopener noreferrer" />}
           >
-            <Download className="size-4" aria-hidden /> Download invoice
+            <Download className="size-4" aria-hidden /> Download receipt
           </Button>
         ) : null}
       </div>

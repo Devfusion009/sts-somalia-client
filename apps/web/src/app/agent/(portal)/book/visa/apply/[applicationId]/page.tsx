@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getReapplyCredit } from "@/modules/visa/queries";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
@@ -82,7 +83,7 @@ export default async function AgentVisaWizardPage({
           ) : step === 4 ? (
             <StepDocuments application={application} vaultOptions={[]} desk />
           ) : (
-            <StepReview application={application} desk />
+            <StepReview application={application} desk credit={step >= 5 ? await getReapplyCredit(application) : null} />
           )}
         </section>
 

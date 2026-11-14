@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CreditCard, Smartphone, Wallet, Landmark, Building2, Lock } from "lucide-react";
+import { AlertCircle, CreditCard, Smartphone, Wallet, Landmark, Building2, Lock, ShieldCheck, Check } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,13 +25,13 @@ export type CheckoutMethod = {
 };
 
 const GROUPS = [
-  { id: "local", title: "Local payments" },
-  { id: "international", title: "International cards" },
-  { id: "other", title: "Other ways to pay" },
+  { id: "local", title: "Mobile money", icon: Smartphone },
+  { id: "international", title: "Card", icon: CreditCard },
+  { id: "other", title: "Bank & cash", icon: Landmark },
 ] as const;
 
 const TILE =
-  "rounded-xl border bg-card text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
+  "rounded-xl border bg-card text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
 const KIND_ICONS = {
   card: CreditCard,
@@ -49,6 +49,7 @@ export function CheckoutForm({
   remaining,
   isFirstPayment,
   minDeposit,
+  allowPartial,
 }: {
   orderId: string;
   methods: CheckoutMethod[];
@@ -60,6 +61,8 @@ export function CheckoutForm({
   isFirstPayment: boolean;
   /** Minimum a first payment must cover to count as a deposit (order.total * MIN_DEPOSIT_FRACTION). */
   minDeposit: number;
+  /** Umrah packages take deposits; every other order is paid in full. */
+  allowPartial: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +95,9 @@ export function CheckoutForm({
 
   // Radio-group keyboard model for the method tiles: one tab stop, arrows move
   // the selection (WAI-ARIA radio pattern). Order matches the rendered groups.
-  const orderedMethods = GROUPS.flatMap((g) => methods.filter((m) => m.group === g.id));
+  const groups = GROUPS.filter((g) => methods.some((m) => m.group === g.id));
+  const activeGroup = selected?.group ?? groups[0]?.id;
+  const orderedMethods = methods.filter((m) => m.group === activeGroup);
   const tileRefs = useRef(new Map<string, HTMLButtonElement>());
   function onMethodKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     const keys = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"];
@@ -124,10 +129,10 @@ export function CheckoutForm({
   }
 
   return (
-    <form action={handleSubmit} className="space-y-6">
-      {remaining < 1 - 0.005 || (isFirstPayment && minDeposit >= remaining) ? null : (
+    <form action={handleSubmit} className="space-y-7">
+      {!allowPartial || remaining < 1 - 0.005 || (isFirstPayment && minDeposit >= remaining) ? null : (
         <fieldset>
-          <legend id="pay-amount-heading" className="font-heading text-base font-semibold">
+          <legend id="pay-amount-heading" className="font-heading text-lg font-semibold tracking-tight">
             Amount
           </legend>
           <div role="radiogroup" aria-labelledby="pay-amount-heading" className="mt-3 grid gap-2.5 sm:grid-cols-2">
@@ -194,23 +199,47 @@ export function CheckoutForm({
         </fieldset>
       )}
 
-      <div>
-        <h2 id="payment-method-heading" className="font-heading text-base font-semibold">
+      <div className="space-y-4">
+        <h2 id="payment-method-heading" className="font-heading text-lg font-semibold tracking-tight">
           Payment method
         </h2>
+
+        {groups.length > 1 ? (
+          <div role="tablist" aria-label="Payment type" className="grid gap-1 rounded-xl bg-muted p-1" style={{ gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))` }}>
+            {groups.map((group) => {
+              const active = group.id === activeGroup;
+              const GroupIcon = group.icon;
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => {
+                    if (active) return;
+                    const first = methods.find((m) => m.group === group.id);
+                    if (first) setSelectedId(first.id);
+                  }}
+                  className={cn(
+                    "flex min-h-10 flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all sm:flex-row sm:gap-2 sm:text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <GroupIcon className="size-4 shrink-0" aria-hidden />
+                  <span className="truncate">{group.title}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
         <div
-          className="mt-3 space-y-5"
           role="radiogroup"
           aria-labelledby="payment-method-heading"
           onKeyDown={onMethodKeyDown}
+          className={cn("grid gap-3", orderedMethods.length > 1 && "sm:grid-cols-2")}
         >
-          {GROUPS.map((group) => {
-            const groupMethods = methods.filter((m) => m.group === group.id);
-            if (groupMethods.length === 0) return null;
-            return (
-              <div key={group.id} className="space-y-2.5">
-                <h3 className="text-sm font-medium text-muted-foreground">{group.title}</h3>
-                {groupMethods.map((method) => {
+          {orderedMethods.map((method) => {
             const Icon = KIND_ICONS[method.kind];
             const active = method.id === selectedId;
             return (
@@ -227,51 +256,50 @@ export function CheckoutForm({
                 onClick={() => setSelectedId(method.id)}
                 className={cn(
                   TILE,
-                  "flex min-h-14 w-full items-center gap-3 px-4 py-3",
+                  "relative flex w-full items-start gap-3 p-4",
                   active
-                    ? "border-primary bg-primary/[0.03] ring-2 ring-primary/20"
-                    : "border-border hover:border-primary/40"
+                    ? "border-primary bg-primary/[0.04] shadow-[0_0_0_1px_var(--primary)]"
+                    : "border-border hover:border-foreground/20 hover:shadow-sm"
                 )}
               >
                 <span
                   aria-hidden
                   className={cn(
-                    "flex size-4 shrink-0 items-center justify-center rounded-full border-2",
-                    active ? "border-primary" : "border-muted-foreground/40"
+                    "flex size-10 shrink-0 items-center justify-center rounded-xl border",
+                    active ? "border-primary/20 bg-primary text-primary-foreground" : "border-border bg-muted/50 text-muted-foreground"
                   )}
                 >
-                  {active ? <span className="size-2 rounded-full bg-primary" /> : null}
+                  <Icon className="size-[18px]" />
+                </span>
+                <span className="min-w-0 flex-1 pr-6">
+                  <span className="block text-sm font-semibold">{method.label}</span>
+                  <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                    {method.description}
+                    {method.simulated ? " · test mode" : ""}
+                  </span>
+                  {method.badges.length > 0 ? (
+                    <span className="mt-2.5 flex flex-wrap gap-1.5">
+                      {method.badges.map((badge) => (
+                        <span
+                          key={badge}
+                          className="rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase"
+                        >
+                          {badge}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
                 </span>
                 <span
                   aria-hidden
                   className={cn(
-                    "flex size-9 shrink-0 items-center justify-center rounded-lg",
-                    active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    "absolute top-4 right-4 flex size-5 items-center justify-center rounded-full border-2 transition-colors",
+                    active ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30"
                   )}
                 >
-                  <Icon className="size-4.5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">{method.label}</span>
-                  <span className="block text-xs text-muted-foreground sm:truncate">
-                    {method.description}
-                    {method.simulated ? " · test mode" : ""}
-                  </span>
-                </span>
-                <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
-                  {method.badges.map((badge) => (
-                    <span
-                      key={badge}
-                      className="rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground"
-                    >
-                      {badge}
-                    </span>
-                  ))}
+                  {active ? <Check className="size-3" strokeWidth={3} /> : null}
                 </span>
               </button>
-            );
-          })}
-              </div>
             );
           })}
         </div>
@@ -299,17 +327,7 @@ export function CheckoutForm({
         </Alert>
       ) : null}
 
-      <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-muted-foreground">
-          By paying you agree to our{" "}
-          <Link
-            href="/terms"
-            className="rounded-sm underline underline-offset-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            terms and conditions
-          </Link>
-          .
-        </p>
+      <div className="space-y-3 border-t border-border pt-6">
         <Button
           type="submit"
           size="lg"
@@ -318,11 +336,24 @@ export function CheckoutForm({
             !selected ||
             (payChoice === "amount" && (!Number.isFinite(amount) || amount < amountFloor || amount > remaining))
           }
-          className="w-full gap-2 tabular-nums sm:w-auto"
+          className="h-13 w-full gap-2 rounded-xl text-base font-semibold tabular-nums shadow-sm"
         >
           {initiate.isPending ? null : <Lock className="size-4" aria-hidden />}
-          {initiate.isPending ? "Processing…" : `Pay ${payLabel}`}
+          {initiate.isPending ? "Processing…" : selected?.id === "cash_office" ? "Choose office payment" : selected?.id === "bank_transfer" ? "Get bank transfer details" : `Pay ${payLabel}`}
         </Button>
+        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+          <ShieldCheck className="size-3.5 shrink-0" aria-hidden />
+          <span>
+            By continuing you agree to our{" "}
+            <Link
+              href="/terms"
+              className="rounded-sm underline underline-offset-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              terms and conditions
+            </Link>
+            .
+          </span>
+        </p>
       </div>
     </form>
   );

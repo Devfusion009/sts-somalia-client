@@ -1,3 +1,4 @@
+import { RedisService } from "../../../infra/redis/redis.service";
 import { Injectable } from "@nestjs/common";
 import type { Database } from "@sts/shared-types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -8,9 +9,9 @@ import { dbException, throwIfDbError } from "../../../common/errors/db-error";
 export const IMAGES_BUCKET = "umrah-images";
 
 const CARD_SELECT =
-  "id, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats, offline_seats, sales_close_days, status), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
+  "id, package_type, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats, offline_seats, sales_close_days, status), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
 
-const DETAIL_SELECT = `id, slug, name, description, tagline, tier, is_featured, origin_iata, destination_iata,
+const DETAIL_SELECT = `id, package_type, slug, name, description, tagline, tier, is_featured, origin_iata, destination_iata,
   duration_days, includes, images, base_price, original_price, currency, status,
   meal_plan, meals_note, contact_person_name, contact_person_phone, contact_person_email, contact_whatsapp,
   umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, offline_seats, price_override, sales_close_days, status,
@@ -30,7 +31,7 @@ type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-exp
 /** umrah_packages and the tables that hang off a package (departures, hotels, days, rate card, agencies). */
 @Injectable()
 export class PackageRepository {
-  constructor(private readonly rls: RlsSupabaseService) {}
+  constructor(private readonly rls: RlsSupabaseService, private readonly cache: RedisService) {}
 
   /** Typed reads: row shapes flow from the generated schema to the API's callers. */
   private db(): SupabaseClient<Database> {
@@ -105,13 +106,16 @@ export class PackageRepository {
   }
 
   async insertPackage(row: Row) {
-    const { error } = await this.write().from("umrah_packages").insert(row);
+    const { data, error } = await this.write().from("umrah_packages").insert(row).select("id").single();
     throwIfDbError(error, "The package could not be saved.");
+    await this.cache.invalidate("umrah-packages");
+    return data!.id as string;
   }
 
   async updatePackage(id: string, row: Row) {
     const { error } = await this.write().from("umrah_packages").update(row).eq("id", id);
     throwIfDbError(error, "The package could not be saved.");
+    await this.cache.invalidate("umrah-packages");
   }
 
   async findImages(packageId: string): Promise<unknown | undefined> {
@@ -123,6 +127,7 @@ export class PackageRepository {
   async setImages(packageId: string, images: string[]) {
     const { error } = await this.write().from("umrah_packages").update({ images }).eq("id", packageId);
     throwIfDbError(error, "The gallery could not be saved.");
+    await this.cache.invalidate("umrah-packages");
   }
 
   async signImageUpload(path: string) {

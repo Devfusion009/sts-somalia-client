@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/table";
 import { getHotelsAdmin, getHotelPartnersForSelect } from "@/modules/admin/queries";
 import { HotelForm } from "./hotel-form";
-import { OnboardPartnerDialog } from "./onboard-partner-dialog";
 import { cn } from "@/lib/utils";
 import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
@@ -63,12 +62,7 @@ export default async function AdminHotelsPage({
             {total.toLocaleString("en-US")}
           </Badge>
         }
-        actions={
-          <>
-            <OnboardPartnerDialog />
-            <HotelForm partners={partners} />
-          </>
-        }
+        actions={<HotelForm partners={partners} />}
       />
 
       <form action="/admin/hotels" role="search" className="flex flex-wrap items-center gap-2">

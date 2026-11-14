@@ -89,7 +89,7 @@ function StageButton({ action, applicationId, run }: { action: VisaAction; appli
   );
 }
 
-function CancelCase({ applicationId }: { applicationId: string }) {
+function CancelCase({ applicationId, refundNote }: { applicationId: string; refundNote: string }) {
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(adminCancelCase, null);
   const [lastState, setLastState] = useState(state);
@@ -111,6 +111,7 @@ function CancelCase({ applicationId }: { applicationId: string }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel this case?</AlertDialogTitle>
           </AlertDialogHeader>
+          <p className="rounded-lg bg-secondary/60 px-3 py-2 text-sm font-medium">{refundNote}</p>
           <Field>
             <FieldLabel htmlFor="cancel-reason">Reason</FieldLabel>
             <Textarea id="cancel-reason" name="reason" rows={3} minLength={5} required />
@@ -133,7 +134,16 @@ function CancelCase({ applicationId }: { applicationId: string }) {
 }
 
 /** Stage-derived actions — the only way a case moves outside decisions and lodgement. */
-export function CaseActions({ applicationId, actions }: { applicationId: string; actions: VisaAction[] }) {
+export function CaseActions({
+  applicationId,
+  actions,
+  refundNote,
+}: {
+  applicationId: string;
+  actions: VisaAction[];
+  /** What cancelling refunds: full before filing, nothing after. */
+  refundNote: string;
+}) {
   if (actions.length === 0) return null;
 
   return (
@@ -158,7 +168,7 @@ export function CaseActions({ applicationId, actions }: { applicationId: string;
           case "cancel":
             return (
               <span key={action.key} className="ml-auto">
-                <CancelCase applicationId={applicationId} />
+                <CancelCase applicationId={applicationId} refundNote={refundNote} />
               </span>
             );
           default:

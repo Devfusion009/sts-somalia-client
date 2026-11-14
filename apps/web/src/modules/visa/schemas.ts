@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { RELATIONSHIPS } from "@sts/shared-types";
+import { COUNTRY_NAMES } from "@/lib/countries";
 
 /**
  * Wizard step payloads. traveler_details / contact_details / travel_details
@@ -33,7 +34,7 @@ const unexpiredDate = (message: string) =>
 /**
  * Only what the passport, the consulate contact chain, and payment actually
  * need. Anything a specific destination additionally requires goes through
- * visa_types.application_questions (per-country, admin-configured) instead
+ * visa_types.application_sections (per-country, admin-configured) instead
  * of being asked of every applicant regardless of destination.
  */
 export const personalInfoSchema = z.object({
@@ -44,7 +45,13 @@ export const personalInfoSchema = z.object({
   passportNumber: z.string().min(3, "Enter the passport number."),
   passportExpiry: unexpiredDate("Enter the passport expiry date."),
   email: z.string().email("Enter a valid email address."),
-  mobile: z.string().min(7, "Enter a valid mobile number."),
+  mobile: z.string().trim().regex(
+    /^\+[1-9][0-9]{0,3} ?[0-9]{6,14}$/,
+    "Enter a valid mobile number using digits only.",
+  ).refine((value) => {
+    const digits = value.replace(/\D/g, "");
+    return digits.length >= 8 && digits.length <= 15;
+  }, "Mobile number must contain 8–15 digits including the country code."),
 });
 export type PersonalInfo = z.infer<typeof personalInfoSchema>;
 
@@ -116,31 +123,245 @@ export function applicationDocumentSlots(app: {
   return parseDocumentSlots(app.resolved_documents ?? app.visa_type?.required_documents);
 }
 
-/** One country-specific extra question from visa_types.application_questions. */
-export type ApplicationQuestion = {
-  key: string;
-  label: string;
-  type: "text" | "yesno" | "select";
-  options?: string[];
-  required: boolean;
+/* ------------------------------------------------------------------------- */
+/* Admin-defined requirement sections (visa_types.application_sections)       */
+/* ------------------------------------------------------------------------- */
+
+export const REQUIREMENT_FIELD_TYPES = [
+  "short_text",
+  "long_text",
+  "number",
+  "date",
+  "country",
+  "phone",
+  "email",
+  "yes_no",
+  "dropdown",
+  "multi_choice",
+  "file",
+] as const;
+export type RequirementFieldType = (typeof REQUIREMENT_FIELD_TYPES)[number];
+
+export const REQUIREMENT_FIELD_TYPE_LABELS: Record<RequirementFieldType, string> = {
+  short_text: "Short text",
+  long_text: "Long text",
+  number: "Number",
+  date: "Date",
+  country: "Country",
+  phone: "Phone",
+  email: "Email",
+  yes_no: "Yes / No",
+  dropdown: "Dropdown",
+  multi_choice: "Multiple choice",
+  file: "File upload",
 };
 
-export function parseApplicationQuestions(raw: unknown): ApplicationQuestion[] {
+/** Field types whose answer must be one of the admin's options. */
+export const CHOICE_FIELD_TYPES: readonly RequirementFieldType[] = ["dropdown", "multi_choice"];
+
+export type RequirementField = {
+  key: string;
+  label: string;
+  type: RequirementFieldType;
+  required: boolean;
+  options?: string[];
+};
+
+export type RequirementScope = "application" | "traveller";
+
+export type RequirementSection = {
+  key: string;
+  title: string;
+  scope: RequirementScope;
+  fields: RequirementField[];
+};
+
+/** A section's answers: one value per field key; multi-choice is a list. */
+export type SectionAnswers = Record<string, string | string[]>;
+/** All answers for one owner (the application or one traveller), by section key. */
+export type RequirementAnswers = Record<string, SectionAnswers>;
+
+const KEY_PATTERN = /^[a-z0-9_]+$/;
+
+export function parseRequirementSections(raw: unknown): RequirementSection[] {
   if (!Array.isArray(raw)) return [];
-  return raw.flatMap((entry): ApplicationQuestion[] => {
-    if (!entry || typeof entry !== "object" || !("key" in entry) || !("label" in entry)) return [];
-    const q = entry as Record<string, unknown>;
-    const type = q.type === "yesno" || q.type === "select" ? q.type : "text";
+  return raw.flatMap((entry): RequirementSection[] => {
+    if (!entry || typeof entry !== "object") return [];
+    const s = entry as Record<string, unknown>;
+    const key = typeof s.key === "string" ? s.key : "";
+    if (!KEY_PATTERN.test(key)) return [];
+    const fields = (Array.isArray(s.fields) ? s.fields : []).flatMap((f): RequirementField[] => {
+      if (!f || typeof f !== "object") return [];
+      const field = f as Record<string, unknown>;
+      const fieldKey = typeof field.key === "string" ? field.key : "";
+      const type = REQUIREMENT_FIELD_TYPES.find((t) => t === field.type);
+      if (!KEY_PATTERN.test(fieldKey) || !type) return [];
+      const options = Array.isArray(field.options) ? field.options.map(String).filter(Boolean) : undefined;
+      if (CHOICE_FIELD_TYPES.includes(type) && !options?.length) return [];
+      return [
+        {
+          key: fieldKey,
+          label: typeof field.label === "string" && field.label.trim() ? field.label : fieldKey.replace(/_/g, " "),
+          type,
+          required: field.required !== false,
+          ...(CHOICE_FIELD_TYPES.includes(type) ? { options } : {}),
+        },
+      ];
+    });
+    if (fields.length === 0) return [];
     return [
       {
-        key: String(q.key),
-        label: String(q.label),
-        type,
-        options: Array.isArray(q.options) ? q.options.map(String) : undefined,
-        required: q.required !== false,
+        key,
+        title: typeof s.title === "string" && s.title.trim() ? s.title : key.replace(/_/g, " "),
+        scope: s.scope === "traveller" ? "traveller" : "application",
+        fields,
       },
     ];
   });
+}
+
+/** Reads a jsonb answers blob ({ section: { field: value } }), dropping anything malformed. */
+export function parseRequirementAnswers(raw: unknown): RequirementAnswers {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: RequirementAnswers = {};
+  for (const [section, values] of Object.entries(raw as Record<string, unknown>)) {
+    if (!values || typeof values !== "object" || Array.isArray(values)) continue;
+    const answers: SectionAnswers = {};
+    for (const [field, value] of Object.entries(values as Record<string, unknown>)) {
+      if (typeof value === "string") answers[field] = value;
+      else if (Array.isArray(value)) answers[field] = value.map(String);
+    }
+    out[section] = answers;
+  }
+  return out;
+}
+
+/** Traveller-scope answers live in visa_members.details.answers. */
+export function memberRequirementAnswers(details: unknown): RequirementAnswers {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return {};
+  return parseRequirementAnswers((details as Record<string, unknown>).answers);
+}
+
+/** visa_documents.document_type for a section file field. */
+export function sectionFileKey(sectionKey: string, fieldKey: string) {
+  return `${sectionKey}.${fieldKey}`;
+}
+
+/** Form input name for a non-file field; memberId only for traveller scope. */
+export function sectionInputName(sectionKey: string, fieldKey: string, memberId?: string) {
+  return memberId ? `s.${sectionKey}.${memberId}.${fieldKey}` : `s.${sectionKey}.${fieldKey}`;
+}
+
+/** Human-readable answer for review screens. */
+export function formatRequirementAnswer(field: RequirementField, value: string | string[] | undefined): string {
+  if (value === undefined) return "";
+  if (Array.isArray(value)) return value.join(", ");
+  if (field.type === "yes_no") return value === "yes" ? "Yes" : value === "no" ? "No" : value;
+  if (field.type === "country") return COUNTRY_NAMES[value.toUpperCase()] ?? value;
+  return value;
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function isEmpty(value: string | string[] | undefined) {
+  return value === undefined || (Array.isArray(value) ? value.length === 0 : value.trim() === "");
+}
+
+/**
+ * Checks one owner's answers for a section. Returns the first problem as a
+ * short message, or null. File fields are checked against uploads separately.
+ */
+export function sectionAnswerError(
+  section: RequirementSection,
+  answers: SectionAnswers | undefined,
+  owner?: string
+): string | null {
+  const suffix = owner ? ` (${owner})` : "";
+  for (const field of section.fields) {
+    if (field.type === "file") continue;
+    const value = answers?.[field.key];
+    if (isEmpty(value)) {
+      if (field.required) return `${section.title}: ${field.label} is required${suffix}.`;
+      continue;
+    }
+    const text = Array.isArray(value) ? "" : (value ?? "").trim();
+    const invalid = `${section.title}: ${field.label} is not valid${suffix}.`;
+    switch (field.type) {
+      case "email":
+        if (!EMAIL_PATTERN.test(text)) return invalid;
+        break;
+      case "number":
+        if (!Number.isFinite(Number(text))) return invalid;
+        break;
+      case "date":
+        if (!DATE_PATTERN.test(text)) return invalid;
+        break;
+      case "country":
+        if (!COUNTRY_NAMES[text.toUpperCase()]) return invalid;
+        break;
+      case "phone":
+        if (!/^\+?[0-9 ()-]{6,20}$/.test(text)) return invalid;
+        break;
+      case "yes_no":
+        if (text !== "yes" && text !== "no") return invalid;
+        break;
+      case "dropdown":
+        if (!field.options?.includes(text)) return invalid;
+        break;
+      case "multi_choice": {
+        const list = Array.isArray(value) ? value : [text];
+        if (list.some((v) => !field.options?.includes(v))) return invalid;
+        break;
+      }
+      default:
+        if (text.length > 2000) return invalid;
+    }
+  }
+  return null;
+}
+
+/** One upload a section file field asks for: per application, or per traveller. */
+export type SectionFileSlot = {
+  documentType: string;
+  sectionTitle: string;
+  label: string;
+  required: boolean;
+  memberId: string | null;
+  memberName: string | null;
+};
+
+export function sectionFileSlots(
+  sections: RequirementSection[],
+  members: { id: string; full_name: string }[]
+): SectionFileSlot[] {
+  return sections.flatMap((section) =>
+    section.fields
+      .filter((f) => f.type === "file")
+      .flatMap((field): SectionFileSlot[] => {
+        const base = {
+          documentType: sectionFileKey(section.key, field.key),
+          sectionTitle: section.title,
+          label: field.label,
+          required: field.required,
+        };
+        return section.scope === "traveller"
+          ? members.map((m) => ({ ...base, memberId: m.id, memberName: m.full_name }))
+          : [{ ...base, memberId: null, memberName: null }];
+      })
+  );
+}
+
+/** Label for a stored document_type that belongs to a section file field, or null. */
+export function sectionFileLabel(sections: RequirementSection[], documentType: string): string | null {
+  for (const section of sections) {
+    for (const field of section.fields) {
+      if (field.type === "file" && sectionFileKey(section.key, field.key) === documentType) {
+        return `${section.title}: ${field.label}`;
+      }
+    }
+  }
+  return null;
 }
 
 /** Customer-facing labels for application statuses (badges, timeline). */

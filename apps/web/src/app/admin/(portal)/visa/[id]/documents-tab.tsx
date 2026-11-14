@@ -62,6 +62,8 @@ function SlotRow({ slot, applicationId, reviewable }: { slot: Slot; applicationI
               documentId={current.id}
               applicationId={applicationId}
               reviewStatus={current.review_status}
+              label={slot.label}
+              checklist={slot.checklist}
             />
           ) : null}
         </div>

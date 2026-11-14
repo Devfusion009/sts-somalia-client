@@ -23,12 +23,18 @@ export function agentNotificationHref(n: NotificationLike): string | null {
   if (n.type === "partner_onboarding_reminder") return "/agent";
   // The agent portal has no per-application visa view yet (that arrives with
   // the desk in M7), so this lands on the filtered agency bookings list.
-  if (n.type === "visa_status_changed") return "/agent/bookings?type=visa";
+  if (n.type === "visa_status_changed" || n.type === "visa_documents_reminder" || n.type === "visa_auto_cancelled" || n.type === "visa_refusal_credit") {
+    return "/agent/bookings?type=visa";
+  }
   // Every umrah_* notification (stage, cancellation, quote, documents,
   // reminders, travel changes) carries the order it belongs to.
   if (n.type.startsWith("umrah_")) {
     const data = n.data as { orderId?: string } | null;
     return data?.orderId ? `/agent/bookings/${data.orderId}` : "/agent/bookings?type=umrah";
+  }
+  if (n.type === "flight_booked" || n.type === "flight_ticketed" || n.type === "flight_booking_delayed") {
+    const orderId = (n.data as { order_id?: string } | null)?.order_id;
+    return orderId ? `/agent/bookings/${orderId}` : "/agent/bookings";
   }
   if (n.type === "wallet_booking_payment") {
     const data = n.data as { orderId?: string } | null;
@@ -50,6 +56,9 @@ export function customerNotificationHref(n: NotificationLike): string | null {
     n.type === "booking_confirmed" ||
     n.type === "booking_declined" ||
     n.type === "order_paid" ||
+    n.type === "flight_booked" ||
+    n.type === "flight_ticketed" ||
+    n.type === "flight_booking_delayed" ||
     n.type.startsWith("booking_request_")
   ) {
     const orderId = (n.data as { order_id?: string } | null)?.order_id;
@@ -61,7 +70,7 @@ export function customerNotificationHref(n: NotificationLike): string | null {
     const orderId = (n.data as { orderId?: string } | null)?.orderId;
     return orderId ? `/account/bookings/${orderId}` : "/account/bookings";
   }
-  if (n.type === "visa_status_changed") {
+  if (n.type === "visa_status_changed" || n.type === "visa_documents_reminder" || n.type === "visa_auto_cancelled" || n.type === "visa_refusal_credit") {
     const applicationId = (n.data as { applicationId?: string } | null)?.applicationId;
     return applicationId ? `/account/visa/${applicationId}` : "/account/visa";
   }
@@ -70,7 +79,8 @@ export function customerNotificationHref(n: NotificationLike): string | null {
 
 export function adminNotificationHref(n: NotificationLike): string | null {
   if (n.type === "new_order") return newOrderHref(n) ?? "/admin/orders";
-  if (n.type === "flight_quote_request") return "/admin/flights";
+  if (n.type === "flight_ticketing_failed") return "/admin/flights?view=attention";
+  if (n.type === "private_umrah_request") return "/admin/umrah/requests?status=pending";
   if (n.type === "payout_request") return "/admin/finance/withdrawals?status=pending";
   if (n.type === "visa_application_submitted" || n.type === "visa_status_changed" || n.type === "visa_case_attention") {
     const applicationId = (n.data as { applicationId?: string } | null)?.applicationId;

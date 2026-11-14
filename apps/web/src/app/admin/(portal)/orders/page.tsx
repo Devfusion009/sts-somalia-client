@@ -308,12 +308,12 @@ export default async function AdminOrdersPage({
                               variant={statusBadgeVariant(payment.status, PAYMENT_STATUS_VARIANT)}
                               className="capitalize"
                             >
-                              {payment.status.replace(/_/g, " ")}
+                              {payment.provider === "manual" && payment.status === "requires_action" ? "Pending payment approval" : payment.status.replace(/_/g, " ")}
                             </Badge>
                             <span className="text-muted-foreground tabular-nums">
                               {formatDistanceToNowStrict(new Date(payment.created_at))} ago
                             </span>
-                            {payment.status === "requires_action" ? (
+                            {payment.provider === "manual" && payment.status === "requires_action" && ["pending_payment", "held", "partially_paid"].includes(order.status) ? (
                               <ConfirmPaymentButton paymentId={payment.id} />
                             ) : null}
                           </div>

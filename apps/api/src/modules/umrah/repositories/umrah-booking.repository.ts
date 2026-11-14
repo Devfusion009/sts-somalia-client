@@ -67,8 +67,8 @@ export class UmrahBookingRepository {
     return { id: data?.id ?? null, error };
   }
 
-  async findPrice(bookingId: string): Promise<{ id: string; total_price: number; currency: string } | null> {
-    const { data } = await this.db().from("umrah_bookings").select("id, total_price, currency").eq("id", bookingId).single();
+  async findPrice(bookingId: string): Promise<{ id: string; total_price: number; currency: string; booking_kind: string } | null> {
+    const { data } = await this.db().from("umrah_bookings").select("id, total_price, currency, booking_kind").eq("id", bookingId).single();
     return data;
   }
 
@@ -407,7 +407,7 @@ export class UmrahBookingRepository {
          package:package_id(duration_days, contact_person_name, contact_person_phone, contact_person_email, contact_whatsapp),
          departure:departure_id(departure_date, return_date, outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at,
            return_airline, return_flight_number, return_departs_at, return_arrives_at),
-         custom_request:custom_request_id(departure_date, nights_makkah, nights_madinah)`
+         custom_request:custom_request_id(departure_date, nights_makkah, nights_madinah, package_snapshot)`
       )
       .eq("id", bookingId)
       .maybeSingle();

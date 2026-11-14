@@ -9,7 +9,12 @@ import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { money as formatMoney } from "@/lib/money";
 import { countryName } from "@/lib/countries";
 import { cn } from "@/lib/utils";
-import { parseApplicationQuestions } from "@/modules/visa/schemas";
+import {
+  formatRequirementAnswer,
+  memberRequirementAnswers,
+  parseRequirementAnswers,
+  parseRequirementSections,
+} from "@/modules/visa/schemas";
 import { PAYMENT_STATE_LABELS, type VisaAction } from "@/modules/visa/workflow";
 import type { VisaCase } from "@/modules/visa/case-queries";
 import { CaseActions } from "./case-actions";
@@ -36,13 +41,19 @@ function NoActivity() {
 export function OverviewTab({ data, actions }: { data: VisaCase; actions: VisaAction[] }) {
   const recent = data.events.filter((e) => e.event_type !== "document.accessed").slice(0, 6);
   const applies = data.readiness.filter((r) => r.applies);
+  const refundNote =
+    data.jobs.length > 0
+      ? "Filed with the authority · no refund"
+      : data.order && data.order.paid > 0
+        ? `Full refund · ${formatMoney(data.order.paid, data.order.currency)}`
+        : "Nothing paid · no refund";
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
         <CardContent className="space-y-5">
           <SectionHeading>Next step</SectionHeading>
-          {actions.length > 0 ? <CaseActions applicationId={data.application.id} actions={actions} /> : null}
+          {actions.length > 0 ? <CaseActions applicationId={data.application.id} actions={actions} refundNote={refundNote} /> : null}
           {applies.length > 0 ? (
             <ul className="divide-y divide-border">
               {applies.map((item) => (
@@ -106,9 +117,11 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
     const value = str(v)?.replace(/_/g, " ");
     return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
   };
-  const questions = parseApplicationQuestions(app.visa_type?.application_questions);
-  const answers = (app.custom_answers ?? {}) as Record<string, string>;
-  const answered = questions.filter((q) => answers[q.key]);
+  const appAnswers = parseRequirementAnswers(app.custom_answers);
+  const sections = parseRequirementSections(app.visa_type?.application_sections)
+    .map((section) => ({ ...section, fields: section.fields.filter((f) => f.type !== "file") }))
+    .filter((section) => section.fields.length > 0);
+  const multipleTravellers = data.application.members.length > 1;
 
   return (
     <div className="space-y-6">
@@ -184,14 +197,26 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
         </section>
       ) : null}
 
-      {answered.length > 0 ? (
-        <Card>
+      {sections.map((section) => (
+        <Card key={section.key}>
           <CardContent className="space-y-4">
-            <SectionHeading>Additional answers</SectionHeading>
-            <DetailGrid rows={answered.map((q) => [q.label, answers[q.key]])} />
+            <SectionHeading>{section.title}</SectionHeading>
+            {section.scope === "application" ? (
+              <DetailGrid rows={section.fields.map((f) => [f.label, formatRequirementAnswer(f, appAnswers[section.key]?.[f.key]) || undefined])} />
+            ) : (
+              data.application.members.map((member) => {
+                const answers = memberRequirementAnswers(member.details)[section.key];
+                return (
+                  <div key={member.id} className="space-y-2">
+                    {multipleTravellers ? <p className="text-sm font-semibold">{member.full_name}</p> : null}
+                    <DetailGrid rows={section.fields.map((f) => [f.label, formatRequirementAnswer(f, answers?.[f.key]) || undefined])} />
+                  </div>
+                );
+              })
+            )}
           </CardContent>
         </Card>
-      ) : null}
+      ))}
     </div>
   );
 }

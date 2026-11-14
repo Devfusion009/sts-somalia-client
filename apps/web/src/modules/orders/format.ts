@@ -32,6 +32,8 @@ export type DescribableOrderItem = {
     origin_iata: string;
     destination_iata: string;
     depart_at: string;
+    provider_booking_ref?: string | null;
+    ticketing_status?: string | null;
   } | null;
   umrah_booking: {
     booking_kind: string;
@@ -57,6 +59,16 @@ export function hotelGuestNames(guestDetails: unknown): string[] {
     .map((g) => (g && typeof g === "object" && "full_name" in g ? String((g as { full_name: unknown }).full_name) : null))
     .filter((name): name is string => Boolean(name && name.trim()));
 }
+
+const FLIGHT_STAGE: Record<string, string> = {
+  awaiting_payment: "Fare held",
+  queued: "Booking with airline",
+  booking: "Booking with airline",
+  booked: "Ticket issuing",
+  ticketed: "E-ticket issued",
+  failed: "Being finalised",
+  expired: "Fare expired",
+};
 
 /** Human title/subtitle + post-payment destination for one order item. */
 export function describeOrderItem(item: DescribableOrderItem): {
@@ -121,8 +133,15 @@ export function describeOrderItem(item: DescribableOrderItem): {
         title: booking
           ? `Flight ${booking.origin_iata} → ${booking.destination_iata}`
           : "Flight booking",
-        // Quoted fares carry a date, not a departure time; the e-ticket has the times.
-        subtitle: booking ? format(new Date(booking.depart_at), "d MMM yyyy") : "",
+        subtitle: booking
+          ? [
+              format(new Date(booking.depart_at), "d MMM yyyy"),
+              booking.provider_booking_ref ? `PNR ${booking.provider_booking_ref}` : null,
+              booking.ticketing_status ? FLIGHT_STAGE[booking.ticketing_status] : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : "",
         href: "/account/bookings",
       };
     }

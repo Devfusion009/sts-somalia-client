@@ -1,202 +1,160 @@
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Inbox } from "lucide-react";
+import { Plane } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/auth/session";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { PageHeader } from "@/components/ui/page-header";
 import { FilterChips } from "@/components/dashboard/filter-chips";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { money } from "@/lib/money";
-import { getFlightQuoteRequests, type FlightQuoteRequest } from "@/modules/flights/admin-quotes";
-import { FlightQuoteForm, FlightTicketForm } from "./quote-actions";
+import { RetryTicketingForm } from "./retry-form";
 
-export const metadata = { title: "Flight Requests" };
+export const metadata = { title: "Flight bookings" };
 
-const CABIN: Record<string, string> = {
-  economy: "Economy",
-  premium_economy: "Premium economy",
-  business: "Business",
-  first: "First",
+const STATUS: Record<string, { label: string; variant: "neutral" | "info" | "success" | "destructive" }> = {
+  awaiting_payment: { label: "Awaiting payment", variant: "neutral" },
+  queued: { label: "Booking", variant: "info" },
+  booking: { label: "Booking", variant: "info" },
+  booked: { label: "Booked · ticket pending", variant: "info" },
+  ticketed: { label: "Ticketed", variant: "success" },
+  failed: { label: "Needs attention", variant: "destructive" },
+  expired: { label: "Fare expired", variant: "neutral" },
 };
+
+const FILTERS = [
+  { key: "all", label: "All", statuses: null },
+  { key: "attention", label: "Needs attention", statuses: ["failed"] },
+  { key: "pending", label: "In progress", statuses: ["queued", "booking", "booked"] },
+  { key: "ticketed", label: "Ticketed", statuses: ["ticketed"] },
+  { key: "unpaid", label: "Awaiting payment", statuses: ["awaiting_payment"] },
+] as const;
 
 function day(value: string | null) {
   if (!value) return null;
   return new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
-type Stage = "new" | "quoted" | "paid" | "ticketed" | "closed";
-
-function stageOf(r: FlightQuoteRequest): Stage {
-  if (r.status === "confirmed" || r.status === "completed") return "ticketed";
-  if (r.status !== "pending") return "closed";
-  if (!r.order) return "new";
-  return ["paid", "processing", "completed"].includes(r.order.status) ? "paid" : "quoted";
-}
-
-const STAGE_LABEL: Record<Stage, string> = {
-  new: "New request",
-  quoted: "Quoted",
-  paid: "Paid · ticket due",
-  ticketed: "Ticketed",
-  closed: "Closed",
-};
-
-const FILTERS: { key: string; label: string; stages: Stage[] | null }[] = [
-  { key: "open", label: "Open", stages: ["new", "quoted", "paid"] },
-  { key: "new", label: "New", stages: ["new"] },
-  { key: "quoted", label: "Awaiting payment", stages: ["quoted"] },
-  { key: "paid", label: "Ticket due", stages: ["paid"] },
-  { key: "all", label: "All", stages: null },
-];
-
-export default async function AdminFlightRequestsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ view?: string }>;
-}) {
+export default async function AdminFlightBookingsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   await requirePlatformAdmin();
   const { view } = await searchParams;
-  const requests = await getFlightQuoteRequests();
-  const withStage = requests.map((r) => ({ ...r, stage: stageOf(r) }));
+  const { data } = await createAdminClient()
+    .from("flight_bookings")
+    .select(
+      "id, origin_iata, destination_iata, depart_at, return_at, total_price, currency, ticketing_status, ticketing_error, provider_booking_ref, provider_order_id, ticket_numbers, created_at, agency:agency_id(name), customer:customer_id(full_name, email), passengers:flight_passengers(full_name), order_items(order:orders(id, order_number))"
+    )
+    .not("ticketing_status", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  const bookings = data ?? [];
+
   const filter = FILTERS.find((f) => f.key === view) ?? FILTERS[0];
-  const shown = filter.stages ? withStage.filter((r) => filter.stages!.includes(r.stage)) : withStage;
-  const waiting = withStage.filter((r) => r.stage === "new" || r.stage === "paid").length;
+  const shown = filter.statuses ? bookings.filter((b) => (filter.statuses as readonly string[]).includes(b.ticketing_status ?? "")) : bookings;
+  const failed = bookings.filter((b) => b.ticketing_status === "failed").length;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Flight requests"
+        title="Flight bookings"
         status={
-          waiting > 0 ? (
-            <Badge variant="warning" className="tabular-nums">
-              {waiting} waiting
+          failed > 0 ? (
+            <Badge variant="destructive" className="tabular-nums">
+              {failed} need attention
             </Badge>
           ) : null
         }
       />
 
       <FilterChips
-        label="Filter flight requests"
+        label="Filter flight bookings"
         active={filter.key}
         items={FILTERS.map((f) => ({
           key: f.key,
           label: f.label,
-          href: f.key === "open" ? "/admin/flights" : `/admin/flights?view=${f.key}`,
-          count: f.stages ? withStage.filter((r) => f.stages!.includes(r.stage)).length : withStage.length,
+          href: f.key === "all" ? "/admin/flights" : `/admin/flights?view=${f.key}`,
+          count: f.statuses ? bookings.filter((b) => (f.statuses as readonly string[]).includes(b.ticketing_status ?? "")).length : bookings.length,
         }))}
       />
 
-      {shown.length === 0 ? (
-        <Card>
-          <CardContent>
-            <Empty>
-              <EmptyMedia variant="icon">
-                <Inbox />
-              </EmptyMedia>
-              <EmptyTitle>No flight requests</EmptyTitle>
-            </Empty>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {shown.map((r) => {
-            const customer = Array.isArray(r.customer) ? r.customer[0] : r.customer;
-            const agency = Array.isArray(r.agency) ? r.agency[0] : r.agency;
-            const traveller = Array.isArray(r.agency_customer) ? r.agency_customer[0] : r.agency_customer;
-            const price = Number(r.total_price) > 0 ? Number(r.total_price) : null;
-            const depart = day(r.depart_at);
-            const ret = r.trip_type === "round_trip" ? day(r.return_at) : null;
-            const name = traveller?.full_name ?? customer?.full_name ?? customer?.email ?? "Customer";
-            const phone = r.contactPhone ?? traveller?.phone ?? customer?.phone ?? null;
-
-            return (
-              <Card key={r.id} className="gap-0 overflow-hidden py-0">
-                <CardContent className="space-y-3 p-4 sm:p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0 space-y-1">
-                      <p className="flex flex-wrap items-center gap-2 font-medium">
-                        <span className="font-mono text-sm">
-                          {r.origin_iata} → {r.destination_iata}
-                        </span>
-                        <Badge
-                          variant={r.stage === "new" || r.stage === "paid" ? "warning" : statusBadgeVariant(r.status)}
-                        >
-                          {STAGE_LABEL[r.stage]}
-                        </Badge>
-                        {agency?.name ? <Badge variant="neutral">{agency.name}</Badge> : null}
-                        {r.provider_booking_ref ? (
-                          <span className="font-mono text-xs text-muted-foreground">PNR {r.provider_booking_ref}</span>
-                        ) : null}
-                      </p>
-                      <p className="text-sm text-muted-foreground tabular-nums">
-                        {depart}
-                        {ret ? ` – ${ret}` : " · one way"} · {r.passengers} passenger{r.passengers > 1 ? "s" : ""} ·{" "}
-                        {CABIN[r.cabin_class] ?? r.cabin_class}
+      <Card className="overflow-hidden py-0">
+        {shown.length === 0 ? (
+          <Empty>
+            <EmptyMedia variant="icon">
+              <Plane />
+            </EmptyMedia>
+            <EmptyTitle>No flight bookings</EmptyTitle>
+          </Empty>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Route</TableHead>
+                <TableHead>Passengers</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>PNR · tickets</TableHead>
+                <TableHead numeric>Fare</TableHead>
+                <TableHead numeric>Booked</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {shown.map((b) => {
+                const status = STATUS[b.ticketing_status ?? ""] ?? { label: b.ticketing_status ?? "—", variant: "neutral" as const };
+                const agency = Array.isArray(b.agency) ? b.agency[0] : b.agency;
+                const customer = Array.isArray(b.customer) ? b.customer[0] : b.customer;
+                const item = b.order_items?.[0];
+                const order = item ? (Array.isArray(item.order) ? item.order[0] : item.order) : null;
+                return (
+                  <TableRow key={b.id} className="align-top">
+                    <TableCell>
+                      <p className="font-mono text-sm font-semibold">
+                        {b.origin_iata} → {b.destination_iata}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {name}
-                        {phone ? (
-                          <>
-                            {" · "}
-                            <a href={`tel:${phone.replace(/\s+/g, "")}`} className="hover:text-foreground">
-                              {phone}
-                            </a>
-                          </>
-                        ) : null}
-                        {" · "}
-                        {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
+                        {day(b.depart_at)}
+                        {b.return_at ? ` – ${day(b.return_at)}` : " · one way"}
                       </p>
-                    </div>
-                    <div className="flex flex-col items-start gap-1 sm:items-end">
-                      <p className="font-heading text-xl font-semibold tabular-nums">
-                        {price ? money(price, r.currency) : "—"}
-                      </p>
-                      {r.order ? (
-                        <Link
-                          href={`/admin/orders?order=${r.order.id}`}
-                          className="font-mono text-xs text-muted-foreground hover:text-foreground"
-                        >
-                          {r.order.order_number} · {r.order.status.replace(/_/g, " ")}
+                      {order ? (
+                        <Link href={`/admin/orders?order=${order.id}#order-${order.id}`} className="font-mono text-xs text-primary hover:underline">
+                          {order.order_number}
                         </Link>
                       ) : null}
-                    </div>
-                  </div>
-
-                  {r.notes || r.quote?.airline ? (
-                    <div className="flex flex-wrap gap-2 text-sm">
-                      {r.notes ? (
-                        <p className="rounded-lg bg-secondary/40 px-3 py-2">
-                          <span className="text-xs text-muted-foreground">Traveller · </span>
-                          {r.notes}
-                        </p>
+                    </TableCell>
+                    <TableCell className="max-w-56 text-sm">
+                      <p className="truncate">{(b.passengers ?? []).map((p) => p.full_name).join(", ") || "—"}</p>
+                      <p className="truncate text-xs text-muted-foreground">{agency?.name ?? customer?.full_name ?? customer?.email}</p>
+                    </TableCell>
+                    <TableCell className="max-w-64">
+                      <Badge variant={status.variant}>{status.label}</Badge>
+                      {b.ticketing_status === "failed" ? (
+                        <div className="mt-2 space-y-2">
+                          {b.ticketing_error ? <p className="text-xs break-words text-destructive">{b.ticketing_error}</p> : null}
+                          {!b.provider_order_id ? <RetryTicketingForm bookingId={b.id} /> : null}
+                        </div>
                       ) : null}
-                      {r.quote?.airline ? (
-                        <p className="rounded-lg bg-secondary/40 px-3 py-2">
-                          <span className="text-xs text-muted-foreground">Quoted · </span>
-                          {r.quote.airline}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <p className="font-semibold">{b.provider_booking_ref ?? "—"}</p>
+                      {(b.ticket_numbers ?? []).map((t) => (
+                        <p key={t} className="text-muted-foreground">
+                          {t}
                         </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  {r.stage === "new" || r.stage === "quoted" ? (
-                    <FlightQuoteForm
-                      bookingId={r.id}
-                      currency={r.currency}
-                      price={price}
-                      airline={r.quote?.airline ?? null}
-                      quoted={r.stage === "quoted"}
-                    />
-                  ) : r.stage === "paid" ? (
-                    <FlightTicketForm bookingId={r.id} />
-                  ) : null}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                      ))}
+                    </TableCell>
+                    <TableCell numeric className="whitespace-nowrap tabular-nums">
+                      {money(Number(b.total_price), b.currency)}
+                    </TableCell>
+                    <TableCell numeric className="whitespace-nowrap text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(b.created_at), { addSuffix: true })}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
     </div>
   );
 }

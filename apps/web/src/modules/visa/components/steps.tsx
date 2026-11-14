@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import {
@@ -8,18 +8,25 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  ClipboardList,
+  FileCheck2,
   FileText,
   Pencil,
+  Plane,
   Plus,
+  Receipt,
+  ShieldCheck,
   Trash2,
   User,
   Users,
   UsersRound,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { createUploadQueue } from "@/modules/visa/upload-queue";
 import { CountrySearchSelect } from "@/components/ui/country-select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,8 +70,23 @@ import {
   continueFromDocuments,
   submitVisaApplication,
   type ActionState,
+  type MemberActionState,
 } from "@/modules/visa/actions";
-import { RELATIONSHIPS, parseDocumentSlots, parseApplicationQuestions, todayIso, type DocumentSlot } from "@/modules/visa/schemas";
+import {
+  RELATIONSHIPS,
+  formatRequirementAnswer,
+  memberRequirementAnswers,
+  parseDocumentSlots,
+  parseRequirementAnswers,
+  parseRequirementSections,
+  sectionFileSlots,
+  sectionInputName,
+  todayIso,
+  type DocumentSlot,
+  type RequirementField,
+  type RequirementSection,
+  type SectionAnswers,
+} from "@/modules/visa/schemas";
 import type { WizardApplication } from "@/modules/visa/queries";
 import { FileField } from "@/components/ui/upload";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -118,9 +140,9 @@ function ErrorAlert({ state }: { state: ActionState }) {
   );
 }
 
-function BackButton({ href }: { href: string }) {
+function BackButton({ href, disabled }: { href: string; disabled?: boolean }) {
   return (
-    <Button variant="outline" size="lg" render={<Link href={href} />} className="gap-2">
+    <Button variant="outline" size="lg" disabled={disabled} render={<Link href={href} />} className="gap-2">
       <ArrowLeft className="size-4" aria-hidden /> Back
     </Button>
   );
@@ -218,23 +240,30 @@ const APPLICANT_TYPE_CARDS = [
   },
 ] as const;
 
+type WizardMember = WizardApplication["members"][number];
+
 function MemberDialog({
   applicationId,
   member,
   trigger,
+  onSaved,
 }: {
   applicationId: string;
-  member?: WizardApplication["members"][number];
+  member?: WizardMember;
   trigger: React.ReactNode;
+  onSaved: (member: WizardMember) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(saveVisaMember, null);
-  const lastState = useRef<ActionState>(null);
+  const lastState = useRef<MemberActionState>(null);
 
   useEffect(() => {
-    if (state !== lastState.current && state && state.error === null) setOpen(false);
+    if (state !== lastState.current && state && state.error === null) {
+      onSaved(state.member);
+      setOpen(false);
+    }
     lastState.current = state;
-  }, [state]);
+  }, [state, onSaved]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -306,7 +335,7 @@ function MemberDialog({
             />
           </Field>
           <div className="sm:col-span-2">
-            <ErrorAlert state={state} />
+            <ErrorAlert state={state?.error ? { error: state.error } : null} />
           </div>
           <div className="flex flex-col-reverse gap-2 sm:col-span-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
@@ -333,7 +362,21 @@ export function StepApplicantType({
   const [state, formAction] = useActionState(saveApplicantType, null);
   useWizardNavigate(state);
   const [applicantType, setApplicantType] = useState(application.applicant_type);
-  const members = application.members;
+  // Saved members merge in locally (see saveVisaMember); a fresh server
+  // render (after a removal) replaces the list.
+  const [members, setMembers] = useState(application.members);
+  const [serverMembers, setServerMembers] = useState(application.members);
+  if (serverMembers !== application.members) {
+    setServerMembers(application.members);
+    setMembers(application.members);
+  }
+  const upsertMember = useCallback((saved: WizardMember) => {
+    setMembers((current) =>
+      current.some((m) => m.id === saved.id)
+        ? current.map((m) => (m.id === saved.id ? saved : m))
+        : [...current, saved]
+    );
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -389,6 +432,7 @@ export function StepApplicantType({
             <StepHeading title={applicantType === "family" ? "Family details" : "Group details"} />
             <MemberDialog
               applicationId={application.id}
+              onSaved={upsertMember}
               trigger={
                 <Button className="gap-1.5">
                   <Plus className="size-4" aria-hidden /> Add member
@@ -438,6 +482,7 @@ export function StepApplicantType({
                           <MemberDialog
                             applicationId={application.id}
                             member={member}
+                            onSaved={upsertMember}
                             trigger={
                               <Button variant="ghost" size="icon" aria-label={`Edit ${member.full_name}`}>
                                 <Pencil className="size-4" aria-hidden />
@@ -555,6 +600,7 @@ export function StepPersonalInfo({
             defaultValue={v.mobile ?? c.mobile ?? ""}
             defaultCountry={v.nationality ?? t.nationality ?? "SO"}
             placeholder="61 XXXXXXX"
+            validateNumber
             required
           />
         </Field>
@@ -613,6 +659,136 @@ function YesNo({ name, label, defaultValue }: { name: string; label: string; def
   );
 }
 
+const FULL_WIDTH_FIELD_TYPES: readonly RequirementField["type"][] = ["long_text", "multi_choice"];
+
+/** One admin-defined field. Value precedence: re-filled form values, then saved answers. */
+function RequirementInput({
+  field,
+  name,
+  saved,
+  refill,
+}: {
+  field: RequirementField;
+  name: string;
+  saved: string | string[] | undefined;
+  refill: string | undefined;
+}) {
+  const id = name.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const text = refill ?? (typeof saved === "string" ? saved : "");
+  const wide = FULL_WIDTH_FIELD_TYPES.includes(field.type) ? "@min-[30rem]/visa-form:col-span-2" : undefined;
+
+  switch (field.type) {
+    case "yes_no":
+      return <YesNo name={name} label={field.label} defaultValue={text === "yes" ? "yes" : "no"} />;
+    case "dropdown":
+      return (
+        <Field label={field.label} htmlFor={id} required={field.required}>
+          <LabeledSelect
+            id={id}
+            name={name}
+            required={field.required}
+            defaultValue={text}
+            placeholder="Select an option"
+            options={(field.options ?? []).map((o) => ({ value: o, label: o }))}
+          />
+        </Field>
+      );
+    case "multi_choice": {
+      let selected: string[] = Array.isArray(saved) ? saved : [];
+      if (refill !== undefined) {
+        try {
+          const parsed: unknown = JSON.parse(refill);
+          selected = Array.isArray(parsed) ? parsed.map(String) : [refill];
+        } catch {
+          selected = [refill];
+        }
+      }
+      return (
+        <fieldset className={cn("min-w-0 space-y-2", wide)}>
+          <legend className="text-sm font-medium text-foreground">
+            {field.label}
+            {field.required ? <span className="text-destructive"> *</span> : null}
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {(field.options ?? []).map((option) => (
+              <label
+                key={option}
+                className="flex min-h-12 cursor-pointer items-center gap-2.5 rounded-lg border border-border px-4 text-base transition-colors has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+              >
+                <input type="checkbox" name={name} value={option} defaultChecked={selected.includes(option)} className="size-4 accent-primary" />
+                {option}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      );
+    }
+    case "country":
+      return (
+        <Field label={field.label} htmlFor={id} required={field.required}>
+          <CountrySearchSelect id={id} name={name} required={field.required} defaultValue={text || undefined} placeholder="Search country" />
+        </Field>
+      );
+    case "phone":
+      return (
+        <Field label={field.label} htmlFor={id} required={field.required}>
+          <PhoneInput id={id} name={name} required={field.required} defaultValue={text} />
+        </Field>
+      );
+    case "long_text":
+      return (
+        <Field label={field.label} htmlFor={id} required={field.required} className={wide}>
+          <Textarea id={id} name={name} rows={3} defaultValue={text} required={field.required} maxLength={2000} />
+        </Field>
+      );
+    default: {
+      const inputType = field.type === "number" ? "number" : field.type === "date" ? "date" : field.type === "email" ? "email" : "text";
+      return (
+        <Field label={field.label} htmlFor={id} required={field.required}>
+          <Input
+            id={id}
+            name={name}
+            type={inputType}
+            step={field.type === "number" ? "any" : undefined}
+            defaultValue={text}
+            required={field.required}
+            maxLength={inputType === "text" ? 2000 : undefined}
+          />
+        </Field>
+      );
+    }
+  }
+}
+
+/** An admin-defined section's non-file fields, for the application or one traveller. */
+function RequirementSectionFields({
+  section,
+  title,
+  memberId,
+  answers,
+  values,
+}: {
+  section: RequirementSection;
+  title: string;
+  memberId?: string;
+  answers: SectionAnswers | undefined;
+  values: Record<string, string>;
+}) {
+  return (
+    <div className="space-y-5 border-t border-border pt-5">
+      <h3 className="font-heading text-base font-bold">{title}</h3>
+      <div className="grid grid-cols-1 gap-x-6 gap-y-6 @min-[30rem]/visa-form:grid-cols-2">
+        {section.fields
+          .filter((field) => field.type !== "file")
+          .map((field) => {
+            const name = sectionInputName(section.key, field.key, memberId);
+            return <RequirementInput key={field.key} field={field} name={name} saved={answers?.[field.key]} refill={values[name]} />;
+          })}
+      </div>
+    </div>
+  );
+}
+
 export function StepTravelInfo({
   application,
   destination,
@@ -628,8 +804,10 @@ export function StepTravelInfo({
   const t = (application.travel_details ?? {}) as Record<string, string | boolean | null>;
   const v = state?.values ?? {};
   const str = (key: string) => (typeof t[key] === "string" ? (t[key] as string) : "");
-  const questions = parseApplicationQuestions(application.visa_type?.application_questions);
-  const answers = (application.custom_answers ?? {}) as Record<string, string>;
+  const sections = parseRequirementSections(application.visa_type?.application_sections).filter((section) =>
+    section.fields.some((f) => f.type !== "file")
+  );
+  const appAnswers = parseRequirementAnswers(application.custom_answers);
 
   return (
     <form action={formAction} className="space-y-7">
@@ -667,46 +845,28 @@ export function StepTravelInfo({
         />
       </Field>
 
-      {questions.length > 0 ? (
-        <div className="space-y-5 border-t border-border pt-5">
-          <h3 className="font-heading text-base font-bold">Additional questions for {destination}</h3>
-          <div className="grid grid-cols-1 gap-x-6 gap-y-6 @min-[30rem]/visa-form:grid-cols-2">
-            {questions.map((q) => {
-              const fieldName = `answer_${q.key}`;
-              const existing = v[fieldName] ?? answers[q.key] ?? "";
-              if (q.type === "yesno") {
-                return (
-                  <YesNo
-                    key={q.key}
-                    name={fieldName}
-                    label={q.label}
-                    defaultValue={existing === "yes" ? "yes" : "no"}
-                  />
-                );
-              }
-              if (q.type === "select") {
-                return (
-                  <Field key={q.key} label={q.label} htmlFor={fieldName} required={q.required}>
-                    <LabeledSelect
-                      id={fieldName}
-                      name={fieldName}
-                      required={q.required}
-                      defaultValue={existing}
-                      placeholder="Select an option"
-                      options={(q.options ?? []).map((o) => ({ value: o, label: o }))}
-                    />
-                  </Field>
-                );
-              }
-              return (
-                <Field key={q.key} label={q.label} htmlFor={fieldName} required={q.required}>
-                  <Input id={fieldName} name={fieldName} defaultValue={existing} required={q.required} />
-                </Field>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+      {sections.map((section) =>
+        section.scope === "application" ? (
+          <RequirementSectionFields
+            key={section.key}
+            section={section}
+            title={section.title}
+            answers={appAnswers[section.key]}
+            values={v}
+          />
+        ) : (
+          application.members.map((member) => (
+            <RequirementSectionFields
+              key={`${section.key}-${member.id}`}
+              section={section}
+              title={application.members.length > 1 ? `${section.title} — ${member.full_name}` : section.title}
+              memberId={member.id}
+              answers={memberRequirementAnswers(member.details)[section.key]}
+              values={v}
+            />
+          ))
+        )
+      )}
 
       <ErrorAlert state={state} />
 
@@ -741,15 +901,23 @@ export type VaultOption = {
 function UploadSlot({
   applicationId,
   slot,
+  memberId,
   existing,
   vaultOptions,
+  enqueueUpload,
 }: {
   applicationId: string;
   slot: DocumentSlot;
+  /** Set for a traveller-scope section file field. */
+  memberId?: string;
   existing?: WizardApplication["documents"][number];
   vaultOptions: VaultOption[];
+  enqueueUpload: (data: FormData) => Promise<ActionState>;
 }) {
-  const [state, formAction] = useActionState(uploadVisaDocument, null);
+  const domId = `${slot.key}-${memberId ?? "app"}`.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const [state, setState] = useState<ActionState>(null);
+  const [uploading, setUploading] = useState(false);
+  const submitting = useRef(false);
   const [attachState, attachAction, attaching] = useActionState(attachVaultDocument, null);
 
   // Documents whose saved type matches this slot float to the top; the rest
@@ -801,14 +969,35 @@ function UploadSlot({
           </form>
         </div>
       ) : (
-        <form action={formAction}>
+        <form onSubmit={async (event) => {
+          event.preventDefault();
+          if (submitting.current) return;
+          const form = event.currentTarget;
+          const data = new FormData(form);
+          submitting.current = true;
+          setUploading(true);
+          setState(null);
+          try {
+            setState(await enqueueUpload(data));
+          } catch {
+            setState({ error: "Upload failed. Choose the file again to retry." });
+          } finally {
+            submitting.current = false;
+            setUploading(false);
+            // Restore the picker after failures as well as successful uploads.
+            form.reset();
+          }
+        }}>
           <input type="hidden" name="applicationId" value={applicationId} />
           <input type="hidden" name="slotKey" value={slot.key} />
+          {memberId ? <input type="hidden" name="memberId" value={memberId} /> : null}
           <FileField
             name="file"
             accept=".jpg,.jpeg,.png,.pdf"
             maxBytes={(slot.max_mb ?? 5) * 1024 * 1024}
             autoSubmit
+            uploading={uploading}
+            disabled={uploading}
             label="Drop JPG, PNG or PDF"
           />
           {state?.error ? (
@@ -826,11 +1015,12 @@ function UploadSlot({
         <form action={attachAction} className="flex flex-wrap items-center gap-2 pt-1">
           <input type="hidden" name="applicationId" value={applicationId} />
           <input type="hidden" name="slotKey" value={slot.key} />
-          <label className="sr-only" htmlFor={`vault-${slot.key}`}>
+          {memberId ? <input type="hidden" name="memberId" value={memberId} /> : null}
+          <label className="sr-only" htmlFor={`vault-${domId}`}>
             Use a saved document for {slot.label}
           </label>
           <select
-            id={`vault-${slot.key}`}
+            id={`vault-${domId}`}
             name="documentId"
             defaultValue=""
             required
@@ -871,9 +1061,28 @@ export function StepDocuments({
   desk?: boolean;
 }) {
   const [state, formAction] = useActionState(continueFromDocuments, null);
+  const uploadQueue = useRef(createUploadQueue());
+  const [pendingUploads, setPendingUploads] = useState(0);
+  const pendingUploadsRef = useRef(0);
+  const enqueueUpload = useCallback(async (data: FormData) => {
+    pendingUploadsRef.current += 1;
+    setPendingUploads(pendingUploadsRef.current);
+    try {
+      return await uploadQueue.current(() => new Promise<ActionState>((resolve, reject) => {
+        startTransition(() => {
+          void uploadVisaDocument(null, data).then(resolve, reject);
+        });
+      }));
+    } finally {
+      pendingUploadsRef.current -= 1;
+      setPendingUploads(pendingUploadsRef.current);
+    }
+  }, []);
   useWizardNavigate(state);
   const slots = parseDocumentSlots(application.resolved_documents ?? application.visa_type?.required_documents);
   const byKey = new Map(application.documents.map((d) => [d.document_type, d]));
+  const fileSlots = sectionFileSlots(parseRequirementSections(application.visa_type?.application_sections), application.members);
+  const fileGroups = [...new Set(fileSlots.map((f) => f.sectionTitle))];
 
   return (
     <div className="space-y-7">
@@ -887,17 +1096,47 @@ export function StepDocuments({
             slot={slot}
             existing={byKey.get(slot.key)}
             vaultOptions={vaultOptions}
+            enqueueUpload={enqueueUpload}
           />
         ))}
       </div>
 
+      {fileGroups.map((group) => (
+        <div key={group} className="space-y-5 border-t border-border pt-5">
+          <h3 className="font-heading text-base font-bold">{group}</h3>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
+            {fileSlots
+              .filter((f) => f.sectionTitle === group)
+              .map((f) => (
+                <UploadSlot
+                  key={`${f.documentType}-${f.memberId ?? "app"}`}
+                  applicationId={application.id}
+                  slot={{
+                    key: f.documentType,
+                    label: f.memberName && application.members.length > 1 ? `${f.label} — ${f.memberName}` : f.label,
+                    required: f.required,
+                  }}
+                  memberId={f.memberId ?? undefined}
+                  existing={application.documents.find(
+                    (d) => d.document_type === f.documentType && (f.memberId === null || d.member_id === f.memberId)
+                  )}
+                  vaultOptions={vaultOptions}
+                  enqueueUpload={enqueueUpload}
+                />
+              ))}
+          </div>
+        </div>
+      ))}
+
       <ErrorAlert state={state} />
 
-      <form action={formAction} className={STEP_FOOTER}>
+      <form action={formAction} className={STEP_FOOTER} onSubmit={(event) => {
+        if (pendingUploadsRef.current > 0) event.preventDefault();
+      }}>
         <input type="hidden" name="applicationId" value={application.id} />
         {desk ? <input type="hidden" name="desk" value="1" /> : null}
-        <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=3`} />
-        <SubmitButton size="lg" pendingText="Checking…" className="min-w-36 gap-2 rounded-xl">
+        <BackButton href={`${wizardBasePath(desk)}/${application.id}?step=3`} disabled={pendingUploads > 0} />
+        <SubmitButton size="lg" pendingText="Checking…" disabled={pendingUploads > 0} className="min-w-36 gap-2 rounded-xl">
           Review application <ArrowRight className="size-4" aria-hidden />
         </SubmitButton>
       </form>
@@ -911,52 +1150,105 @@ export function StepDocuments({
 
 function ReviewSection({
   title,
+  icon: Icon,
+  meta,
   editHref,
   children,
 }: {
   title: string;
+  icon: LucideIcon;
+  meta?: string;
   editHref: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl bg-secondary/20">
-      <div className="flex items-center justify-between gap-3 border-b border-border/70 py-2.5 pr-3 pl-4 sm:pl-5">
-        <h3 className="text-sm font-semibold">{title}</h3>
+    <section className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-4 py-3 @min-[30rem]/visa-form:px-5">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="size-4" aria-hidden />
+        </span>
+        <h3 className="min-w-0 flex-1 truncate text-sm font-semibold">
+          {title}
+          {meta ? <span className="ml-2 font-normal text-muted-foreground tabular-nums">{meta}</span> : null}
+        </h3>
         <Button
           variant="ghost"
-          size="icon"
+          size="sm"
+          className="shrink-0 gap-1.5 text-muted-foreground hover:text-foreground"
           aria-label={`Edit ${title.toLowerCase()}`}
-          title="Edit"
           render={<Link href={editHref} />}
         >
-          <Pencil aria-hidden />
+          <Pencil className="size-3.5" aria-hidden /> Edit
         </Button>
       </div>
-      <div className="px-4 py-4 sm:px-5">{children}</div>
+      <div className="px-4 py-5 @min-[30rem]/visa-form:px-5">{children}</div>
     </section>
   );
 }
 
 function ReviewGrid({ rows }: { rows: Array<[string, string]> }) {
   return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+    <dl className="grid grid-cols-1 gap-x-8 gap-y-5 @min-[30rem]/visa-form:grid-cols-2 @min-[48rem]/visa-form:grid-cols-3">
       {rows.map(([label, value]) => (
-        <div key={label}>
-          <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-          <dd className={cn("text-sm break-words tabular-nums", value ? "font-semibold text-foreground" : "text-muted-foreground")}>{value || "—"}</dd>
+        <div key={label} className="min-w-0 space-y-1">
+          <dt className="text-xs text-muted-foreground">{label}</dt>
+          <dd
+            className={cn(
+              "text-sm [overflow-wrap:anywhere] tabular-nums",
+              value ? "font-medium text-foreground" : "text-muted-foreground"
+            )}
+          >
+            {value || "—"}
+          </dd>
         </div>
       ))}
     </dl>
   );
 }
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
+function ReviewDocumentRow({ label, fileName, required }: { label: string; fileName: string | null; required: boolean }) {
+  return (
+    <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+      <span
+        className={cn(
+          "flex size-9 shrink-0 items-center justify-center rounded-lg",
+          fileName ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+        )}
+      >
+        <FileText className="size-4" aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{label}</p>
+        <p className="truncate text-xs text-muted-foreground">{fileName ?? "No file uploaded"}</p>
+      </div>
+      {fileName ? (
+        <Badge variant="success">
+          <CheckCircle2 aria-hidden /> Uploaded
+        </Badge>
+      ) : required ? (
+        <Badge variant="destructive">Missing</Badge>
+      ) : (
+        <Badge variant="neutral">Optional</Badge>
+      )}
+    </li>
+  );
+}
+
 export function StepReview({
   application,
   desk = false,
+  credit = null,
 }: {
   application: WizardApplication;
   /** Agent-desk host — see advanceWizard() in actions.ts. */
   desk?: boolean;
+  /** Re-application credit from a refused visa; offsets the STS fee. */
+  credit?: { amount: number; currency: string } | null;
 }) {
   const [state, formAction] = useActionState(submitVisaApplication, null);
   useWizardNavigate(state);
@@ -965,8 +1257,13 @@ export function StepReview({
   const travel = (application.travel_details ?? {}) as Record<string, string | boolean | null>;
   const slots = parseDocumentSlots(application.resolved_documents ?? application.visa_type?.required_documents);
   const byKey = new Map(application.documents.map((d) => [d.document_type, d]));
-  const questions = parseApplicationQuestions(application.visa_type?.application_questions);
-  const answers = (application.custom_answers ?? {}) as Record<string, string>;
+  const sections = parseRequirementSections(application.visa_type?.application_sections);
+  const appAnswers = parseRequirementAnswers(application.custom_answers);
+  const fileSlots = sectionFileSlots(sections, application.members);
+  const answerRows = (section: RequirementSection, answers: SectionAnswers | undefined): Array<[string, string]> =>
+    section.fields
+      .filter((f) => f.type !== "file")
+      .map((f) => [f.label, formatRequirementAnswer(f, answers?.[f.key])]);
   const termsAndConditions = application.visa_type?.terms_and_conditions;
   const editBase = `${wizardBasePath(desk)}/${application.id}?step=`;
 
@@ -980,14 +1277,35 @@ export function StepReview({
   const travellers = application.applicant_type === "single" ? 1 : Math.max(application.members.length, 1);
   const unitPrice = Number(application.resolved_price ?? application.price ?? application.visa_type?.price ?? 0);
   const unitFee = Number(application.resolved_processing_fee ?? application.visa_type?.processing_fee ?? 0);
-  const total = (unitPrice + unitFee) * travellers;
+  const creditApplied = credit ? Math.min(credit.amount, unitFee * travellers) : 0;
+  const total = (unitPrice + unitFee) * travellers - creditApplied;
   const currency = application.visa_type?.currency ?? application.currency;
+  const perTraveller = travellers > 1 ? ` × ${travellers}` : "";
+
+  const documentRows = [
+    ...slots.map((slot) => ({
+      key: slot.key,
+      label: slot.label,
+      fileName: byKey.get(slot.key)?.file_name ?? null,
+      required: slot.required,
+    })),
+    ...fileSlots.map((f) => ({
+      key: `${f.documentType}-${f.memberId ?? "app"}`,
+      label: f.memberName && application.members.length > 1 ? `${f.label} — ${f.memberName}` : f.label,
+      fileName:
+        application.documents.find(
+          (d) => d.document_type === f.documentType && (f.memberId === null || d.member_id === f.memberId)
+        )?.file_name ?? null,
+      required: f.required,
+    })),
+  ];
+  const uploaded = documentRows.filter((d) => d.fileName).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <StepHeading index={5} title="Review your application" />
 
-      <ReviewSection title="Personal information" editHref={`${editBase}2`}>
+      <ReviewSection title="Personal information" icon={User} editHref={`${editBase}2`}>
         <ReviewGrid
           rows={[
             ["Full name", t.full_name],
@@ -1003,26 +1321,37 @@ export function StepReview({
       </ReviewSection>
 
       {application.applicant_type !== "single" ? (
-        <ReviewSection title={`Members (${application.members.length})`} editHref={`${editBase}1`}>
-          <div className="space-y-2">
+        <ReviewSection
+          title="Travellers"
+          icon={Users}
+          meta={String(application.members.length)}
+          editHref={`${editBase}1`}
+        >
+          <ul className="divide-y divide-border">
             {application.members.map((member) => (
-              <div key={member.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                <span className="font-medium">{member.full_name}</span>
-                <Badge variant="neutral">
-                  {member.is_primary
-                    ? "Primary applicant"
-                    : (RELATIONSHIP_LABELS[member.relationship] ?? member.relationship)}
-                </Badge>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {member.passport_number}
+              <li key={member.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
+                  {initials(member.full_name)}
                 </span>
-              </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{member.full_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {member.is_primary
+                      ? "Primary applicant"
+                      : (RELATIONSHIP_LABELS[member.relationship] ?? member.relationship)}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-xs text-muted-foreground">Passport</p>
+                  <p className="font-mono text-sm tracking-wide">{member.passport_number}</p>
+                </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </ReviewSection>
       ) : null}
 
-      <ReviewSection title="Travel information" editHref={`${editBase}3`}>
+      <ReviewSection title="Travel information" icon={Plane} editHref={`${editBase}3`}>
         <ReviewGrid
           rows={[
             ["Date of arrival", date(travel.arrival_date)],
@@ -1033,67 +1362,118 @@ export function StepReview({
         />
       </ReviewSection>
 
-      {questions.length > 0 ? (
-        <ReviewSection title="Additional questions" editHref={`${editBase}3`}>
-          <ReviewGrid rows={questions.map((q) => [q.label, answers[q.key] ?? ""])} />
-        </ReviewSection>
-      ) : null}
+      {sections
+        .filter((section) => section.fields.some((f) => f.type !== "file"))
+        .map((section) => (
+          <ReviewSection key={section.key} title={section.title} icon={ClipboardList} editHref={`${editBase}3`}>
+            {section.scope === "application" ? (
+              <ReviewGrid rows={answerRows(section, appAnswers[section.key])} />
+            ) : (
+              <div className="divide-y divide-border">
+                {application.members.map((member) => (
+                  <div key={member.id} className="space-y-4 py-5 first:pt-0 last:pb-0">
+                    {application.members.length > 1 ? (
+                      <p className="flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                        <User className="size-3.5" aria-hidden /> {member.full_name}
+                      </p>
+                    ) : null}
+                    <ReviewGrid rows={answerRows(section, memberRequirementAnswers(member.details)[section.key])} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </ReviewSection>
+        ))}
 
-      <ReviewSection title="Documents" editHref={`${editBase}4`}>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {slots.map((slot) => {
-            const doc = byKey.get(slot.key);
-            return (
-              <p key={slot.key} className="flex items-center gap-2 text-sm">
-                {doc ? (
-                  <CheckCircle2 className="size-4 shrink-0 text-primary" aria-label="Provided" />
-                ) : (
-                  <X className="size-4 shrink-0 text-muted-foreground" aria-label="Not provided" />
-                )}
-                <span className="font-medium">{slot.label}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {doc?.file_name ?? (slot.required ? "Missing" : "Not provided")}
-                </span>
-              </p>
-            );
-          })}
-        </div>
+      <ReviewSection
+        title="Documents"
+        icon={FileCheck2}
+        meta={`${uploaded} / ${documentRows.length}`}
+        editHref={`${editBase}4`}
+      >
+        <ul className="divide-y divide-border">
+          {documentRows.map((d) => (
+            <ReviewDocumentRow key={d.key} label={d.label} fileName={d.fileName} required={d.required} />
+          ))}
+        </ul>
       </ReviewSection>
 
-      <div className="flex flex-wrap items-baseline justify-between gap-4 rounded-xl bg-secondary px-5 py-6 sm:px-6">
-        <div>
-          <p className="text-sm font-semibold">Total</p>
-          {travellers > 1 ? (
-            <p className="text-xs text-muted-foreground tabular-nums">
-              {travellers} travellers × {fmtMoney(unitPrice + unitFee, currency)}
-            </p>
-          ) : null}
+      <section className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-4 py-3 @min-[30rem]/visa-form:px-5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Receipt className="size-4" aria-hidden />
+          </span>
+          <h3 className="text-sm font-semibold">Price summary</h3>
         </div>
-        <p className="font-heading text-2xl font-bold text-primary tabular-nums">{fmtMoney(total, currency)}</p>
-      </div>
+        <dl className="space-y-2.5 px-4 py-5 text-sm tabular-nums @min-[30rem]/visa-form:px-5">
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted-foreground">Visa fee{perTraveller}</dt>
+            <dd>{fmtMoney(unitPrice * travellers, currency)}</dd>
+          </div>
+          {unitFee > 0 ? (
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">Processing fee{perTraveller}</dt>
+              <dd>{fmtMoney(unitFee * travellers, currency)}</dd>
+            </div>
+          ) : null}
+          {creditApplied > 0 ? (
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">Re-application credit</dt>
+              <dd className="text-primary">−{fmtMoney(creditApplied, currency)}</dd>
+            </div>
+          ) : null}
+        </dl>
+        <div className="flex items-baseline justify-between gap-4 border-t border-border bg-primary/5 px-4 py-4 @min-[30rem]/visa-form:px-5">
+          <span className="text-sm font-semibold">Total due</span>
+          <span className="font-heading text-2xl font-bold text-primary tabular-nums">{fmtMoney(total, currency)}</span>
+        </div>
+      </section>
 
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="applicationId" value={application.id} />
         {desk ? <input type="hidden" name="desk" value="1" /> : null}
-        {termsAndConditions ? (
-          <div className="space-y-2 rounded-lg border border-border p-4">
-            <p className="text-sm font-semibold">Terms and conditions</p>
-            <div className="max-h-40 overflow-y-auto rounded-md bg-secondary/40 p-3 text-xs whitespace-pre-wrap text-muted-foreground">
-              {termsAndConditions}
-            </div>
-            <label className="flex items-start gap-2.5 text-sm">
-              <input type="checkbox" name="agreeTerms" className="mt-0.5 size-4 accent-primary" required />
-              <span>I agree to the terms and conditions.</span>
+        <section className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-4 py-3 @min-[30rem]/visa-form:px-5">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <ShieldCheck className="size-4" aria-hidden />
+            </span>
+            <h3 className="text-sm font-semibold">Declarations</h3>
+          </div>
+          <div className="divide-y divide-border">
+            {termsAndConditions ? (
+              <div className="space-y-3 px-4 py-4 @min-[30rem]/visa-form:px-5">
+                <div className="max-h-40 overflow-y-auto rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                  {termsAndConditions}
+                </div>
+                <label className="flex cursor-pointer items-start gap-3 text-sm">
+                  <input type="checkbox" name="agreeTerms" className="mt-0.5 size-4 shrink-0 accent-primary" required />
+                  <span>I agree to the terms and conditions.</span>
+                </label>
+              </div>
+            ) : null}
+            <label className="flex cursor-pointer items-start gap-3 px-4 py-4 text-sm transition-colors hover:bg-muted/20 @min-[30rem]/visa-form:px-5">
+              <input type="checkbox" name="confirmAccuracy" className="mt-0.5 size-4 shrink-0 accent-primary" required />
+              <span className="leading-relaxed">
+                I confirm that all the information provided is correct and matches the travel
+                documents. I understand that once submitted, changes may not be possible.
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 px-4 py-4 text-sm transition-colors hover:bg-muted/20 @min-[30rem]/visa-form:px-5">
+              <input type="checkbox" name="authorise" className="mt-0.5 size-4 shrink-0 accent-primary" required />
+              <span className="space-y-1.5 leading-relaxed">
+                <span className="block">
+                  {desk
+                    ? "The applicant authorises Scout Travel Solution to prepare and file this visa application with the issuing authority on their behalf."
+                    : "I authorise Scout Travel Solution to prepare and file this visa application with the issuing authority on my behalf."}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Refunds: in full until STS files the application; none once filed. If the visa is refused,
+                  the STS service fee is credited towards a new application.
+                </span>
+              </span>
             </label>
           </div>
-        ) : null}
-        <label className="flex items-start gap-2.5 rounded-lg border border-border p-4 text-sm">
-          <input type="checkbox" name="confirmAccuracy" className="mt-0.5 size-4 accent-primary" required />
-          <span>
-            I confirm that all the information provided is correct and matches the travel
-            documents. I understand that once submitted, changes may not be possible.
-          </span>
-        </label>
+        </section>
 
         <ErrorAlert state={state} />
 

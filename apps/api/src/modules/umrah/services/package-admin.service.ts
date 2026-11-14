@@ -68,6 +68,9 @@ export class PackageAdminService {
 
   async upsert(input: PackageUpsertInput) {
     const row = {
+      ...(input.originIata !== undefined ? { origin_iata: input.originIata } : {}),
+      ...(input.destinationIata !== undefined ? { destination_iata: input.destinationIata } : {}),
+      ...(input.packageType ? { package_type: input.packageType } : {}),
       name: input.name,
       description: input.description || null,
       duration_days: input.durationDays,
@@ -77,8 +80,11 @@ export class PackageAdminService {
       currency: input.currency.toUpperCase(),
       status: input.status,
     };
-    if (input.id) await this.packages.updatePackage(input.id, row);
-    else await this.packages.insertPackage({ ...row, slug: slugify(input.name) });
+    if (input.id) {
+      await this.packages.updatePackage(input.id, row);
+      return { id: input.id };
+    }
+    return { id: await this.packages.insertPackage({ ...row, slug: slugify(input.name) }) };
   }
 
   async updateDetails(d: PackageDetailsInput) {

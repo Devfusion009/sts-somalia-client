@@ -8,11 +8,11 @@ function load(relative,mocks={}){
 }
 const navigation=load('apps/web/src/app/admin/(portal)/navigation.ts');
 const {filterNavigationGroups}=load('apps/web/src/components/portal/navigation-search.ts');
-const expected=['/admin','/admin/queue','/admin/calendar','/admin/orders','/admin/umrah/requests','/admin/umrah/bookings','/admin/umrah/departures','/admin/visa','/admin/visa/appointments','/admin/hotels','/admin/events','/admin/catalog/visa','/admin/catalog/umrah','/admin/catalog/umrah/services','/admin/applications','/admin/partners','/admin/agencies','/admin/agency-tiers','/admin/broadcasts','/admin/finance/top-ups','/admin/finance/withdrawals','/admin/refunds','/admin/reports/aging','/admin/users','/admin/security','/admin/integrations','/admin/site-settings','/admin/audit-log'];
+const expected=['/admin','/admin/queue','/admin/calendar','/admin/orders','/admin/flights','/admin/umrah/requests','/admin/umrah/bookings','/admin/umrah/departures','/admin/visa','/admin/visa/appointments','/admin/hotels','/admin/events','/admin/catalog/visa','/admin/catalog/umrah','/admin/applications','/admin/agencies','/admin/agency-tiers','/admin/broadcasts','/admin/finance/top-ups','/admin/finance/withdrawals','/admin/refunds','/admin/reports/aging','/admin/users','/admin/security','/admin/integrations','/admin/site-settings','/admin/audit-log'];
 const hrefs=groups=>groups.flatMap(g=>g.items.map(i=>i.href));
 
 test('all existing admin destinations remain present exactly once',()=>{
- const routes=hrefs(navigation.ADMIN_NAV_GROUPS);assert.equal(new Set(routes).size,28);assert.deepEqual(routes.toSorted(),expected.toSorted());
+ const routes=hrefs(navigation.ADMIN_NAV_GROUPS);assert.equal(new Set(routes).size,27);assert.deepEqual(routes.toSorted(),expected.toSorted());
  assert.deepEqual(navigation.ADMIN_NAV_GROUPS.map(g=>g.label),['Workspace','Bookings & fulfilment','Catalog & inventory','Partners & agencies','Finance','Administration']);
  assert.equal(navigation.ADMIN_NAV_GROUPS[0].alwaysOpen,true);
  assert.deepEqual(hrefs([navigation.ADMIN_NAV_GROUPS[0]]),['/admin','/admin/queue','/admin/calendar']);
@@ -29,7 +29,7 @@ test('queue badges retain their original destinations and review counts',()=>{
 for(const [query,paths]of [
  ['visa',['/admin/visa','/admin/visa/appointments','/admin/catalog/visa']],
  ['  VISA   applications  ',['/admin/visa']],
- ['flights',['/admin/orders']],
+ ['flights',['/admin/orders','/admin/flights']],
  ['wallet',['/admin/finance/top-ups']],
  ['catalog hotels',['/admin/hotels']],
  ['receivables',['/admin/reports/aging']],
@@ -41,7 +41,7 @@ for(const [query,paths]of [
 test('clearing search restores the complete menu without losing badges or metadata',()=>{
  const groups=navigation.getAdminNavGroups({queue:11,visa:5});const snapshot=JSON.stringify(groups);
  const visa=filterNavigationGroups(groups,'visa');assert.equal(visa[0].items[0].badge,5);assert.equal(JSON.stringify(groups),snapshot);
- assert.equal(filterNavigationGroups(groups,'  '),groups);assert.equal(hrefs(groups).length,28);
+ assert.equal(filterNavigationGroups(groups,'  '),groups);assert.equal(hrefs(groups).length,27);
 });
 
 test('admin access is checked before sidebar data or background jobs are read',async()=>{

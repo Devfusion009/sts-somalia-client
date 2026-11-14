@@ -9,8 +9,8 @@ import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/ba
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusTimeline } from "@/modules/bookings/components/status-timeline";
-import { getApplicationDetail, getOrderForVisaApplication } from "@/modules/visa/queries";
-import { applicationDocumentSlots } from "@/modules/visa/schemas";
+import { getApplicationDetail, getOrderForVisaApplication, getReapplyCredit } from "@/modules/visa/queries";
+import { applicationDocumentSlots, parseRequirementSections, sectionFileLabel } from "@/modules/visa/schemas";
 import { visaCustomerProgress, visaNextAction } from "@/modules/visa/progress";
 import { formatInZone } from "@/modules/visa/time";
 import {
@@ -25,7 +25,8 @@ import { MessageThread } from "@/modules/visa/components/message-thread";
 import { MessageComposer } from "@/modules/visa/components/message-composer";
 import { RequestUpload } from "@/modules/visa/components/request-upload";
 import { ReplaceUpload } from "@/modules/visa/components/replace-upload";
-import { sendVisaMessage } from "@/modules/visa/actions";
+import { reapplyVisa, sendVisaMessage } from "@/modules/visa/actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export const metadata: Metadata = { title: "Visa Application" };
 
@@ -64,8 +65,11 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
 
   const slots = applicationDocumentSlots(application);
   const slotLabel = new Map(slots.map((s) => [s.key, s.label]));
+  const sections = parseRequirementSections(visaType.application_sections);
   const labelFor = (type: string) =>
-    type.startsWith("request:") ? type.slice(8) : (slotLabel.get(type) ?? type.replace(/_/g, " "));
+    type.startsWith("request:")
+      ? type.slice(8)
+      : (slotLabel.get(type) ?? sectionFileLabel(sections, type) ?? type.replace(/_/g, " "));
 
   const decisions = application.decisions;
   const superseded = new Set(decisions.map((d) => d.supersedes_id).filter(Boolean));
@@ -101,6 +105,7 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
   const balance = order ? Number(order.total) - Number(order.paid) : 0;
   const balanceDue = !!order && balance > 0.005 && ["pending_payment", "held", "partially_paid"].includes(order.status);
   const approved = application.status === "approved" || application.status === "issued";
+  const credit = application.status === "rejected" ? await getReapplyCredit(application) : null;
   const travellers = application.applicant_type === "single" ? 1 : Math.max(application.members.length, 1);
 
   return (
@@ -131,6 +136,16 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
           </div>
         </div>
       </header>
+
+      {application.status === "rejected" ? (
+        <form action={reapplyVisa} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
+          <input type="hidden" name="applicationId" value={application.id} />
+          <p className="text-sm font-medium">
+            {credit ? `Re-application credit · ${fmtMoney(credit.amount, credit.currency)}` : "Visa refused"}
+          </p>
+          <SubmitButton pendingText="Starting…">Apply again</SubmitButton>
+        </form>
+      ) : null}
 
       <NextActionCard action={next} />
 

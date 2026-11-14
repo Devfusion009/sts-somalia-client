@@ -2,7 +2,7 @@ import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { CalendarDays, Mail, Phone, Plane, Receipt } from "lucide-react";
+import { CalendarDays, Mail, Phone, Receipt } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyCustomerDetail } from "@/modules/agencies/queries";
@@ -49,7 +49,7 @@ export default async function AgentCustomerDetailPage({
   const detail = await getAgencyCustomerDetail(membership.agency.id, id);
   if (!detail) notFound();
 
-  const { customer, orders, flightQuotes } = detail;
+  const { customer, orders } = detail;
   const spent = orders
     .filter((o) => PAID_STATUSES.includes(o.status))
     .reduce((sum, o) => sum + Number(o.total), 0);
@@ -97,7 +97,6 @@ export default async function AgentCustomerDetailPage({
           label="Last booking"
           value={lastBookingAt ? format(new Date(lastBookingAt), "d MMM yyyy") : "—"}
         />
-        <StatRailItem label="Flight quotes" value={flightQuotes.length} />
       </StatRail>
 
       <nav className={styles.profileNavigation} aria-label="Customer profile sections">
@@ -171,54 +170,6 @@ export default async function AgentCustomerDetailPage({
         </Card>
       </section>
 
-      {flightQuotes.length > 0 ? (
-        <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h2 className="font-heading text-base font-semibold">Flight quotes</h2>
-            <Badge variant="neutral" className="tabular-nums">
-              {flightQuotes.length}
-            </Badge>
-          </div>
-          <Card className="overflow-hidden py-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Route</TableHead>
-                  <TableHead>Departure</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead numeric>Requested</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {flightQuotes.map((quote) => (
-                  <TableRow key={quote.id}>
-                    <TableCell className="font-medium">
-                      <span className="inline-flex items-center gap-2">
-                        <Plane className="size-3.5 text-muted-foreground" aria-hidden="true" />
-                        {quote.origin_iata} → {quote.destination_iata}
-                        {quote.return_at ? (
-                          <span className="font-normal text-muted-foreground">Return</span>
-                        ) : null}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(quote.depart_at), "d MMM yyyy")}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusBadgeVariant(quote.status)} className="capitalize">
-                        {quote.status.replace(/_/g, " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell numeric className="text-sm text-muted-foreground">
-                      {format(new Date(quote.created_at), "d MMM yyyy")}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        </section>
-      ) : null}
     </div>
   );
 }

@@ -132,9 +132,10 @@ export class UmrahCatalogService {
       booking.custom_request_id ? this.requests.findHotelLines(booking.custom_request_id) : Promise.resolve([]),
     ]);
 
-    const departureDate: string | null = departure?.departure_date ?? request?.departure_date ?? null;
+    const snapshot = request?.package_snapshot as Row | null;
+    const departureDate: string | null = snapshot?.departureDate ?? departure?.departure_date ?? request?.departure_date ?? null;
     const hotels: Row[] =
-      booking.booking_kind === "private" && request
+      snapshot && Array.isArray(snapshot.hotels) ? snapshot.hotels : booking.booking_kind === "private" && request
         ? [
             ...requestHotelRows
               .filter((h) => h.category === "hotel_makkah" && request.nights_makkah > 0)
@@ -159,7 +160,7 @@ export class UmrahCatalogService {
       ? buildDatedItinerary({
           departureDate,
           returnDate:
-            departure?.return_date ??
+            snapshot?.returnDate ?? departure?.return_date ??
             (request ? addCalendarDays(request.departure_date, request.nights_makkah + request.nights_madinah) : null),
           durationDays: pkg?.duration_days ?? null,
           outbound: flight("outbound"),

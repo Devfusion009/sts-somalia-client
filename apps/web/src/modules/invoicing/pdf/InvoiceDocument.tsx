@@ -126,7 +126,7 @@ export function InvoiceDocument({
             <Text style={styles.brandSub}>+252 611 444 420 · info@scoutsts.com</Text>
           </View>
           <View>
-            <Text style={styles.docTitle}>{proforma ? "PROFORMA INVOICE" : "INVOICE"}</Text>
+            <Text style={styles.docTitle}>{proforma ? "PROFORMA INVOICE" : isSettled ? "INVOICE / RECEIPT" : "INVOICE"}</Text>
             <Text style={styles.docMeta}>{invoiceNumber}</Text>
             <Text style={styles.docMeta}>Issued {format(new Date(issuedAt), "d MMM yyyy")}</Text>
             <Text style={styles.docMeta}>Order {order.order_number}</Text>

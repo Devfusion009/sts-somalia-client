@@ -22,9 +22,12 @@ import { createUmrahPackage, updateUmrahPackage } from "@/modules/admin/actions"
 import { UMRAH_INCLUDE_OPTIONS } from "@/modules/umrah/includes";
 import type { Database } from "@/lib/types/database.types";
 
+import type { Airport } from "@sts/shared-types";
+import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
+
 type UmrahPackage = Database["public"]["Tables"]["umrah_packages"]["Row"];
 
-export function UmrahPackageForm({ pkg }: { pkg?: UmrahPackage }) {
+export function UmrahPackageForm({ pkg, airports = [] }: { pkg?: UmrahPackage; airports?: Airport[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const action = pkg ? updateUmrahPackage : createUmrahPackage;
@@ -46,31 +49,46 @@ export function UmrahPackageForm({ pkg }: { pkg?: UmrahPackage }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {pkg ? (
-        <DialogTrigger render={<Button size="icon" variant="ghost" aria-label={`Edit ${pkg.name}`} title="Edit" />}>
-          <Pencil />
+        <DialogTrigger render={<Button size="sm" variant="outline" aria-label={`Edit ${pkg.name}`} />}>
+          <Pencil aria-hidden="true" /> Edit package & status
         </DialogTrigger>
       ) : (
         <DialogTrigger render={<Button />}>
-          <Plus aria-hidden="true" /> Add package
+          <Plus aria-hidden="true" /> Create package
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-lg">
-        <form action={formAction}>
+      <DialogContent className="flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+        <form action={formAction} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {pkg ? <input type="hidden" name="id" value={pkg.id} /> : null}
-          <DialogHeader>
-            <DialogTitle>{pkg ? "Edit Umrah package" : "Add Umrah package"}</DialogTitle>
+          <DialogHeader className="shrink-0 border-b border-border px-5 py-5 pr-12">
+            <DialogTitle>{pkg ? "Edit Umrah package" : "Create Umrah package"}</DialogTitle>
           </DialogHeader>
 
-          <FieldGroup className="gap-4 py-4">
+          <FieldGroup className="min-h-0 flex-1 gap-4 overflow-y-auto overscroll-contain p-5">
             {state?.error ? (
               <Alert variant="destructive">
                 <AlertDescription>{state.error}</AlertDescription>
               </Alert>
             ) : null}
             <Field>
+              <FieldLabel htmlFor="packageType">Package type</FieldLabel>
+              <select id="packageType" name="packageType" defaultValue={pkg?.package_type ?? "group"} className={NATIVE_SELECT_CLASS}>
+                <option value="group">Group package</option><option value="private">Private package · admin confirmation</option>
+              </select>
+            </Field>
+            <Field>
               <FieldLabel htmlFor="name">Name</FieldLabel>
               <Input id="name" name="name" defaultValue={pkg?.name} required />
             </Field>
+            {!pkg ? <div className="grid gap-4 sm:grid-cols-2">
+              {([{ name: "originIata", label: "From" }, { name: "destinationIata", label: "To" }]).map(({ name, label }) => <Field key={name}>
+                <FieldLabel htmlFor={name}>{label}</FieldLabel>
+                <select id={name} name={name} required defaultValue="" className={NATIVE_SELECT_CLASS}>
+                  <option value="" disabled>Select airport</option>
+                  {airports.map((airport) => <option key={airport.iata_code} value={airport.iata_code}>{airport.city} ({airport.iata_code})</option>)}
+                </select>
+              </Field>)}
+            </div> : null}
             <Field>
               <FieldLabel htmlFor="description">Description</FieldLabel>
               <Textarea id="description" name="description" defaultValue={pkg?.description ?? ""} rows={2} />
@@ -121,7 +139,7 @@ export function UmrahPackageForm({ pkg }: { pkg?: UmrahPackage }) {
                 })}
               </div>
             </Field>
-            <Field>
+            {pkg ? <Field>
               <FieldLabel htmlFor="status">Status</FieldLabel>
               <Select name="status" defaultValue={pkg?.status ?? "draft"}>
                 <SelectTrigger id="status" className="w-full">
@@ -134,14 +152,14 @@ export function UmrahPackageForm({ pkg }: { pkg?: UmrahPackage }) {
                   <SelectItem value="suspended">Suspended</SelectItem>
                 </SelectContent>
               </Select>
-            </Field>
+            </Field> : <input type="hidden" name="status" value="draft" />}
           </FieldGroup>
 
-          <DialogFooter>
+          <DialogFooter className="static m-0 shrink-0 rounded-none bg-muted/50 px-5 py-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <SubmitButton pendingText="Saving…">{pkg ? "Save changes" : "Create package"}</SubmitButton>
+            <SubmitButton pendingText="Saving…">{pkg ? "Save changes" : "Create & configure"}</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

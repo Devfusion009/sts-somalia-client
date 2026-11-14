@@ -214,6 +214,8 @@ export function groupBookingErrorMessage(message: string | undefined) {
   if (message.includes("departure not found")) return "That departure could not be found.";
   if (message.includes("full name")) return "Enter each pilgrim's full name.";
   if (message.includes("do not match")) return "Add details for every pilgrim.";
+  if (message.includes("already exists")) return "These travellers already have a request for these dates.";
+  if (message.includes("route is incomplete")) return "This package is not available for booking.";
   return "Could not create the booking.";
 }
 

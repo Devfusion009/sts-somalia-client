@@ -1,11 +1,11 @@
+import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../../trpc/trpc";
-import { flightSearchParamsSchema, flightOffersFilterSchema, requestFlightQuoteSchema } from "@sts/shared-types";
+import { bookFlightSchema, flightSearchParamsSchema } from "@sts/shared-types";
 import { FlightsService } from "./flights.service";
 
 /**
- * Airports/offer-cache reads and live search are public (unauthenticated) in
- * the original — flight search doesn't require a login, matching the
- * marketing flights page. Only the quote request needs a caller.
+ * Airports and search are public (the marketing flights page needs no
+ * login); booking needs a signed-in caller.
  */
 export const flightsRouter = router({
   airports: publicProcedure.query(async ({ ctx }) => {
@@ -13,18 +13,18 @@ export const flightsRouter = router({
     return svc.getAirports();
   }),
 
-  offers: publicProcedure.input(flightOffersFilterSchema).query(async ({ ctx, input }) => {
+  search: publicProcedure.input(flightSearchParamsSchema).mutation(async ({ ctx, input }) => {
     const svc = await ctx.resolve(FlightsService);
-    return svc.searchFlightOffers(input);
+    return svc.search(input);
   }),
 
-  searchLive: publicProcedure.input(flightSearchParamsSchema).mutation(async ({ ctx, input }) => {
+  offer: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ ctx, input }) => {
     const svc = await ctx.resolve(FlightsService);
-    return svc.searchLive(input);
+    return svc.getOffer(input.id);
   }),
 
-  requestQuote: protectedProcedure.input(requestFlightQuoteSchema).mutation(async ({ ctx, input }) => {
+  book: protectedProcedure.input(bookFlightSchema).mutation(async ({ ctx, input }) => {
     const svc = await ctx.resolve(FlightsService);
-    return svc.requestQuote(ctx.user!.id, input);
+    return svc.book(ctx.user!.id, input);
   }),
 });
