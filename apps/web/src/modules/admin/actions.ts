@@ -49,7 +49,16 @@ export async function updateOrderStatus(_prev: ActionState, formData: FormData):
   const status = String(formData.get("status")) as OrderStatus;
   if (!orderStatuses.includes(status)) return { error: "Invalid status." };
 
+  if (["paid", "partially_paid", "refunded"].includes(status)) {
+    return { error: "Use payment approval, record payment or the refund workflow to update payment status." };
+  }
   const supabase = await createClient();
+  if (["processing", "completed"].includes(status)) {
+    const { data: current } = await supabase.from("orders").select("status").eq("id", orderId).maybeSingle();
+    if (!current || !["paid", "partially_paid", "processing", "completed"].includes(current.status)) {
+      return { error: "Approve the payment before processing or completing this order." };
+    }
+  }
   const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
   if (error) return { error: error.message };
   revalidatePath("/admin/orders");

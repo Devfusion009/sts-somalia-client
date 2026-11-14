@@ -20,6 +20,7 @@ export async function getVisaCase(id: string) {
     .select(
       `*,
        visa_type:visa_type_id (*),
+       agency:agency_id (name),
        submitter:profiles!visa_applications_submitted_by_fkey (full_name, email, phone),
        members:visa_members (*),
        documents:visa_documents (*),

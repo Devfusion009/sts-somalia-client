@@ -189,7 +189,7 @@ export default async function AdminVisaCasePage({
       <Tabs key={initialTab} defaultValue={initialTab}>
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="overview">Application overview</TabsTrigger>
             <TabsTrigger value="applicant">Applicant</TabsTrigger>
             <TabsTrigger value="documents">
               Documents
@@ -216,7 +216,7 @@ export default async function AdminVisaCasePage({
         </div>
 
         <TabsContent value="overview" className="mt-4">
-          <OverviewTab data={data} actions={actions} />
+          <OverviewTab data={data} actions={actions} reviewable={!closed && can("visa.documents.review")} />
         </TabsContent>
         <TabsContent value="applicant" className="mt-4">
           <ApplicantTab data={data} />

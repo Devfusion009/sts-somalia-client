@@ -258,7 +258,7 @@ export class PaymentsService {
     const { data: payment } = await supabase.from("payments").select("id, order_id, status, provider").eq("id", paymentId).maybeSingle();
     if (!payment || payment.status !== "requires_action" || payment.provider === "waafi") return { ok: true };
 
-    await this.admin.get().from("payments").update({ status: "failed" }).eq("id", payment.id);
+    await this.admin.get().from("payments").update({ status: "failed" }).eq("id", payment.id).eq("status", "requires_action");
     return { ok: true };
   }
 

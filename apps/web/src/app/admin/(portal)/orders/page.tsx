@@ -1,4 +1,10 @@
-import { format, formatDistanceToNowStrict } from "date-fns";
+import { getPaymentProofs } from "@/modules/payments/proof-actions";
+import Link from "next/link";
+import { Input } from "@/components/ui/input";
+import { OrderPaymentsPanel } from "./order-payments-panel";
+import { RefreshOrdersButton } from "./refresh-orders-button";
+import { findOrderReferences } from "@/modules/admin/order-reference-search";
+import { format } from "date-fns";
 import {
   Building2,
   CalendarRange,
@@ -26,7 +32,6 @@ import { Pager } from "@/components/dashboard/pager";
 import { parsePage } from "@/lib/pagination";
 import { OrderStatusSelect } from "./order-status-select";
 import { RecordPaymentDialog } from "./record-payment-dialog";
-import { ConfirmPaymentButton } from "./confirm-payment-button";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
 
@@ -40,12 +45,9 @@ const ITEM_ICON: Record<string, LucideIcon> = {
   hall: PartyPopper,
 };
 
-/** Payment rows: a manual payment waiting on staff is the one to act on. */
-const PAYMENT_STATUS_VARIANT = { requires_action: "warning", partially_refunded: "neutral" } as const;
-
 const FILTERS = [
   { key: "all", label: "All" },
-  { key: "action", label: "Needs action" },
+  { key: "action", label: "Payment requests" },
   { key: "upcoming", label: "Travelling soon" },
   { key: "pending_payment", label: "Unpaid" },
   { key: "partially_paid", label: "Partially paid" },
@@ -56,41 +58,43 @@ const FILTERS = [
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string; page?: string; order?: string }>;
+  searchParams: Promise<{ filter?: string; page?: string; order?: string; q?: string }>;
 }) {
-  const { filter: filterParam, page: pageParam, order: orderParam } = await searchParams;
+  const { filter: filterParam, page: pageParam, order: orderParam, q: queryParam } = await searchParams;
   // Opened from a new-order alert: that order is pinned to the top and outlined.
   const focusId = orderParam && /^[0-9a-f-]{36}$/i.test(orderParam) ? orderParam : null;
-  const filter = FILTERS.find((f) => f.key === filterParam)?.key ?? "all";
+  const filter = queryParam?.trim() ? "all" : FILTERS.find((f) => f.key === filterParam)?.key ?? "action";
   const page = parsePage(pageParam);
 
   // Filters, chip counts and the stat tiles are aggregated in the database;
   // only the page of orders actually shown loads its full booking and payment detail.
   const today = new Date().setHours(0, 0, 0, 0);
   const queue = await getOrderQueue(filter, page, format(today, "yyyy-MM-dd"));
+  const search = (queryParam ?? "").trim().slice(0,80);
+  const found = search ? await findOrderReferences(search,page) : null;
   const [listed, focused] = await Promise.all([
-    getOrdersByIds(queue.ids),
+    getOrdersByIds(found?.ids ?? queue.ids),
     focusId ? getOrdersByIds([focusId]) : Promise.resolve([]),
   ]);
   const visible = [...focused, ...listed.filter((o) => o.id !== focusId)];
+  const proofs = await getPaymentProofs(visible.flatMap(o => o.payments.filter(p => p.provider === "manual" && p.method_label === "Bank Transfer").map(p => p.id)));
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Orders & Payments" />
+      <PageHeader title="Orders & Payments" actions={<RefreshOrdersButton />} />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatTile label="Orders" value={queue.total.toLocaleString("en-US")} />
+        <Link href="/admin/orders?filter=all" className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary"><StatTile label="Orders" value={queue.total.toLocaleString("en-US")} /></Link>
         <StatTile
           label="Settled revenue"
-          value={`USD ${Math.round(queue.settledRevenue).toLocaleString("en-US")}`}
+          value={money(queue.settledRevenue, "USD")}
           hint={`${queue.settledCount} paid`}
         />
-        <StatTile
-          label="Awaiting confirmation"
+        <Link href="/admin/orders?filter=action" className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary"><StatTile
+          label="Payment requests"
           value={String(queue.action)}
-          hint="bank transfer / cash"
           tone={queue.action > 0 ? "warn" : undefined}
-        />
+        /></Link>
         <StatTile
           label="Travelling within 30 days"
           value={String(queue.upcoming)}
@@ -98,6 +102,13 @@ export default async function AdminOrdersPage({
         />
       </div>
 
+      <div className="space-y-4 rounded-xl border border-border bg-card p-4">
+      <form role="search" className="flex flex-wrap items-end gap-2">
+        <input type="hidden" name="filter" value="all" />
+        <div className="min-w-48 flex-1"><label htmlFor="order-search" className="mb-2 block text-xs font-medium text-muted-foreground">Find an order</label><Input id="order-search" name="q" defaultValue={search} placeholder="Order reference, e.g. STS-2026-000071" maxLength={80} /></div>
+        <Button type="submit" variant="outline">Search</Button>
+        {search ? <Button variant="ghost" render={<Link href="/admin/orders?filter=all" />}>Clear</Button> : null}
+      </form>
       <FilterChips
         label="Filter orders"
         active={filter}
@@ -116,6 +127,8 @@ export default async function AdminOrdersPage({
                   : (queue.byStatus[f.key] ?? 0),
         }))}
       />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-semibold">{search ? `Results for “${search}”` : filter === "all" ? "All orders" : FILTERS.find(f=>f.key===filter)?.label}</h2><span className="text-xs text-muted-foreground tabular-nums">{found?.total ?? queue.matching} {(found?.total ?? queue.matching) === 1 ? "order" : "orders"}</span></div>
 
       {visible.length === 0 ? (
         <Card>
@@ -124,7 +137,8 @@ export default async function AdminOrdersPage({
               <EmptyMedia variant="icon">
                 <Receipt />
               </EmptyMedia>
-              <EmptyTitle>{queue.total === 0 ? "No orders" : "No orders match this filter"}</EmptyTitle>
+              <EmptyTitle>{search ? "No matching order references" : filter === "action" ? "No payment requests awaiting review" : queue.total === 0 ? "No orders" : "No orders match this filter"}</EmptyTitle>
+              <Button variant="outline" render={<Link href="/admin/orders?filter=all" />}>View all orders</Button>
             </Empty>
           </CardContent>
         </Card>
@@ -210,7 +224,7 @@ export default async function AdminOrdersPage({
                       <p className="font-heading text-xl font-semibold tabular-nums">
                         {money(order.total, order.currency)}
                       </p>
-                      {order.status === "partially_paid" ? (
+                      {balanceDue > 0 && ["pending_payment","held","partially_paid"].includes(order.status) ? (
                         <p className="text-xs tabular-nums">
                           <span className="text-muted-foreground">
                             {money(paidTotal, order.currency)} paid ·{" "}
@@ -226,7 +240,7 @@ export default async function AdminOrdersPage({
                           ? ` · paid ${format(new Date(order.paid_at), "d MMM")}`
                           : ""}
                       </p>
-                      <OrderStatusSelect orderId={order.id} status={order.status} />
+                      <details className="relative text-xs"><summary className="cursor-pointer rounded-md px-2 py-1 text-muted-foreground hover:bg-muted">Manage order</summary><div className="mt-2"><OrderStatusSelect orderId={order.id} status={order.status} /></div></details>
                     </div>
                   </div>
 
@@ -246,7 +260,7 @@ export default async function AdminOrdersPage({
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                              {d.title}
+                              {item.visa_application?.id ? <Link className="rounded-sm text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-primary" href={`/admin/visa/${item.visa_application.id}`}>{d.title}</Link> : d.title}
                               <Badge variant="neutral">{d.typeLabel}</Badge>
                               {d.status ? (
                                 <span className="text-xs text-muted-foreground capitalize">
@@ -283,46 +297,10 @@ export default async function AdminOrdersPage({
                     })}
                   </ul>
 
-                  {/* Payments + documents */}
-                  <div className="flex flex-col gap-3 border-t border-border bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                    <div className="flex min-w-0 flex-col gap-1.5">
-                      {order.payments.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">No payments</span>
-                      ) : (
-                        order.payments.map((payment) => (
-                          <div
-                            key={payment.id}
-                            className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
-                          >
-                            <span className="font-medium">
-                              {payment.method_label ?? payment.provider}
-                            </span>
-                            <span className="text-muted-foreground">
-                              via {payment.provider}
-                              {payment.payer_phone ? ` · ${payment.payer_phone}` : ""}
-                            </span>
-                            <span className="tabular-nums">
-                              {money(payment.amount, payment.currency)}
-                            </span>
-                            <Badge
-                              variant={statusBadgeVariant(payment.status, PAYMENT_STATUS_VARIANT)}
-                              className="capitalize"
-                            >
-                              {payment.provider === "manual" && payment.status === "requires_action" ? "Pending payment approval" : payment.status.replace(/_/g, " ")}
-                            </Badge>
-                            <span className="text-muted-foreground tabular-nums">
-                              {formatDistanceToNowStrict(new Date(payment.created_at))} ago
-                            </span>
-                            {payment.provider === "manual" && payment.status === "requires_action" && ["pending_payment", "held", "partially_paid"].includes(order.status) ? (
-                              <ConfirmPaymentButton paymentId={payment.id} />
-                            ) : null}
-                          </div>
-                        ))
-                      )}
-                    </div>
-
+                  <OrderPaymentsPanel order={order} proofs={proofs} />
+                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-muted/20 px-4 py-3 sm:px-5">
                     <div className="flex flex-wrap items-center gap-2">
-                      {balanceDue > 0.01 && !["cancelled", "refunded"].includes(order.status) ? (
+                      {!awaiting.some(p => p.provider === "manual") && balanceDue > 0.01 && !["cancelled", "refunded"].includes(order.status) ? (
                         <RecordPaymentDialog orderId={order.id} remaining={balanceDue} currency={order.currency} />
                       ) : null}
                       {daysToTravel !== null && daysToTravel >= 0 && daysToTravel <= 30 ? (
@@ -346,7 +324,7 @@ export default async function AdminOrdersPage({
                           <Download aria-hidden="true" /> {invoice.invoice_number}
                         </Button>
                       ) : (
-                        <span className="text-xs text-muted-foreground">No invoice</span>
+                        <span className="text-xs text-muted-foreground">{["cancelled", "refunded"].includes(order.status) ? "No invoice" : "Invoice pending payment"}</span>
                       )}
                     </div>
                   </div>
@@ -357,7 +335,7 @@ export default async function AdminOrdersPage({
         </div>
       )}
 
-      <Pager page={page} total={queue.matching} hrefFor={(n) => `/admin/orders?filter=${filter}&page=${n}`} />
+      <Pager page={page} total={found?.total ?? queue.matching} hrefFor={(n) => `/admin/orders?filter=${filter}&page=${n}${search ? `&q=${encodeURIComponent(search)}` : ""}`} />
     </div>
   );
 }

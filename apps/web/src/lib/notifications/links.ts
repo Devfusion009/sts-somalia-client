@@ -45,6 +45,10 @@ export function agentNotificationHref(n: NotificationLike): string | null {
 }
 
 export function customerNotificationHref(n: NotificationLike): string | null {
+  if (n.type === "bank_proof_rejected") {
+    const id = (n.data as { order_id?: string } | null)?.order_id;
+    return id ? `/checkout/${id}` : "/account/bookings";
+  }
   // A decided application opens its own page, where the progress track shows the outcome.
   if (n.type === "application_approved" || n.type === "application_rejected") {
     const d = n.data as { applicationType?: string; applicationId?: string } | null;
@@ -78,6 +82,7 @@ export function customerNotificationHref(n: NotificationLike): string | null {
 }
 
 export function adminNotificationHref(n: NotificationLike): string | null {
+  if (n.type === "bank_proof_submitted") return newOrderHref(n) ?? "/admin/orders";
   if (n.type === "new_order") return newOrderHref(n) ?? "/admin/orders";
   if (n.type === "flight_ticketing_failed") return "/admin/flights?view=attention";
   if (n.type === "private_umrah_request") return "/admin/umrah/requests?status=pending";

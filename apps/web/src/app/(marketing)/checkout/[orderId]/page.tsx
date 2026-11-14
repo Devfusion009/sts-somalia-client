@@ -1,3 +1,5 @@
+import { getPaymentProofs } from "@/modules/payments/proof-actions";
+import { BankTransferProof } from "@/modules/payments/components/bank-transfer-proof";
 import { WaafiPaymentStatus } from "@/modules/payments/components/waafi-payment-status";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
@@ -142,6 +144,7 @@ export default async function CheckoutPage({
   }
 
   const pendingPayment = order.payments.find((p) => p.status === "requires_action" || (p.provider === "waafi" && p.status === "processing"));
+  const bankProofs = pendingPayment?.provider === "manual" && pendingPayment.method_label === "Bank Transfer" ? await getPaymentProofs([pendingPayment.id]) : [];
   const availableMethods = await trpc.payments.methods.query({ agencyWallet });
   const methods: CheckoutMethod[] = availableMethods.map(
     ({ id, label, description, kind, group, badges, requiresPhone, simulated }) => ({
@@ -334,7 +337,7 @@ export default async function CheckoutPage({
               <Alert variant="warning">
                 <Hourglass />
                 <AlertTitle>{pendingPayment.provider === "manual"
-                  ? pendingPayment.method_label === "Pay at Office" ? "Office payment pending" : "Bank transfer pending verification"
+                  ? pendingPayment.method_label === "Pay at Office" ? "Office payment pending" : bankProofs[0]?.status === "rejected" ? "Bank transfer — correction requested" : bankProofs.length ? "Transfer proof under review" : "Bank transfer — awaiting proof"
                   : `${pendingPayment.method_label} — awaiting payment`}</AlertTitle>
                 {pendingPayment.provider === "manual" ? (
                   <AlertDescription>Booking confirmation and your receipt follow staff approval of the payment.</AlertDescription>
@@ -343,6 +346,7 @@ export default async function CheckoutPage({
               {pendingPayment.instructions ? (
                 <p className="mt-4 text-sm leading-relaxed whitespace-pre-line">{pendingPayment.instructions}</p>
               ) : null}
+              {pendingPayment.provider === "manual" && pendingPayment.method_label === "Bank Transfer" ? <BankTransferProof paymentId={pendingPayment.id} proofs={bankProofs} /> : null}
               <div className="mt-4">
                 {pendingPayment.provider === "waafi" ? <WaafiPaymentStatus kind="payment" referenceId={pendingPayment.id} /> : <CancelPendingPaymentButton paymentId={pendingPayment.id} />}
               </div>

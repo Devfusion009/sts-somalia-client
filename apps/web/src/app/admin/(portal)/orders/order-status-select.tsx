@@ -68,7 +68,7 @@ export function OrderStatusSelect({ orderId, status }: { orderId: string; status
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {STATUSES.map((s) => (
+          {STATUSES.filter(s => s === status || !["paid", "partially_paid", "refunded"].includes(s)).map((s) => (
             <SelectItem key={s} value={s} className="capitalize">
               {s.replace(/_/g, " ")}
             </SelectItem>
