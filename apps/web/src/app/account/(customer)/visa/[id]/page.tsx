@@ -89,7 +89,12 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
     decisionOutcome: (decision?.outcome as "approved" | "refused" | undefined) ?? null,
   };
   const progress = visaCustomerProgress(input);
-  let next = visaNextAction(input, labelFor);
+  let next = visaNextAction(input, (type, documentId) => {
+    const document = application.documents.find(doc => doc.id === documentId);
+    const memberId = document ? documentMemberId(application, document) : null;
+    const member = application.members.find(member => member.id === memberId);
+    return member ? `${member.full_name} · ${labelFor(type)}` : labelFor(type);
+  });
   if (!["approved", "issued", "rejected", "cancelled"].includes(application.status) && next.kind !== "pay") {
     const missing = missingTravellerDocuments(application).filter(slot => !application.documents.some(doc => doc.is_current && doc.document_type === slot.key && documentMemberId(application, doc) === slot.memberId));
     if (missing.length) next = { kind: "upload", items: [...(next.kind === "upload" ? next.items : []), ...missing.map(slot => ({ label: `${slot.memberName} · ${slot.label}`, reason: null, due: null }))] };
