@@ -9,7 +9,7 @@ import { WaafiService, type WaafiSettlement } from "./waafi.service";
 import { getPaymentMethod } from "./registry";
 import { initiateWithProvider } from "./providers";
 import type { InitiationResult, InitiatePaymentInput, RecordPaymentInput } from "@sts/shared-types";
-import { MIN_DEPOSIT_FRACTION, hallAwaitingQuote } from "@sts/shared-types";
+import { FLIGHT_FARE_HOLD_MINUTES, MIN_DEPOSIT_FRACTION, flightPaymentErrorMessage, hallAwaitingQuote } from "@sts/shared-types";
 
 const PAYABLE_ORDER_STATUSES = ["pending_payment", "held", "partially_paid"] as const;
 const phonePattern = /^\+?[0-9][0-9\s-]{6,14}$/;
@@ -55,12 +55,23 @@ export class PaymentsService {
 
     const { data: stayItems } = await supabase
       .from("order_items")
-      .select("hotel_booking:hotel_booking_id (status), hall_booking:hall_booking_id (status)")
+      .select("hotel_booking:hotel_booking_id (status), hall_booking:hall_booking_id (status), umrah_booking:umrah_booking_id (status, booking_kind), flight_booking:flight_booking_id (ticketing_status, priced_at)")
       .eq("order_id", order.id);
+    if (!stayItems) return { error: "Booking confirmation could not be checked." };
+    const flight = stayItems
+      .map((item) => item.flight_booking as unknown as { ticketing_status: string | null; priced_at: string | null } | null)
+      .find((f) => f?.ticketing_status);
+    if (flight) {
+      if (flight.ticketing_status !== "awaiting_payment") return { error: "This flight booking can no longer be paid." };
+      if (!flight.priced_at || Date.parse(flight.priced_at) < Date.now() - FLIGHT_FARE_HOLD_MINUTES * 60_000) {
+        return { error: "This fare has expired. Search again for the latest price." };
+      }
+    }
     const waiting = (stayItems ?? []).some((item) => {
       const hotel = item.hotel_booking as unknown as { status: string } | null;
       const hall = item.hall_booking as unknown as { status: string } | null;
-      return hotel?.status === "waitlisted" || hall?.status === "waitlisted";
+      const umrah = item.umrah_booking as unknown as { status: string; booking_kind: string } | null;
+      return hotel?.status === "waitlisted" || hall?.status === "waitlisted" || (umrah?.booking_kind === "private" && umrah.status === "pending");
     });
     if (waiting) return { error: "This booking is waiting for confirmation." };
 
@@ -79,7 +90,9 @@ export class PaymentsService {
     const remaining = Number(order.total) - paidTotal;
     if (remaining <= 0) return { error: "This order is already fully paid." };
 
-    let amount = input.amount ?? remaining;
+    // Only Umrah packages take deposits; every other order is paid in full.
+    const allowsDeposit = stayItems.some((item) => item.umrah_booking);
+    let amount = allowsDeposit ? (input.amount ?? remaining) : remaining;
     amount = Math.round(amount * 100) / 100;
     if (amount > remaining + 0.01) {
       return { error: `That's more than the remaining balance of ${order.currency} ${remaining.toFixed(2)}.` };
@@ -121,7 +134,7 @@ export class PaymentsService {
       .single();
 
     if (paymentError || !payment) {
-      return { error: paymentError?.message ?? "Could not start the payment." };
+      return { error: flightPaymentErrorMessage(paymentError?.message) ?? paymentError?.message ?? "Could not start the payment." };
     }
 
     let result: InitiationResult;
@@ -163,12 +176,14 @@ export class PaymentsService {
       case "redirect":
         await admin.from("payments").update({ provider_ref: result.providerRef ?? null }).eq("id", payment.id).in("status", ["processing", "requires_action"]);
         return { error: null, result, orderId: order.id };
-      case "instructions":
-        await admin
+      case "instructions": {
+        const { error } = await admin
           .from("payments")
           .update({ status: "requires_action", instructions: result.instructions, provider_ref: result.providerRef ?? null })
           .eq("id", payment.id).in("status", ["processing", "requires_action"]);
+        if (error) return { error: "Payment instructions could not be saved. Please try again." };
         return { error: null, result, orderId: order.id };
+      }
       case "error":
         if (method.provider === "waafi") await admin.rpc("fail_waafi_attempt", { p_reference_id: payment.id });
         await admin.from("payments").update({ status: "failed" }).eq("id", payment.id).in("status", ["processing", "requires_action"]);
@@ -200,7 +215,7 @@ export class PaymentsService {
       p_order_id: order.id,
       p_amount: amount,
     });
-    if (error) return { error: error.message };
+    if (error) return { error: flightPaymentErrorMessage(error.message) ?? error.message };
     return { error: null, result: { type: "success" }, orderId: order.id };
   }
 
@@ -249,9 +264,8 @@ export class PaymentsService {
 
   /** Admin marks a manual payment (bank transfer / cash) as received. Caller enforces admin via protectedAdminProcedure. */
   async adminConfirmPayment(paymentId: string) {
-    const { data, error } = await this.admin.get().from("payments").update({ status: "succeeded" })
-      .eq("id", paymentId).eq("provider", "manual").eq("status", "requires_action").select("id");
-    if (error || !data?.length) throw new Error("Only pending manual payments can be confirmed here.");
+    const { error } = await this.rls.get().rpc("confirm_manual_payment", { p_payment_id: paymentId });
+    if (error) throw new Error(error.message);
     return { ok: true };
   }
 
@@ -263,8 +277,15 @@ export class PaymentsService {
    */
   async adminRecordPayment(input: RecordPaymentInput): Promise<{ error: string | null }> {
     const admin = this.admin.get();
-    const { data: order } = await admin.from("orders").select("id, currency, total").eq("id", input.orderId).maybeSingle();
+    const { data: order } = await admin.from("orders").select("id, currency, total, status").eq("id", input.orderId).maybeSingle();
     if (!order) return { error: "We could not find this order." };
+    if (!PAYABLE_ORDER_STATUSES.includes(order.status as (typeof PAYABLE_ORDER_STATUSES)[number])) {
+      return { error: "This order is not awaiting payment." };
+    }
+    const { data: pendingManual, error: manualError } = await admin.from("payments").select("id")
+      .eq("order_id", order.id).eq("provider", "manual").eq("status", "requires_action").limit(1);
+    if (manualError) return { error: "Pending payments could not be checked." };
+    if (pendingManual?.length) return { error: "Approve the pending payment instead of recording another payment." };
 
     const { data: pendingWaafi, error: pendingError } = await admin.from("waafi_payment_attempts").select("reference_id")
       .eq("order_id", order.id).in("status", ["initiating", "pending"]).limit(1);

@@ -284,6 +284,9 @@ export function SubmissionTab({
                   ["Lodged with", job.route === "partner" ? getProvider(job.provider_key ?? "")?.name ?? job.provider_key : job.lodged_with],
                   ["Reference", <span key="ref" className="font-mono text-xs">{job.lodgement_reference ?? job.partner_ref ?? "—"}</span>],
                   ["Submitted", formatDay(job.submitted_at ?? job.lodgement_date)],
+                  ...(job.expected_decision_on
+                    ? ([["Expected decision", `${formatDay(job.expected_decision_on)}${app.status === "processing" && job.expected_decision_on < new Date().toISOString().slice(0, 10) ? " · overdue" : ""}`]] as Array<[string, string]>)
+                    : []),
                   ["Processing", PROCESSING_STAGE_LABELS[job.processing_stage]],
                   ...(job.route === "partner" ? ([["Partner status", job.partner_status?.replace(/_/g, " ") ?? "—"]] as Array<[string, string]>) : []),
                   ...(job.receipt_document_id ? ([["Receipt", <DocLink key="rc" id={job.receipt_document_id} label="Open" />]] as Array<[string, React.ReactNode]>) : []),

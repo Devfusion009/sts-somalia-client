@@ -11,6 +11,7 @@ export function toPackageCard(pkg: Row, today: string): PackageCard {
   const upcoming = bookableDepartures((pkg.umrah_package_departures ?? []) as Array<Row & { departure_date: string }>, today);
   return packageCardSchema.parse({
     id: pkg.id,
+    package_type: pkg.package_type,
     slug: pkg.slug,
     name: pkg.name,
     tagline: pkg.tagline,

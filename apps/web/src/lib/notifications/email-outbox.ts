@@ -14,7 +14,7 @@ import { adminNotificationHref, agentNotificationHref, customerNotificationHref,
  * each into one branded email to the recipient and records the result.
  *
  * - Types that already have a dedicated email (application decisions, visa,
- *   Umrah, flight quotes, partner bookings) are skipped, so nobody gets the
+ *   Umrah, flight bookings, partner bookings) are skipped, so nobody gets the
  *   same news twice.
  * - Customers who switched email off in their preferences are skipped,
  *   except for money and account events, which always send.
@@ -29,8 +29,7 @@ const SENT_ELSEWHERE = new Set([
   "application_rejected",
   "application_more_info_requested",
   "visa_status_changed",
-  "flight_quote_ready",
-  "flight_quote_declined",
+  "flight_booked",
   "flight_ticketed",
   "partner_onboarding_reminder",
   "new_booking",
@@ -39,6 +38,10 @@ const SENT_ELSEWHERE_PREFIXES = ["umrah_"];
 
 /** Sent even when the recipient turned email notifications off. */
 const ALWAYS_SEND = new Set([
+  "visa_documents_reminder",
+  "visa_auto_cancelled",
+  "visa_refusal_credit",
+  "flight_booking_delayed",
   "order_paid",
   "wallet_booking_payment",
   "topup_reviewed",
@@ -51,7 +54,7 @@ const ALWAYS_SEND = new Set([
   "application_document_rejected",
 ]);
 
-const WARNING_TYPES = new Set(["low_balance", "payout_failed", "application_document_rejected", "booking_declined", "waafi_payment_review", "visa_case_attention"]);
+const WARNING_TYPES = new Set(["visa_documents_reminder", "visa_auto_cancelled", "flight_ticketing_failed", "low_balance", "payout_failed", "application_document_rejected", "booking_declined", "waafi_payment_review", "visa_case_attention"]);
 const SUCCESS_TYPES = new Set(["order_paid", "booking_confirmed", "payout_paid", "payout_sent", "application_documents_verified", "booking_request_completed"]);
 
 /** Status pill text per event; anything unlisted reads as a plain update. */
@@ -82,7 +85,12 @@ const LABELS: Record<string, string> = {
   application_documents_verified: "Documents verified",
   visa_application_submitted: "New visa application",
   visa_case_attention: "Needs attention",
-  flight_quote_request: "Flight quote request",
+  flight_ticketing_failed: "Flight booking failed",
+  flight_booking_delayed: "Ticket in progress",
+  visa_documents_reminder: "Documents needed",
+  visa_auto_cancelled: "Application cancelled",
+  visa_refusal_credit: "Re-application credit",
+  private_umrah_request: "Umrah booking request",
   waafi_payment_review: "Payment review",
   admin_event_reminder: "Reminder",
 };

@@ -174,11 +174,11 @@ test('booking progress identifies the active step on canonical and rewritten por
  }
 });
 
-test('quote and private-request steps do not imply immediate payment',()=>{
+test('flight steps book and pay; private Umrah steps stay a request',()=>{
  for(const pathname of ['/agent/book/flights','/book/flights','/agent/book/umrah/private','/book/umrah/private/request-id']) {
   const Steps=load(portal+'book/desk-steps.tsx',{'next/navigation':{usePathname:()=>pathname,useSearchParams:()=>new URLSearchParams()},'@/modules/agencies/services':services}).DeskSteps;
   const labels=nodes(Steps({hasCustomer:true})).filter(n=>n.type==='li').map(n=>n.props.children[1].props.children);
-  assert.equal(labels.at(-1),pathname.includes('flights')?'Request quote':'Review request');
+  assert.equal(labels.at(-1),pathname.includes('flights')?'Book & pay':'Review request');
   assert.ok(!labels.includes('Review & pay'));
  }
 });

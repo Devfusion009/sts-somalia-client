@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Banknote, CheckCheck, Percent, Receipt, Users, Wallet } from "lucide-react";
 import { format } from "date-fns";
@@ -98,6 +99,12 @@ export default async function AdminAgencyDetailPage({
       getAgencyPayoutRequests(agency.id),
       getAgencyTopupRequests(agency.id),
     ]);
+  const { data: partnerAccount } = await (await createClient())
+    .from("partner_accounts")
+    .select("id")
+    .eq("type", "agency")
+    .eq("entity_id", agency.id)
+    .maybeSingle();
   // One signing request for every proof instead of one round trip per request.
   const proofUrls = new Map<string, string>();
   const withProof = topupRequests.filter((r) => r.proof_path);
@@ -142,7 +149,7 @@ export default async function AdminAgencyDetailPage({
     <div className="space-y-8">
       <div className="space-y-5">
         <BackLink href="/admin/agencies" label="All agencies" />
-        <header className="flex min-w-0 items-center gap-4">
+        <header className="flex min-w-0 flex-wrap items-center gap-4">
           {logoUrl ? (
             <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background max-sm:size-12">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -162,6 +169,15 @@ export default async function AdminAgencyDetailPage({
             </div>
             {meta ? <p className="text-sm break-words text-muted-foreground">{meta}</p> : null}
           </div>
+          {partnerAccount ? (
+            <Button
+              variant="outline"
+              className="ml-auto shrink-0"
+              render={<Link href={`/admin/partners/agency/${partnerAccount.id}`} />}
+            >
+              Account &amp; onboarding
+            </Button>
+          ) : null}
         </header>
         {agency.about ? <p className="max-w-3xl text-sm text-muted-foreground">{agency.about}</p> : null}
 

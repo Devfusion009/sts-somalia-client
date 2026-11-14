@@ -68,7 +68,7 @@ export const createGroupBookingSchema = bookedForSchema.extend({
 });
 export type CreateGroupBookingInput = z.infer<typeof createGroupBookingSchema>;
 
-export const orderResultSchema = z.object({ orderId: z.string() });
+export const orderResultSchema = z.object({ orderId: z.string(), requiresApproval: z.boolean().optional() });
 export type OrderResult = z.infer<typeof orderResultSchema>;
 
 // ---------------------------------------------------------------------------
@@ -123,9 +123,12 @@ export type SubmitTripInput = z.infer<typeof submitTripSchema>;
 export const packageRefSchema = z.object({ packageId: uuid });
 
 export const packageUpsertSchema = z.object({
+  packageType: z.enum(["group", "private"]).optional(),
   id: uuid.optional(),
   name: z.string().trim().min(2, "Enter the package name."),
   description: z.string().optional(),
+  originIata: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Select the departure airport.").optional(),
+  destinationIata: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Select the arrival airport.").optional(),
   durationDays: z.number().int().min(1, "Duration must be at least 1 day."),
   includes: z.array(z.string()),
   basePrice: z.number().min(0, "The price can't be negative."),
@@ -354,6 +357,7 @@ const stringList = z
   .transform((items) => items.filter((v): v is string => typeof v === "string" && v.length > 0));
 
 export const packageCardSchema = z.object({
+  package_type: z.enum(["group", "private"]).default("group"),
   id: z.string(),
   slug: z.string(),
   name: z.string(),
@@ -410,6 +414,7 @@ const departurePublic = z.object({
 });
 
 export const packageDetailSchema = z.object({
+  package_type: z.enum(["group", "private"]).default("group"),
   id: z.string(),
   slug: z.string(),
   name: z.string(),
@@ -478,6 +483,7 @@ const categoryEnum = z.enum(["hotel_makkah", "hotel_madinah", "flight", "visa", 
 const priceUnitEnum = z.enum(["per_person", "per_person_per_night", "per_night", "per_booking"]);
 
 export const customRequestSchema = z.object({
+  package_snapshot: z.object({ packageId: z.string(), name: z.string(), origin: z.string(), destination: z.string(), departureDate: z.string(), returnDate: z.string(), includes: z.array(z.string()).default([]), images: z.array(z.string()).default([]) }).nullable().optional(),
   id: z.string(),
   reference: z.string(),
   status: z.string(),

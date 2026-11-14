@@ -58,9 +58,9 @@ export class GroupBookingService {
         itemType: "umrah",
         price: Number(booking.total_price),
         umrahBookingId: booking.id,
-        hold,
+        hold: hold && booking.booking_kind === "group",
       });
-      return { orderId: order.id };
+      return { orderId: order.id, requiresApproval: booking.booking_kind === "private" };
     } catch {
       // Undo the booking so its seats are not held by a booking with no order.
       await this.bookings.delete(booking.id);

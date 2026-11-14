@@ -34,7 +34,7 @@ export default async function AgentUmrahDeskPage() {
   const customer = await getBookingCustomer(supabase, membership.agency.id);
   if (!customer) redirect("/agent/book?service=umrah");
 
-  const packages = await getAllPackages();
+  const packages = (await Promise.all([getAllPackages(), getAllPackages("private")])).flat();
 
   return (
     <div className="space-y-6">
@@ -54,7 +54,7 @@ export default async function AgentUmrahDeskPage() {
             <EmptyMedia variant="icon">
               <Landmark />
             </EmptyMedia>
-            <EmptyTitle>No group packages</EmptyTitle>
+            <EmptyTitle>No Umrah packages</EmptyTitle>
           </Empty>
         ) : (
           <Table>

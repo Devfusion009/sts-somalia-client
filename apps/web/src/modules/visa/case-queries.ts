@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getVisaOrderAdmin, getVisaProcessingWorkspace } from "@/modules/admin/queries";
-import { applicationDocumentSlots } from "./schemas";
+import { applicationDocumentSlots, parseRequirementSections, sectionFileSlots } from "./schemas";
 import type { PaymentState, ReadinessItem } from "./workflow";
 import type { VisaQueue } from "./queues";
 
@@ -90,31 +90,66 @@ export async function getVisaCase(id: string) {
   app.document_requests.sort((a, b) => a.created_at.localeCompare(b.created_at));
 
   // Group every version under its slot, newest first; the head is current.
+  // Section file fields (admin-defined requirements) can repeat per
+  // traveller, so their uploads group by type and traveller.
   const slots = applicationDocumentSlots(app);
+  const fileSlots = sectionFileSlots(parseRequirementSections(app.visa_type?.application_sections), app.members);
+  const sectionTypes = new Set(fileSlots.map((f) => f.documentType));
+  const groupKey = (type: string, memberId: string | null) => (sectionTypes.has(type) ? `${type}|${memberId ?? ""}` : type);
   const byType = new Map<string, typeof app.documents>();
   for (const doc of [...app.documents].sort((a, b) => b.version - a.version || b.created_at.localeCompare(a.created_at))) {
-    const list = byType.get(doc.document_type) ?? [];
+    const key = groupKey(doc.document_type, doc.member_id);
+    const list = byType.get(key) ?? [];
     list.push(doc);
-    byType.set(doc.document_type, list);
+    byType.set(key, list);
   }
+  const multipleTravellers = app.members.length > 1;
+  const sectionSlots = fileSlots.map((f) => ({
+    key: groupKey(f.documentType, f.memberId),
+    documentType: f.documentType,
+    label: `${f.sectionTitle}: ${f.label}${f.memberName && multipleTravellers ? ` — ${f.memberName}` : ""}`,
+    required: f.required,
+    staff: false,
+    versions: byType.get(groupKey(f.documentType, f.memberId)) ?? [],
+  }));
+  const knownKeys = new Set([...slots.map((s) => s.key), ...sectionSlots.map((s) => s.key)]);
   const documentSlots = [
     ...slots.map((slot) => ({
       key: slot.key,
+      documentType: slot.key,
       label: slot.label,
       required: slot.required,
       staff: false,
       versions: byType.get(slot.key) ?? [],
     })),
+    ...sectionSlots,
     ...[...byType.entries()]
-      .filter(([type]) => !slots.some((s) => s.key === type))
-      .map(([type, versions]) => ({
-        key: type,
-        label: STAFF_DOC_LABELS[type] ?? (type.startsWith("request:") ? type.slice(8) : type.replace(/_/g, " ")),
-        required: false,
-        staff: type in STAFF_DOC_LABELS,
-        versions,
-      })),
+      .filter(([key]) => !knownKeys.has(key))
+      .map(([key, versions]) => {
+        const type = versions[0]?.document_type ?? key;
+        return {
+          key,
+          documentType: type,
+          label: STAFF_DOC_LABELS[type] ?? (type.startsWith("request:") ? type.slice(8) : type.replace(/_/g, " ")),
+          required: false,
+          staff: type in STAFF_DOC_LABELS,
+          versions,
+        };
+      }),
   ];
+
+  // The standard review checklist for each applicant-uploaded slot.
+  const checklistByType = new Map(
+    await Promise.all(
+      documentSlots
+        .filter((slot) => !slot.staff)
+        .map(async (slot) => {
+          const { data } = await supabase.rpc("visa_document_checklist", { p_document_type: slot.documentType });
+          return [slot.key, (data ?? []) as Array<{ key: string; label: string }>] as const;
+        })
+    )
+  );
+  const slotsWithChecks = documentSlots.map((slot) => ({ ...slot, checklist: checklistByType.get(slot.key) ?? [] }));
 
   // Decision chain: the current one is the row nobody supersedes.
   const decisions = decisionsRes.data ?? [];
@@ -136,7 +171,7 @@ export async function getVisaCase(id: string) {
     readiness: (readinessRes.data ?? []) as ReadinessItem[],
     paymentState: ((paymentRes.data as string | null) ?? "not_billed") as PaymentState,
     events: eventsRes.data ?? [],
-    documentSlots,
+    documentSlots: slotsWithChecks,
     appointments: appointmentsRes.data ?? [],
     jobs: jobsRes.data ?? [],
     activeJob: (jobsRes.data ?? []).find((j) => j.status === "active") ?? null,

@@ -46,7 +46,7 @@ export default async function UmrahPackagePage({
   const hasSeats = upcomingDepartures.some((departure) =>
     departure.total_seats - departure.booked_seats - departure.offline_seats > 0
   );
-  const bookingLabel = hasSeats ? "Book now" : upcomingDepartures.length > 0 ? "Fully booked" : "No departures";
+  const bookingLabel = hasSeats ? (pkg.package_type === "private" ? "Request booking" : "Book now") : upcomingDepartures.length > 0 ? "Fully booked" : "No departures";
 
   const includes: string[] = Array.isArray(pkg.includes) ? (pkg.includes as string[]) : [];
   const tier = packageTier(pkg);
@@ -70,7 +70,7 @@ export default async function UmrahPackagePage({
         className="mb-4"
         items={[
           { label: "Umrah", href: "/umrah" },
-          { label: "Group", href: "/umrah/group" },
+          { label: pkg.package_type === "private" ? "Private" : "Group", href: pkg.package_type === "private" ? "/umrah/private" : "/umrah/group" },
           { label: pkg.name },
         ]}
       />
@@ -98,7 +98,7 @@ export default async function UmrahPackagePage({
           <Badge className="border-transparent bg-card font-semibold text-foreground">
             {tier.label} package
           </Badge>
-          <Badge className="border-transparent bg-card font-semibold text-primary">Group · fixed price</Badge>
+          <Badge className="border-transparent bg-card font-semibold text-primary">{pkg.package_type === "private" ? "Private · admin confirmation" : "Group · fixed price"}</Badge>
         </div>
       </div>
 
@@ -298,6 +298,7 @@ export default async function UmrahPackagePage({
             className="scroll-mt-24 rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7"
           >
             <BookingForm
+              requiresApproval={pkg.package_type === "private"}
               packageSlug={pkg.slug}
               currency={pkg.currency}
               basePrice={pkg.base_price}

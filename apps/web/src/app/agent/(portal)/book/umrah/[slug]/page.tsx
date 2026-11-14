@@ -61,6 +61,7 @@ export default async function AgentUmrahBookingPage({
       <Card>
         <CardContent>
           <BookingForm
+            requiresApproval={pkg.package_type === "private"}
             packageSlug={pkg.slug}
             currency={pkg.currency}
             basePrice={Number(pkg.base_price)}

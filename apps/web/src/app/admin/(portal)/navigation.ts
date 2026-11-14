@@ -15,7 +15,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
     label: "Bookings & fulfilment",
     items: [
       { href: "/admin/orders", label: "Orders & payments", icon: "orders", searchTerms: "flights tickets reservations bookings" },
-      { href: "/admin/flights", label: "Flight requests", icon: "bookings", searchTerms: "flights tickets quotes fares PNR" },
+      { href: "/admin/flights", label: "Flight bookings", icon: "bookings", searchTerms: "flights tickets e-tickets fares PNR amadeus" },
       { href: "/admin/visa", label: "Visa applications", icon: "visa", searchTerms: "cases processing documents" },
       { href: "/admin/visa/appointments", label: "Visa appointments", icon: "calendar" },
       { href: "/admin/umrah/requests", label: "Private Umrah requests", icon: "bookings", searchTerms: "quotes custom" },
@@ -30,15 +30,13 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
       { href: "/admin/events", label: "Events & halls", icon: "events", searchTerms: "venues availability managers" },
       { href: "/admin/catalog/visa", label: "Visa products", icon: "catalog", searchTerms: "catalog countries pricing" },
       { href: "/admin/catalog/umrah", label: "Umrah packages", icon: "catalog", searchTerms: "catalog group pricing" },
-      { href: "/admin/catalog/umrah/services", label: "Umrah services", icon: "catalog", searchTerms: "catalog transfers extras" },
     ],
   },
   {
     label: "Partners & agencies",
     items: [
       { href: "/admin/applications", label: "Partner applications", icon: "applications", searchTerms: "onboarding approvals agents" },
-      { href: "/admin/partners", label: "Partner accounts", icon: "become-partner", searchTerms: "hotel venue affiliate accounts" },
-      { href: "/admin/agencies", label: "Travel agencies", icon: "agency", searchTerms: "agents B2B markups commissions earnings review" },
+      { href: "/admin/agencies", label: "Travel agencies", icon: "agency", searchTerms: "agents B2B partner accounts onboarding markups commissions earnings review" },
       { href: "/admin/agency-tiers", label: "Agency tiers", icon: "tiers", searchTerms: "agents commission levels" },
       { href: "/admin/broadcasts", label: "Agency broadcasts", icon: "broadcast", searchTerms: "agents announcements notifications messages" },
     ],

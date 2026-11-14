@@ -1,6 +1,6 @@
 /** Canonical desk routes; service intent is restricted to these five keys. */
 export const AGENT_SERVICES = [
-  { key: "flights", label: "Flights", action: "Request quote", href: "/agent/book/flights", icon: "flights" },
+  { key: "flights", label: "Flights", action: "Search flights", href: "/agent/book/flights", icon: "flights" },
   { key: "hotels", label: "Hotels", action: "Find rooms", href: "/agent/book/hotels", icon: "hotels" },
   { key: "visa", label: "Visas", action: "Start application", href: "/agent/book/visa", icon: "visa" },
   { key: "umrah", label: "Umrah", action: "View packages", href: "/agent/book/umrah", icon: "umrah" },

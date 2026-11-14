@@ -1,3 +1,5 @@
+import { getAllPackages } from "@/modules/umrah/queries";
+import { PackageCard } from "@/modules/umrah/components/package-card";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
@@ -17,7 +19,7 @@ import { UMRAH_CATEGORIES, UMRAH_TIERS, UMRAH_TIER_LABELS, PRICE_UNIT_LABELS } f
 import { formatMoney, tripDurationDays } from "@/modules/umrah/pricing";
 
 export const metadata: Metadata = {
-  title: "Private Umrah — build your own",
+  title: "Private Umrah packages & custom trips",
   description:
     "Build an Umrah trip around your own dates: choose your Makkah and Madinah hotels, flights, visa, transport and extras, and see the total as you go.",
 };
@@ -46,6 +48,7 @@ export default async function PrivateUmrahPage({
     getUmrahSharingPrices(),
     getCurrentProfile(),
   ]);
+  const packages = await getAllPackages("private");
   // Only a signed-in visitor can have a draft at all (starting one requires
   // an account), so this is skipped entirely for a signed-out visitor rather
   // than costing them a query that can never return anything.
@@ -72,6 +75,11 @@ export default async function PrivateUmrahPage({
         items={[{ label: "Umrah", href: "/umrah" }, { label: "Private Umrah" }]}
       />
 
+      <section className="mb-10 space-y-5" aria-labelledby="private-packages">
+        <div className="flex flex-wrap items-center justify-between gap-4"><h1 id="private-packages" className="font-heading text-3xl font-semibold">Private Umrah packages</h1><Button variant="outline" render={<a href="#custom-trip" />}>Build a custom trip</Button></div>
+        <p className="text-sm text-muted-foreground">Choose an STS package and send a booking request. Our team confirms your travel arrangements before payment.</p>
+        {packages.length ? <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{packages.map((pkg) => <PackageCard key={pkg.id} pkg={pkg} />)}</div> : <p className="rounded-xl border border-border p-5 text-sm">No private packages are currently published.</p>}
+      </section>
       {error ? (
         <Alert variant="destructive" className="mb-6">
           <AlertCircle />
@@ -79,7 +87,7 @@ export default async function PrivateUmrahPage({
         </Alert>
       ) : null}
 
-      <section className="relative overflow-hidden rounded-2xl bg-sidebar text-sidebar-foreground">
+      <section id="custom-trip" className="relative scroll-mt-24 overflow-hidden rounded-2xl bg-sidebar text-sidebar-foreground">
         {/* A single figure alone in a wide, sunlit courtyard — this page is
             about travelling on your own terms, not with a group, and the
             about-us team photo that was here said the opposite. Chosen over
@@ -111,9 +119,9 @@ export default async function PrivateUmrahPage({
               // not the exact same first-time pitch, which reads as "start
               // over" even though nothing was lost.
               <>
-                <h1 className="font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl">
+                <h2 className="font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl">
                   Welcome back — pick up where you left off
-                </h1>
+                </h2>
                 <dl className="mt-5 flex flex-col gap-2 text-sm text-sidebar-foreground/80 sm:flex-row sm:flex-wrap sm:gap-x-6">
                   <div className="flex items-center gap-1.5">
                     <dt className="sr-only">Travellers</dt>
@@ -160,9 +168,9 @@ export default async function PrivateUmrahPage({
               </>
             ) : (
               <>
-                <h1 className="font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl">
+                <h2 className="font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl">
                   Build your own Umrah
-                </h1>
+                </h2>
                 <p className="mt-4 text-lg leading-relaxed text-sidebar-foreground/80">
                   For one traveller, a couple, a family or a small party. Choose your Makkah and
                   Madinah hotels, flights, visa, transport and extras, and see the total as you go.

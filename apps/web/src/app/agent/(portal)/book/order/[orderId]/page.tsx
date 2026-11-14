@@ -44,9 +44,9 @@ export default async function DeskOrderPage({
   searchParams,
 }: {
   params: Promise<{ orderId: string }>;
-  searchParams: Promise<{ topup?: string }>;
+  searchParams: Promise<{ topup?: string; wallet?: string }>;
 }) {
-  const [{ orderId }, { topup }] = await Promise.all([params, searchParams]);
+  const [{ orderId }, { topup, wallet }] = await Promise.all([params, searchParams]);
   const profile = await requireUser();
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
@@ -124,6 +124,13 @@ export default async function DeskOrderPage({
           </>
         }
       />
+
+      {wallet === "failed" && order.status !== "paid" ? (
+        <Alert variant="warning">
+          <AlertCircle />
+          <AlertDescription>Wallet payment did not go through. Check the balance and pay below.</AlertDescription>
+        </Alert>
+      ) : null}
 
       {topup === "success" ? (
         <Alert>

@@ -15,14 +15,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/submit-button";
 import { createVisaType, updateVisaType } from "@/modules/admin/actions";
-import { documentSlotsToRows, applicationQuestionsToRows } from "@/modules/admin/visa-type-utils";
+import { documentSlotsToRows, requirementSectionsToRows } from "@/modules/admin/visa-type-utils";
 import { providersByCategory } from "@/lib/provider-catalog";
 import { CountrySearchSelect } from "@/components/ui/country-select";
 import { COUNTRY_NAMES, countryName } from "@/lib/countries";
 import { visaCardImage, visaImageUrl } from "@/modules/visa/images";
 import type { Database } from "@/lib/types/database.types";
 import { DocumentSlotsField } from "./document-slots-field";
-import { ApplicationQuestionsField } from "./application-questions-field";
+import { RequirementSectionsField } from "./requirement-sections-field";
 import { FileField } from "@/components/ui/upload";
 
 type VisaType = Database["public"]["Tables"]["visa_types"]["Row"];
@@ -377,10 +377,10 @@ export function VisaTypeEditor({
           <DocumentSlotsField name="requiredDocuments" initialRows={documentSlotsToRows(visaType?.required_documents)} />
         </Section>
 
-        <Section title="Application questions">
-          <ApplicationQuestionsField
-            name="applicationQuestions"
-            initialRows={applicationQuestionsToRows(visaType?.application_questions)}
+        <Section title="Application requirements">
+          <RequirementSectionsField
+            name="applicationSections"
+            initialRows={requirementSectionsToRows(visaType?.application_sections)}
           />
         </Section>
 

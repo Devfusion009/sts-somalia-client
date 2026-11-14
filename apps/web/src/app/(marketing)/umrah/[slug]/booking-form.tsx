@@ -97,6 +97,7 @@ function Field({
 }
 
 export function BookingForm({
+  requiresApproval = false,
   currency,
   basePrice,
   departures,
@@ -105,6 +106,7 @@ export function BookingForm({
   action,
   desk,
 }: {
+  requiresApproval?: boolean;
   packageSlug: string;
   currency: string;
   basePrice: number;
@@ -177,6 +179,7 @@ export function BookingForm({
   return (
     <form action={formAction} className="space-y-8">
       {bookedForSlot}
+      {requiresApproval && rates.length === 0 ? <input type="hidden" name="room_sharing" value="1" /> : null}
       <section className="space-y-4">
         <SectionHeading index={1} title="Choose a departure" />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -209,7 +212,7 @@ export function BookingForm({
                   variant={full ? "destructive" : left <= 10 ? "warning" : "success"}
                   className="mt-2 tabular-nums"
                 >
-                  {full ? "Fully booked" : `${left} seats left`}
+                  {requiresApproval ? "Subject to admin confirmation" : full ? "Fully booked" : `${left} seats left`}
                 </Badge>
               </button>
             );
@@ -332,7 +335,7 @@ export function BookingForm({
           </p>
         </div>
         <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center">
-          {bookedForSlot ? (
+          {bookedForSlot && !requiresApproval ? (
             <SubmitButton
               name="intent"
               value="hold"
@@ -345,7 +348,7 @@ export function BookingForm({
             </SubmitButton>
           ) : null}
           <SubmitButton size="lg" disabled={cannotBook} pendingText="Creating booking…">
-            Continue to payment <ArrowRight data-icon="inline-end" aria-hidden="true" />
+            {requiresApproval ? "Send booking request" : "Continue to payment"} <ArrowRight data-icon="inline-end" aria-hidden="true" />
           </SubmitButton>
         </div>
       </div>

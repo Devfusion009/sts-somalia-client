@@ -387,7 +387,7 @@ export function RecordSubmissionForm({
           </Field>
         ) : null}
         <Field label="Receipt" htmlFor="sub-receipt">
-          <FileField id="sub-receipt" name="receipt" accept=".pdf,.jpg,.jpeg,.png" compact />
+          <FileField id="sub-receipt" name="receipt" accept=".pdf,.jpg,.jpeg,.png" compact required />
         </Field>
       </div>
       <div className="flex items-center justify-between gap-3">
@@ -503,7 +503,7 @@ export function RecordDecisionForm({ applicationId, authority }: { applicationId
           <Input id="dec-date" name="decisionDate" type="date" max={todayIso()} defaultValue={todayIso()} required />
         </Field>
         <Field label="Decision letter" htmlFor="dec-letter">
-          <FileField id="dec-letter" name="letter" accept=".pdf,.jpg,.jpeg,.png" compact />
+          <FileField id="dec-letter" name="letter" accept=".pdf,.jpg,.jpeg,.png" compact required={outcome === "refused"} />
         </Field>
       </div>
       <Field label="Notes" htmlFor="dec-notes">

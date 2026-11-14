@@ -56,6 +56,7 @@ export function PhoneInput({
   defaultCountry = "SO",
   placeholder,
   required,
+  validateNumber = false,
   className,
 }: {
   name: string;
@@ -65,6 +66,7 @@ export function PhoneInput({
   defaultCountry?: string;
   placeholder?: string;
   required?: boolean;
+  validateNumber?: boolean;
   /** Applied to both the calling-code trigger and the number input, so they share a height. */
   className?: string;
 }) {
@@ -121,6 +123,8 @@ export function PhoneInput({
         onChange={(e) => setLocal(e.target.value)}
         placeholder={placeholder}
         required={required}
+        pattern={validateNumber ? `[0-9]{${Math.max(6, 8 - countryDialCode(country).length + 1)},${15 - countryDialCode(country).length + 1}}` : undefined}
+        title={validateNumber ? "Enter a valid mobile number using digits only (8–15 digits including the country code)." : undefined}
         className={cn("flex-1", className)}
       />
       <input type="hidden" name={name} value={combined} />

@@ -1934,6 +1934,18 @@ export type Database = {
       }
       flight_bookings: {
         Row: {
+          offer_snapshot: Json | null
+          priced_at: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          ticketing_status: string | null
+          ticketing_attempts: number
+          ticketing_claimed_at: string | null
+          ticketing_error: string | null
+          provider_order_id: string | null
+          ticket_numbers: string[]
+          booked_at: string | null
+          ticketed_at: string | null
           agency_customer_id: string | null
           agency_id: string | null
           booked_by: string
@@ -1955,6 +1967,18 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          offer_snapshot?: Json | null
+          priced_at?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          ticketing_status?: string | null
+          ticketing_attempts?: number
+          ticketing_claimed_at?: string | null
+          ticketing_error?: string | null
+          provider_order_id?: string | null
+          ticket_numbers?: string[]
+          booked_at?: string | null
+          ticketed_at?: string | null
           agency_customer_id?: string | null
           agency_id?: string | null
           booked_by: string
@@ -1976,6 +2000,18 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          offer_snapshot?: Json | null
+          priced_at?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          ticketing_status?: string | null
+          ticketing_attempts?: number
+          ticketing_claimed_at?: string | null
+          ticketing_error?: string | null
+          provider_order_id?: string | null
+          ticket_numbers?: string[]
+          booked_at?: string | null
+          ticketed_at?: string | null
           agency_customer_id?: string | null
           agency_id?: string | null
           booked_by?: string
@@ -2119,6 +2155,11 @@ export type Database = {
       }
       flight_passengers: {
         Row: {
+          first_name: string | null
+          last_name: string | null
+          gender: string | null
+          passport_country: string | null
+          traveler_ref: string | null
           booking_id: string
           date_of_birth: string | null
           full_name: string
@@ -2131,6 +2172,11 @@ export type Database = {
           seat_preference: string | null
         }
         Insert: {
+          first_name?: string | null
+          last_name?: string | null
+          gender?: string | null
+          passport_country?: string | null
+          traveler_ref?: string | null
           booking_id: string
           date_of_birth?: string | null
           full_name: string
@@ -2143,6 +2189,11 @@ export type Database = {
           seat_preference?: string | null
         }
         Update: {
+          first_name?: string | null
+          last_name?: string | null
+          gender?: string | null
+          passport_country?: string | null
+          traveler_ref?: string | null
           booking_id?: string
           date_of_birth?: string | null
           full_name?: string
@@ -4818,6 +4869,7 @@ export type Database = {
       }
       umrah_custom_requests: {
         Row: {
+          package_snapshot: Json | null
           agency_id: string | null
           booked_by: string
           created_at: string
@@ -4839,6 +4891,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          package_snapshot?: Json | null
           agency_id?: string | null
           booked_by: string
           created_at?: string
@@ -4860,6 +4913,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          package_snapshot?: Json | null
           agency_id?: string | null
           booked_by?: string
           created_at?: string
@@ -5143,6 +5197,7 @@ export type Database = {
       }
       umrah_packages: {
         Row: {
+          package_type: string
           deposit_percent: number | null
           balance_due_days: number
           full_payment_before_documents: boolean
@@ -5172,6 +5227,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          package_type?: string
           deposit_percent?: number | null
           balance_due_days?: number
           full_payment_before_documents?: boolean
@@ -5201,6 +5257,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          package_type?: string
           deposit_percent?: number | null
           balance_due_days?: number
           full_payment_before_documents?: boolean
@@ -5932,6 +5989,9 @@ export type Database = {
       }
       visa_applications: {
         Row: {
+          consent_at: string | null
+          consent_by: string | null
+          consent_version: string | null
           admin_notes: string | null
           agency_customer_id: string | null
           agency_id: string | null
@@ -5974,6 +6034,9 @@ export type Database = {
           visa_case_attention: string | null
         }
         Insert: {
+          consent_at?: string | null
+          consent_by?: string | null
+          consent_version?: string | null
           admin_notes?: string | null
           agency_customer_id?: string | null
           agency_id?: string | null
@@ -6013,6 +6076,9 @@ export type Database = {
           workflow?: Json
         }
         Update: {
+          consent_at?: string | null
+          consent_by?: string | null
+          consent_version?: string | null
           admin_notes?: string | null
           agency_customer_id?: string | null
           agency_id?: string | null
@@ -6200,6 +6266,51 @@ export type Database = {
           },
         ]
       }
+      visa_reapply_credits: {
+        Row: {
+          agency_customer_id: string | null
+          agency_id: string | null
+          amount: number
+          created_at: string
+          currency: string
+          expires_at: string
+          id: string
+          profile_id: string
+          source_application_id: string
+          status: string
+          used_application_id: string | null
+          used_at: string | null
+        }
+        Insert: {
+          agency_customer_id?: string | null
+          agency_id?: string | null
+          amount: number
+          created_at?: string
+          currency: string
+          expires_at?: string
+          id?: string
+          profile_id: string
+          source_application_id: string
+          status?: string
+          used_application_id?: string | null
+          used_at?: string | null
+        }
+        Update: {
+          agency_customer_id?: string | null
+          agency_id?: string | null
+          amount?: number
+          created_at?: string
+          currency?: string
+          expires_at?: string
+          id?: string
+          profile_id?: string
+          source_application_id?: string
+          status?: string
+          used_application_id?: string | null
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       visa_case_events: {
         Row: {
           actor_id: string | null
@@ -6325,6 +6436,9 @@ export type Database = {
       }
       visa_case_ops: {
         Row: {
+          customer_reminded_at: string | null
+          check_reminded_at: string | null
+          overdue_flagged_at: string | null
           application_id: string
           assigned_to: string | null
           priority: string
@@ -6332,6 +6446,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          customer_reminded_at?: string | null
+          check_reminded_at?: string | null
+          overdue_flagged_at?: string | null
           application_id: string
           assigned_to?: string | null
           priority?: string
@@ -6339,6 +6456,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          customer_reminded_at?: string | null
+          check_reminded_at?: string | null
+          overdue_flagged_at?: string | null
           application_id?: string
           assigned_to?: string | null
           priority?: string
@@ -6539,6 +6659,7 @@ export type Database = {
       }
       visa_documents: {
         Row: {
+          review_checks: Json | null
           application_id: string
           content_type: string | null
           created_at: string
@@ -6560,6 +6681,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          review_checks?: Json | null
           application_id: string
           content_type?: string | null
           created_at?: string
@@ -6581,6 +6703,7 @@ export type Database = {
           version?: number
         }
         Update: {
+          review_checks?: Json | null
           application_id?: string
           content_type?: string | null
           created_at?: string
@@ -6907,6 +7030,7 @@ export type Database = {
       }
       visa_processing_jobs: {
         Row: {
+          expected_decision_on: string | null
           application_id: string
           appointment_date: string | null
           appointment_id: string | null
@@ -6934,6 +7058,7 @@ export type Database = {
           submitted_at: string | null
         }
         Insert: {
+          expected_decision_on?: string | null
           application_id: string
           appointment_date?: string | null
           appointment_id?: string | null
@@ -6961,6 +7086,7 @@ export type Database = {
           submitted_at?: string | null
         }
         Update: {
+          expected_decision_on?: string | null
           application_id?: string
           appointment_date?: string | null
           appointment_id?: string | null
@@ -7118,6 +7244,7 @@ export type Database = {
       visa_types: {
         Row: {
           application_questions: Json
+          application_sections: Json
           cover_image: string | null
           created_at: string
           currency: string
@@ -7150,6 +7277,7 @@ export type Database = {
         }
         Insert: {
           application_questions?: Json
+          application_sections?: Json
           cover_image?: string | null
           created_at?: string
           currency?: string
@@ -7182,6 +7310,7 @@ export type Database = {
         }
         Update: {
           application_questions?: Json
+          application_sections?: Json
           cover_image?: string | null
           created_at?: string
           currency?: string
@@ -7296,6 +7425,15 @@ export type Database = {
       claim_manager_password_recovery: { Args: { p_manager_code: string }; Returns: { login_email: string; contact_email: string }[] }
 
       claim_agent_password_recovery: { Args: { p_agent_id: string }; Returns: { login_email: string; contact_email: string }[] }
+      claim_flight_ticketing: {
+        Args: { p_limit?: number }
+        Returns: Database["public"]["Tables"]["flight_bookings"]["Row"][]
+      }
+      claim_flight_ticket_checks: {
+        Args: { p_limit?: number }
+        Returns: Database["public"]["Tables"]["flight_bookings"]["Row"][]
+      }
+      expire_flight_fares: { Args: never; Returns: number }
       claim_notification_emails: {
         Args: { p_limit?: number }
         Returns: Database["public"]["Tables"]["notifications"]["Row"][]
@@ -8650,8 +8788,20 @@ export type Database = {
         Returns: Database["public"]["Enums"]["visa_status"]
       }
       visa_review_document: {
-        Args: { p_decision: string; p_document_id: string; p_reason?: string }
+        Args: { p_checks?: Json; p_decision: string; p_document_id: string; p_reason?: string }
         Returns: undefined
+      }
+      visa_run_follow_ups: { Args: never; Returns: Json }
+      visa_claim_reapply_credit: { Args: { p_application_id: string }; Returns: number }
+      visa_release_reapply_credit: { Args: { p_application_id: string }; Returns: undefined }
+      visa_reapply: { Args: { p_application_id: string }; Returns: string }
+      visa_give_consent: {
+        Args: { p_application_id: string; p_version: string }
+        Returns: undefined
+      }
+      visa_document_checklist: {
+        Args: { p_document_type: string }
+        Returns: { key: string; label: string }[]
       }
       visa_send_message: {
         Args: { p_application_id: string; p_body: string }

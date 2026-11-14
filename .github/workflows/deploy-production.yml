@@ -115,12 +115,15 @@ jobs:
           SMTP_SECURE: ${{ vars.SMTP_SECURE }}
           SMTP_USER: ${{ vars.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          AMADEUS_BASE_URL: ${{ vars.AMADEUS_BASE_URL }}
+          AMADEUS_CLIENT_ID: ${{ vars.AMADEUS_CLIENT_ID }}
+          AMADEUS_CLIENT_SECRET: ${{ secrets.AMADEUS_CLIENT_SECRET }}
         run: |
           {
             printf '%s\n' "${{ secrets.PROD_ENV_FILE }}"
             echo "WEB_IMAGE=${{ needs.build.outputs.web_image }}"
             echo "API_IMAGE=${{ needs.build.outputs.api_image }}"
-            for key in EMAIL_PROVIDER EMAIL_FROM EMAIL_REPLY_TO SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS; do
+            for key in EMAIL_PROVIDER EMAIL_FROM EMAIL_REPLY_TO SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS AMADEUS_BASE_URL AMADEUS_CLIENT_ID AMADEUS_CLIENT_SECRET; do
               if [ -n "${!key}" ]; then printf "%s='%s'\n" "$key" "${!key}"; fi
             done
           } | ssh prod "umask 077 && cat > ${APP_DIR}/.env.next"

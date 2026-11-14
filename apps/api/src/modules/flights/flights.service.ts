@@ -1,33 +1,43 @@
-import { Injectable } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
+import { Injectable, Logger } from "@nestjs/common";
 import { RlsSupabaseService } from "../../infra/supabase/rls-supabase.service";
+import { AdminSupabaseService } from "../../infra/supabase/admin-supabase.service";
 import { createAnonClient } from "../../infra/supabase/supabase-clients";
 import { OrdersService } from "../orders/orders.service";
-import type { FlightSearchParams, FlightOffersFilter, RequestFlightQuoteInput } from "@sts/shared-types";
-import { searchLiveFlights } from "./duffel-provider";
+import type { BookFlightInput, BookFlightResult, FlightOffer, FlightSearchParams, FlightSearchResult } from "@sts/shared-types";
 import { RedisService } from "../../infra/redis/redis.service";
+import { AmadeusError, amadeusConfig, priceOffer, searchOffers, toFlightOffer, type AmadeusOffer } from "./amadeus-client";
+
+/** Search results stay selectable this long; pricing re-checks before booking. */
+const OFFER_TTL_MINUTES = 30;
+
+type StoredOffer = { offer: AmadeusOffer; carriers: Record<string, string>; adults: number; search: FlightSearchParams };
 
 /**
- * Direct port of apps/web's modules/flights/{queries,actions}.ts. Booking
- * creation isn't part of this module — a quote request is just a
- * flight_bookings row (provider 'quote_request', price 0); staff finalize
- * the order from the admin side, unchanged from the original.
+ * Flight search and instant booking through Amadeus.
+ *
+ * search    -> offers are stored in flight_offers (service role) and the UI
+ *              gets our row ids, so the raw provider offer never round-trips
+ *              through the browser.
+ * book      -> re-prices the offer with the provider, writes the booking,
+ *              its passengers and the order at the verified price, and for
+ *              an agency desk pays from the wallet in the same step.
+ * ticketing -> FlightTicketingService books with the provider once the
+ *              order is paid in full.
  */
 @Injectable()
 export class FlightsService {
+  private readonly logger = new Logger(FlightsService.name);
+
   constructor(
     private readonly rls: RlsSupabaseService,
+    private readonly admin: AdminSupabaseService,
     private readonly orders: OrdersService,
     private readonly cache: RedisService
   ) {}
 
-  /**
-   * All airports (reference data) for origin/destination pickers. Public —
-   * uses an anon client, not this.rls, since the marketing flights page
-   * doesn't require a login (matches the original's cookie-bound client,
-   * which degrades to anon-only when there's no session either).
-   */
+  /** All airports (reference data) for origin/destination pickers. Public. */
   async getAirports() {
-    // Reference data that changes a few times a year: an hour in Redis.
     return this.cache.cachedRead(
       "flights:airports",
       3600,
@@ -43,39 +53,112 @@ export class FlightsService {
     );
   }
 
-  /**
-   * Reads the flight_offers cache table. No live GDS/NDC provider
-   * integration in this build — returns an empty array today, which is
-   * expected, not a bug (unchanged from the original's own note). Public,
-   * same anon-client reasoning as getAirports.
-   */
-  async searchFlightOffers(filters: FlightOffersFilter) {
-    let query = createAnonClient()
-      .from("flight_offers")
-      .select("*, airlines(name, iata_code)")
-      .gt("expires_at", new Date().toISOString());
+  async search(params: FlightSearchParams): Promise<FlightSearchResult> {
+    if (!amadeusConfig()) return { live: false, offers: [] };
+    try {
+      const { offers, carriers } = await searchOffers(params);
+      if (offers.length === 0) return { live: true, offers: [] };
 
-    if (filters.origin) query = query.eq("origin_iata", filters.origin.toUpperCase());
-    if (filters.destination) query = query.eq("destination_iata", filters.destination.toUpperCase());
-    if (filters.departDate) {
-      const start = new Date(`${filters.departDate}T00:00:00.000Z`).toISOString();
-      const end = new Date(`${filters.departDate}T23:59:59.999Z`).toISOString();
-      query = query.gte("depart_at", start).lte("depart_at", end);
+      const expiresAt = new Date(Date.now() + OFFER_TTL_MINUTES * 60_000).toISOString();
+      const rows = offers.map((offer) => {
+        const first = offer.itineraries?.[0]?.segments?.[0];
+        const segments = offer.itineraries?.[0]?.segments ?? [];
+        const last = segments[segments.length - 1];
+        const payload: StoredOffer = { offer, carriers, adults: params.adults, search: params };
+        return {
+          provider: "amadeus",
+          provider_offer_id: randomUUID(),
+          origin_iata: params.origin,
+          destination_iata: params.destination,
+          depart_at: `${String(first?.departure?.at ?? params.departDate).slice(0, 19)}Z`,
+          arrive_at: `${String(last?.arrival?.at ?? params.departDate).slice(0, 19)}Z`,
+          cabin_class: params.cabinClass,
+          flight_number: first ? `${first.carrierCode}${first.number}` : null,
+          price: Number(offer.price?.grandTotal ?? 0),
+          currency: String(offer.price?.currency ?? "USD"),
+          raw_payload: payload,
+          expires_at: expiresAt,
+        };
+      });
+      const { data, error } = await this.admin.get().from("flight_offers").insert(rows).select("id, raw_payload");
+      if (error || !data) throw new Error(error?.message ?? "offers not stored");
+
+      const result: FlightOffer[] = data.map((row) => {
+        const stored = row.raw_payload as unknown as StoredOffer;
+        return toFlightOffer(row.id, stored.offer, stored.carriers);
+      });
+      result.sort((a, b) => a.totalAmount - b.totalAmount);
+      // Expired search rows are housekeeping only; clear them opportunistically.
+      void this.admin.get().from("flight_offers").delete().lt("expires_at", new Date(Date.now() - 3600_000).toISOString());
+      return { live: true, offers: result };
+    } catch (error) {
+      this.logger.warn(`[flights] search failed: ${error instanceof Error ? error.message : String(error)}`);
+      return { live: true, offers: [], providerError: "Flight search is unavailable right now. Try again shortly." };
+    }
+  }
+
+  /** One stored search offer, for the booking page. */
+  async getOffer(id: string): Promise<{ offer: FlightOffer; adults: number; search: FlightSearchParams } | null> {
+    const { data } = await this.admin
+      .get()
+      .from("flight_offers")
+      .select("id, raw_payload, expires_at")
+      .eq("id", id)
+      .eq("provider", "amadeus")
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+    if (!data) return null;
+    const stored = data.raw_payload as unknown as StoredOffer;
+    return { offer: toFlightOffer(data.id, stored.offer, stored.carriers), adults: stored.adults, search: stored.search };
+  }
+
+  async book(userId: string, input: BookFlightInput): Promise<BookFlightResult> {
+    if (!amadeusConfig()) return { error: "Flight booking is not available right now." };
+    const admin = this.admin.get();
+
+    const { data: row } = await admin
+      .from("flight_offers")
+      .select("id, price, raw_payload, expires_at")
+      .eq("id", input.offerId)
+      .eq("provider", "amadeus")
+      .maybeSingle();
+    if (!row || new Date(row.expires_at) < new Date()) return { error: "This fare is no longer available. Search again." };
+    const stored = row.raw_payload as unknown as StoredOffer;
+    if (input.passengers.length !== stored.adults) return { error: `Enter details for all ${stored.adults} passengers.` };
+
+    const departDate = stored.search.departDate;
+    for (const passenger of input.passengers) {
+      if (passenger.passportExpiry <= (stored.search.returnDate ?? departDate)) {
+        return { error: `The passport for ${passenger.firstName} ${passenger.lastName} expires before the trip ends.` };
+      }
+      if (passenger.dateOfBirth >= departDate) return { error: "Check each passenger's date of birth." };
     }
 
-    const { data } = await query.order("depart_at", { ascending: true });
-    return data ?? [];
-  }
-
-  async searchLive(params: FlightSearchParams) {
-    return searchLiveFlights(params);
-  }
-
-  async requestQuote(userId: string, input: RequestFlightQuoteInput) {
     const agencyId = await this.orders.getActiveAgencyId(userId);
     const access = await this.orders.assertAgencyCanBookProduct(agencyId, "flight");
-    if (!access.ok) {
-      return { error: access.message };
+    if (!access.ok) return { error: access.message };
+    if (input.payFromWallet && !agencyId) return { error: "Only agency bookings can be paid from a wallet." };
+
+    // The provider confirms seats and the current fare before anything is written.
+    let priced: AmadeusOffer;
+    try {
+      priced = await priceOffer(stored.offer);
+    } catch (error) {
+      const message = error instanceof AmadeusError ? error.message : "";
+      this.logger.warn(`[flights] pricing failed: ${message}`);
+      return { error: "This fare is no longer available. Search again." };
+    }
+    const fare = Math.round(Number(priced.price?.grandTotal ?? priced.price?.total ?? 0) * 100) / 100;
+    const currency = String(priced.price?.currency ?? "USD");
+    if (!(fare > 0)) return { error: "This fare is no longer available. Search again." };
+    if (fare > Number(row.price) + 0.01) {
+      // Keep the new fare on the offer so the page shows it and a second
+      // submit books at that price.
+      await admin
+        .from("flight_offers")
+        .update({ price: fare, raw_payload: { ...stored, offer: priced } as never })
+        .eq("id", row.id);
+      return { error: `The fare has changed to ${currency} ${fare.toFixed(2)}. Review the new price and book again.` };
     }
 
     const agencyCustomerId = await this.orders.resolveBookedForCustomer(agencyId, {
@@ -84,37 +167,95 @@ export class FlightsService {
       newCustomerPhone: input.newCustomerPhone,
     });
 
-    const { error } = await this.rls.get().from("flight_bookings").insert({
-      customer_id: userId,
-      booked_by: userId,
-      agency_id: agencyId,
-      agency_customer_id: agencyCustomerId,
-      provider: "quote_request",
-      trip_type: input.tripType,
-      origin_iata: input.origin,
-      destination_iata: input.destination,
-      depart_at: new Date(`${input.departDate}T09:00:00Z`).toISOString(),
-      return_at:
-        input.tripType === "round_trip" && input.returnDate
-          ? new Date(`${input.returnDate}T09:00:00Z`).toISOString()
-          : null,
-      cabin_class: input.cabinClass,
-      status: "pending",
-      total_price: 0,
-      currency: "USD",
-      raw_payload: {
-        passengers: input.adults,
+    const itineraries = priced.itineraries ?? stored.offer.itineraries ?? [];
+    const outFirst = itineraries[0]?.segments?.[0];
+    const backFirst = itineraries[1]?.segments?.[0];
+    const { data: booking, error: bookingError } = await admin
+      .from("flight_bookings")
+      .insert({
+        customer_id: userId,
+        booked_by: userId,
+        agency_id: agencyId,
+        agency_customer_id: agencyCustomerId,
+        provider: "amadeus",
+        trip_type: itineraries.length > 1 ? "round_trip" : "one_way",
+        origin_iata: stored.search.origin,
+        destination_iata: stored.search.destination,
+        depart_at: `${String(outFirst?.departure?.at ?? departDate).slice(0, 19)}Z`,
+        return_at: backFirst ? `${String(backFirst.departure?.at).slice(0, 19)}Z` : null,
+        cabin_class: stored.search.cabinClass,
+        status: "pending",
+        total_price: fare,
+        currency,
+        raw_payload: { offer_id: row.id, carriers: stored.carriers, passengers: input.passengers.length },
+        offer_snapshot: priced,
+        priced_at: new Date().toISOString(),
+        contact_email: input.contactEmail,
         contact_phone: input.contactPhone,
-        notes: input.notes ?? null,
-        requested_at: new Date().toISOString(),
-      },
-    });
-
-    if (error) {
-      // Raw Postgres text ("violates foreign key constraint ...") must never reach a traveller.
-      console.error(`[flights] quote request insert failed: ${error.code} ${error.message}`);
-      return { error: "Could not send the quote request. Try again or call +252 611 444 420." };
+        ticketing_status: "awaiting_payment",
+      })
+      .select("id")
+      .single();
+    if (bookingError || !booking) {
+      this.logger.error(`[flights] booking insert failed: ${bookingError?.message}`);
+      return { error: "The booking could not be completed. Try again." };
     }
-    return { error: null };
+
+    const { error: passengerError } = await admin.from("flight_passengers").insert(
+      input.passengers.map((p, index) => ({
+        booking_id: booking.id,
+        passenger_type: "adult" as const,
+        traveler_ref: priced.travelerPricings?.[index]?.travelerId ?? String(index + 1),
+        full_name: `${p.firstName} ${p.lastName}`,
+        first_name: p.firstName,
+        last_name: p.lastName,
+        gender: p.gender,
+        date_of_birth: p.dateOfBirth,
+        nationality: p.nationality,
+        passport_number: p.passportNumber,
+        passport_expiry: p.passportExpiry,
+        passport_country: p.passportCountry,
+      }))
+    );
+
+    let orderId: string;
+    try {
+      if (passengerError) throw new Error(passengerError.message);
+      const order = await this.orders.createForBooking({
+        customerId: userId,
+        bookedBy: userId,
+        agencyId,
+        agencyCustomerId,
+        currency,
+        itemType: "flight",
+        price: fare,
+        flightBookingId: booking.id,
+      });
+      orderId = order.id;
+    } catch (error) {
+      this.logger.error(`[flights] order creation failed: ${error instanceof Error ? error.message : String(error)}`);
+      await admin.from("flight_bookings").delete().eq("id", booking.id);
+      return { error: "The booking could not be completed. Try again." };
+    }
+
+    // The search offer is spent; a second submit must not create a second order.
+    await admin.from("flight_offers").update({ expires_at: new Date().toISOString() }).eq("id", row.id);
+
+    if (!input.payFromWallet) return { error: null, orderId, paid: false };
+
+    const { data: order } = await this.rls.get().from("orders").select("total").eq("id", orderId).single();
+    const { error: walletError } = await this.rls.get().rpc("pay_order_from_agency_wallet", {
+      p_order_id: orderId,
+      p_amount: Number(order?.total ?? fare),
+    });
+    if (walletError) {
+      return { error: null, orderId, paid: false, paymentError: walletErrorMessage(walletError.message) };
+    }
+    return { error: null, orderId, paid: true };
   }
+}
+
+function walletErrorMessage(message: string) {
+  if (/insufficient|available|balance|credit/i.test(message)) return "Wallet balance is too low. Top up, then pay from the booking.";
+  return "The wallet payment did not go through. Pay from the booking.";
 }

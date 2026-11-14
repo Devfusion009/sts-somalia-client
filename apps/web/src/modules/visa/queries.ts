@@ -206,3 +206,26 @@ export async function getOrderForVisaApplication(applicationId: string) {
     method: succeeded.at(-1)?.method_label ?? null,
   };
 }
+
+/** Available re-application credit for this application's applicant (refused visa, STS fee). */
+export async function getReapplyCredit(app: {
+  currency: string;
+  agency_customer_id: string | null;
+  applicant_profile_id: string | null;
+  submitted_by: string;
+}): Promise<{ amount: number; currency: string } | null> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("visa_reapply_credits")
+    .select("amount, currency")
+    .eq("status", "available")
+    .eq("currency", app.currency)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at")
+    .limit(1);
+  query = app.agency_customer_id
+    ? query.eq("agency_customer_id", app.agency_customer_id)
+    : query.is("agency_customer_id", null).eq("profile_id", app.applicant_profile_id ?? app.submitted_by);
+  const { data } = await query.maybeSingle();
+  return data ? { amount: Number(data.amount), currency: data.currency } : null;
+}

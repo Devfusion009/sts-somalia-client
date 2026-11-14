@@ -22,7 +22,7 @@ export async function getAgencyBatchOrders(agencyId: string, batchId: string) {
        order_items (
          *,
          hotel_booking:hotel_booking_id (id, status, check_in, check_out, num_rooms, guest_details, hotel:hotel_id (name)),
-         flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at),
+         flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at, provider_booking_ref, ticketing_status),
          visa_application:visa_application_id (id, application_ref, applicant_type, visa_type:visa_type_id (name, destination_country_code)),
          umrah_booking:umrah_booking_id (id, num_pilgrims, booking_kind, status, package:package_id (name), custom_request:custom_request_id (reference, departure_date)),
          hall_booking:hall_booking_id (id, status, start_date, end_date, start_time, event_type, venue:venue_id (name, price_unit, base_price))
@@ -52,7 +52,7 @@ export async function getAgencyOrder(agencyId: string, orderId: string) {
        order_items (
          *,
          hotel_booking:hotel_booking_id (id, status, check_in, check_out, num_rooms, guest_details, hotel:hotel_id (name)),
-         flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at),
+         flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at, provider_booking_ref, ticketing_status),
          visa_application:visa_application_id (id, application_ref, applicant_type, visa_type:visa_type_id (name, destination_country_code)),
          umrah_booking:umrah_booking_id (
            id, num_pilgrims, booking_kind, status, fulfillment_stage, room_sharing,
@@ -98,7 +98,7 @@ export async function getAgencyOrders(
        order_items (
          id, item_type,
          hotel_booking:hotel_booking_id (status, check_in, check_out, num_rooms, hotel:hotel_id (name)),
-         flight_booking:flight_booking_id (origin_iata, destination_iata, depart_at),
+         flight_booking:flight_booking_id (origin_iata, destination_iata, depart_at, provider_booking_ref, ticketing_status),
          visa_application:visa_application_id (id, application_ref, visa_type:visa_type_id (name, destination_country_code)),
          umrah_booking:umrah_booking_id (num_pilgrims, booking_kind, package:package_id (name), custom_request:custom_request_id (reference)),
          hall_booking:hall_booking_id (status, event_type, start_date, end_date, venue:venue_id (name))
@@ -1210,12 +1210,11 @@ export type TravelDocs = {
 
 /**
  * One client with their full history: every order the agency placed for
- * them (labelled per vertical) plus flight quote requests, which have no
- * order until STS staff finalize one.
+ * them, labelled per vertical.
  */
 export async function getAgencyCustomerDetail(agencyId: string, customerId: string) {
   const supabase = await createClient();
-  const [{ data: customer }, { data: orders }, { data: flightQuotes }] = await Promise.all([
+  const [{ data: customer }, { data: orders }] = await Promise.all([
     supabase
       .from("agency_customers")
       .select("*")
@@ -1228,17 +1227,10 @@ export async function getAgencyCustomerDetail(agencyId: string, customerId: stri
       .eq("agency_id", agencyId)
       .eq("agency_customer_id", customerId)
       .order("created_at", { ascending: false }),
-    supabase
-      .from("flight_bookings")
-      .select("id, origin_iata, destination_iata, depart_at, return_at, status, created_at")
-      .eq("agency_id", agencyId)
-      .eq("agency_customer_id", customerId)
-      .eq("provider", "quote_request")
-      .order("created_at", { ascending: false }),
   ]);
 
   if (!customer) return null;
-  return { customer, orders: orders ?? [], flightQuotes: flightQuotes ?? [] };
+  return { customer, orders: orders ?? [] };
 }
 
 export type AgencyCustomerDetail = NonNullable<Awaited<ReturnType<typeof getAgencyCustomerDetail>>>;
