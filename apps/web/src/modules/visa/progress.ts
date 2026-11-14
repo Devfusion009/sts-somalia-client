@@ -124,7 +124,7 @@ export type NextAction =
   | { kind: "download"; documentId: string }
   | { kind: "none" };
 
-export function visaNextAction(input: ProgressInput, labelFor: (documentType: string) => string): NextAction {
+export function visaNextAction(input: ProgressInput, labelFor: (documentType: string, documentId?: string) => string): NextAction {
   const workflow = readWorkflow(input.workflow);
   if (input.status === "cancelled") return { kind: "none" };
 
@@ -138,7 +138,7 @@ export function visaNextAction(input: ProgressInput, labelFor: (documentType: st
     return {
       kind: "upload",
       items: [
-        ...rejected.map((d) => ({ label: labelFor(d.document_type), reason: d.rejection_reason, due: null })),
+        ...rejected.map((d) => ({ label: labelFor(d.document_type, d.id), reason: d.rejection_reason, due: null })),
         ...openRequests.map((r) => ({ label: r.title, reason: r.description, due: r.due_date })),
       ],
     };
