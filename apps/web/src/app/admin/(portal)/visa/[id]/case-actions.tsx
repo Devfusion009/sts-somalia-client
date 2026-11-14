@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -68,18 +69,39 @@ function TabAction({ action }: { action: VisaAction }) {
 }
 
 function StageButton({ action, applicationId, run }: { action: VisaAction; applicationId: string; run: ServerAction }) {
-  const [state, formAction] = useActionState(run, null);
+  const [state, setState] = useState<ActionState>(null);
+  const [pending, setPending] = useState(false);
+  const submitting = useRef(false);
+  const router = useRouter();
   const Icon = ICONS[action.key as keyof typeof ICONS] ?? ArrowRight;
   return (
-    <form action={formAction} className="contents">
+    <form className="contents" onSubmit={(event) => {
+      event.preventDefault();
+      if (submitting.current || action.disabledReason) return;
+      const data = new FormData(event.currentTarget);
+      submitting.current = true;
+      setPending(true);
+      setState(null);
+      startTransition(() => {
+        void run(null, data).then((result) => {
+          setState(result);
+          if (result && !result.error) router.refresh();
+        }).catch(() => {
+          setState({ error: "The case could not be updated. Refresh to check its status before retrying." });
+        }).finally(() => {
+          submitting.current = false;
+          setPending(false);
+        });
+      });
+    }}>
       <input type="hidden" name="applicationId" value={applicationId} />
-      <SubmitButton
-        pendingText="Working…"
-        disabled={Boolean(action.disabledReason)}
+      <Button type="submit"
+        loading={pending}
+        disabled={pending || Boolean(action.disabledReason)}
         title={action.disabledReason}
       >
-        <Icon data-icon="inline-start" /> {action.label}
-      </SubmitButton>
+        {!pending ? <Icon data-icon="inline-start" /> : null} {pending ? "Working…" : action.label}
+      </Button>
       {state?.error ? (
         <p role="alert" className="basis-full text-xs text-destructive">
           {state.error}

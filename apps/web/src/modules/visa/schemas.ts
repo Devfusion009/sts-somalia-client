@@ -38,13 +38,13 @@ const unexpiredDate = (message: string) =>
  * of being asked of every applicant regardless of destination.
  */
 export const personalInfoSchema = z.object({
-  fullName: z.string().min(2, "Enter the full name as shown in the passport."),
+  fullName: z.string().trim().min(2, "Enter the full name as shown in the passport."),
   dateOfBirth: pastDate("Enter the date of birth."),
   gender: z.enum(["male", "female"], { error: "Select a gender." }),
   nationality: z.string().length(2, "Select a nationality."),
-  passportNumber: z.string().min(3, "Enter the passport number."),
+  passportNumber: z.string().trim().min(3, "Enter the passport number."),
   passportExpiry: unexpiredDate("Enter the passport expiry date."),
-  email: z.string().email("Enter a valid email address."),
+  email: z.string().trim().email("Enter a valid email address."),
   mobile: z.string().trim().regex(
     /^\+[1-9][0-9]{0,3} ?[0-9]{6,14}$/,
     "Enter a valid mobile number using digits only.",
@@ -62,7 +62,7 @@ export const travelInfoSchema = z.object({
     ["tourism", "business", "family_visit", "medical", "transit", "umrah", "other"],
     { error: "Select the purpose of visit." }
   ),
-  addressAtDestination: z.string().min(3, "Enter a hotel name or contact address."),
+  addressAtDestination: z.string().trim().min(3, "Enter a hotel name or contact address."),
 }).refine((t) => t.departureDate >= t.arrivalDate, {
   message: "Departure must be on or after arrival.",
   path: ["departureDate"],
@@ -70,11 +70,11 @@ export const travelInfoSchema = z.object({
 export type TravelInfo = z.infer<typeof travelInfoSchema>;
 
 export const memberSchema = z.object({
-  fullName: z.string().min(2, "Enter the member's full name."),
+  fullName: z.string().trim().min(2, "Enter the member's full name."),
   relationship: z.enum(RELATIONSHIPS, { error: "Select a relationship." }),
   dateOfBirth: pastDate("Enter the date of birth."),
   nationality: z.string().length(2, "Select a nationality."),
-  passportNumber: z.string().min(3, "Enter the passport number."),
+  passportNumber: z.string().trim().min(3, "Enter the passport number."),
   passportExpiry: unexpiredDate("Enter a valid passport expiry date.").optional(),
 });
 export type MemberInput = z.infer<typeof memberSchema>;

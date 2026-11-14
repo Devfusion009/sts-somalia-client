@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useCaseActionState } from "@/modules/visa/components/use-case-action-state";
 import { format } from "date-fns";
 import { FilePlus2, RefreshCw, Send, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,7 @@ export function RequestDocumentDialog({
   trigger?: "outline" | "secondary";
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useActionState(adminRequestDocument, null);
+  const [state, formAction] = useCaseActionState(adminRequestDocument, null);
 
   // Derived during render (not an effect) per React's guidance for reacting
   // to a state change — refs can't be read/written during render.
@@ -115,7 +116,7 @@ export function RequestDocumentDialog({
 
 /** Upload the final visa document that the customer downloads. */
 export function ResultUpload({ applicationId }: { applicationId: string }) {
-  const [state, formAction, pending] = useActionState(adminUploadResultDocument, null);
+  const [state, formAction, pending] = useCaseActionState(adminUploadResultDocument, null);
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [chosen, setChosen] = useState<File | null>(null);
@@ -166,7 +167,7 @@ export function PartnerControl({
   partnerStatus: string | null;
   partnerLastSyncedAt: string | null;
 }) {
-  const [state, submitAction] = useActionState(adminSubmitToPartner, null);
+  const [state, submitAction] = useCaseActionState(adminSubmitToPartner, null);
 
   return (
     <div className="space-y-3 text-sm">

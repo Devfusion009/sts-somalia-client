@@ -299,7 +299,7 @@ export default async function CheckoutPage({
               ) : null}
               {/* Hotel, hall and Umrah refunds follow their own cancellation rules; only visa fees are never returned. */}
               {order.order_items.some((item) => item.item_type === "visa") ? (
-                <p className="mt-2 text-right text-xs text-muted-foreground">All fees are non-refundable.</p>
+                <p className="mt-2 text-right text-xs text-muted-foreground">{order.order_items.some((item) => item.item_type === "visa") ? "Visa fees are refundable before STS files the application." : "All fees are non-refundable."}</p>
               ) : null}
             </div>
           </section>

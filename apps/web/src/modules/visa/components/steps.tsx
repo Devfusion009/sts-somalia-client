@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import {
   AlertCircle,
@@ -563,7 +564,7 @@ export function StepPersonalInfo({
 
       <div className="grid grid-cols-1 gap-x-6 gap-y-6 @min-[30rem]/visa-form:grid-cols-2">
         <Field label="Full name (as in passport)" htmlFor="fullName" required className="@min-[30rem]/visa-form:col-span-2">
-          <Input id="fullName" name="fullName" autoComplete="name" defaultValue={v.fullName ?? t.full_name ?? ""} placeholder="Enter full name" required />
+          <Input id="fullName" name="fullName" minLength={2} pattern=".*\S.*" autoComplete="name" defaultValue={v.fullName ?? t.full_name ?? ""} placeholder="Enter full name" required />
         </Field>
         <Field label="Date of birth" htmlFor="dateOfBirth" required>
           <Input id="dateOfBirth" name="dateOfBirth" type="date" autoComplete="bday" max={todayIso()} defaultValue={v.dateOfBirth ?? t.date_of_birth ?? ""} required />
@@ -585,7 +586,7 @@ export function StepPersonalInfo({
           <CountrySearchSelect id="nationality" name="nationality" defaultValue={v.nationality ?? t.nationality ?? undefined} placeholder="Search nationality" required />
         </Field>
         <Field label="Passport number" htmlFor="passportNumber" required>
-          <Input id="passportNumber" name="passportNumber" autoCapitalize="characters" spellCheck={false} defaultValue={v.passportNumber ?? t.passport_number ?? ""} placeholder="Enter passport number" required />
+          <Input id="passportNumber" name="passportNumber" minLength={3} pattern=".*\S.*" autoCapitalize="characters" spellCheck={false} defaultValue={v.passportNumber ?? t.passport_number ?? ""} placeholder="Enter passport number" required />
         </Field>
         <Field label="Passport expiry date" htmlFor="passportExpiry" required>
           <Input id="passportExpiry" name="passportExpiry" type="date" min={todayIso()} defaultValue={v.passportExpiry ?? t.passport_expiry ?? ""} required />
@@ -622,40 +623,38 @@ export function StepPersonalInfo({
 /* Step 3 — travel information                                                */
 /* ------------------------------------------------------------------------- */
 
-function YesNo({ name, label, defaultValue }: { name: string; label: string; defaultValue: "yes" | "no" }) {
-  const [value, setValue] = useState<"yes" | "no">(defaultValue);
-  const labelId = `${name}-label`;
+function YesNo({ name, label, defaultValue, required }: { name: string; label: string; defaultValue?: "yes" | "no"; required?: boolean }) {
   return (
-    <div className="space-y-2">
-      <Label id={labelId}>{label}</Label>
-      <input type="hidden" name={name} value={value} />
-      <div role="radiogroup" aria-labelledby={labelId} className="flex gap-2">
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium">{label}{required ? <span className="text-destructive"> *</span> : null}</legend>
+      <div className="flex gap-2">
         {(["yes", "no"] as const).map((option) => (
-          <button
-            key={option}
-            type="button"
-            role="radio"
-            aria-checked={value === option}
-            onClick={() => setValue(option)}
-            className={cn(
-              "flex min-h-12 items-center gap-2 rounded-lg border px-4 text-base transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-              value === option ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
-            )}
-          >
-            <span
-              aria-hidden
-              className={cn(
-                "flex size-4 items-center justify-center rounded-full border-2",
-                value === option ? "border-primary" : "border-muted-foreground/40"
-              )}
-            >
-              {value === option ? <span className="size-2 rounded-full bg-primary" /> : null}
-            </span>
+          <label key={option} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-border px-4 text-base transition-colors has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
+            <input type="radio" name={name} value={option} defaultChecked={defaultValue === option} required={required} className="size-4 accent-primary" />
             {option === "yes" ? "Yes" : "No"}
-          </button>
+          </label>
         ))}
       </div>
-    </div>
+    </fieldset>
+  );
+}
+
+function RequiredChoices({ field, name, initial }: { field: RequirementField; name: string; initial: string[] }) {
+  const [selected, setSelected] = useState(initial);
+  return (
+    <fieldset className="min-w-0 space-y-2 @min-[30rem]/visa-form:col-span-2">
+      <legend className="text-sm font-medium">{field.label}{field.required ? <span className="text-destructive"> *</span> : null}</legend>
+      <div className="flex flex-wrap gap-2">
+        {(field.options ?? []).map((option, index) => (
+          <label key={option} className="flex min-h-12 cursor-pointer items-center gap-2.5 rounded-lg border border-border px-4 text-base transition-colors has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
+            <input type="checkbox" name={name} value={option} checked={selected.includes(option)} required={field.required && selected.length === 0 && index === 0}
+              onChange={(event) => setSelected((values) => event.target.checked ? [...values, option] : values.filter((value) => value !== option))}
+              className="size-4 accent-primary" />
+            {option}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
@@ -679,7 +678,7 @@ function RequirementInput({
 
   switch (field.type) {
     case "yes_no":
-      return <YesNo name={name} label={field.label} defaultValue={text === "yes" ? "yes" : "no"} />;
+      return <YesNo name={name} label={field.label} defaultValue={text === "yes" || text === "no" ? text : undefined} required={field.required} />;
     case "dropdown":
       return (
         <Field label={field.label} htmlFor={id} required={field.required}>
@@ -703,25 +702,7 @@ function RequirementInput({
           selected = [refill];
         }
       }
-      return (
-        <fieldset className={cn("min-w-0 space-y-2", wide)}>
-          <legend className="text-sm font-medium text-foreground">
-            {field.label}
-            {field.required ? <span className="text-destructive"> *</span> : null}
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {(field.options ?? []).map((option) => (
-              <label
-                key={option}
-                className="flex min-h-12 cursor-pointer items-center gap-2.5 rounded-lg border border-border px-4 text-base transition-colors has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
-              >
-                <input type="checkbox" name={name} value={option} defaultChecked={selected.includes(option)} className="size-4 accent-primary" />
-                {option}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      );
+      return <RequiredChoices field={field} name={name} initial={selected} />;
     }
     case "country":
       return (
@@ -732,7 +713,7 @@ function RequirementInput({
     case "phone":
       return (
         <Field label={field.label} htmlFor={id} required={field.required}>
-          <PhoneInput id={id} name={name} required={field.required} defaultValue={text} />
+          <PhoneInput id={id} name={name} validateNumber required={field.required} defaultValue={text} />
         </Field>
       );
     case "long_text":
@@ -1061,6 +1042,7 @@ export function StepDocuments({
   desk?: boolean;
 }) {
   const [state, formAction] = useActionState(continueFromDocuments, null);
+  const router = useRouter();
   const uploadQueue = useRef(createUploadQueue());
   const [pendingUploads, setPendingUploads] = useState(0);
   const pendingUploadsRef = useRef(0);
@@ -1068,16 +1050,18 @@ export function StepDocuments({
     pendingUploadsRef.current += 1;
     setPendingUploads(pendingUploadsRef.current);
     try {
-      return await uploadQueue.current(() => new Promise<ActionState>((resolve, reject) => {
+      const result = await uploadQueue.current(() => new Promise<ActionState>((resolve, reject) => {
         startTransition(() => {
           void uploadVisaDocument(null, data).then(resolve, reject);
         });
       }));
+      if (result && !result.error) router.refresh();
+      return result;
     } finally {
       pendingUploadsRef.current -= 1;
       setPendingUploads(pendingUploadsRef.current);
     }
-  }, []);
+  }, [router]);
   useWizardNavigate(state);
   const slots = parseDocumentSlots(application.resolved_documents ?? application.visa_type?.required_documents);
   const byKey = new Map(application.documents.map((d) => [d.document_type, d]));

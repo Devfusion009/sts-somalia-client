@@ -39,7 +39,7 @@ function visaDates(travelDetails: unknown): { from: string | null; to: string | 
   if (!travelDetails || typeof travelDetails !== "object") return { from: null, to: null };
   const t = travelDetails as Record<string, unknown>;
   const pick = (k: string) => (typeof t[k] === "string" && t[k] ? (t[k] as string) : null);
-  return { from: pick("arrivalDate"), to: pick("departureDate") };
+  return { from: pick("arrival_date") ?? pick("arrivalDate"), to: pick("departure_date") ?? pick("departureDate") };
 }
 
 export function describeOrderItem(item: AdminOrder["order_items"][number]): OrderItemSummary {
