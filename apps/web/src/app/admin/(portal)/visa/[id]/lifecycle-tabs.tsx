@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { submissionDocuments, submissionBlocker } from "@/modules/visa/submission-packet";
+import { ApplicantTab } from "./case-tabs";
 import { CalendarClock, ExternalLink, Gavel, Send, BookUser, type LucideIcon } from "lucide-react";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -238,17 +241,25 @@ export function SubmissionTab({
   const blocker = data.readiness.find((r) => ["appointment", "biometrics", "passport"].includes(r.key) && r.applies && !r.ok);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="space-y-6">
+      <Card><CardContent className="space-y-4">
+        <SectionHeading action={<Pill tone={submissionBlocker(data) ? "warn" : "good"}>{submissionBlocker(data) ? "Not ready" : "Ready to prepare"}</Pill>}>Visa office submission</SectionHeading>
+        <ul className="divide-y divide-border">{submissionDocuments(data).map(doc => <li key={doc.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"><DocLink id={doc.id} label={doc.label} /><Pill tone={doc.review_status === "accepted" ? "good" : "warn"}>{doc.review_status === "accepted" ? "Verified" : "Awaiting review"}</Pill></li>)}</ul>
+        {canSubmit && ready && !submissionBlocker(data) ? <Button render={<Link href={`/admin/visa/${app.id}/submission-email`} target="_blank" rel="noopener noreferrer" />}><Send className="size-4" />Prepare visa office email</Button> : submissionBlocker(data) ? <div className="text-sm text-amber-800 dark:text-amber-300">{submissionBlocker(data)}</div> : null}
+      </CardContent></Card>
+      <ApplicantTab data={data} />
+      <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-4">
         {ready && canSubmit ? (
-          <Card>
-            <CardContent className="space-y-4">
+          <details className="rounded-xl border border-border bg-card p-4">
+            <summary className="cursor-pointer text-sm font-semibold">After sending · Record submission</summary>
+            <div className="mt-4 space-y-4">
               <SectionHeading action={blocker ? <Pill tone="warn">{blocker.label} outstanding</Pill> : null}>
                 Record submission
               </SectionHeading>
               <RecordSubmissionForm applicationId={app.id} centres={centres} appointments={attended} />
-            </CardContent>
-          </Card>
+            </div>
+          </details>
         ) : null}
 
         {ready && canSubmit && data.workspace.route === "partner" ? (
@@ -349,6 +360,7 @@ export function SubmissionTab({
             </CardContent>
           </Card>
         ) : null}
+      </div>
       </div>
     </div>
   );

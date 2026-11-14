@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { ArrowRight, CheckCircle2, CircleDashed, History, NotebookPen, Receipt } from "lucide-react";
+import { ArrowRight, CheckCircle2, CircleDashed, History, NotebookPen, Receipt, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -42,6 +42,7 @@ function NoActivity() {
 export function OverviewTab({ data, actions, reviewable }: { data: VisaCase; actions: VisaAction[]; reviewable: boolean }) {
   const recent = data.events.filter((e) => e.event_type !== "document.accessed").slice(0, 6);
   const applies = data.readiness.filter((r) => r.applies);
+  const paymentBlocked = data.application.status === "submitted" && !["paid", "partially_paid"].includes(data.paymentState);
   const refundNote =
     data.jobs.length > 0
       ? "Filed with the authority · no refund"
@@ -60,6 +61,21 @@ export function OverviewTab({ data, actions, reviewable }: { data: VisaCase; act
         <Card>
           <CardContent className="space-y-5">
             <SectionHeading>Next step</SectionHeading>
+            {paymentBlocked ? (
+              <div role="status" className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+                <div className="flex items-start gap-3">
+                  <LockKeyhole className="mt-0.5 size-5 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />
+                  <div className="space-y-1">
+                    <div className="text-sm font-semibold">Review blocked · Payment not confirmed</div>
+                    <div className="text-sm text-amber-900 dark:text-amber-200">Confirm payment before starting the application review.</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-amber-200 pt-3 dark:border-amber-900">
+                  <span className="text-sm font-medium tabular-nums">{data.order ? `${formatMoney(data.order.remaining, data.order.currency)} outstanding` : "No payment recorded"}</span>
+                  <Button variant="outline" size="sm" render={<Link href={data.order ? `/admin/orders?order=${data.order.id}#order-${data.order.id}` : "?tab=payment"} />}><Receipt className="size-3.5" />Check payment</Button>
+                </div>
+              </div>
+            ) : null}
             {actions.length > 0 ? <CaseActions applicationId={data.application.id} actions={actions} refundNote={refundNote} /> : null}
             {applies.length > 0 ? (
               <ul className="divide-y divide-border">
@@ -145,8 +161,8 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
           </div>
           <DetailGrid rows={[
             ["Booked by", app.submitter?.full_name ?? app.submitter?.email],
-            ["Booking channel", app.agency_id ? "Agency" : "Direct"],
-            ["Agency", app.agency?.name],
+            ["Booking channel", app.agency_id ? "Agency" : "Direct customer"],
+            ...(app.agency_id ? [["Agency", app.agency?.name] as [string, string | null | undefined]] : []),
             ["Application type", label(app.applicant_type)],
             ["Account email", app.submitter?.email],
             ["Account phone", app.submitter?.phone],

@@ -17,7 +17,7 @@ import { getBookingCustomers } from "@/modules/agencies/booking-context";
 import { travellerName } from "@/modules/agencies/traveller-profile";
 import {
   APPLICANT_TYPES,
-  applicationDocumentSlots,
+  travellerDocumentSlots, missingTravellerDocuments,
   memberSchema,
   memberRequirementAnswers,
   parseRequirementAnswers,
@@ -125,7 +125,7 @@ function missingSectionFiles(application: EditableApplication, sections: Require
     .filter(
       (slot) =>
         !application.documents.some(
-          (d) => d.document_type === slot.documentType && (slot.memberId === null || d.member_id === slot.memberId)
+          (d) => d.document_type === slot.documentType && d.member_id === slot.memberId && d.is_current && d.review_status !== "rejected"
         )
     )
     .map((slot) => (slot.memberName ? `${slot.label} (${slot.memberName})` : slot.label));
@@ -136,21 +136,14 @@ function missingSectionFiles(application: EditableApplication, sections: Require
  * slot, or a file field of an admin-defined section. Null when it is neither.
  */
 function resolveUploadSlot(application: EditableApplication, slotKey: string, memberId: string | null) {
-  const slot = applicationDocumentSlots(application).find((s) => s.key === slotKey);
-  if (slot) return { key: slot.key, label: slot.label, maxMb: slot.max_mb ?? 5, memberId: null, sectionField: false };
+  const slot = travellerDocumentSlots(application).find((s) => s.key === slotKey && s.memberId === memberId);
+  if (slot) return { key: slot.key, label: slot.label, maxMb: slot.max_mb ?? 5, memberId: slot.memberId, sectionField: false };
   const sections = parseRequirementSections(application.visa_type?.application_sections);
   const fileSlot = sectionFileSlots(sections, application.members).find(
     (s) => s.documentType === slotKey && s.memberId === memberId
   );
   if (!fileSlot) return null;
   return { key: fileSlot.documentType, label: fileSlot.label, maxMb: 5, memberId: fileSlot.memberId, sectionField: true };
-}
-
-/** Earlier uploads the new file replaces: same slot, and same traveller for section files. */
-function previousUploads(application: EditableApplication, target: NonNullable<ReturnType<typeof resolveUploadSlot>>) {
-  return application.documents.filter(
-    (doc) => doc.document_type === target.key && (!target.sectionField || doc.member_id === target.memberId)
-  );
 }
 
 function wizardPath(applicationId: string, step: number) {
@@ -419,7 +412,7 @@ export async function saveVisaMember(_prev: MemberActionState, formData: FormDat
     requireUser(),
     supabase
       .from("visa_applications")
-      .select("id, submitted_by, visa_type:visa_type_id (destination_country_code), members:visa_members (id)")
+      .select("id, submitted_by, visa_type:visa_type_id (destination_country_code), members:visa_members (id,passport_number,nationality)")
       .eq("id", applicationId.data)
       .eq("status", "draft")
       .maybeSingle(),
@@ -432,6 +425,9 @@ export async function saveVisaMember(_prev: MemberActionState, formData: FormDat
   }
 
   const memberId = formData.get("memberId")?.toString();
+  if (memberId && !z.string().uuid().safeParse(memberId).success) return { error: "Invalid traveller." };
+  if (application.members.some(member => member.id !== memberId && member.passport_number?.replace(/\s/g, "").toUpperCase() === parsed.data.passportNumber.replace(/\s/g, "").toUpperCase() && member.nationality === parsed.data.nationality)) return { error: "This passport is already assigned to another traveller." };
+
   const row = {
     application_id: application.id,
     full_name: parsed.data.fullName,
@@ -689,30 +685,14 @@ export async function uploadVisaDocument(
     .upload(storagePath, file, { contentType: file.type });
   if (uploadError) return { error: uploadError.message };
 
-  // Replace any previous upload in the same slot.
-  const previous = previousUploads(application, slot);
-  if (previous.length > 0) {
-    await supabase.storage.from("visa-documents").remove(previous.map((p) => p.storage_path));
-    await supabase
-      .from("visa_documents")
-      .delete()
-      .in(
-        "id",
-        previous.map((p) => p.id)
-      );
-  }
-
-  const { error: insertError } = await supabase.from("visa_documents").insert({
-    application_id: application.id,
-    document_type: slot.key,
-    member_id: slot.memberId,
-    storage_path: storagePath,
-    uploaded_by: user.id,
-    file_name: file.name,
-    file_size: file.size,
-    content_type: file.type,
+  const { error: insertError } = await supabase.rpc("visa_save_draft_document", {
+    p_application_id: application.id, p_document_type: slot.key, p_member_id: slot.memberId!,
+    p_storage_path: storagePath, p_file_name: file.name, p_file_size: file.size, p_content_type: file.type,
   });
-  if (insertError) return { error: insertError.message };
+  if (insertError) {
+    await supabase.storage.from("visa-documents").remove([storagePath]);
+    return { error: insertError.message };
+  }
 
   revalidatePath(`/visa/apply/${application.id}`);
   return { error: null };
@@ -789,27 +769,9 @@ export async function attachVaultDocument(
     .upload(storagePath, blob, { contentType: vaultDoc.content_type ?? blob.type });
   if (uploadError) return { error: uploadError.message };
 
-  const previous = previousUploads(application, slot);
-  if (previous.length > 0) {
-    await supabase.storage.from("visa-documents").remove(previous.map((p) => p.storage_path));
-    await supabase
-      .from("visa_documents")
-      .delete()
-      .in(
-        "id",
-        previous.map((p) => p.id)
-      );
-  }
-
-  const { error: insertError } = await supabase.from("visa_documents").insert({
-    application_id: application.id,
-    document_type: slot.key,
-    member_id: slot.memberId,
-    storage_path: storagePath,
-    uploaded_by: user.id,
-    file_name: fileName,
-    file_size: vaultDoc.file_size,
-    content_type: vaultDoc.content_type,
+  const { error: insertError } = await supabase.rpc("visa_save_draft_document", {
+    p_application_id: application.id, p_document_type: slot.key, p_member_id: slot.memberId!,
+    p_storage_path: storagePath, p_file_name: fileName, p_file_size: blob.size, p_content_type: vaultDoc.content_type ?? blob.type,
   });
   if (insertError) {
     await supabase.storage.from("visa-documents").remove([storagePath]);
@@ -845,10 +807,8 @@ export async function continueFromDocuments(
   const { supabase, application } = await getEditableApplication(applicationId.data, user.id);
   if (!application) return { error: "This application can no longer be edited." };
 
-  const slots = applicationDocumentSlots(application);
-  const uploadedKeys = new Set(application.documents.map((d) => d.document_type));
   const missing = [
-    ...slots.filter((s) => s.required && !uploadedKeys.has(s.key)).map((s) => s.label),
+    ...missingTravellerDocuments(application).map(s => `${s.label}${s.memberName ? ` (${s.memberName})` : ""}`),
     ...missingSectionFiles(application, parseRequirementSections(application.visa_type?.application_sections)),
   ];
   if (missing.length > 0) {
@@ -922,6 +882,9 @@ export async function submitVisaApplication(
   if (personal.data.passportExpiry <= travelCheck.data.departureDate) {
     return { error: "The passport expires before the departure date. Review step 2." };
   }
+  for (const member of application.members) {
+    if (!member.passport_expiry || member.passport_expiry <= travelCheck.data.departureDate) return { error: `${member.full_name}: passport must be valid after departure. Review the traveller details.` };
+  }
   const sections = parseRequirementSections(visaType.application_sections);
   const answersError = requirementAnswersError(
     sections,
@@ -930,10 +893,8 @@ export async function submitVisaApplication(
   );
   if (answersError) return { error: `${answersError} Review step 3.` };
 
-  const slots = applicationDocumentSlots(application);
-  const uploadedKeys = new Set(application.documents.map((d) => d.document_type));
   const missing = [
-    ...slots.filter((s) => s.required && !uploadedKeys.has(s.key)).map((s) => s.label),
+    ...missingTravellerDocuments(application).map(s => `${s.label}${s.memberName ? ` (${s.memberName})` : ""}`),
     ...missingSectionFiles(application, sections),
   ];
   if (missing.length > 0) {

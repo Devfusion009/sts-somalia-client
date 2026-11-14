@@ -1,11 +1,10 @@
-import { Check, ExternalLink, FileStack, X } from "lucide-react";
+import { ExternalLink, FileStack } from "lucide-react";
 import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/badge";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { adminResolveDocumentRequest } from "@/modules/visa/admin-actions";
+import { ResolveRequestControls } from "./resolve-request-controls";
 import { DocumentStatusBadge } from "@/modules/visa/components/visa-shared";
 import type { VisaCase } from "@/modules/visa/case-queries";
 import { DocumentReviewControls } from "./document-review-controls";
@@ -183,30 +182,7 @@ export function DocumentsTab({ data, reviewable }: { data: VisaCase; reviewable:
                       </TableCell>
                       <TableCell>
                         {open && reviewable ? (
-                          <div className="flex justify-end gap-1">
-                            <form action={adminResolveDocumentRequest}>
-                              <input type="hidden" name="requestId" value={request.id} />
-                              <input type="hidden" name="applicationId" value={application.id} />
-                              <input type="hidden" name="resolution" value="received" />
-                              <SubmitButton
-                                size="icon-sm"
-                                variant="outline"
-                                aria-label="Mark received"
-                                title="Mark received"
-                                pendingText=""
-                              >
-                                <Check className="text-primary" />
-                              </SubmitButton>
-                            </form>
-                            <form action={adminResolveDocumentRequest}>
-                              <input type="hidden" name="requestId" value={request.id} />
-                              <input type="hidden" name="applicationId" value={application.id} />
-                              <input type="hidden" name="resolution" value="waived" />
-                              <SubmitButton size="icon-sm" variant="ghost" aria-label="Waive" title="Waive" pendingText="">
-                                <X />
-                              </SubmitButton>
-                            </form>
-                          </div>
+                          <ResolveRequestControls requestId={request.id} applicationId={application.id} uploaded={Boolean(upload)} />
                         ) : null}
                       </TableCell>
                     </TableRow>

@@ -8838,6 +8838,14 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["visa_status"]
       }
+      visa_save_draft_document: {
+        Args: { p_application_id: string; p_member_id?: string; p_document_type: string; p_storage_path: string; p_file_name: string; p_file_size: number; p_content_type: string }
+        Returns: string
+      }
+      visa_upload_missing_document: {
+        Args: { p_application_id: string; p_member_id: string; p_document_type: string; p_storage_path: string; p_file_name: string; p_file_size: number; p_content_type: string }
+        Returns: string
+      }
       visa_update_submission: {
         Args: {
           p_application_id: string
