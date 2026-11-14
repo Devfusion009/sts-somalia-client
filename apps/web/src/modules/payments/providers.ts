@@ -142,8 +142,8 @@ function initiateManual(input: GatewayCharge, { bankTransfer }: PaymentGateways)
       instructions:
         `Transfer ${input.currency} ${input.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} to ${bankTransfer.bankName}, ` +
         `account "${bankTransfer.accountName}", account no. ${bankTransfer.accountNumber}. ` +
-        `Use ${input.reference} as the transfer reference, then share the receipt with our team ` +
-        `on +252 611 444 420. We confirm transfers within one working day.`,
+        `Use ${input.reference} as the transfer reference, then upload the transfer receipt or bank statement here. ` +
+        `STS will verify the funds before confirming your booking.`,
     };
   }
   return {

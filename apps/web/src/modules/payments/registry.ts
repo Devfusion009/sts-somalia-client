@@ -109,7 +109,7 @@ export async function getAvailablePaymentMethods(opts?: {
     {
       id: "bank_transfer",
       label: "Bank Transfer",
-      description: "Pay via bank transfer and send us the receipt",
+      description: "Transfer to STS and upload payment proof",
       kind: "bank",
       provider: "manual",
       badges: ["Bank"],

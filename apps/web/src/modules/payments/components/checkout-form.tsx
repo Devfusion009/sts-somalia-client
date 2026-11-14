@@ -86,6 +86,7 @@ export function CheckoutForm({
   });
   const [selectedId, setSelectedId] = useState(methods[0]?.id ?? "");
   const selected = methods.find((m) => m.id === selectedId);
+  const onlineAvailable = methods.some(m => ["card", "mobile_money"].includes(m.kind));
 
   const canDeposit = isFirstPayment && minDeposit < remaining;
   const [payChoice, setPayChoice] = useState<"full" | "amount">("full");
@@ -237,7 +238,7 @@ export function CheckoutForm({
           role="radiogroup"
           aria-labelledby="payment-method-heading"
           onKeyDown={onMethodKeyDown}
-          className={cn("grid gap-3", orderedMethods.length > 1 && "sm:grid-cols-2")}
+          className={cn("grid gap-3", onlineAvailable && orderedMethods.length > 1 && "sm:grid-cols-2")}
         >
           {orderedMethods.map((method) => {
             const Icon = KIND_ICONS[method.kind];
@@ -302,6 +303,12 @@ export function CheckoutForm({
               </button>
             );
           })}
+          {!onlineAvailable ? (
+            <button type="button" role="radio" aria-checked={false} disabled className={cn(TILE, "flex items-start gap-3 border-border bg-muted/30 p-4 text-muted-foreground opacity-75")}>
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted"><CreditCard className="size-[18px]" aria-hidden /></span>
+              <span className="min-w-0"><span className="block text-sm font-semibold">Online payment</span><span className="mt-1 block text-xs">Not yet available</span></span>
+            </button>
+          ) : null}
         </div>
       </div>
 

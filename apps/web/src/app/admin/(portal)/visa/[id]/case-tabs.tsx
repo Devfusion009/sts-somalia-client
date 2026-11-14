@@ -23,6 +23,7 @@ import { MessageThread } from "@/modules/visa/components/message-thread";
 import { MessageComposer } from "@/modules/visa/components/message-composer";
 import { adminSendMessage } from "@/modules/visa/admin-actions";
 import { DetailGrid, EventList, SectionHeading, formatWhen } from "./case-ui";
+import { DocumentsTab } from "./documents-tab";
 
 function NoActivity() {
   return (
@@ -38,7 +39,7 @@ function NoActivity() {
 // ---------------------------------------------------------------------------
 // Overview
 // ---------------------------------------------------------------------------
-export function OverviewTab({ data, actions }: { data: VisaCase; actions: VisaAction[] }) {
+export function OverviewTab({ data, actions, reviewable }: { data: VisaCase; actions: VisaAction[]; reviewable: boolean }) {
   const recent = data.events.filter((e) => e.event_type !== "document.accessed").slice(0, 6);
   const applies = data.readiness.filter((r) => r.applies);
   const refundNote =
@@ -49,53 +50,63 @@ export function OverviewTab({ data, actions }: { data: VisaCase; actions: VisaAc
         : "Nothing paid · no refund";
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
-        <CardContent className="space-y-5">
-          <SectionHeading>Next step</SectionHeading>
-          {actions.length > 0 ? <CaseActions applicationId={data.application.id} actions={actions} refundNote={refundNote} /> : null}
-          {applies.length > 0 ? (
-            <ul className="divide-y divide-border">
-              {applies.map((item) => (
-                <li key={item.key} className="flex items-start gap-3 py-2.5 text-sm">
-                  {item.ok ? (
-                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-label="Done" />
-                  ) : (
-                    <CircleDashed className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-label="Outstanding" />
-                  )}
-                  <div className="min-w-0">
-                    <p className={cn("font-medium", item.ok && "text-muted-foreground")}>{item.label}</p>
-                    {!item.ok && item.detail && item.key !== "payment" ? (
-                      <p className="text-xs text-muted-foreground first-letter:uppercase">{item.detail}</p>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      <nav aria-label="Application sections" className="flex flex-wrap gap-2">
+        {[["applicant", "Applicant & answers"], ["documents", "Documents"], ["payment", "Order & payment"]].map(([id, label]) => (
+          <Button key={id} variant="outline" size="sm" render={<a href={`#case-${id}`} />}>{label}</Button>
+        ))}
+      </nav>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardContent className="space-y-5">
+            <SectionHeading>Next step</SectionHeading>
+            {actions.length > 0 ? <CaseActions applicationId={data.application.id} actions={actions} refundNote={refundNote} /> : null}
+            {applies.length > 0 ? (
+              <ul className="divide-y divide-border">
+                {applies.map((item) => (
+                  <li key={item.key} className="flex items-start gap-3 py-2.5 text-sm">
+                    {item.ok ? (
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-label="Done" />
+                    ) : (
+                      <CircleDashed className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-label="Outstanding" />
+                    )}
+                    <div className="min-w-0">
+                      <p className={cn("font-medium", item.ok && "text-muted-foreground")}>{item.label}</p>
+                      {!item.ok && item.detail && item.key !== "payment" ? (
+                        <p className="text-xs text-muted-foreground first-letter:uppercase">{item.detail}</p>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardContent className="space-y-3">
-          <SectionHeading
-            action={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="All activity"
-                title="All activity"
-                render={<Link href={`?tab=activity`} scroll={false} />}
-              >
-                <ArrowRight />
-              </Button>
-            }
-          >
-            Recent activity
-          </SectionHeading>
-          {recent.length === 0 ? <NoActivity /> : <EventList events={recent} />}
-        </CardContent>
-      </Card>
+        <Card>
+          <CardContent className="space-y-3">
+            <SectionHeading
+              action={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="All activity"
+                  title="All activity"
+                  render={<Link href={`?tab=activity`} scroll={false} />}
+                >
+                  <ArrowRight />
+                </Button>
+              }
+            >
+              Recent activity
+            </SectionHeading>
+            {recent.length === 0 ? <NoActivity /> : <EventList events={recent} />}
+          </CardContent>
+        </Card>
+      </div>
+      <section id="case-applicant" className="scroll-mt-24"><ApplicantTab data={data} /></section>
+      <section id="case-documents" className="scroll-mt-24"><DocumentsTab data={data} reviewable={reviewable} /></section>
+      <section id="case-payment" className="scroll-mt-24"><PaymentTab data={data} /></section>
     </div>
   );
 }
@@ -125,6 +136,23 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardContent className="space-y-4">
+          <SectionHeading>Application contact</SectionHeading>
+          <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
+            {contact.email ? <a className="break-all font-medium text-primary underline underline-offset-4" href={`mailto:${contact.email}`}>{contact.email}</a> : null}
+            {contact.mobile ? <a className="font-medium text-primary underline underline-offset-4" href={`tel:${contact.mobile.replace(/[^+0-9]/g, "")}`}>{contact.mobile}</a> : null}
+          </div>
+          <DetailGrid rows={[
+            ["Booked by", app.submitter?.full_name ?? app.submitter?.email],
+            ["Booking channel", app.agency_id ? "Agency" : "Direct"],
+            ["Agency", app.agency?.name],
+            ["Application type", label(app.applicant_type)],
+            ["Account email", app.submitter?.email],
+            ["Account phone", app.submitter?.phone],
+          ]} />
+        </CardContent>
+      </Card>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardContent className="space-y-4">
@@ -137,8 +165,6 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
                 ["Nationality", traveler.nationality ? countryName(traveler.nationality) : undefined],
                 ["Passport number", traveler.passport_number],
                 ["Passport expiry", day(traveler.passport_expiry)],
-                ["Email", contact.email],
-                ["Mobile", contact.mobile],
               ]}
             />
           </CardContent>
@@ -152,8 +178,6 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
                 ["Departure", day(travel.departure_date)],
                 ["Purpose", label(travel.purpose)],
                 ["Address", str(travel.address)],
-                ["Booked by", data.application.submitter?.full_name ?? data.application.submitter?.email],
-                ["Booking channel", app.agency_id ? "Agency" : "Direct"],
               ]}
             />
           </CardContent>
@@ -172,6 +196,7 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
                   <TableHead>Date of birth</TableHead>
                   <TableHead>Nationality</TableHead>
                   <TableHead>Passport</TableHead>
+                  <TableHead>Passport expiry</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -189,6 +214,7 @@ export function ApplicantTab({ data }: { data: VisaCase }) {
                     <TableCell className="whitespace-nowrap tabular-nums">{day(member.date_of_birth) ?? "—"}</TableCell>
                     <TableCell>{member.nationality ? countryName(member.nationality) : "—"}</TableCell>
                     <TableCell className="font-mono text-xs">{member.passport_number ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">{day(member.passport_expiry) ?? "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -239,6 +265,7 @@ export function PaymentTab({ data }: { data: VisaCase }) {
     );
   }
   const money = (v: number | string) => formatMoney(v, order.currency);
+  const pending = order.payments.filter((p) => ["requires_action", "processing"].includes(p.status));
   const rows: Array<[string, string, boolean?]> = [
     ["Visa service", money(order.subtotal)],
     ...(Number(order.markup_amount) > 0 ? ([["Agency service fee", money(order.markup_amount)]] as Array<[string, string]>) : []),
@@ -269,9 +296,16 @@ export function PaymentTab({ data }: { data: VisaCase }) {
               </div>
             ))}
           </dl>
-          <div className="flex justify-end">
-            <Button variant="outline" size="sm" render={<Link href="/admin/orders" />}>
-              Open in Orders
+          {pending.length > 0 ? <ul className="space-y-2">{pending.map((payment, index) => (
+            <li key={index} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3 text-sm">
+              <span className="font-medium">{payment.method_label ?? "Online payment"} · {money(payment.amount)}</span>
+              <Badge variant="warning">{payment.status === "processing" ? "Processing" : "Awaiting confirmation"}</Badge>
+            </li>
+          ))}</ul> : null}
+          <div className="flex flex-wrap justify-end gap-2">
+            {order.invoices ? <Button variant="outline" size="sm" render={<a href={`/api/invoices/${order.id}`} target="_blank" rel="noopener noreferrer" />}><Receipt className="size-4" />{order.invoices.invoice_number}</Button> : null}
+            <Button variant="outline" size="sm" render={<Link href={`/admin/orders?order=${order.id}#order-${order.id}`} />}>
+              Open order & payments
             </Button>
           </div>
         </CardContent>

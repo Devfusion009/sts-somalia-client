@@ -317,7 +317,7 @@ export async function getOrdersByIds(ids: string[]) {
   const { data } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, currency, subtotal, discount_total, total, created_at, paid_at, notes, customer:profiles!orders_customer_id_fkey(full_name, email, phone), agency:agencies(name), agency_customer:agency_customer_id(full_name, phone), payments(id, provider, method_label, amount, currency, status, payer_phone, created_at), invoices(invoice_number, status), order_items(id, item_type, quantity, total_price, hotel_booking:hotel_booking_id(check_in, check_out, num_rooms, num_adults, status, hotel:hotel_id(name, city)), flight_booking:flight_booking_id(origin_iata, destination_iata, depart_at, return_at, status, provider_booking_ref, ticketing_status), visa_application:visa_application_id(application_ref, status, travel_details, visa_type:visa_type_id(name, destination_country_code)), umrah_booking:umrah_booking_id(num_pilgrims, status, package:package_id(name, duration_days), departure:departure_id(departure_date, return_date)), hall_booking:hall_booking_id(event_type, start_date, end_date, status, venue:venue_id(name, city)))"
+      "id, order_number, status, currency, subtotal, discount_total, total, created_at, paid_at, notes, customer:profiles!orders_customer_id_fkey(full_name, email, phone), agency:agencies(name), agency_customer:agency_customer_id(full_name, phone), payments(id, provider, method_label, amount, currency, status, payer_phone, created_at), invoices(invoice_number, status), order_items(id, item_type, quantity, total_price, hotel_booking:hotel_booking_id(check_in, check_out, num_rooms, num_adults, status, hotel:hotel_id(name, city)), flight_booking:flight_booking_id(origin_iata, destination_iata, depart_at, return_at, status, provider_booking_ref, ticketing_status), visa_application:visa_application_id(id, application_ref, status, travel_details, visa_type:visa_type_id(name, destination_country_code)), umrah_booking:umrah_booking_id(num_pilgrims, status, package:package_id(name, duration_days), departure:departure_id(departure_date, return_date)), hall_booking:hall_booking_id(event_type, start_date, end_date, status, venue:venue_id(name, city)))"
     )
     .in("id", ids);
 
@@ -477,7 +477,7 @@ export async function getVisaOrderAdmin(applicationId: string) {
   const { data } = await supabase
     .from("order_items")
     .select(
-      "order:order_id (id, order_number, status, subtotal, markup_amount, fee_total, total, currency, payments(status, method_label, amount))"
+      "order:order_id (id, order_number, status, subtotal, markup_amount, fee_total, total, currency, payments(status, method_label, amount), invoices(invoice_number))"
     )
     .eq("visa_application_id", applicationId)
     .maybeSingle();
