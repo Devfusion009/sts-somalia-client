@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireVisaPermission } from "./staff-auth";
@@ -11,7 +12,7 @@ import { submitToPartner, syncPartnerStatus, mapPartnerStatus } from "./partner/
 import { parkForUnmappedPartnerStatus, parkForRefusedPartnerTransition } from "./partner/sync";
 import type { Json } from "@/lib/types/database.types";
 
-export type ActionState = { error: string | null } | null;
+export type ActionState = { error: string | null; requiresRefresh?: boolean } | null;
 
 function revalidateVisaViews(applicationId: string) {
   revalidatePath("/admin/visa");
@@ -118,7 +119,7 @@ export async function adminRequestDocument(
   });
   if (error) return { error: rpcMessage(error.message) };
   if (parsed.data.requirement === "required") {
-    await notifyVisaCustomer(parsed.data.applicationId, "documents_requested", `Please upload: ${parsed.data.title}.`);
+    after(() => notifyVisaCustomer(parsed.data.applicationId, "documents_requested", `Please upload: ${parsed.data.title}.`));
   }
 
   revalidateVisaViews(parsed.data.applicationId);
@@ -168,11 +169,11 @@ export async function adminReviewDocument(
   if (error) return { error: rpcMessage(error.message) };
   if (parsed.data.decision === "reject") {
     const { data: doc } = await supabase.from("visa_documents").select("rejection_reason").eq("id", parsed.data.documentId).maybeSingle();
-    await notifyVisaCustomer(
+    after(() => notifyVisaCustomer(
       parsed.data.applicationId,
       "documents_requested",
       `A document needs to be replaced: ${doc?.rejection_reason ?? parsed.data.reason ?? ""}`
-    );
+    ));
   }
 
   revalidateVisaViews(parsed.data.applicationId);
@@ -200,7 +201,7 @@ export async function adminAddInternalNote(_prev: ActionState, formData: FormDat
 }
 
 /** Mark a requested document received (accepting its upload) or waive it. */
-export async function adminResolveDocumentRequest(formData: FormData): Promise<void> {
+export async function adminResolveDocumentRequest(_previous: ActionState, formData: FormData): Promise<ActionState> {
   await requireVisaPermission("visa.documents.review");
   const parsed = z
     .object({
@@ -215,11 +216,17 @@ export async function adminResolveDocumentRequest(formData: FormData): Promise<v
     });
 
   const supabase = await createClient();
-  await supabase.rpc("visa_resolve_document_request", {
+  const { data: request, error: requestError } = await supabase.from("visa_document_requests")
+    .select("application_id,status,document_id").eq("id", parsed.requestId).eq("application_id", parsed.applicationId).maybeSingle();
+  if (requestError || !request) return { error: "Document request could not be loaded." };
+  if (parsed.resolution === "received" && (request.status !== "uploaded" || !request.document_id)) return { error: "The customer must upload the document before it can be verified." };
+  const { error } = await supabase.rpc("visa_resolve_document_request", {
     p_request_id: parsed.requestId,
     p_resolution: parsed.resolution,
   });
+  if (error) return { error: rpcMessage(error.message) };
   revalidateVisaViews(parsed.applicationId);
+  return { error: null };
 }
 
 /** Attach the final visa document (shown as "Download Visa" to the customer). */

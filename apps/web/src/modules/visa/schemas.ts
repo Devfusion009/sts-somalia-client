@@ -25,7 +25,7 @@ export function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
-const isoDate = (message: string) => z.string({ error: message }).regex(/^\d{4}-\d{2}-\d{2}$/, message);
+const isoDate = (message: string) => z.string({ error: message }).regex(/^\d{4}-\d{2}-\d{2}$/, message).refine(value => { const date = new Date(`${value}T00:00:00Z`); return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value; }, message);
 const pastDate = (message: string) =>
   isoDate(message).refine((d) => d < todayIso(), "Date of birth must be in the past.");
 const unexpiredDate = (message: string) =>
@@ -75,7 +75,7 @@ export const memberSchema = z.object({
   dateOfBirth: pastDate("Enter the date of birth."),
   nationality: z.string().length(2, "Select a nationality."),
   passportNumber: z.string().trim().min(3, "Enter the passport number."),
-  passportExpiry: unexpiredDate("Enter a valid passport expiry date.").optional(),
+  passportExpiry: unexpiredDate("Enter a valid passport expiry date."),
 });
 export type MemberInput = z.infer<typeof memberSchema>;
 
@@ -121,6 +121,30 @@ export function applicationDocumentSlots(app: {
   visa_type?: { required_documents?: unknown } | null;
 }): DocumentSlot[] {
   return parseDocumentSlots(app.resolved_documents ?? app.visa_type?.required_documents);
+}
+
+type TravellerDocumentApplication = Parameters<typeof applicationDocumentSlots>[0] & {
+  members: { id: string; full_name: string; is_primary?: boolean }[];
+  documents?: { document_type: string; member_id: string | null; is_current?: boolean; review_status?: string }[];
+};
+
+/** Standard requirements repeat for every traveller, including the primary applicant. */
+export function travellerDocumentSlots(app: TravellerDocumentApplication) {
+  return applicationDocumentSlots(app).flatMap(slot => app.members.length
+    ? app.members.map(member => ({ ...slot, memberId: member.id as string | null, memberName: member.full_name as string | null }))
+    : [{ ...slot, memberId: null as string | null, memberName: null as string | null }]);
+}
+
+/** Historical unassigned standard files belong only to the primary traveller. */
+export function documentMemberId(app: TravellerDocumentApplication, doc: { document_type: string; member_id: string | null }) {
+  if (doc.member_id || !applicationDocumentSlots(app).some(slot => slot.key === doc.document_type)) return doc.member_id;
+  return app.members.find(member => member.is_primary)?.id ?? app.members[0]?.id ?? null;
+}
+
+export function missingTravellerDocuments(app: TravellerDocumentApplication) {
+  return travellerDocumentSlots(app).filter(slot => slot.required && !(app.documents ?? []).some(doc =>
+    doc.document_type === slot.key && documentMemberId(app, doc) === slot.memberId && doc.is_current !== false && doc.review_status !== "rejected"
+  ));
 }
 
 /* ------------------------------------------------------------------------- */

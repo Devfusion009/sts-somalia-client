@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import { ClipboardCheck } from "lucide-react";
+import { useCaseActionState } from "@/modules/visa/components/use-case-action-state";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -31,7 +32,7 @@ export function DocumentReviewControls({
   label: string;
   checklist: Check[];
 }) {
-  const [state, action] = useActionState(adminReviewDocument, null);
+  const [state, action] = useCaseActionState(adminReviewDocument, null);
   const [open, setOpen] = useState(false);
   const [verdicts, setVerdicts] = useState<Record<string, Verdict>>({});
   const [lastState, setLastState] = useState(state);
@@ -95,6 +96,7 @@ export function DocumentReviewControls({
             </Field>
           ) : null}
 
+          {state?.requiresRefresh ? <Button type="button" variant="outline" onClick={() => window.location.reload()}>Check status</Button> : null}
           {state?.error ? (
             <p role="alert" className="text-sm text-destructive">
               {state.error}
@@ -106,11 +108,11 @@ export function DocumentReviewControls({
               Cancel
             </Button>
             {failed || reviewStatus !== "pending" ? (
-              <SubmitButton variant="destructive" pendingText="Rejecting…" disabled={reviewStatus === "rejected"}>
+              <SubmitButton variant="destructive" pendingText="Rejecting…" disabled={reviewStatus === "rejected" || state?.requiresRefresh}>
                 Reject document
               </SubmitButton>
             ) : (
-              <SubmitButton pendingText="Accepting…" disabled={!canAccept}>
+              <SubmitButton pendingText="Accepting…" disabled={!canAccept || state?.requiresRefresh}>
                 Accept document
               </SubmitButton>
             )}

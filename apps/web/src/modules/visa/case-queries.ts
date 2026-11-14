@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getVisaOrderAdmin, getVisaProcessingWorkspace } from "@/modules/admin/queries";
-import { applicationDocumentSlots, parseRequirementSections, sectionFileSlots } from "./schemas";
+import { applicationDocumentSlots, travellerDocumentSlots, documentMemberId, parseRequirementSections, sectionFileSlots } from "./schemas";
 import type { PaymentState, ReadinessItem } from "./workflow";
 import { parseVisaSort, type VisaQueue, type VisaSort } from "./queues";
 
@@ -93,13 +93,13 @@ export async function getVisaCase(id: string) {
   // Group every version under its slot, newest first; the head is current.
   // Section file fields (admin-defined requirements) can repeat per
   // traveller, so their uploads group by type and traveller.
-  const slots = applicationDocumentSlots(app);
+  const slots = travellerDocumentSlots(app);
   const fileSlots = sectionFileSlots(parseRequirementSections(app.visa_type?.application_sections), app.members);
   const sectionTypes = new Set(fileSlots.map((f) => f.documentType));
-  const groupKey = (type: string, memberId: string | null) => (sectionTypes.has(type) ? `${type}|${memberId ?? ""}` : type);
+  const groupKey = (type: string, memberId: string | null) => (sectionTypes.has(type) || applicationDocumentSlots(app).some(s => s.key === type) ? `${type}|${memberId ?? ""}` : type);
   const byType = new Map<string, typeof app.documents>();
   for (const doc of [...app.documents].sort((a, b) => b.version - a.version || b.created_at.localeCompare(a.created_at))) {
-    const key = groupKey(doc.document_type, doc.member_id);
+    const key = groupKey(doc.document_type, documentMemberId(app, doc));
     const list = byType.get(key) ?? [];
     list.push(doc);
     byType.set(key, list);
@@ -113,15 +113,15 @@ export async function getVisaCase(id: string) {
     staff: false,
     versions: byType.get(groupKey(f.documentType, f.memberId)) ?? [],
   }));
-  const knownKeys = new Set([...slots.map((s) => s.key), ...sectionSlots.map((s) => s.key)]);
+  const knownKeys = new Set([...slots.map((s) => groupKey(s.key, s.memberId)), ...sectionSlots.map((s) => s.key)]);
   const documentSlots = [
     ...slots.map((slot) => ({
-      key: slot.key,
+      key: groupKey(slot.key, slot.memberId),
       documentType: slot.key,
-      label: slot.label,
+      label: slot.memberName ? `${slot.memberName} · ${slot.label}` : slot.label,
       required: slot.required,
       staff: false,
-      versions: byType.get(slot.key) ?? [],
+      versions: byType.get(groupKey(slot.key, slot.memberId)) ?? [],
     })),
     ...sectionSlots,
     ...[...byType.entries()]

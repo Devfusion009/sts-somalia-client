@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusTimeline } from "@/modules/bookings/components/status-timeline";
 import { getApplicationDetail, getOrderForVisaApplication, getReapplyCredit } from "@/modules/visa/queries";
-import { applicationDocumentSlots, parseRequirementSections, sectionFileLabel } from "@/modules/visa/schemas";
+import { applicationDocumentSlots, documentMemberId, missingTravellerDocuments, parseRequirementSections, sectionFileLabel } from "@/modules/visa/schemas";
 import { visaCustomerProgress, visaNextAction } from "@/modules/visa/progress";
 import { formatInZone } from "@/modules/visa/time";
 import {
@@ -23,6 +23,7 @@ import { VisaStatusBadge, fmtMoney } from "@/modules/visa/components/visa-shared
 import { NextActionCard } from "@/modules/visa/components/next-action-card";
 import { MessageThread } from "@/modules/visa/components/message-thread";
 import { MessageComposer } from "@/modules/visa/components/message-composer";
+import { PortalDocumentUpload } from "@/modules/visa/components/portal-document-upload";
 import { RequestUpload } from "@/modules/visa/components/request-upload";
 import { ReplaceUpload } from "@/modules/visa/components/replace-upload";
 import { reapplyVisa, sendVisaMessage } from "@/modules/visa/actions";
@@ -88,7 +89,11 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
     decisionOutcome: (decision?.outcome as "approved" | "refused" | undefined) ?? null,
   };
   const progress = visaCustomerProgress(input);
-  const next = visaNextAction(input, labelFor);
+  let next = visaNextAction(input, labelFor);
+  if (!["approved", "issued", "rejected", "cancelled"].includes(application.status) && next.kind !== "pay") {
+    const missing = missingTravellerDocuments(application).filter(slot => !application.documents.some(doc => doc.is_current && doc.document_type === slot.key && documentMemberId(application, doc) === slot.memberId));
+    if (missing.length) next = { kind: "upload", items: [...(next.kind === "upload" ? next.items : []), ...missing.map(slot => ({ label: `${slot.memberName} · ${slot.label}`, reason: null, due: null }))] };
+  }
 
   const currentDocs = application.documents
     .filter((d) => d.is_current && !STAFF_DOCS.has(d.document_type) && !d.request_id)
@@ -226,7 +231,7 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                     return (
                       <li key={doc.id} className="space-y-2 py-3">
                         <div className="flex flex-wrap items-center gap-3">
-                          <p className="min-w-0 flex-1 text-sm font-medium">{labelFor(doc.document_type)}</p>
+                          <p className="min-w-0 flex-1 text-sm font-medium">{application.members.find(member => member.id === documentMemberId(application, doc))?.full_name ? `${application.members.find(member => member.id === documentMemberId(application, doc))!.full_name} · ` : ""}{labelFor(doc.document_type)}</p>
                           <Badge variant={status.variant}>{status.label}</Badge>
                           {doc.review_status === "rejected" ? (
                             <ReplaceUpload documentId={doc.id} applicationId={application.id} />
@@ -241,6 +246,7 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                   {currentDocs.length === 0 && application.document_requests.length === 0 ? (
                     <li className="py-6 text-center text-sm text-muted-foreground">No documents</li>
                   ) : null}
+                  {!["approved", "issued", "rejected", "cancelled"].includes(application.status) ? missingTravellerDocuments(application).filter(slot => slot.memberId && !application.documents.some(doc => doc.is_current && doc.document_type === slot.key && documentMemberId(application, doc) === slot.memberId)).map(slot => <li key={`${slot.key}-${slot.memberId}`} className="flex flex-wrap items-center justify-between gap-3 py-3"><span className="text-sm font-medium">{slot.memberName} · {slot.label}<span className="ml-2 text-xs text-destructive">Required</span></span><PortalDocumentUpload applicationId={application.id} targetId={slot.memberId!} slotKey={slot.key} kind="missing" /></li>) : null}
                   {application.document_requests.map((request) => (
                     <li key={request.id} className="flex flex-wrap items-center gap-3 py-3">
                       <div className="min-w-0 flex-1">

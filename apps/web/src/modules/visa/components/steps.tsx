@@ -78,7 +78,7 @@ import {
   RELATIONSHIPS,
   formatRequirementAnswer,
   memberRequirementAnswers,
-  parseDocumentSlots,
+  travellerDocumentSlots, documentMemberId,
   parseRequirementAnswers,
   parseRequirementSections,
   sectionFileSlots,
@@ -327,10 +327,11 @@ function MemberDialog({
               required
             />
           </Field>
-          <Field label="Passport expiry date" htmlFor={`member-expiry-${member?.id ?? "new"}`}>
+          <Field label="Passport expiry date" htmlFor={`member-expiry-${member?.id ?? "new"}`} required>
             <Input
               id={`member-expiry-${member?.id ?? "new"}`}
               name="passportExpiry"
+              required
               type="date"
               min={todayIso()}
               defaultValue={member?.passport_expiry ?? ""}
@@ -1078,8 +1079,8 @@ export function StepDocuments({
     }
   }, [router]);
   useWizardNavigate(state);
-  const slots = parseDocumentSlots(application.resolved_documents ?? application.visa_type?.required_documents);
-  const byKey = new Map(application.documents.map((d) => [d.document_type, d]));
+  const slots = travellerDocumentSlots(application);
+  const byKey = new Map(application.documents.filter(d => d.is_current).map((d) => [`${d.document_type}|${documentMemberId(application, d) ?? ""}`, d]));
   const fileSlots = sectionFileSlots(parseRequirementSections(application.visa_type?.application_sections), application.members);
   const fileGroups = [...new Set(fileSlots.map((f) => f.sectionTitle))];
 
@@ -1087,18 +1088,16 @@ export function StepDocuments({
     <div className="space-y-7">
       <StepHeading index={4} title="Documents" />
 
-      <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-        {slots.map((slot) => (
-          <UploadSlot
-            key={slot.key}
-            applicationId={application.id}
-            slot={slot}
-            existing={byKey.get(slot.key)}
-            vaultOptions={vaultOptions}
-            enqueueUpload={enqueueUpload}
-          />
-        ))}
-      </div>
+      {[...new Set(slots.map(slot => slot.memberId))].map(memberId => (
+        <section key={memberId ?? "app"} className="space-y-4 rounded-xl border border-border p-4">
+          <h3 className="font-heading text-base font-semibold">{slots.find(slot => slot.memberId === memberId)?.memberName ?? "Applicant documents"}</h3>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {slots.filter(slot => slot.memberId === memberId).map(slot => (
+              <UploadSlot key={`${slot.key}-${memberId ?? "app"}`} applicationId={application.id} slot={slot} memberId={memberId ?? undefined} existing={byKey.get(`${slot.key}|${memberId ?? ""}`)} vaultOptions={vaultOptions} enqueueUpload={enqueueUpload} />
+            ))}
+          </div>
+        </section>
+      ))}
 
       {fileGroups.map((group) => (
         <div key={group} className="space-y-5 border-t border-border pt-5">
@@ -1254,8 +1253,8 @@ export function StepReview({
   const t = (application.traveler_details ?? {}) as Record<string, string>;
   const c = (application.contact_details ?? {}) as Record<string, string>;
   const travel = (application.travel_details ?? {}) as Record<string, string | boolean | null>;
-  const slots = parseDocumentSlots(application.resolved_documents ?? application.visa_type?.required_documents);
-  const byKey = new Map(application.documents.map((d) => [d.document_type, d]));
+  const slots = travellerDocumentSlots(application);
+  const byKey = new Map(application.documents.filter(d => d.is_current).map((d) => [`${d.document_type}|${documentMemberId(application, d) ?? ""}`, d]));
   const sections = parseRequirementSections(application.visa_type?.application_sections);
   const appAnswers = parseRequirementAnswers(application.custom_answers);
   const fileSlots = sectionFileSlots(sections, application.members);
@@ -1283,9 +1282,9 @@ export function StepReview({
 
   const documentRows = [
     ...slots.map((slot) => ({
-      key: slot.key,
-      label: slot.label,
-      fileName: byKey.get(slot.key)?.file_name ?? null,
+      key: `${slot.key}-${slot.memberId ?? "app"}`,
+      label: slot.memberName ? `${slot.memberName} · ${slot.label}` : slot.label,
+      fileName: byKey.get(`${slot.key}|${slot.memberId ?? ""}`)?.file_name ?? null,
       required: slot.required,
     })),
     ...fileSlots.map((f) => ({
