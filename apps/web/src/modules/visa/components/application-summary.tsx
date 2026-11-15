@@ -12,6 +12,7 @@ import { countryName } from "@/lib/countries";
 import { Button } from "@/components/ui/button";
 import { fmtMoney, processingText } from "./visa-shared";
 import type { WizardApplication } from "@/modules/visa/queries";
+import { travellerPricing } from "../schemas";
 
 const APPLICANT_TYPE_LABELS: Record<string, string> = {
   single: "Single Applicant",
@@ -26,7 +27,7 @@ export function ApplicationSummary({
 }: {
   application: Pick<
     WizardApplication,
-    "applicant_type" | "members" | "currency" | "price" | "resolved_price" | "resolved_processing_fee"
+    "applicant_type" | "members" | "currency" | "price" | "resolved_price" | "resolved_processing_fee" | "traveller_requirements" | "workflow"
   > & {
     visa_type: WizardApplication["visa_type"];
   };
@@ -40,10 +41,7 @@ export function ApplicationSummary({
   // resolved_* is stamped once nationality is known (step 2 onward) and
   // reflects any nationality-specific rule; before that, or with no rule,
   // it falls back to the visa type's own listed price/fee.
-  const unitPrice = Number(application.resolved_price ?? visaType.price);
-  const unitFee = Number(application.resolved_processing_fee ?? visaType.processing_fee ?? 0);
-  const price = unitPrice * memberCount;
-  const feeAmount = unitFee * memberCount;
+  const { price, fee: feeAmount } = travellerPricing(application);
   const total = price + feeAmount;
 
   const rows = [
@@ -107,10 +105,9 @@ export function ApplicationSummary({
         </div>
         {memberCount > 1 ? (
           <p className="mt-1 text-right text-xs text-muted-foreground">
-            {fmtMoney(unitPrice, visaType.currency)} × {memberCount} applicants
+            {memberCount} travellers
           </p>
         ) : null}
-        <p className="mt-2 text-xs text-muted-foreground">All fees are non-refundable.</p>
       </div>
 
       <div className="rounded-2xl border border-border bg-secondary/50 p-5">

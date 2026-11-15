@@ -35,23 +35,15 @@ const source = fs.readFileSync(path.resolve(__dirname,'../src/modules/visa/actio
 const start=source.indexOf('export async function saveTravelInfo(');
 const end=source.indexOf('// Step 4 — document upload',start);
 const body=ts.transpileModule(source.slice(start,end).replace('export async','async')+'\nreturn saveTravelInfo;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText;
-for (const failure of ['visa_applications','visa_members']) {
-  test(`customer cannot advance when ${failure} save fails`, async () => {
-    const updates=[];let advanced=false;
-    const db={from:table=>{
-      const q={update:row=>{updates.push({table,row});return q;},eq:()=>q,then:resolve=>Promise.resolve({error:table===failure?{message:'Save failed'}:null}).then(resolve)};
-      return q;
-    }};
-    const app={id:'11111111-1111-4111-8111-111111111111',current_step:3,visa_type:{application_sections:[]},members:[{id:'member',full_name:'QA',details:{}}],traveler_details:{passport_expiry:'2099-01-01'}};
-    const dependencies={z,travelInfoSchema:schemas.travelInfoSchema,requireUser:async()=>({id:'user'}),getEditableApplication:async()=>({supabase:db,application:app}),parseRequirementSections:()=>[{key:'passport',scope:'traveller',fields:[]}],orderedMembers:v=>v,sectionInputName:()=>'',requirementAnswersError:()=>null,travelFormValues:()=>({}),formValues:()=>({}),advanceWizard:()=>{advanced=true;}};
-    const action=new Function(...Object.keys(dependencies),body)(...Object.values(dependencies));
-    const form=new FormData();
-    for(const [key,value] of Object.entries({applicationId:app.id,arrivalDate:'2090-02-01',departureDate:'2090-02-10',purposeOfVisit:'tourism',addressAtDestination:'QA hotel'}))form.set(key,value);
-    const result=await action(null,form);
-    assert.equal(result.error,'Save failed');assert.equal(advanced,false);
-    assert(!updates.some(({row})=>row.current_step===4));
-  });
-}
+test('failed atomic travel save does not advance and sends the displayed revision', async () => {
+ let advanced=false;const calls=[];
+ const db={rpc:async(name,args)=>{calls.push({name,args});return {error:{message:'Save failed'}};}};
+ const app={id:'11111111-1111-4111-8111-111111111111',updated_at:'2026-11-15T00:00:00Z',current_step:3,visa_type:{application_sections:[]},members:[{id:'member',full_name:'QA',details:{}}],traveler_details:{passport_expiry:'2099-01-01'}};
+ const dependencies={z,travelInfoSchema:schemas.travelInfoSchema,requireUser:async()=>({id:'user'}),getEditableApplication:async()=>({supabase:db,application:app}),parseRequirementSections:()=>[],orderedMembers:v=>v,sectionInputName:()=>'',requirementAnswersError:()=>null,travelFormValues:()=>({}),formValues:()=>({}),advanceWizard:()=>{advanced=true;}};
+ const action=new Function(...Object.keys(dependencies),body)(...Object.values(dependencies));const form=new FormData();
+ for(const [key,value] of Object.entries({applicationId:app.id,expectedUpdatedAt:app.updated_at,arrivalDate:'2090-02-01',departureDate:'2090-02-10',purposeOfVisit:'tourism',addressAtDestination:'QA hotel'}))form.set(key,value);
+ const result=await action(null,form);assert.equal(result.error,'Save failed');assert.equal(advanced,false);assert.equal(calls.length,1);assert.equal(calls[0].name,'visa_save_draft_step');assert.equal(calls[0].args.p_expected_updated_at,app.updated_at);assert.equal(calls[0].args.p_values.departure_date,'2090-02-10');
+});
 
 test('travel dates reject departure before arrival and allow a valid trip', () => {
   const trip = {arrivalDate:'2090-02-10',departureDate:'2090-02-01',purposeOfVisit:'tourism',addressAtDestination:'Test hotel'};

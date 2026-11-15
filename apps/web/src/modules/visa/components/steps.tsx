@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useDraftRecovery } from "./use-draft-recovery";
 import { DocumentRequirementsGuide } from "./document-requirements-guide";
 import { format, parseISO } from "date-fns";
 import {
@@ -77,7 +78,7 @@ import {
   RELATIONSHIPS,
   formatRequirementAnswer,
   memberRequirementAnswers,
-  travellerDocumentSlots, documentMemberId,
+  travellerDocumentSlots, documentMemberId, travellerPricing, travellerRequirement,
   parseRequirementAnswers,
   parseRequirementSections,
   sectionFileSlots,
@@ -555,10 +556,12 @@ export function StepPersonalInfo({
   const t = (application.traveler_details ?? {}) as Record<string, string>;
   const c = (application.contact_details ?? {}) as Record<string, string>;
   // After a validation error, prefer what the user just typed over saved data.
-  const v = state?.values ?? {};
+  const { formRef: draftFormRef, recovered: recoveredValues, generation: recoveryGeneration, capture: captureDraft } = useDraftRecovery(application.id, 2, application.updated_at, Boolean(state?.destination));
+  const v = state?.values ?? recoveredValues;
 
   return (
-    <form action={formAction} className="space-y-7">
+    <form key={recoveryGeneration} ref={draftFormRef} onChange={() => queueMicrotask(captureDraft)} onSubmit={captureDraft} action={formAction} className="space-y-7">
+      <input type="hidden" name="expectedUpdatedAt" value={application.updated_at} />
       <input type="hidden" name="applicationId" value={application.id} />
       {desk ? <input type="hidden" name="desk" value="1" /> : null}
       <StepHeading index={2} title="Personal information" />
@@ -784,7 +787,6 @@ export function StepTravelInfo({
   const [state, formAction] = useActionState(saveTravelInfo, null);
   useWizardNavigate(state);
   const t = (application.travel_details ?? {}) as Record<string, string | boolean | null>;
-  const v = state?.values ?? {};
   const str = (key: string) => (typeof t[key] === "string" ? (t[key] as string) : "");
   const sections = parseRequirementSections(application.visa_type?.application_sections).filter((section) =>
     section.fields.some((f) => f.type !== "file")
@@ -792,6 +794,8 @@ export function StepTravelInfo({
   const appAnswers = parseRequirementAnswers(application.custom_answers);
   const [arrival, setArrival] = useState(str("arrival_date"));
   const [departure, setDeparture] = useState(str("departure_date"));
+  const { formRef: draftFormRef, recovered: recoveredValues, generation: recoveryGeneration, capture: captureDraft } = useDraftRecovery(application.id, 3, application.updated_at, Boolean(state?.destination), values => { setArrival(values.arrivalDate ?? str("arrival_date")); setDeparture(values.departureDate ?? str("departure_date")); });
+  const v = state?.values ?? recoveredValues;
   const primaryExpiry = (application.traveler_details as Record<string, string> | null)?.passport_expiry;
   const invalidPassport = [
     ...(primaryExpiry ? [{ full_name: "Primary applicant", passport_expiry: primaryExpiry }] : []),
@@ -803,7 +807,8 @@ export function StepTravelInfo({
 
 
   return (
-    <form action={formAction} className="space-y-7">
+    <form key={recoveryGeneration} ref={draftFormRef} onChange={() => queueMicrotask(captureDraft)} onSubmit={captureDraft} action={formAction} className="space-y-7">
+      <input type="hidden" name="expectedUpdatedAt" value={application.updated_at} />
       <input type="hidden" name="applicationId" value={application.id} />
       {desk ? <input type="hidden" name="desk" value="1" /> : null}
       <StepHeading index={3} title="Travel information" />
@@ -1099,6 +1104,7 @@ export function StepDocuments({
       {[...new Set(slots.map(slot => slot.memberId))].map(memberId => (
         <section key={memberId ?? "app"} className="space-y-4 rounded-xl border border-border p-4">
           <h3 className="font-heading text-base font-semibold">{slots.find(slot => slot.memberId === memberId)?.memberName ?? "Applicant documents"}</h3>
+          {memberId && typeof travellerRequirement(application, memberId)?.eligibility_requirements === "string" && travellerRequirement(application, memberId)?.eligibility_requirements ? <details className="text-sm"><summary className="cursor-pointer font-medium">Eligibility requirements</summary><div className="whitespace-pre-line pt-2">{String(travellerRequirement(application, memberId)?.eligibility_requirements)}</div></details> : null}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             {slots.filter(slot => slot.memberId === memberId).map(slot => (
               <UploadSlot key={`${slot.key}-${memberId ?? "app"}`} applicationId={application.id} slot={slot} memberId={memberId ?? undefined} existing={byKey.get(`${slot.key}|${memberId ?? ""}`)} vaultOptions={vaultOptions} enqueueUpload={enqueueUpload} />
@@ -1281,12 +1287,11 @@ export function StepReview({
 
   // Same arithmetic as submit_visa_application(): unit price and fee per traveller.
   const travellers = application.applicant_type === "single" ? 1 : Math.max(application.members.length, 1);
-  const unitPrice = Number(application.resolved_price ?? application.price ?? application.visa_type?.price ?? 0);
-  const unitFee = Number(application.resolved_processing_fee ?? application.visa_type?.processing_fee ?? 0);
-  const creditApplied = credit ? Math.min(credit.amount, unitFee * travellers) : 0;
-  const total = (unitPrice + unitFee) * travellers - creditApplied;
+  const pricing = travellerPricing(application);
+  const creditApplied = credit ? Math.min(credit.amount, pricing.fee) : 0;
+  const total = pricing.price + pricing.fee - creditApplied;
   const currency = application.visa_type?.currency ?? application.currency;
-  const perTraveller = travellers > 1 ? ` × ${travellers}` : "";
+  const perTraveller = travellers > 1 ? ` · ${travellers} travellers` : "";
 
   const documentRows = [
     ...slots.map((slot) => ({
@@ -1414,12 +1419,12 @@ export function StepReview({
         <dl className="space-y-2.5 px-4 py-5 text-sm tabular-nums @min-[30rem]/visa-form:px-5">
           <div className="flex justify-between gap-4">
             <dt className="text-muted-foreground">Visa fee{perTraveller}</dt>
-            <dd>{fmtMoney(unitPrice * travellers, currency)}</dd>
+            <dd>{fmtMoney(pricing.price, currency)}</dd>
           </div>
-          {unitFee > 0 ? (
+          {pricing.fee > 0 ? (
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Processing fee{perTraveller}</dt>
-              <dd>{fmtMoney(unitFee * travellers, currency)}</dd>
+              <dd>{fmtMoney(pricing.fee, currency)}</dd>
             </div>
           ) : null}
           {creditApplied > 0 ? (

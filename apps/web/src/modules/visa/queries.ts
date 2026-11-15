@@ -152,7 +152,9 @@ export async function getApplicationForWizard(applicationId: string) {
   data.members.sort(
     (a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order
   );
-  return data;
+  const { data: requirements, error } = await supabase.rpc("visa_traveller_requirements", { p_application_id: data.id });
+  if (error) throw error;
+  return { ...data, traveller_requirements: requirements };
 }
 
 /** Tracking/result view: adds status history and document requests. */

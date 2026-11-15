@@ -17,7 +17,7 @@ export type PortalUploadInput = z.infer<typeof metadata>;
 async function checkTarget(input: PortalUploadInput) {
   const user = await requireUser(`/account/visa/${input.applicationId}`);
   const client = await createClient();
-  const { data: app } = await client.from("visa_applications").select("submitted_by,status,resolved_documents,visa_type:visa_type_id(required_documents),members:visa_members(id,full_name,is_primary),documents:visa_documents(document_type,member_id,is_current,review_status)").eq("id", input.applicationId).maybeSingle();
+  const { data: app } = await client.from("visa_applications").select("submitted_by,status,workflow,resolved_documents,visa_type:visa_type_id(required_documents),members:visa_members(id,full_name,is_primary),documents:visa_documents(document_type,member_id,is_current,review_status)").eq("id", input.applicationId).maybeSingle();
   if (!app || app.submitted_by !== user.id || ["draft", "approved", "rejected", "issued", "cancelled"].includes(app.status)) return { error: "This application is not available for uploads." };
   if (input.kind === "request") {
     const { data } = await client.from("visa_document_requests").select("status").eq("id", input.targetId).eq("application_id", input.applicationId).maybeSingle();

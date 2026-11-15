@@ -8451,6 +8451,14 @@ export type Database = {
           required_documents: Json
         }[]
       }
+      visa_save_draft_step: {
+        Args: { p_application_id: string; p_expected_updated_at: string; p_step: string; p_values: Json; p_member_answers?: Json }
+        Returns: undefined
+      }
+      visa_traveller_requirements: {
+        Args: { p_application_id: string }
+        Returns: Json
+      }
       resolve_visa_processing_route: {
         Args: { p_visa_type_id: string }
         Returns: {

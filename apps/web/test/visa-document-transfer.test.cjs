@@ -73,3 +73,10 @@ test('admin verification reports a database refusal and cannot verify a missing 
   assert(result.error);assert.equal(called,status==='uploaded');assert.equal(refreshed,false);
  }
 });
+test('slow transfers get five minutes overall and stalled transfers abort without finalising',async()=>{
+ const originalSet=global.setTimeout,originalClear=global.clearTimeout;let stall;const cleared=[];
+ try{
+ global.setTimeout=(fn,ms)=>{assert.equal(ms,45000);stall=fn;return 99;};global.clearTimeout=id=>cleared.push(id);
+ const task=transferFile('https://storage.test/signed',file,new AbortController().signal,()=>{});const xhr=FakeXHR.latest;assert.equal(xhr.timeout,300000);const first=stall;xhr.upload.onprogress({lengthComputable:true,loaded:1,total:4});assert(cleared.includes(99));assert.notEqual(stall,first);stall();await assert.rejects(task,/stalled/);assert.equal(xhr.aborted,true);
+ }finally{global.setTimeout=originalSet;global.clearTimeout=originalClear;}
+});

@@ -88,7 +88,10 @@ async function getEditableApplication(applicationId: string, userId: string) {
     .eq("submitted_by", userId)
     .eq("status", "draft")
     .maybeSingle();
-  return { supabase, application: data };
+  if (!data) return { supabase, application: null };
+  const { data: requirements, error } = await supabase.rpc("visa_traveller_requirements", { p_application_id: data.id });
+  if (error) throw error;
+  return { supabase, application: { ...data, traveller_requirements: requirements } };
 }
 
 type EditableApplication = NonNullable<Awaited<ReturnType<typeof getEditableApplication>>["application"]>;
@@ -502,44 +505,13 @@ export async function savePersonalInfo(
   if (isDestinationCountry(application, d.nationality)) {
     return { error: "Passport nationality can't be the same as the destination country.", values: formValues(formData) };
   }
+  if (application.members.some(member => !member.is_primary && member.nationality === d.nationality && member.passport_number?.replace(/\s/g, "").toUpperCase() === d.passportNumber.replace(/\s/g, "").toUpperCase())) return { error: "This passport is already assigned to another traveller.", values: formValues(formData) };
 
-  // Saving nationality re-stamps the quote (price, fee, documents) server-side
-  // in visa_applications_draft_integrity; nothing re-resolves after submit.
-  const { error: saveError } = await supabase
-    .from("visa_applications")
-    .update({
-      traveler_details: {
-        full_name: d.fullName,
-        date_of_birth: d.dateOfBirth,
-        gender: d.gender,
-        nationality: d.nationality,
-        passport_number: d.passportNumber,
-        passport_expiry: d.passportExpiry,
-      },
-      contact_details: { email: d.email, mobile: d.mobile },
-      current_step: Math.max(application.current_step, 3),
-    })
-    .eq("id", application.id);
-  if (saveError) return { error: saveError.message, values: formValues(formData) };
-
-  // The primary applicant is also a member row so the member list is the
-  // complete travelling party.
-  const primary = application.members.find((m) => m.is_primary);
-  const primaryRow = {
-    application_id: application.id,
-    is_primary: true,
-    full_name: d.fullName,
-    relationship: "self",
-    date_of_birth: d.dateOfBirth,
-    nationality: d.nationality,
-    passport_number: d.passportNumber,
-    passport_expiry: d.passportExpiry,
-    sort_order: -1,
-  };
-  const primarySave = primary
-    ? await supabase.from("visa_members").update(primaryRow).eq("id", primary.id)
-    : await supabase.from("visa_members").insert(primaryRow);
-  if (primarySave.error) return { error: primarySave.error.message, values: formValues(formData) };
+  const { error } = await supabase.rpc("visa_save_draft_step", {
+    p_application_id: application.id, p_expected_updated_at: String(formData.get("expectedUpdatedAt") ?? ""), p_step: "personal",
+    p_values: { full_name: d.fullName, date_of_birth: d.dateOfBirth, gender: d.gender, nationality: d.nationality, passport_number: d.passportNumber, passport_expiry: d.passportExpiry, email: d.email, mobile: d.mobile },
+  });
+  if (error) return { error: error.message, values: formValues(formData) };
 
   return advanceWizard(formData, application.id, 3);
 }
@@ -608,38 +580,12 @@ export async function saveTravelInfo(
   if ((passportExpiry && passportExpiry <= d.departureDate) || invalidMember) {
     return { error: `${invalidMember?.full_name ?? "Primary applicant"}: passport must be valid after departure.`, values: travelFormValues(formData, sections, members) };
   }
-  const { error: travelSaveError } = await supabase
-    .from("visa_applications")
-    .update({
-      travel_details: {
-        arrival_date: d.arrivalDate,
-        departure_date: d.departureDate,
-        purpose: d.purposeOfVisit,
-        address: d.addressAtDestination,
-      },
-      custom_answers: customAnswers,
-    })
-    .eq("id", application.id);
-  if (travelSaveError) return { error: travelSaveError.message, values: travelFormValues(formData, sections, members) };
-
-  if (sections.some((section) => section.scope === "traveller")) {
-    const memberSaves = await Promise.all(
-      members.map((m) => {
-        const details = m.details && typeof m.details === "object" && !Array.isArray(m.details) ? m.details : {};
-        return supabase
-          .from("visa_members")
-          .update({ details: { ...details, answers: memberAnswers.get(m.id) ?? {} } })
-          .eq("id", m.id)
-          .eq("application_id", application.id);
-      })
-    );
-    const memberSaveError = memberSaves.find((result) => result.error)?.error;
-    if (memberSaveError) return { error: memberSaveError.message, values: travelFormValues(formData, sections, members) };
-  }
-
-  const { error: progressError } = await supabase.from("visa_applications")
-    .update({ current_step: Math.max(application.current_step, 4) }).eq("id", application.id);
-  if (progressError) return { error: progressError.message, values: travelFormValues(formData, sections, members) };
+  const { error } = await supabase.rpc("visa_save_draft_step", {
+    p_application_id: application.id, p_expected_updated_at: String(formData.get("expectedUpdatedAt") ?? ""), p_step: "travel",
+    p_values: { arrival_date: d.arrivalDate, departure_date: d.departureDate, purpose: d.purposeOfVisit, address: d.addressAtDestination, custom_answers: customAnswers },
+    p_member_answers: Object.fromEntries(memberAnswers),
+  });
+  if (error) return { error: error.message, values: travelFormValues(formData, sections, members) };
   return advanceWizard(formData, application.id, 4);
 }
 
