@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FlightsHero } from "@/components/marketing/flights-hero";
 import { FlightDealsRail } from "@/components/marketing/flight-deals-rail";
+import { FlightBookingPoster } from "@/components/marketing/flight-booking-poster";
 import { TravelProsCards } from "@/components/marketing/travel-pros-cards";
 import { TrendingGrid } from "@/components/marketing/trending-grid";
 import { DealsByDestination, FlightsFaq } from "@/components/marketing/flight-accordions";
@@ -98,6 +99,7 @@ export default async function FlightsPage({
       {!hasSearch ? (
         <>
           <FlightDealsRail title="Where will you fly next?" href="#flight-search" deals={FLIGHT_DEALS} />
+          <FlightBookingPoster />
           <TravelProsCards />
           <TrendingGrid
             title="Trending cities"
