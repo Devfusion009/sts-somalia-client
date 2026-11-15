@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowRight, ChevronDown, ShoppingBag, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc/react";
 import { usePortalNotifications } from "@/components/portal/use-portal-notifications";
@@ -20,33 +20,20 @@ export { newOrderHref };
 
 /**
  * Unread new-order alerts as one collapsed bar on the dashboard; expanding it
- * lists the newest few. Opening the Orders page counts as having seen them all,
- * so the bar and the bell clear instead of resurfacing on the next visit.
+ * lists the newest few. Only opening an individual order acknowledges it.
  */
 export function NewOrderBanner() {
   const { data: notifications = [] } = usePortalNotifications(false);
-  const utils = trpc.useUtils();
   // The proxy rewrites admin.<host>/orders to /admin/orders, so both forms are matched.
   const path = stripPortalPrefix(usePathname()) ?? "/";
   const onDashboard = path === "/";
-  const onOrders = path === "/orders" || path.startsWith("/orders/");
   const [open, setOpen] = useState(false);
-  const dismiss = trpc.notifications.dismiss.useMutation({ onSuccess: () => utils.notifications.unread.invalidate() });
-  const dismissAll = trpc.notifications.dismissType.useMutation({ onSuccess: () => utils.notifications.unread.invalidate() });
+  const { data: inbox } = trpc.notifications.unreadOrderCount.useQuery(undefined, { staleTime: 30_000 });
 
   const orders = notifications.filter((n) => n.type === "new_order");
-  const latestId = orders[0]?.id;
-  const markedFor = useRef<string | null>(null);
-  const { mutate: markAllSeen } = dismissAll;
-
-  useEffect(() => {
-    if (!onOrders || !latestId || markedFor.current === latestId) return;
-    markedFor.current = latestId;
-    markAllSeen({ type: "new_order" });
-  }, [onOrders, latestId, markAllSeen]);
-
   if (!onDashboard || orders.length === 0) return null;
   const shown = orders.slice(0, MAX_SHOWN);
+  const count = inbox?.count ?? orders.length;
 
   return (
     <section aria-label="New orders" className="mb-6 rounded-xl bg-primary/5 ring-1 ring-primary/25">
@@ -55,7 +42,7 @@ export function NewOrderBanner() {
           <ShoppingBag className="size-4" aria-hidden="true" />
         </span>
         <p className="min-w-0 flex-1 truncate font-medium tabular-nums">
-          {orders.length} new {orders.length === 1 ? "order" : "orders"}
+          {count} new {count === 1 ? "order" : "orders"}
         </p>
         <Button size="sm" variant="ghost" render={<Link href="/admin/orders" />}>
           View all <ArrowRight data-icon="inline-end" aria-hidden="true" />
@@ -89,22 +76,11 @@ export function NewOrderBanner() {
                 {href ? (
                   <Button
                     size="sm"
-                    render={<Link href={href} onClick={() => dismiss.mutate({ notificationId: n.id })} />}
+                    render={<Link href={href} />}
                   >
                     View order <ArrowRight data-icon="inline-end" aria-hidden="true" />
                   </Button>
                 ) : null}
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="ghost"
-                  className="text-muted-foreground hover:text-foreground"
-                  aria-label={`Dismiss ${n.title}`}
-                  disabled={dismiss.isPending && dismiss.variables?.notificationId === n.id}
-                  onClick={() => dismiss.mutate({ notificationId: n.id })}
-                >
-                  <X aria-hidden="true" />
-                </Button>
               </li>
             );
           })}

@@ -16,6 +16,9 @@ export type ActionState = { error: string | null; requiresRefresh?: boolean } | 
 
 function revalidateVisaViews(applicationId: string) {
   revalidatePath("/admin/visa");
+  revalidatePath("/admin/visa/appointments");
+  revalidatePath("/admin");
+  revalidatePath("/account/visa");
   revalidatePath(`/admin/visa/${applicationId}`);
   revalidatePath(`/account/visa/${applicationId}`);
 }

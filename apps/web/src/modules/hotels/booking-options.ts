@@ -226,3 +226,15 @@ export function readStayDetails(value: unknown): StayDetails {
   }
   return out;
 }
+
+/** Keeps the staying guest alongside any additional guests entered at checkout. */
+export function bookingGuestDetails(form: FormData, bookerName: string | null) {
+  const other = form.get("bookedForOther") === "on";
+  const leadName = other ? String(form.get("leadName") ?? "").trim().slice(0, 120) : bookerName?.trim();
+  const leadPhone = other ? String(form.get("leadPhone") ?? "").trim().slice(0, 30) : "";
+  const additional = String(form.get("guestNames") ?? "").split("\n").map(name => name.trim().slice(0, 120)).filter(Boolean).slice(0, 30);
+  return [
+    ...(leadName ? [{ full_name: leadName, ...(leadPhone ? { phone: leadPhone } : {}) }] : []),
+    ...additional.map(full_name => ({ full_name })),
+  ];
+}

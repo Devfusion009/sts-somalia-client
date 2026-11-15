@@ -24,6 +24,7 @@ import { MessageComposer } from "@/modules/visa/components/message-composer";
 import { adminSendMessage } from "@/modules/visa/admin-actions";
 import { DetailGrid, EventList, SectionHeading, formatWhen } from "./case-ui";
 import { DocumentsTab } from "./documents-tab";
+import { visaReviewHandoff } from "@/modules/visa/review-handoff";
 
 function NoActivity() {
   return (
@@ -43,6 +44,7 @@ export function OverviewTab({ data, actions, reviewable }: { data: VisaCase; act
   const recent = data.events.filter((e) => e.event_type !== "document.accessed").slice(0, 6);
   const applies = data.readiness.filter((r) => r.applies);
   const paymentBlocked = data.application.status === "submitted" && !["paid", "partially_paid"].includes(data.paymentState);
+  const review = visaReviewHandoff(data.application.status, data.paymentState);
   const refundNote =
     data.jobs.length > 0
       ? "Filed with the authority · no refund"
@@ -61,6 +63,7 @@ export function OverviewTab({ data, actions, reviewable }: { data: VisaCase; act
         <Card>
           <CardContent className="space-y-5">
             <SectionHeading>Next step</SectionHeading>
+            {review ? <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"><span className="inline-flex items-center gap-2 text-sm font-semibold text-primary"><CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />{review.message}</span><Button size="sm" render={<Link href="?tab=documents" scroll={false} />}>{review.label}<ArrowRight className="size-4" aria-hidden="true" /></Button></div> : null}
             {paymentBlocked ? (
               <div role="status" className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
                 <div className="flex items-start gap-3">

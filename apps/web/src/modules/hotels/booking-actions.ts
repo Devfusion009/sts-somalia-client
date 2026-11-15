@@ -1,5 +1,6 @@
 "use server";
 
+import { bookingGuestDetails } from "./booking-options";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -158,16 +159,10 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
     .filter((id) => z.string().uuid().safeParse(id).success)
     .slice(0, 20);
   const stayDetails = readStayDetailsForm(formData, numRooms);
-
-  const guestNamesRaw = formData.get("guestNames")?.toString() ?? "";
-  const guestDetails = guestNamesRaw
-    .split("\n")
-    .map((name) => name.trim())
-    .filter(Boolean)
-    .slice(0, 30)
-    .map((full_name) => ({ full_name }));
+  if (formData.get("bookedForOther") === "on" && !stayDetails.lead_guest?.name) return { error: "Enter the staying guest’s full name." };
 
   const profile = await requireUser();
+  const guestDetails = bookingGuestDetails(formData, profile.full_name);
   const supabase = await createClient();
 
   const { data: room, error: roomError } = await supabase
@@ -223,7 +218,7 @@ export async function createHotelBooking(_prevState: ActionState, formData: Form
     special_requests: specialRequests || null,
     // No names typed: the booker is the lead guest, so every console shows a
     // name instead of "Guest" (front desk, bookings list, booking detail).
-    guest_details: guestDetails.length > 0 || !profile.full_name ? guestDetails : [{ full_name: profile.full_name }],
+    guest_details: guestDetails,
     total_price: totalPrice,
     currency: room.currency,
     // The database re-prices a customer's or agency's booking with the same

@@ -63,6 +63,7 @@ import { PanelPairSkeleton, PanelSkeleton, StatRowSkeleton } from "@/components/
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/auth/session";
 import { AdminWorkspace } from "./admin-workspace";
+import { RefreshOrdersButton } from "./orders/refresh-orders-button";
 
 // Deliberately plural and separate from ROLE_LABELS in lib/auth/roles.ts:
 // these name chart series ("Agents"), not an individual's role ("Travel
@@ -198,7 +199,7 @@ export default async function AdminDashboardPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Dashboard" actions={<DateRangePicker currentKey={range.key} />} />
+      <PageHeader title="Dashboard" actions={<div className="flex flex-wrap items-center gap-3"><RefreshOrdersButton /><DateRangePicker currentKey={range.key} /></div>} />
 
       <AdminWorkspace />
       <Suspense fallback={null}><FinancePriorities /></Suspense>
@@ -260,11 +261,11 @@ async function StatsSection({
           href="/admin/orders"
         />
         <StatCard
-          label="Paid revenue"
+          label="Collected revenue"
           value={money(stats.revenue)}
           change={percentChange(statTrends.revenue.current, statTrends.revenue.previous)}
           series={statTrends.revenue.series}
-          href="/admin/orders?filter=paid"
+          href="/admin/orders"
         />
         <StatCard
           label="Pending applications"

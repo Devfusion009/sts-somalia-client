@@ -1,3 +1,4 @@
+import { CaseLiveSync } from "@/modules/visa/components/case-live-sync";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusTimeline } from "@/modules/bookings/components/status-timeline";
 import { getApplicationDetail, getOrderForVisaApplication, getReapplyCredit } from "@/modules/visa/queries";
-import { travellerDocumentSlots, documentMemberId, missingTravellerDocuments, parseRequirementSections, sectionFileLabel } from "@/modules/visa/schemas";
+import { travellerDocumentSlots, documentMemberId, missingTravellerDocuments, reviewUploadsComplete, parseRequirementSections, sectionFileLabel } from "@/modules/visa/schemas";
 import { visaCustomerProgress, visaNextAction } from "@/modules/visa/progress";
 import { formatInZone } from "@/modules/visa/time";
 import {
@@ -79,6 +80,8 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
   const input = {
     status: application.status as VisaStage,
     workflow: application.workflow,
+    memberIds: application.members.map(member => member.id),
+    documentsComplete: reviewUploadsComplete(application),
     orderStatus: order?.status ?? null,
     orderId: order?.id ?? null,
     orderTotal: order ? fmtMoney(order.total, order.currency) : null,
@@ -164,6 +167,7 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
           <CardTitle>{progress.stepLabel}</CardTitle>
         </CardHeader>
         <CardContent>
+          <CaseLiveSync enabled={!["issued", "rejected", "cancelled"].includes(application.status)} />
           <StatusTimeline stages={progress.stages} currentIndex={progress.index} outcome={progress.outcome} />
         </CardContent>
       </Card>

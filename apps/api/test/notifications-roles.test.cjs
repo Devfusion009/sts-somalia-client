@@ -27,7 +27,7 @@ function fixture({ failed = false, rows = [] } = {}) {
     let predicates = [], limit, start = 0, end, payload, mode = 'select', sort = [];
     const query = {
       select() { return query; },
-      eq(key, value) { predicates.push(row => row[key] === value); return query; },
+      eq(key, value) { predicates.push(row => (key.includes('->>') ? row[key.split('->>')[0]]?.[key.split('->>')[1]] : row[key]) === value); return query; },
       is(key, value) { predicates.push(row => row[key] === value); return query; },
       in(key, values) { predicates.push(row => values.includes(row[key])); return query; },
       order(key, { ascending }) { sort.push({ key, ascending }); return query; },
@@ -42,7 +42,7 @@ function fixture({ failed = false, rows = [] } = {}) {
         if (mode === 'insert') { data = payload.map(row => ({ ...row, id: randomUUID(), read_at: null, created_at: new Date().toISOString() })); tables[name].push(...data); }
         if (mode === 'update') data.forEach(row => Object.assign(row, payload));
         if (sort.length) data.sort((a,b) => { for (const s of sort) { const n = String(a[s.key]).localeCompare(String(b[s.key])); if(n) return s.ascending ? n : -n; } return 0; });
-        return Promise.resolve({ data: data.slice(start, end ?? (limit ? start + limit : undefined)), error: null }).then(resolve, reject);
+        return Promise.resolve({ data: data.slice(start, end ?? (limit ? start + limit : undefined)), count: data.length, error: null }).then(resolve, reject);
       },
     }; return query;
   } };
@@ -105,6 +105,47 @@ test('notification failures are reported rather than appearing as empty or dismi
   await assert.rejects(service.dismiss(customer, randomUUID()), /Database unavailable/);
   await assert.rejects(service.dismissType(customer, 'broadcast'), /Database unavailable/);
   await assert.rejects(service.getBroadcastHistory(), /Database unavailable/);
+  await assert.rejects(service.getUnreadOrderCount(admin), /Database unavailable/);
+  await assert.rejects(service.readOrder(admin, randomUUID()), /Database unavailable/);
+});
+
+test('order badge counts the entire inbox, independently of the ten-item bell', async () => {
+  const rows = Array.from({ length: 27 }, () => ({ id: randomUUID(), profile_id: admin, type: 'new_order', read_at: null, data: { order_id: randomUUID() } }));
+  rows.push({ id: randomUUID(), profile_id: admin, type: 'broadcast', read_at: null });
+  rows.push({ id: randomUUID(), profile_id: admin, type: 'new_order', read_at: '2026-11-15' });
+  rows.push({ id: randomUUID(), profile_id: customer, type: 'new_order', read_at: null });
+  const f = fixture({ rows });
+  assert.equal((await f.caller(admin).unread()).length, 10);
+  assert.deepEqual(await f.caller(admin).unreadOrderCount(), { count: 27 });
+  assert.equal(rows.filter(r => r.read_at === null).length, 29, 'reading counts/lists must not mark anything seen');
+});
+
+test('opening an order is persistent, idempotent, and scoped to its admin and order', async () => {
+  const order = randomUUID(), other = randomUUID();
+  const rows = [
+    { id: randomUUID(), profile_id: admin, type: 'new_order', read_at: null, data: { order_id: order } },
+    { id: randomUUID(), profile_id: admin, type: 'new_order', read_at: null, data: { order_id: other } },
+    { id: randomUUID(), profile_id: customer, type: 'new_order', read_at: null, data: { order_id: order } },
+    { id: randomUUID(), profile_id: admin, type: 'bank_proof_submitted', read_at: null, data: { order_id: order } },
+  ];
+  const f = fixture({ rows });
+  await f.caller(admin).readOrder({ orderId: order });
+  assert.deepEqual(await f.caller(admin).unreadOrderCount(), { count: 1 });
+  assert.ok(rows[0].read_at);
+  const saved = rows[0].read_at;
+  await f.caller(admin).readOrder({ orderId: order });
+  assert.equal(rows[0].read_at, saved);
+  assert.deepEqual(rows.slice(1).map(r => r.read_at), [null, null, null]);
+  assert.deepEqual(await f.caller(customer).unreadOrderCount(), { count: 1 });
+  await f.caller(admin).readOrder({ orderId: randomUUID() });
+  assert.deepEqual(await f.caller(admin).unreadOrderCount(), { count: 1 });
+});
+
+test('order inbox endpoints require authentication and validate order identifiers', async () => {
+  const f = fixture();
+  await assert.rejects(f.caller(null).unreadOrderCount(), e => e.code === 'UNAUTHORIZED');
+  await assert.rejects(f.caller(null).readOrder({ orderId: randomUUID() }), e => e.code === 'UNAUTHORIZED');
+  await assert.rejects(f.caller(admin).readOrder({ orderId: 'all' }), e => e.code === 'BAD_REQUEST');
 });
 test('invalid messages and audience values are rejected at the API boundary', async () => {
   const caller = fixture().caller(admin);

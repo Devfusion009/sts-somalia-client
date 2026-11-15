@@ -20,6 +20,8 @@ import { readWorkflow, type VisaStage } from "./workflow";
 export type ProgressInput = {
   status: VisaStage;
   workflow: unknown;
+  memberIds?: string[];
+  documentsComplete?: boolean;
   orderStatus: string | null;
   orderId: string | null;
   orderTotal: string | null;
@@ -32,6 +34,8 @@ export type ProgressInput = {
     scheduled_at: string;
     confirmation_number: string | null;
     biometrics_required: boolean;
+    member_id?: string | null;
+    biometrics_completed?: boolean;
     centre: { name: string; city: string; address: string | null; timezone: string; collection_hours?: string | null } | null;
   }>;
   passports: Array<{ id: string; status: string; holder_name: string | null; tracking_reference: string | null }>;
@@ -62,7 +66,13 @@ export function visaCustomerProgress(input: ProgressInput) {
   const refused = input.status === "rejected";
   const cancelled = input.status === "cancelled";
   const decided = input.decisionOutcome !== null || ["approved", "issued", "rejected"].includes(input.status);
-  const attended = input.appointments.some((a) => a.status === "attended");
+  const attendedAppointments = input.appointments.filter(a => a.status === "attended" && (!workflow.requires_biometrics || a.biometrics_completed));
+  const attended = attendedAppointments.some(a => a.member_id === null) || (input.memberIds?.length
+    ? input.memberIds.every(id => attendedAppointments.some(a => a.member_id === id))
+    : attendedAppointments.length > 0);
+  const reviewDocuments = input.documents.filter(d => d.is_current && !["visa_result", "decision_letter", "submission_receipt", "passport_authorization"].includes(d.document_type));
+  const reviewDone = input.documentsComplete === true && reviewDocuments.length > 0 && reviewDocuments.every(d => d.review_status === "accepted")
+    && !input.requests.some(r => r.requirement === "required" && !["received", "waived"].includes(r.status));
   const passportsBack =
     input.passports.length > 0 && input.passports.every((p) => ["delivered", "collected"].includes(p.status));
 
@@ -73,10 +83,10 @@ export function visaCustomerProgress(input: ProgressInput) {
       key: "documents",
       label: "Documents",
       icon: Stamp,
-      done: decided || reached(input.status, "ready_for_processing") && input.status !== "additional_info_required",
+      done: decided || (input.status !== "additional_info_required" && (reviewDone || reached(input.status, "ready_for_processing"))),
     },
   ];
-  if (workflow.requires_appointment) {
+  if (workflow.requires_appointment || workflow.requires_biometrics) {
     steps.push({ key: "appointment", label: "Appointment", icon: CalendarCheck, done: attended || decided });
   }
   steps.push(

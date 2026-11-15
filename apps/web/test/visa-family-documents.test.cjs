@@ -21,3 +21,11 @@ test('mixed nationalities use independent document lists, eligibility and summed
  assert.deepEqual(m.exports.travellerPricing(a),{price:170,fee:12});assert.equal(m.exports.travellerRequirement(a,'child1').eligibility_requirements,'Valid residence permit');
  a.workflow={traveller_requirements:a.traveller_requirements};delete a.traveller_requirements;assert.deepEqual(m.exports.travellerPricing(a),{price:170,fee:12});assert.equal(travellerDocumentSlots(a).length,3);
 });
+test('tracker completeness includes every required custom traveller file',()=>{
+ const a=app();a.documents=a.members.flatMap(member=>['passport','photo'].map(document_type=>({document_type,member_id:member.id,is_current:true,review_status:'accepted'})));
+ a.visa_type={application_sections:[{key:'extra',title:'Extra',scope:'traveller',fields:[{key:'permit',label:'Permit',type:'file',required:true}]}]};
+ assert.equal(m.exports.reviewUploadsComplete(a),false);
+ const custom=sectionFileSlots(a.visa_type.application_sections,a.members);
+ a.documents.push(...custom.map(slot=>({document_type:slot.documentType,member_id:slot.memberId,is_current:true,review_status:'accepted'})));
+ assert.equal(m.exports.reviewUploadsComplete(a),true);
+});

@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { requireAdminPortalAccess } from "@/lib/auth/session";
 import { hasVerifiedFactor } from "@/lib/auth/mfa";
 import { createClient } from "@/lib/supabase/server";
-import { PortalShell } from "@/components/portal/portal-shell";
+import { AdminPortalShell } from "./admin-portal-shell";
 import { MfaSettings } from "@/modules/auth/components/mfa-settings";
 import { fireDueEventReminders } from "@/modules/admin/calendar-reminders";
 import { AdminNotificationBell } from "./admin-notification-bell";
@@ -50,7 +50,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // cookies() from within after().
   after(() => fireDueEventReminders(supabase));
 
-  const [mfaEnabled, { data: navCountsRaw }] = await Promise.all([
+  const [mfaEnabled, { data: navCountsRaw }, orderInbox] = await Promise.all([
     // Mandatory TOTP enrollment for the admin console: an account can hold
     // is_platform_admin and still have zero verified factors (enrollment is
     // opt-in everywhere else). Block every /admin route behind an inline
@@ -58,12 +58,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     // route lives under this same layout, so a redirect would loop.
     hasVerifiedFactor(),
     supabase.rpc("admin_nav_counts"),
+    supabase.from("notifications").select("id", { count: "exact", head: true })
+      .eq("profile_id", profile.id).eq("type", "new_order").is("read_at", null),
   ]);
 
-  const navGroups = getAdminNavGroups((navCountsRaw ?? {}) as Record<string, number>);
+  const navGroups = getAdminNavGroups({ ...(navCountsRaw ?? {}) as Record<string, number>, orders: orderInbox.count ?? 0 });
 
   return (
-    <PortalShell
+    <AdminPortalShell
       className={styles.shell}
       searchableNavigation
       portalName="Admin Console"
@@ -96,6 +98,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {children}
         </>
       )}
-    </PortalShell>
+    </AdminPortalShell>
   );
 }

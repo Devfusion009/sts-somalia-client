@@ -23,6 +23,7 @@ import {
 import { ATTENTION_LABELS, VISA_QUEUE_GROUPS, VISA_QUEUE_LABELS, VISA_SORT_OPTIONS, parseVisaSort, isVisaQueue, type VisaQueue } from "@/modules/visa/queues";
 import { requireVisaPermission } from "@/modules/visa/staff-auth";
 import { PAYMENT_STATE_LABELS, daysSince, isPast, type PaymentState, type VisaStage } from "@/modules/visa/workflow";
+import { visaReviewHandoff } from "@/modules/visa/review-handoff";
 import { StageBadge } from "./[id]/case-ui";
 import { RefreshOrdersButton } from "../orders/refresh-orders-button";
 import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
@@ -67,7 +68,7 @@ function AppointmentCell({ row }: { row: QueueRow }) {
 export default async function AdminVisaQueuePage({ searchParams }: { searchParams: Promise<Search> }) {
   const profile = await requireVisaPermission("visa.applications.read");
   const sp = await searchParams;
-  const queue: VisaQueue = isVisaQueue(sp.queue) ? sp.queue : "all";
+  const queue: VisaQueue = isVisaQueue(sp.queue) ? sp.queue : "needs_action";
   const sort = parseVisaSort(sp.sort);
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
   const current: Search = {
@@ -253,6 +254,7 @@ export default async function AdminVisaQueuePage({ searchParams }: { searchParam
                 const age = daysSince(row.stage_entered_at);
                 const closed = ["approved", "rejected", "issued", "cancelled"].includes(row.status ?? "");
                 const overdue = !closed && isPast(row.sla_due_at);
+                const review = visaReviewHandoff(row.status, row.payment_state);
                 return (
                   <TableRow key={row.id} className="group">
                     <TableCell>
@@ -295,6 +297,7 @@ export default async function AdminVisaQueuePage({ searchParams }: { searchParam
                       <Badge variant={statusBadgeVariant(row.payment_state ?? "pending", { not_billed: "neutral" })}>
                         {PAYMENT_STATE_LABELS[(row.payment_state ?? "pending") as PaymentState]}
                       </Badge>
+                      {review ? <span className="mt-1.5 block max-w-40 text-xs font-medium text-primary">{review.message}</span> : null}
                     </TableCell>
                     <TableCell className="whitespace-nowrap tabular-nums">
                       <span className={cn((row.docs_rejected ?? 0) > 0 && "font-medium text-destructive")}>
@@ -316,12 +319,12 @@ export default async function AdminVisaQueuePage({ searchParams }: { searchParam
                     </TableCell>
                     <TableCell numeric>
                       <Button
-                        variant="outline"
+                        variant={review ? "default" : "outline"}
                         size="sm"
-                        aria-label={`Open documents for ${row.application_ref}`}
+                        aria-label={`${review ? "Review documents" : "Open documents"} for ${row.application_ref}`}
                         render={<Link href={`/admin/visa/${row.id}?tab=documents`} />}
                       >
-                        <FileCheck2 className="size-3.5" /> Documents
+                        <FileCheck2 className="size-3.5" /> {review ? review.label : "Documents"}
                       </Button>
                     </TableCell>
                   </TableRow>

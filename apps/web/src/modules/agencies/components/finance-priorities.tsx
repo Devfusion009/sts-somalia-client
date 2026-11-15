@@ -1,11 +1,14 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { ArrowRight, Banknote, BellRing, ClipboardList, Landmark, Undo2 } from "lucide-react";
+import { ArrowRight, Banknote, BellRing, Building2, ClipboardList, FileSearch, Landmark, Undo2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getPaymentPriorities } from "@/modules/admin/payment-priorities";
+import { formatDistanceToNow } from "date-fns";
 
 /** Exact counts avoid hiding an approval behind the finance tables' pagination. */
 export async function FinancePriorities({ agencyId }: { agencyId?: string }) {
   const db = await createClient();
+  const paymentsPromise = agencyId ? Promise.resolve(null) : getPaymentPriorities();
   const scope = agencyId ? "agent" : "admin";
   const definitions = [
     { table: "agency_payout_requests" as const, statuses: ["pending"], label: "Withdrawals awaiting approval", action: "Review", tone: "var(--brand-gold)", icon: Landmark, href: `/${scope}/finance/withdrawals` },
@@ -19,7 +22,12 @@ export async function FinancePriorities({ agencyId }: { agencyId?: string }) {
     const { count, error } = await query;
     return { ...item, count, error };
   }));
-  const visible = rows.filter((row) => row.error || (row.count ?? 0) > 0);
+  const payments = await paymentsPromise;
+  const paymentRows = payments ? [
+    { label: "Bank transfer proofs awaiting review", action: "Review transfers", tone: "var(--brand-gold)", icon: FileSearch, href: "/admin/orders?filter=action", count: payments.bank.count, error: payments.bank.error },
+    { label: "Office payments awaiting cash collection", action: "View cash requests", tone: "var(--chart-3)", icon: Building2, href: "/admin/orders?filter=action", count: payments.cash.count, error: payments.cash.error },
+  ] : [];
+  const visible = [...paymentRows, ...rows].filter((row) => row.error || (row.count ?? 0) > 0);
   if (!visible.length) return null;
   const total = visible.reduce((sum, row) => sum + (row.count ?? 0), 0);
   return (
@@ -36,7 +44,7 @@ export async function FinancePriorities({ agencyId }: { agencyId?: string }) {
           <h2 id="finance-priorities-title" className="font-heading text-lg font-semibold tracking-tight">Pending tasks</h2>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_oklch,var(--brand-gold)_40%,var(--border))] bg-[color-mix(in_oklch,var(--brand-gold)_10%,var(--card))] px-3 py-1 text-xs font-semibold text-[color-mix(in_oklch,var(--brand-gold),black_40%)] dark:text-brand-gold">
-          <span className="tabular-nums">{total}</span> action{total === 1 ? "" : "s"} required
+          {visible.some(row => row.error) ? "Some queues unavailable" : <><span className="tabular-nums">{total}</span> action{total === 1 ? "" : "s"} required</>}
         </span>
       </div>
       <ul className="mt-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
@@ -65,6 +73,23 @@ export async function FinancePriorities({ agencyId }: { agencyId?: string }) {
           );
         })}
       </ul>
+      {payments && (payments.bank.rows.length > 0 || payments.cash.rows.length > 0) ? (
+        <div className="mt-5 border-t border-border pt-5">
+          <h3 className="text-sm font-semibold">Payments to follow up</h3>
+          <ul className="mt-3 divide-y divide-border">
+            {[...payments.bank.rows.map(row => ({ ...row, bank: true })), ...payments.cash.rows.map(row => ({ ...row, bank: false }))].map(row => (
+              <li key={row.id}>
+                <Link href={`/admin/orders?order=${row.order_id}#order-${row.order_id}`} className="group flex flex-wrap items-center gap-x-5 gap-y-3 rounded-lg px-2 py-4 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-primary">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-800 dark:text-amber-300">{row.bank ? <Landmark className="size-4" aria-hidden="true" /> : <Building2 className="size-4" aria-hidden="true" />}</span>
+                  <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{row.order.order_number}<span className="ml-2 font-normal text-muted-foreground">{row.order.agency_customer?.full_name ?? row.order.customer?.full_name ?? "Customer"}</span></span><span className="mt-1 block text-xs break-words text-muted-foreground">{row.bank ? "Bank transfer · Proof ready for review" : "Pay at Office · Awaiting cash collection"}{row.bank && row.proofs?.[0]?.transfer_reference ? ` · Ref: ${row.proofs[0].transfer_reference}` : ""}</span></span>
+                  <span className="text-right"><span className="block text-sm font-semibold tabular-nums">{new Intl.NumberFormat("en-US", { style: "currency", currency: row.currency }).format(Number(row.amount))}</span><span className="mt-1 block text-xs text-muted-foreground">Requested {formatDistanceToNow(new Date(row.created_at), { addSuffix: true })}</span></span>
+                  <span className="inline-flex items-center gap-2 text-xs font-semibold text-primary">{row.bank ? "Review proof" : "Open cash request"}<ArrowRight className="size-4" aria-hidden="true" /></span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -52,7 +52,31 @@ export class NotificationsService {
     return { ok: true as const };
   }
 
-  /** Marks every unread notification of one type as read, e.g. all new-order alerts once the Orders page is opened. */
+  async getUnreadOrderCount(userId: string) {
+    const { count, error } = await this.rls.get().from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("profile_id", userId).eq("type", "new_order").is("read_at", null);
+    if (error) throw new Error(error.message);
+    return { count: count ?? 0 };
+  }
+
+  async getAdminNavCounts() {
+    const { data, error } = await this.rls.get().rpc("admin_nav_counts");
+    if (error) throw new Error(error.message);
+    return (data ?? {}) as Record<string, number>;
+  }
+
+  /** Opening one order never acknowledges another order or another staff member's inbox. */
+  async readOrder(userId: string, orderId: string) {
+    const { error } = await this.rls.get().from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("profile_id", userId).eq("type", "new_order")
+      .eq("data->>order_id", orderId).is("read_at", null);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  }
+
+  /** Explicit dismissal of a notification category; opening a list does not call this. */
   async dismissType(userId: string, type: string) {
     const { error } = await this.rls
       .get()
