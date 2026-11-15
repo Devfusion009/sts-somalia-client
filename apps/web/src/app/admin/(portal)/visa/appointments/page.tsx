@@ -8,7 +8,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { FilterChips } from "@/components/dashboard/filter-chips";
 import { countryFlag } from "@/lib/countries";
 import { cn } from "@/lib/utils";
-import { getUpcomingVisaAppointments } from "@/modules/visa/case-queries";
+import { Pager } from "@/components/dashboard/pager";
+import { RefreshOrdersButton } from "../../orders/refresh-orders-button";
+import { getAppointmentHandoffs, getUpcomingVisaAppointments } from "@/modules/visa/case-queries";
 import { requireVisaPermission } from "@/modules/visa/staff-auth";
 import { visaStaffCan } from "@/modules/visa/permissions";
 import { formatInZone } from "@/modules/visa/time";
@@ -72,10 +74,11 @@ function Row({ a, canManage }: { a: Appt; canManage: boolean }) {
   );
 }
 
-export default async function VisaAppointmentsPage({ searchParams }: { searchParams: Promise<{ centre?: string }> }) {
+export default async function VisaAppointmentsPage({ searchParams }: { searchParams: Promise<{ centre?: string; page?: string }> }) {
   const profile = await requireVisaPermission("visa.applications.read");
-  const { centre } = await searchParams;
-  const all = await getUpcomingVisaAppointments();
+  const { centre, page: pageParam } = await searchParams;
+  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+  const [all, handoffs] = await Promise.all([getUpcomingVisaAppointments(), getAppointmentHandoffs(page)]);
   const canManage = visaStaffCan(profile, "visa.appointments.manage");
 
   const centres = [...new Map(all.filter((a) => a.centre).map((a) => [a.centre!.id, a.centre!])).values()];
@@ -102,12 +105,19 @@ export default async function VisaAppointmentsPage({ searchParams }: { searchPar
     <div className="space-y-6">
       <PageHeader
         title="Visa appointments"
+        actions={<RefreshOrdersButton />}
         status={
           <Badge variant="neutral" className="tabular-nums">
             {list.length}
           </Badge>
         }
       />
+
+      <section aria-label="Reviewed applications awaiting appointment" className="space-y-3">
+        <div className="flex items-center justify-between"><h2 className="font-semibold">Reviewed applications</h2><Badge variant="warning">{handoffs.count} awaiting completion</Badge></div>
+        {handoffs.rows.length ? <Card className="gap-0 py-0"><ul className="divide-y divide-border">{handoffs.rows.map(row => <li key={row.id}><Link href={`/admin/visa/${row.id}?tab=appointments`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-5 py-4 hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-primary"><span><span className="block text-sm font-semibold">{row.applicant_name || "Applicant"}</span><span className="mt-1 block text-xs text-muted-foreground">{row.application_ref} · {row.visa_name}</span></span><span className="text-xs font-semibold text-primary">{row.booked ? "View appointment" : "Book appointment"} →</span></Link></li>)}</ul></Card> : <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">No reviewed applications awaiting an appointment</div>}
+        <Pager page={page} total={handoffs.count} pageSize={20} hrefFor={next => `/admin/visa/appointments?page=${next}${centre ? `&centre=${encodeURIComponent(centre)}` : ""}`} />
+      </section>
 
       {centres.length > 1 ? <FilterChips items={chips} active={centre ?? ""} label="Filter by centre" /> : null}
 

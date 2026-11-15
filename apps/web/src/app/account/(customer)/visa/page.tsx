@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
+import { reviewUploadsComplete } from "@/modules/visa/schemas";
 import { getMyVisaApplications } from "@/modules/visa/queries";
 import { visaCustomerProgress, visaNextAction, type NextAction } from "@/modules/visa/progress";
 import { VisaStatusBadge, fmtMoney } from "@/modules/visa/components/visa-shared";
@@ -74,6 +75,8 @@ export default async function AccountVisaPage() {
               const input = {
                 status: app.status as VisaStage,
                 workflow: app.workflow,
+                memberIds: app.members.map(member => member.id),
+                documentsComplete: reviewUploadsComplete(app),
                 orderStatus: order?.status ?? null,
                 orderId: order?.id ?? null,
                 orderTotal: order ? fmtMoney(order.total, order.currency) : null,

@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { trpc } from "@/lib/trpc/react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -69,6 +70,7 @@ function TabAction({ action }: { action: VisaAction }) {
 }
 
 function StageButton({ action, applicationId, run }: { action: VisaAction; applicationId: string; run: ServerAction }) {
+  const utils = trpc.useUtils();
   const [state, setState] = useState<ActionState>(null);
   const [pending, setPending] = useState(false);
   const submitting = useRef(false);
@@ -85,7 +87,12 @@ function StageButton({ action, applicationId, run }: { action: VisaAction; appli
       startTransition(() => {
         void run(null, data).then((result) => {
           setState(result);
-          if (result && !result.error) router.refresh();
+          if (result && !result.error) {
+            void utils.notifications.adminNavCounts.invalidate();
+            if (action.key === "start_review") router.push("?tab=documents", { scroll: false });
+            else if (action.afterTab) router.push(`?tab=${action.afterTab}`, { scroll: false });
+            else router.refresh();
+          }
         }).catch(() => {
           setState({ error: "The case could not be updated. Refresh to check its status before retrying." });
         }).finally(() => {

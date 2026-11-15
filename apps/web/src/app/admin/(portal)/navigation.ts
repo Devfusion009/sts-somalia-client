@@ -65,6 +65,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
 export function getAdminNavGroups(counts: Record<string, number>): PortalNavGroup[] {
   const badges: Record<string, number | undefined> = {
     "/admin/queue": counts.queue,
+    "/admin/orders": counts.orders,
     "/admin/refunds": counts.refunds,
     "/admin/visa": counts.visa,
     "/admin/visa/appointments": counts.visa_appointments,

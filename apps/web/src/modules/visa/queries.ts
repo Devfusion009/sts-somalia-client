@@ -86,10 +86,11 @@ export async function getMyVisaApplications() {
     .from("visa_applications")
     .select(
       `*,
-       visa_type:visa_type_id (name, destination_country_code),
-       documents:visa_documents (id, document_type, is_current, review_status, rejection_reason),
+       visa_type:visa_type_id (name, destination_country_code, required_documents, application_sections),
+       members:visa_members (id, full_name, is_primary),
+       documents:visa_documents (id, document_type, member_id, is_current, review_status, rejection_reason),
        document_requests:visa_document_requests (id, title, status, requirement, due_date, description),
-       appointments:visa_appointments (id, status, appointment_type, scheduled_at, confirmation_number, biometrics_required,
+       appointments:visa_appointments (id, status, appointment_type, scheduled_at, confirmation_number, biometrics_required, member_id, biometrics_completed,
          centre:visa_application_centres (name, city, address, timezone, collection_hours)),
        passports:visa_passports (id, status, holder_name, tracking_reference),
        order_items (order:order_id (id, status, total, currency))`

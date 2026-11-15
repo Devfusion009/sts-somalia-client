@@ -16,7 +16,7 @@ export async function getDashboardStats() {
   const supabase = await createClient();
 
   const [
-    { data: totals },
+    { data: totals, error: totalsError },
     { count: pendingAgency },
     { count: pendingPartner },
     { count: pendingAffiliate },
@@ -29,6 +29,7 @@ export async function getDashboardStats() {
     supabase.from("venue_partner_applications").select("*", { count: "exact", head: true }).eq("status", "pending"),
   ]);
 
+  if (totalsError) throw new Error("Dashboard totals are unavailable. Refresh and try again.");
   const raw = (totals ?? {}) as {
     usersByRole?: Record<string, number | string>;
     totalUsers?: number | string;
@@ -320,7 +321,7 @@ export async function getOrdersByIds(ids: string[]) {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, currency, subtotal, discount_total, total, created_at, paid_at, notes, customer:profiles!orders_customer_id_fkey(full_name, email, phone), agency:agencies(name), agency_customer:agency_customer_id(full_name, phone), payments(id, provider, method_label, amount, currency, status, payer_phone, created_at), invoices(invoice_number, status), order_items(id, item_type, quantity, total_price, hotel_booking:hotel_booking_id(check_in, check_out, num_rooms, num_adults, status, hotel:hotel_id(name, city)), flight_booking:flight_booking_id(origin_iata, destination_iata, depart_at, return_at, status, provider_booking_ref, ticketing_status), visa_application:visa_application_id(id, application_ref, status, travel_details, visa_type:visa_type_id(name, destination_country_code)), umrah_booking:umrah_booking_id(num_pilgrims, status, package:package_id(name, duration_days), departure:departure_id(departure_date, return_date)), hall_booking:hall_booking_id(event_type, start_date, end_date, status, venue:venue_id(name, city)))"
+      "id, order_number, status, currency, subtotal, discount_total, total, created_at, paid_at, notes, customer:profiles!orders_customer_id_fkey(full_name, email, phone), agency:agencies(name), agency_customer:agency_customer_id(full_name, phone), payments(id, provider, method_label, amount, currency, status, payer_phone, created_at), invoices(invoice_number, status), order_items(id, item_type, quantity, total_price, hotel_booking:hotel_booking_id(id, check_in, check_out, num_rooms, num_adults, num_children, status, guest_details, stay_details, room_occupancy, special_requests, rate_plan, extras, total_price, currency, room:room_id(name), hotel:hotel_id(name, city)), flight_booking:flight_booking_id(origin_iata, destination_iata, depart_at, return_at, status, provider_booking_ref, ticketing_status), visa_application:visa_application_id(id, application_ref, status, travel_details, visa_type:visa_type_id(name, destination_country_code)), umrah_booking:umrah_booking_id(num_pilgrims, status, package:package_id(name, duration_days), departure:departure_id(departure_date, return_date)), hall_booking:hall_booking_id(event_type, start_date, end_date, status, venue:venue_id(name, city)))"
     )
     .in("id", ids);
 
@@ -769,7 +770,7 @@ export async function getAuditLogEntityTypes() {
   return (data ?? []).map((r) => r.entity_type);
 }
 
-/** [orders, paid+completed count, paid+completed revenue, settled count, settled revenue, B2B count, B2B revenue] per hour. */
+/** Booking counts by creation time; USD collections less completed refunds by receipt/refund time. */
 type OrderActivityHour = [number, number, number, number, number, number, number];
 
 /**
@@ -778,7 +779,8 @@ type OrderActivityHour = [number, number, number, number, number, number, number
  */
 const getOrderActivity = cache(async (fromIso: string, toIso: string) => {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("admin_order_activity", { p_from: fromIso, p_to: toIso });
+  const { data, error } = await supabase.rpc("admin_order_activity", { p_from: fromIso, p_to: toIso });
+  if (error) throw new Error("Revenue figures are unavailable. Refresh and try again.");
   const hours = (data ?? {}) as Record<string, (number | string)[]>;
   return Object.entries(hours).map(([hour, values]) => [hour, values.map(Number) as OrderActivityHour] as const);
 });
@@ -835,7 +837,7 @@ export async function getB2BvsB2C(from: Date, to: Date) {
   ];
 }
 
-/** Top agencies by revenue within the range, paid+completed only. */
+/** Top agencies by net USD collections within the range. */
 export async function getAgentLeaderboard(from: Date, to: Date, limit = 10) {
   const supabase = await createClient();
   const { data } = await supabase.rpc("admin_agent_leaderboard", {

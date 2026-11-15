@@ -101,7 +101,7 @@ export function AdminNotificationBell() {
                   {n.body ? <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</p> : null}
                   <p className="mt-1 text-[11px] text-muted-foreground tabular-nums">{format(new Date(n.created_at), "MMM d, yyyy 'at' h:mm a")}</p>
                 </div>
-                <Button
+                {n.type !== "new_order" ? <Button
                   type="button"
                   size="icon"
                   variant="ghost"
@@ -111,7 +111,7 @@ export function AdminNotificationBell() {
                   onClick={() => dismiss.mutate({ notificationId: n.id })}
                 >
                   <X className="size-3.5" aria-hidden="true" />
-                </Button>
+                </Button> : null}
               </div>
             ))}
           </div>

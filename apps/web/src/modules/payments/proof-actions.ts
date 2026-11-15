@@ -47,6 +47,7 @@ export async function uploadPaymentProof(_previous: ProofState, form: FormData):
     return { error: error.message };
   }
   revalidatePath("/admin/orders");
+  revalidatePath("/admin");
   revalidatePath("/checkout", "layout");
   return { error: null };
 }
@@ -63,6 +64,7 @@ export async function reviewBankPayment(_previous: ProofState, form: FormData): 
     : await (await db()).rpc("reject_payment_proof", { p_proof_id: d.proofId, p_reason: d.reason });
   if (error) return { error: error.message };
   revalidatePath("/admin/orders");
+  revalidatePath("/admin");
   revalidatePath("/checkout", "layout");
   revalidatePath("/account", "layout");
   return { error: null };

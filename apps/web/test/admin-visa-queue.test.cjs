@@ -64,3 +64,10 @@ test('a failed queue read cannot appear as an empty list', async () => {
 test('invalid sort falls back to newest first', () => {
   assert.equal(queues.parseVisaSort('invalid'), 'newest');
 });
+
+test('active review queue excludes processing and closed history', async () => {
+  const { read, calls } = setup();
+  await read({ queue:'needs_action', page:1 }, 'admin');
+  assert(calls.some(c => c[0] === 'not' && c[1] === 'attention'));
+  assert.deepEqual(calls.find(c => c[0] === 'in' && c[1] === 'status'), ['in','status',['submitted','in_review','additional_info_required','ready_for_processing']]);
+});

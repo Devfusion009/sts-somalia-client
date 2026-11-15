@@ -420,3 +420,12 @@ export const VISA_STATUS_LABELS: Record<string, string> = {
   issued: "Visa Issued",
   cancelled: "Cancelled",
 };
+
+/** Tracker completeness includes both standard slots and admin-defined file questions. */
+export function reviewUploadsComplete(app: TravellerDocumentApplication & { visa_type?: { required_documents?: unknown; application_sections?: unknown } | null }) {
+  if (missingTravellerDocuments(app).length) return false;
+  return sectionFileSlots(parseRequirementSections(app.visa_type?.application_sections), app.members)
+    .filter(slot => slot.required).every(slot => (app.documents ?? []).some(doc =>
+      doc.document_type === slot.documentType && doc.member_id === slot.memberId && doc.is_current !== false && doc.review_status !== "rejected"
+    ));
+}

@@ -214,7 +214,7 @@ export async function getVisaCaseQueue(filters: QueueFilters, meId: string) {
 
   switch (filters.queue) {
     case "needs_action":
-      query = query.not("attention", "is", null);
+      query = query.not("attention", "is", null).in("status", ["submitted", "in_review", "additional_info_required", "ready_for_processing"]);
       break;
     case "mine":
       query = query.eq("assigned_to", meId).not("status", "in", CLOSED);
@@ -340,4 +340,12 @@ export async function getUpcomingVisaAppointments(centreId?: string) {
   if (centreId) query = query.eq("centre_id", centreId);
   const { data } = await query.limit(300);
   return data ?? [];
+}
+
+export type AppointmentHandoff = { id: string; application_ref: string; applicant_name: string | null; visa_name: string; destination_country_code: string; booked: boolean };
+export async function getAppointmentHandoffs(page = 1) {
+  const db = await createClient();
+  const { data, error } = await (db as unknown as import("@supabase/supabase-js").SupabaseClient).rpc("admin_visa_appointment_handoffs", { p_offset: (page - 1) * 20, p_limit: 20 });
+  if (error) throw new Error("Appointment handoffs are unavailable. Refresh and try again.");
+  return data as { count: number; rows: AppointmentHandoff[] };
 }
