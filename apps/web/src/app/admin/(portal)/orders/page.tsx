@@ -1,4 +1,4 @@
-import { HotelOrderDisclosure, HotelBookingDetails } from "./hotel-order-details";
+import { HotelBookingDetails } from "./hotel-order-details";
 import { getPaymentProofs } from "@/modules/payments/proof-actions";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ import {
   Mail,
   PartyPopper,
   Phone,
+  UserRound,
+  CalendarDays,
   Plane,
   Receipt,
   type LucideIcon,
@@ -59,12 +61,13 @@ const FILTERS = [
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string; page?: string; order?: string; q?: string; sort?: string }>;
+  searchParams: Promise<{ filter?: string; page?: string; order?: string; q?: string; sort?: string; category?: string }>;
 }) {
-  const { filter: filterParam, page: pageParam, order: orderParam, q: queryParam, sort: sortParam } = await searchParams;
+  const { filter: filterParam, page: pageParam, order: orderParam, q: queryParam, sort: sortParam, category: categoryParam } = await searchParams;
   // Opened from a new-order alert: that order is pinned to the top and outlined.
   const focusId = orderParam && /^[0-9a-f-]{36}$/i.test(orderParam) ? orderParam : null;
   const filter = FILTERS.find((f) => f.key === filterParam)?.key ?? "all";
+  const category = ["visa", "hotel", "flight", "hall", "umrah"].includes(categoryParam ?? "") ? categoryParam! : "all";
   const sort = sortParam === "oldest" ? "oldest" : "newest";
   const page = parsePage(pageParam);
 
@@ -72,9 +75,9 @@ export default async function AdminOrdersPage({
   // only the page of orders actually shown loads its full booking and payment detail.
   const today = new Date().setHours(0, 0, 0, 0);
   const search = (queryParam ?? "").trim().slice(0, 100);
-  const queue = await getOrderQueue(filter, page, format(today, "yyyy-MM-dd"), { sort, search });
+  const queue = await getOrderQueue(filter, page, format(today, "yyyy-MM-dd"), { sort, search, category });
   const ordersHref = (nextFilter: string, nextPage = 1) => {
-    const params = new URLSearchParams({ filter: nextFilter, sort });
+    const params = new URLSearchParams({ filter: nextFilter, sort, category });
     if (search) params.set("q", search);
     if (nextPage > 1) params.set("page", String(nextPage));
     return `/admin/orders?${params}`;
@@ -111,12 +114,13 @@ export default async function AdminOrdersPage({
       </div>
 
       <div className="space-y-4 rounded-xl border border-border bg-card p-4">
-      <form key={`${filter}:${sort}:${search}`} role="search" className="flex flex-wrap items-end gap-2">
+      <form key={`${category}:${filter}:${sort}:${search}`} role="search" className="flex flex-wrap items-end gap-2">
         <input type="hidden" name="filter" value={filter} />
+        <div className="space-y-2"><label htmlFor="order-category" className="block text-xs font-medium text-muted-foreground">Service</label><select id="order-category" name="category" defaultValue={category} className={NATIVE_SELECT_CLASS}>{[["all","All services"],["visa","Visa"],["hotel","Hotels"],["flight","Flights"],["hall","Halls"],["umrah","Umrah"]].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></div>
         <div className="min-w-48 flex-1"><label htmlFor="order-search" className="mb-2 block text-xs font-medium text-muted-foreground">Find an order</label><Input id="order-search" name="q" defaultValue={search} placeholder="Order, visa reference, name or email" maxLength={100} /></div>
         <div className="space-y-2"><label htmlFor="order-sort" className="block text-xs font-medium text-muted-foreground">Sort orders</label><select id="order-sort" name="sort" defaultValue={sort} className={NATIVE_SELECT_CLASS}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></div>
         <Button type="submit" variant="outline">Apply</Button>
-        {(search || filter !== "all" || sort !== "newest") ? <Button variant="ghost" render={<Link href="/admin/orders" />}>Reset</Button> : null}
+        {(search || filter !== "all" || sort !== "newest" || category !== "all") ? <Button variant="ghost" render={<Link href="/admin/orders" />}>Reset</Button> : null}
       </form>
       <div className="flex flex-wrap items-center gap-3">
         <FilterChips label="Filter orders" active={filter} showZero items={filterItems.filter(item => ["all", "action", "pending_payment", "paid"].includes(item.key))} />
@@ -153,38 +157,27 @@ export default async function AdminOrdersPage({
             const balanceDue = Number(order.total) - paidTotal;
 
             return (
-              <Card key={order.id} id={`order-${order.id}`} className={cn("scroll-mt-24 gap-0 overflow-hidden py-0 shadow-none", order.id === focusId && "ring-2 ring-primary")}>
+              <Card key={order.id} id={`order-${order.id}`} className={cn("scroll-mt-24 gap-0 overflow-hidden border-l-[3px] border-l-primary py-0 shadow-sm", order.id === focusId && "ring-2 ring-primary")}>
                 <OrderReadScope orderId={order.id} opened={order.id === focusId}>
-                  <HotelOrderDisclosure order={order} opened={order.id === focusId}>
                   <CardContent className="p-5 sm:p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 space-y-3">
-                        <Link href={`${ordersHref(filter)}&order=${order.id}#order-${order.id}`} className="rounded-sm font-mono text-xs text-muted-foreground hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">{order.order_number}</Link>
-                        <ul className="space-y-3">
-                          {order.order_items.map(item => {
-                            const d = describeOrderItem(item);
-                            const Icon = ITEM_ICON[d.type] ?? FileText;
-                            const dates = travelWindow(d.from, d.to);
-                            return <li key={item.id} className="flex items-start gap-3">
-                              <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold">{d.title}</p>
-                                {dates || d.pax ? <p className="mt-1 text-xs text-muted-foreground">{[dates, d.pax].filter(Boolean).join(" · ")}</p> : null}
-                                {order.order_items.length > 1 ? <p className="mt-1 text-xs tabular-nums">{money(item.total_price, order.currency)}</p> : null}
-                              </div>
-                            </li>;
-                          })}
-                        </ul>
-                        <p className="text-sm text-muted-foreground">{order.agency_customer?.full_name ?? order.customer?.full_name ?? "Customer"}</p>
+                    <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr_1.35fr] lg:items-center">
+                      <div className="min-w-0">
+                        <Link href={`${ordersHref(filter)}&order=${order.id}#order-${order.id}`} className="rounded-md border border-border px-2 py-1 font-mono text-xs hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">{order.order_number}</Link>
+                        <ul className="mt-3 space-y-3">{order.order_items.map(item => {
+                          const d = describeOrderItem(item);
+                          const Icon = ITEM_ICON[d.type] ?? FileText;
+                          const dates = travelWindow(d.from, d.to);
+                          return <li key={item.id} className="flex items-center gap-4">
+                            <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-primary/8 text-primary"><Icon className="size-7" aria-hidden="true" /></span>
+                            <div className="min-w-0"><p className="break-words font-heading text-lg font-semibold">{d.title}</p>{dates ? <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground"><CalendarDays className="size-4 shrink-0" aria-hidden="true" />{dates}</p> : null}{order.order_items.length > 1 ? <p className="mt-1 text-xs tabular-nums">{money(item.total_price,order.currency)}</p> : null}</div>
+                          </li>;
+                        })}</ul>
                       </div>
-                      <div className="shrink-0 space-y-2 text-right">
-                        <p className="font-heading text-lg font-semibold tabular-nums">{money(order.total, order.currency)}</p>
-                        <Badge variant={statusBadgeVariant(order.status)} className="capitalize">{order.status.replace(/_/g, " ")}</Badge>
-                        {paidTotal > 0 && balanceDue > 0.01 && ["pending_payment", "held", "partially_paid"].includes(order.status) ? <p className="text-xs text-muted-foreground tabular-nums">{money(balanceDue, order.currency)} due</p> : null}
-                      </div>
+                      <div className="flex items-center gap-3 lg:border-l lg:border-border lg:px-5"><span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary/8 text-primary"><UserRound className="size-5" aria-hidden="true" /></span><div className="min-w-0"><p className="text-xs text-muted-foreground">Customer</p><p className="mt-1 break-words text-sm font-semibold">{order.agency_customer?.full_name ?? order.customer?.full_name ?? "Customer"}</p></div></div>
+                      <div className="flex flex-wrap items-center justify-between gap-3 lg:border-l lg:border-border lg:pl-5"><div><p className="text-xs text-muted-foreground">Payment amount</p><p className="mt-1 font-heading text-2xl font-semibold tabular-nums">{money(order.total,order.currency)}</p>{paidTotal > 0 && balanceDue > 0.01 && ["pending_payment","held","partially_paid"].includes(order.status) ? <p className="text-xs text-muted-foreground">{money(balanceDue,order.currency)} due</p> : null}</div><Badge variant={statusBadgeVariant(order.status)} className="rounded-full px-3 py-1.5 capitalize">{order.status.replace(/_/g," ")}</Badge></div>
                     </div>
 
-                    <div className="mt-4 border-t border-border pt-4">
+                    <div className="mt-5">
                       <OrderPaymentsPanel order={order} proofs={proofs} />
                       {order.order_items.map(item => {
                         const application = item.visa_application;
@@ -192,7 +185,7 @@ export default async function AdminOrdersPage({
                         return application && review ? <div key={`review-${item.id}`} className="mt-3 flex flex-wrap items-center justify-between gap-3"><span className="text-sm text-muted-foreground">{review.message}</span><Button size="sm" variant="outline" render={<Link href={`/admin/visa/${application.id}?tab=documents`} />}>{review.label}</Button></div> : null;
                       })}
                       {!awaiting.some(payment => payment.provider === "manual") && balanceDue > 0.01 && !["cancelled", "refunded"].includes(order.status) ? <div className="mt-3"><RecordPaymentDialog orderId={order.id} remaining={balanceDue} currency={order.currency} /></div> : null}
-                      <details open={order.order_items.some(item => item.hotel_booking)} className="group mt-3 text-xs">
+                      <details className="group mt-4 border-t border-border pt-3 text-xs">
                         <summary className="w-fit cursor-pointer rounded-sm py-1 font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary">Order details</summary>
                         <div className="mt-3 space-y-4 rounded-lg bg-muted/30 p-4">
                           <div className="flex flex-wrap gap-x-5 gap-y-2 text-muted-foreground">
@@ -208,7 +201,6 @@ export default async function AdminOrdersPage({
                       </details>
                     </div>
                   </CardContent>
-                  </HotelOrderDisclosure>
                 </OrderReadScope>
               </Card>
             );

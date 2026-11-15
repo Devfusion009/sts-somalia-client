@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { Building2, Clock3, FileCheck2, History, Landmark } from "lucide-react";
+import { Building2, Clock3, FileCheck2, History, Landmark, Coins } from "lucide-react";
 import type { AdminOrder } from "@/modules/admin/queries";
 import type { PaymentProof } from "@/modules/payments/proof-actions";
 import { money } from "@/lib/money";
@@ -21,14 +21,15 @@ export function OrderPaymentsPanel({ order, proofs, historyOnly = false }: { ord
         const label = !payable ? "Order closed" : bank ? !latest ? "Waiting for customer proof" : latest.status === "rejected" ? "Waiting for corrected proof" : "Proof ready for review" : cash ? "Awaiting cash collection" : "Awaiting provider confirmation";
         const Icon = bank ? Landmark : cash ? Building2 : Clock3;
         return (
-          <div key={payment.id} className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div key={payment.id} className="grid gap-4 rounded-xl bg-primary/5 p-4 lg:grid-cols-[1fr_1.4fr_auto] lg:items-center">
             <div className="flex min-w-0 items-start gap-3">
-              <span className="flex size-5 shrink-0 items-center justify-center"><Icon className="size-4 text-muted-foreground" aria-hidden /></span>
-              <div className="min-w-0 space-y-0.5">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/8 text-primary"><Icon className="size-4 text-muted-foreground" aria-hidden /></span>
+              <div className="min-w-0 space-y-1"><p className="text-xs text-muted-foreground">Payment method</p>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="text-sm font-semibold">{payment.method_label ?? "Online payment"}</span>{Number(payment.amount) !== Number(order.total) ? <span className="text-sm font-semibold tabular-nums">{money(payment.amount,payment.currency)}</span> : null}</div>
-                <div className="flex items-center gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-300"><span className="size-1.5 rounded-full bg-amber-500" aria-hidden />{label}</div>
+
               </div>
             </div>
+            <div className="flex items-center gap-3 lg:border-l lg:border-border lg:pl-5"><span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/8 text-primary"><Coins className="size-5" aria-hidden="true" /></span><div><p className="mb-1 text-xs text-muted-foreground">Payment note</p>                <div className="flex items-center gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-300"><span className="size-1.5 rounded-full bg-amber-500" aria-hidden />{label}</div></div></div>
             {payable && payment.status === "requires_action" ? <div className="shrink-0 lg:pl-4">{bank && latest ? <BankPaymentReview paymentId={payment.id} proofs={paymentProofs} amount={money(payment.amount,payment.currency)} orderNumber={order.order_number} /> : cash ? <ConfirmPaymentButton paymentId={payment.id} amount={money(payment.amount,payment.currency)} orderNumber={order.order_number} /> : null}</div> : null}
           </div>
         );

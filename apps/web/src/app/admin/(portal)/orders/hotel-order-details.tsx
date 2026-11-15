@@ -4,7 +4,7 @@ import type { AdminOrder } from "@/modules/admin/queries";
 import { money } from "@/lib/money";
 import { readExtrasSnapshot, readRatePlanSnapshot, readStayDetails, ROOM_PREFERENCES, BOARD_LABEL } from "@/modules/hotels/booking-options";
 
-export function HotelOrderDisclosure({ order, children, opened = false }: { order: AdminOrder; children: ReactNode; opened?: boolean }) {
+export function HotelOrderDisclosure({ order, children, opened = true }: { order: AdminOrder; children: ReactNode; opened?: boolean }) {
   if (!order.order_items.some(item => item.hotel_booking)) return <>{children}</>;
   return <details open={opened} className="group/hotel">
     <summary className="flex cursor-pointer list-none items-center gap-4 p-5 outline-none hover:bg-muted/20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:p-6">
