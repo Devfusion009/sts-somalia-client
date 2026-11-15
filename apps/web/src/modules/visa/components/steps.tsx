@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useDraftRecovery } from "./use-draft-recovery";
 import { DocumentRequirementsGuide } from "./document-requirements-guide";
@@ -66,7 +66,6 @@ import {
   removeVisaMember,
   savePersonalInfo,
   saveTravelInfo,
-  uploadVisaDocument,
   attachVaultDocument,
   removeVisaDocument,
   continueFromDocuments,
@@ -897,6 +896,8 @@ export type VaultOption = {
   documentType: string;
 };
 
+type DraftUploadResult = { error: string | null; document?: WizardApplication["documents"][number] };
+
 function UploadSlot({
   applicationId,
   slot,
@@ -904,6 +905,7 @@ function UploadSlot({
   existing,
   vaultOptions,
   enqueueUpload,
+  onRemoved,
 }: {
   applicationId: string;
   slot: DocumentSlot;
@@ -911,7 +913,8 @@ function UploadSlot({
   memberId?: string;
   existing?: WizardApplication["documents"][number];
   vaultOptions: VaultOption[];
-  enqueueUpload: (data: FormData) => Promise<ActionState>;
+  enqueueUpload: (data: FormData) => Promise<DraftUploadResult>;
+  onRemoved: (slotKey: string, memberId?: string) => void;
 }) {
   const domId = `${slot.key}-${memberId ?? "app"}`.replace(/[^a-zA-Z0-9_-]/g, "-");
   const [state, setState] = useState<ActionState>(null);
@@ -954,7 +957,7 @@ function UploadSlot({
             </p>
           </div>
           <CheckCircle2 className="size-4 shrink-0 text-primary" aria-hidden />
-          <form action={removeVisaDocument}>
+          <form action={async data => { await removeVisaDocument(data); onRemoved(slot.key, memberId); }}>
             <input type="hidden" name="documentId" value={existing.id} />
             <input type="hidden" name="applicationId" value={applicationId} />
             <ConfirmButton
@@ -1062,38 +1065,39 @@ export function StepDocuments({
   desk?: boolean;
 }) {
   const [state, formAction] = useActionState(continueFromDocuments, null);
-  const uploadQueue = useRef(createUploadQueue());
+  const [savedDocuments, setSavedDocuments] = useState<Record<string, WizardApplication["documents"][number] | null>>({});
+  const uploadQueue = useRef(createUploadQueue(3));
   const [pendingUploads, setPendingUploads] = useState(0);
   const pendingUploadsRef = useRef(0);
-  const uploadBatch = useRef({ saved: false, failed: false });
   const enqueueUpload = useCallback(async (data: FormData) => {
-    if (pendingUploadsRef.current === 0) uploadBatch.current = { saved: false, failed: false };
     pendingUploadsRef.current += 1;
     setPendingUploads(pendingUploadsRef.current);
     try {
-      const result = await uploadQueue.current(() => new Promise<ActionState>((resolve, reject) => {
-        startTransition(() => {
-          void uploadVisaDocument(null, data).then(resolve, reject);
-        });
-      }));
-      if (result && !result.error) uploadBatch.current.saved = true;
-      else uploadBatch.current.failed = true;
+      const result = await uploadQueue.current(async (): Promise<DraftUploadResult> => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 120_000);
+        try {
+          const response = await fetch("/api/visa/draft-documents", { method: "POST", body: data, signal: controller.signal });
+          const result: DraftUploadResult = await response.json();
+          if (!response.ok && !result?.error) throw new Error("Upload failed.");
+          return result;
+        } finally { clearTimeout(timer); }
+      });
+      if (!result.error && result.document) {
+        const document = result.document;
+        setSavedDocuments(current => ({ ...current, [`${document.document_type}|${document.member_id ?? ""}`]: document }));
+      }
       return result;
-    } catch (error) {
-      uploadBatch.current.failed = true;
-      throw error;
     } finally {
       pendingUploadsRef.current -= 1;
       setPendingUploads(pendingUploadsRef.current);
-      // Refresh once every selected file has saved. Overlapping RSC refreshes
-      // can restore an older checklist while another queued action completes.
-      // Preserve inline errors when any file in the batch failed.
-      if (pendingUploadsRef.current === 0 && uploadBatch.current.saved && !uploadBatch.current.failed) window.location.reload();
     }
   }, []);
   useWizardNavigate(state);
   const slots = travellerDocumentSlots(application);
-  const byKey = new Map(application.documents.filter(d => d.is_current).map((d) => [`${d.document_type}|${documentMemberId(application, d) ?? ""}`, d]));
+  const byKey = new Map(application.documents.filter(d => d.is_current).map(d => [`${d.document_type}|${documentMemberId(application, d) ?? ""}`, d]));
+  for (const [key, document] of Object.entries(savedDocuments)) { if (document) byKey.set(key, document); else byKey.delete(key); }
+  const onRemoved = (key: string, member?: string) => setSavedDocuments(current => ({ ...current, [`${key}|${member ?? ""}`]: null }));
   const fileSlots = sectionFileSlots(parseRequirementSections(application.visa_type?.application_sections), application.members);
   const fileGroups = [...new Set(fileSlots.map((f) => f.sectionTitle))];
 
@@ -1107,7 +1111,7 @@ export function StepDocuments({
           {memberId && typeof travellerRequirement(application, memberId)?.eligibility_requirements === "string" && travellerRequirement(application, memberId)?.eligibility_requirements ? <details className="text-sm"><summary className="cursor-pointer font-medium">Eligibility requirements</summary><div className="whitespace-pre-line pt-2">{String(travellerRequirement(application, memberId)?.eligibility_requirements)}</div></details> : null}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             {slots.filter(slot => slot.memberId === memberId).map(slot => (
-              <UploadSlot key={`${slot.key}-${memberId ?? "app"}`} applicationId={application.id} slot={slot} memberId={memberId ?? undefined} existing={byKey.get(`${slot.key}|${memberId ?? ""}`)} vaultOptions={vaultOptions} enqueueUpload={enqueueUpload} />
+              <UploadSlot key={`${slot.key}-${memberId ?? "app"}`} applicationId={application.id} slot={slot} memberId={memberId ?? undefined} existing={byKey.get(`${slot.key}|${memberId ?? ""}`)} vaultOptions={vaultOptions} enqueueUpload={enqueueUpload} onRemoved={onRemoved} />
             ))}
           </div>
         </section>
@@ -1129,11 +1133,9 @@ export function StepDocuments({
                     required: f.required,
                   }}
                   memberId={f.memberId ?? undefined}
-                  existing={application.documents.find(
-                    (d) => d.document_type === f.documentType && (f.memberId === null || d.member_id === f.memberId)
-                  )}
+                  existing={byKey.get(`${f.documentType}|${f.memberId ?? ""}`)}
                   vaultOptions={vaultOptions}
-                  enqueueUpload={enqueueUpload}
+                  enqueueUpload={enqueueUpload} onRemoved={onRemoved}
                 />
               ))}
           </div>
@@ -1268,6 +1270,7 @@ export function StepReview({
   const c = (application.contact_details ?? {}) as Record<string, string>;
   const travel = (application.travel_details ?? {}) as Record<string, string | boolean | null>;
   const slots = travellerDocumentSlots(application);
+
   const byKey = new Map(application.documents.filter(d => d.is_current).map((d) => [`${d.document_type}|${documentMemberId(application, d) ?? ""}`, d]));
   const sections = parseRequirementSections(application.visa_type?.application_sections);
   const appAnswers = parseRequirementAnswers(application.custom_answers);

@@ -42,3 +42,26 @@ test('a failed document does not block later uploads or a retry', async () => {
   assert.equal(await next, 'next saved');
   assert.equal(await enqueue(async () => 'retry saved'), 'retry saved');
 });
+
+
+test('three files transfer together while later files wait and failures release capacity', async () => {
+  const enqueue = createUploadQueue(3);
+  let active=0, peak=0;
+  const releases=[];
+  const work=Array.from({length:8},(_,i)=>enqueue(async()=>{
+    active++;peak=Math.max(peak,active);
+    await new Promise(resolve=>releases.push(resolve));
+    active--;
+    if(i===1)throw new Error('One failed file');
+    return i;
+  }));
+  const settled=Promise.allSettled(work);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(active,3);
+  while(releases.length){releases.shift()();await new Promise(resolve=>setImmediate(resolve));}
+  const results=await settled;
+  assert.equal(peak,3);
+  assert.equal(results.filter(r=>r.status==='fulfilled').length,7);
+  assert.equal(results[1].status,'rejected');
+  assert.equal(await enqueue(async()=> 'retry'), 'retry');
+});

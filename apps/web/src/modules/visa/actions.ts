@@ -625,7 +625,7 @@ export async function uploadVisaDocument(
     return { error: `"${slot.label}" must be ${slot.maxMb}MB or smaller.` };
   }
 
-  const storagePath = `${application.id}/${slot.key}-${Date.now()}-${sanitizeFilename(file.name)}`;
+  const storagePath = `${application.id}/${slot.key}-${slot.memberId ?? "application"}-${crypto.randomUUID()}-${sanitizeFilename(file.name)}`;
   const { error: uploadError } = await supabase.storage
     .from("visa-documents")
     .upload(storagePath, file, { contentType: file.type });
