@@ -49,6 +49,7 @@ function AirportSelect({
 
 export function PackageDetailsForm({
   packageId,
+  packageType = "private",
   tagline,
   tier,
   isFeatured,
@@ -68,6 +69,7 @@ export function PackageDetailsForm({
   fullPaymentBeforeDocuments,
 }: {
   packageId: string;
+  packageType?: string;
   tagline: string | null;
   tier: string | null;
   isFeatured: boolean;
@@ -186,6 +188,7 @@ export function PackageDetailsForm({
           <Input
             id="mealsNote"
             name="mealsNote"
+            required={packageType === "group"}
             defaultValue={mealsNote ?? ""}
             placeholder="Somali & Arabic buffet, halal certified"
           />
@@ -197,13 +200,14 @@ export function PackageDetailsForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="contactPersonName">Name</FieldLabel>
-            <Input id="contactPersonName" name="contactPersonName" defaultValue={contactPersonName ?? ""} />
+            <Input id="contactPersonName" name="contactPersonName" required={packageType === "group"} defaultValue={contactPersonName ?? ""} />
           </Field>
           <Field>
             <FieldLabel htmlFor="contactPersonPhone">Phone</FieldLabel>
             <Input
               id="contactPersonPhone"
               name="contactPersonPhone"
+              required={packageType === "group"}
               type="tel"
               defaultValue={contactPersonPhone ?? ""}
               placeholder="+252 61 144 4420"
@@ -230,7 +234,7 @@ export function PackageDetailsForm({
         </div>
       </FieldSet>
 
-      <FieldSet className="gap-4 border-t border-border pt-5">
+      {packageType === "group" ? <div className="border-t pt-5"><span className="text-sm font-medium">Full payment before confirmation</span><input type="hidden" name="depositPercent" value="100" /><input type="hidden" name="balanceDueDays" value="0" /><input type="hidden" name="fullPaymentBeforeDocuments" value="on" /></div> : <FieldSet className="gap-4 border-t border-border pt-5">
         <FieldLegend>Payment terms</FieldLegend>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field>
@@ -268,7 +272,7 @@ export function PackageDetailsForm({
           />
           Full payment before e-tickets and hotel vouchers
         </label>
-      </FieldSet>
+      </FieldSet>}
 
       <div className="flex justify-end border-t border-border pt-5">
         <SubmitButton pendingText="Saving…">Save details</SubmitButton>

@@ -1,3 +1,4 @@
+import { PublicPackageDetails } from "@/modules/umrah/components/public-package-details";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
@@ -62,7 +63,7 @@ export default async function UmrahPackagePage({
 
   const priceLabel = (n: number) => `${pkg.currency} ${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
   const sectionTitle = "font-heading text-xl font-bold tracking-tight sm:text-2xl";
-  const contactPhone = pkg.contact_person_phone ?? "+252 611 444 420";
+  const contactPhone = pkg.contact_person_phone ?? "";
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -193,7 +194,8 @@ export default async function UmrahPackagePage({
             </section>
           ) : null}
 
-          {pkg.meal_plan !== "none" || pkg.meals_note ? (
+          {pkg.package_type === "group" ? <section aria-labelledby="package-services"><h2 id="package-services" className={sectionTitle}>Package details</h2><div className="mt-4"><PublicPackageDetails pkg={pkg} /></div></section> : null}
+          {pkg.package_type !== "group" && (pkg.meal_plan !== "none" || pkg.meals_note) ? (
             <section aria-labelledby="pkg-food">
               <h2 id="pkg-food" className={sectionTitle}>
                 Food

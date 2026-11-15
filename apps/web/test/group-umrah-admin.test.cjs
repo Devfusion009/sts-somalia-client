@@ -17,10 +17,10 @@ function service(repository) {
  mod._compile(ts.transpileModule(fs.readFileSync(file, 'utf8'), {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021, experimentalDecorators: true}}).outputText, file);
  return new mod.exports.PackageAdminService(repository, {}, {});
 }
-const input = {name:'Group Umrah', durationDays:12, includes:['hotel'], basePrice:1500, currency:'usd', status:'draft'};
+const input = {name:'Group Umrah', durationDays:12, includes:['hotel'], basePrice:1500, currency:'usd', status:'draft', departureDate:'2027-03-01', totalSeats:20};
 test('creation returns the saved id and persists the selected route for configuration', async () => {
  let row;
- const result = await service({insertPackage:async value => {row=value; return 'new-id';}}).upsert({...input, originIata:'MGQ', destinationIata:'JED'});
+ const result = await service({insertPublicPackage:async (value,date,seats) => {row=value; assert.equal(date,'2027-03-01'); assert.equal(seats,20); return 'new-id';}}).upsert({...input, originIata:'MGQ', destinationIata:'JED'});
  assert.deepEqual(result, {id:'new-id'});
  assert.equal(row.origin_iata, 'MGQ');
  assert.equal(row.destination_iata, 'JED');
@@ -29,11 +29,11 @@ test('creation returns the saved id and persists the selected route for configur
 });
 test('editing basic package fields preserves routes managed by the details form', async () => {
  let row;
- const result = await service({updatePackage:async (id,value) => {assert.equal(id,'existing');row=value;}}).upsert({...input,id:'existing'});
+ const result = await service({findByIdAdmin:async()=>({package_type:'group'}),updatePackage:async (id,value) => {assert.equal(id,'existing');row=value;}}).upsert({...input,id:'existing'});
  assert.deepEqual(result,{id:'existing'});
  assert.equal(Object.hasOwn(row,'origin_iata'),false);
  assert.equal(Object.hasOwn(row,'destination_iata'),false);
 });
 test('save failure does not return a configuration id', async () => {
- await assert.rejects(service({insertPackage:async () => {throw Error('Save failed');}}).upsert(input), /Save failed/);
+ await assert.rejects(service({insertPublicPackage:async () => {throw Error('Save failed');}}).upsert(input), /Save failed/);
 });

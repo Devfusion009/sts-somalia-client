@@ -1,3 +1,4 @@
+import { PublicPackageDetails } from "@/modules/umrah/components/public-package-details";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarDays, ExternalLink } from "lucide-react";
@@ -59,6 +60,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
               <Badge variant={statusBadgeVariant(pkg.status)} className="capitalize">
                 {pkg.status.replace(/_/g, " ")}
               </Badge>
+              {pkg.package_type === "group" && !pkg.public_setup_complete ? <Badge variant="warning">Setup incomplete</Badge> : null}
               {pkg.is_featured ? <Badge variant="info">Most popular</Badge> : null}
             </div>
             <p className="text-sm text-muted-foreground tabular-nums">
@@ -90,6 +92,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
         </StatRail>
       </div>
 
+      {pkg.package_type === "group" ? <Card><CardHeader><CardTitle>Public package</CardTitle><CardAction><Button variant="outline" size="sm" render={<Link href="/admin/umrah/pool" />}>Umrah pool</Button></CardAction></CardHeader><CardContent><PublicPackageDetails pkg={pkg} /></CardContent></Card> : null}
       <nav aria-label="Package configuration" className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-3">
         {[["overview", "Package & publishing"], ["photos", "Photos"], ["details", "Route & details"], ["hotels", "Hotels"], ["pricing", "Pricing"], ["itinerary", "Itinerary"], ["agencies", "Agencies"], ["departures", "Departures"]].map(([id, label]) => <Button key={id} variant="outline" size="sm" render={<a href={`#${id}`} />}>{label}</Button>)}
       </nav>
@@ -120,6 +123,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
         <CardContent>
           <PackageDetailsForm
             packageId={pkg.id}
+            packageType={pkg.package_type}
             tagline={pkg.tagline}
             tier={pkg.tier}
             isFeatured={pkg.is_featured}
