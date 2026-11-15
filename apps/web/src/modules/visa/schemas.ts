@@ -124,15 +124,34 @@ export function applicationDocumentSlots(app: {
 }
 
 type TravellerDocumentApplication = Parameters<typeof applicationDocumentSlots>[0] & {
+  traveller_requirements?: unknown;
+  workflow?: unknown;
   members: { id: string; full_name: string; is_primary?: boolean }[];
   documents?: { document_type: string; member_id: string | null; is_current?: boolean; review_status?: string }[];
 };
 
 /** Standard requirements repeat for every traveller, including the primary applicant. */
 export function travellerDocumentSlots(app: TravellerDocumentApplication) {
-  return applicationDocumentSlots(app).flatMap(slot => app.members.length
-    ? app.members.map(member => ({ ...slot, memberId: member.id as string | null, memberName: member.full_name as string | null }))
-    : [{ ...slot, memberId: null as string | null, memberName: null as string | null }]);
+  return app.members.length ? app.members.flatMap(member => {
+    const quote = travellerRequirement(app, member.id);
+    return parseDocumentSlots(quote?.required_documents ?? app.resolved_documents ?? app.visa_type?.required_documents)
+      .map(slot => ({ ...slot, memberId: member.id as string | null, memberName: member.full_name as string | null }));
+  }) : applicationDocumentSlots(app).map(slot => ({ ...slot, memberId: null as string | null, memberName: null as string | null }));
+}
+
+export function travellerRequirement(app: { traveller_requirements?: unknown; workflow?: unknown }, memberId: string): Record<string, unknown> | null {
+  const workflow = app.workflow && typeof app.workflow === "object" ? app.workflow as Record<string, unknown> : {};
+  const quotes = app.traveller_requirements ?? workflow.traveller_requirements;
+  const quote = quotes && typeof quotes === "object" ? (quotes as Record<string, unknown>)[memberId] : null;
+  return quote && typeof quote === "object" ? quote as Record<string, unknown> : null;
+}
+
+export function travellerPricing(app: { members: { id: string }[]; traveller_requirements?: unknown; workflow?: unknown; resolved_price?: number | null; resolved_processing_fee?: number | null; price?: number; visa_type?: { price?: number; processing_fee?: number | null } | null }) {
+  const people = app.members.length ? app.members : [{ id: "" }];
+  return people.reduce((total, member) => {
+    const quote = travellerRequirement(app, member.id);
+    return { price: total.price + Number(quote?.price ?? app.resolved_price ?? app.visa_type?.price ?? app.price ?? 0), fee: total.fee + Number(quote?.processing_fee ?? app.resolved_processing_fee ?? app.visa_type?.processing_fee ?? 0) };
+  }, { price: 0, fee: 0 });
 }
 
 /** Historical unassigned standard files belong only to the primary traveller. */

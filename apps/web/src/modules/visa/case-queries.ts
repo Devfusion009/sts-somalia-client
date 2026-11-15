@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getVisaOrderAdmin, getVisaProcessingWorkspace } from "@/modules/admin/queries";
-import { applicationDocumentSlots, travellerDocumentSlots, documentMemberId, parseRequirementSections, sectionFileSlots } from "./schemas";
+import { travellerDocumentSlots, documentMemberId, parseRequirementSections, sectionFileSlots } from "./schemas";
 import type { PaymentState, ReadinessItem } from "./workflow";
 import { parseVisaSort, type VisaQueue, type VisaSort } from "./queues";
 
@@ -96,7 +96,8 @@ export async function getVisaCase(id: string) {
   const slots = travellerDocumentSlots(app);
   const fileSlots = sectionFileSlots(parseRequirementSections(app.visa_type?.application_sections), app.members);
   const sectionTypes = new Set(fileSlots.map((f) => f.documentType));
-  const groupKey = (type: string, memberId: string | null) => (sectionTypes.has(type) || applicationDocumentSlots(app).some(s => s.key === type) ? `${type}|${memberId ?? ""}` : type);
+  const standardTypes = new Set(slots.map(slot => slot.key));
+  const groupKey = (type: string, memberId: string | null) => (memberId || sectionTypes.has(type) || standardTypes.has(type) ? `${type}|${memberId ?? ""}` : type);
   const byType = new Map<string, typeof app.documents>();
   for (const doc of [...app.documents].sort((a, b) => b.version - a.version || b.created_at.localeCompare(a.created_at))) {
     const key = groupKey(doc.document_type, documentMemberId(app, doc));

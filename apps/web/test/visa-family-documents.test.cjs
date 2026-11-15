@@ -15,3 +15,9 @@ test('replacement action identifies the rejected document owner when siblings sh
  const next=mod.exports.visaNextAction({status:'under_review',workflow:{},orderStatus:'paid',documents:[{id:'one',document_type:'passport',is_current:true,review_status:'rejected',rejection_reason:'Replace'},{id:'two',document_type:'passport',is_current:true,review_status:'pending'}],requests:[]},(type,id)=>`${id==='one'?'Child One':'Child Two'} · ${type}`);
  assert.equal(next.kind,'upload');assert.equal(next.items.length,1);assert.equal(next.items[0].label,'Child One · passport');
 });
+test('mixed nationalities use independent document lists, eligibility and summed prices',()=>{
+ const a=app();a.traveller_requirements={primary:{price:50,processing_fee:5,required_documents:[{key:'passport',label:'Passport',required:true}]},child1:{price:80,processing_fee:7,required_documents:[{key:'passport',label:'Passport',required:true},{key:'permit',label:'Residence permit',required:true}],eligibility_requirements:'Valid residence permit'},child2:{price:40,processing_fee:0,required_documents:[]}};
+ const slots=travellerDocumentSlots(a);assert.equal(slots.length,3);assert.equal(slots.filter(s=>s.memberId==='child2').length,0);assert(slots.some(s=>s.memberId==='child1'&&s.key==='permit'));
+ assert.deepEqual(m.exports.travellerPricing(a),{price:170,fee:12});assert.equal(m.exports.travellerRequirement(a,'child1').eligibility_requirements,'Valid residence permit');
+ a.workflow={traveller_requirements:a.traveller_requirements};delete a.traveller_requirements;assert.deepEqual(m.exports.travellerPricing(a),{price:170,fee:12});assert.equal(travellerDocumentSlots(a).length,3);
+});

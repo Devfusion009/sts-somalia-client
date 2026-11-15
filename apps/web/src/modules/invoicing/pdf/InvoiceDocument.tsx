@@ -11,7 +11,7 @@ const BORDER = "#e5e7eb";
 
 const styles = StyleSheet.create({
   accentBar: { position: "absolute", top: 0, left: 0, right: 0, height: 8, backgroundColor: PRIMARY },
-  page: { padding: 40, paddingTop: 48, fontSize: 10, color: "#1f2937", fontFamily: "Helvetica" },
+  page: { padding: 40, paddingTop: 48, paddingBottom: 100, fontSize: 10, color: "#1f2937", fontFamily: "Helvetica" },
   headerRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 24 },
   brand: { fontSize: 20, fontWeight: 700, color: PRIMARY },
   // Width chosen so the mark sits level with the INVOICE title opposite it.
@@ -103,6 +103,9 @@ export function InvoiceDocument({
   proforma?: boolean;
 }) {
   const succeededPayment = order.payments.find((p) => p.status === "succeeded");
+  const paid = order.payments.filter(payment => payment.status === "succeeded").reduce((total, payment) => total + Number(payment.amount), 0);
+  const closed = order.status === "cancelled" || order.status === "refunded";
+  const balance = closed ? 0 : Math.max(0, Number(order.total) - paid);
   const logo = stsLogo();
   const isSettled = order.status === "paid" || order.status === "processing" || order.status === "completed";
 
@@ -159,8 +162,7 @@ export function InvoiceDocument({
           ) : null}
         </View>
 
-        <View style={styles.table}>
-          <View style={styles.tableHeaderRow}>
+          <View style={[styles.table, styles.tableHeaderRow]}>
             <Text style={[styles.colItem, styles.thText]}>Item</Text>
             <Text style={[styles.colQty, styles.thText]}>Qty</Text>
             <Text style={[styles.colAmount, styles.thText]}>Amount</Text>
@@ -170,7 +172,7 @@ export function InvoiceDocument({
             const guestNames =
               item.item_type === "hotel" ? hotelGuestNames(item.hotel_booking?.guest_details) : [];
             return (
-              <View key={item.id} style={styles.tableRow}>
+              <View key={item.id} style={styles.tableRow} wrap={false}>
                 <View style={styles.colItem}>
                   <Text style={styles.itemTitle}>{pdfText(info.title)}</Text>
                   {info.subtitle ? <Text style={styles.itemSubtitle}>{pdfText(info.subtitle)}</Text> : null}
@@ -194,9 +196,7 @@ export function InvoiceDocument({
               </View>
             );
           })}
-        </View>
-
-        <View style={styles.totalsBlock}>
+        <View style={styles.totalsBlock} wrap={false}>
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Subtotal</Text>
             <Text style={styles.totalsValue}>{money(order.subtotal, order.currency)}</Text>
@@ -217,18 +217,20 @@ export function InvoiceDocument({
             <Text style={styles.grandTotalLabel}>Total</Text>
             <Text style={styles.grandTotalValue}>{money(order.total, order.currency)}</Text>
           </View>
+          <View style={styles.totalsRow}><Text style={styles.totalsLabel}>Amount paid</Text><Text style={styles.totalsValue}>{money(paid, order.currency)}</Text></View>
+          <View style={styles.totalsRow}><Text style={styles.totalsLabel}>Balance due</Text><Text style={styles.totalsValue}>{money(balance, order.currency)}</Text></View>
         </View>
 
-        {proforma && !isSettled ? (
-          <View style={styles.dueBlock}>
+        {proforma && !isSettled && !closed ? (
+          <View style={styles.dueBlock} wrap={false}>
             <Text style={styles.paymentLabel}>Amount due</Text>
-            <Text style={[styles.paymentText, { fontWeight: 700 }]}>{money(order.total, order.currency)}</Text>
+            <Text style={[styles.paymentText, { fontWeight: 700 }]}>{money(balance, order.currency)}</Text>
             <Text style={[styles.paymentText, { marginTop: 4 }]}>
               Quote ref {order.order_number}. A tax invoice is issued once payment is received.
             </Text>
           </View>
         ) : (
-        <View style={styles.paymentBlock}>
+        <View style={styles.paymentBlock} wrap={false}>
           <Text style={styles.paymentLabel}>Booking status</Text>
           <Text style={styles.paymentText}>
             {isSettled

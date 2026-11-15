@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusTimeline } from "@/modules/bookings/components/status-timeline";
 import { getApplicationDetail, getOrderForVisaApplication, getReapplyCredit } from "@/modules/visa/queries";
-import { applicationDocumentSlots, documentMemberId, missingTravellerDocuments, parseRequirementSections, sectionFileLabel } from "@/modules/visa/schemas";
+import { travellerDocumentSlots, documentMemberId, missingTravellerDocuments, parseRequirementSections, sectionFileLabel } from "@/modules/visa/schemas";
 import { visaCustomerProgress, visaNextAction } from "@/modules/visa/progress";
 import { formatInZone } from "@/modules/visa/time";
 import {
@@ -64,13 +64,13 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
   const visaType = application.visa_type;
   const order = await getOrderForVisaApplication(application.id);
 
-  const slots = applicationDocumentSlots(application);
+  const slots = travellerDocumentSlots(application);
   const slotLabel = new Map(slots.map((s) => [s.key, s.label]));
   const sections = parseRequirementSections(visaType.application_sections);
-  const labelFor = (type: string) =>
+  const labelFor = (type: string, memberId?: string | null) =>
     type.startsWith("request:")
       ? type.slice(8)
-      : (slotLabel.get(type) ?? sectionFileLabel(sections, type) ?? type.replace(/_/g, " "));
+      : (slots.find(slot => slot.key === type && slot.memberId === memberId)?.label ?? slotLabel.get(type) ?? sectionFileLabel(sections, type) ?? type.replace(/_/g, " "));
 
   const decisions = application.decisions;
   const superseded = new Set(decisions.map((d) => d.supersedes_id).filter(Boolean));
@@ -93,7 +93,7 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
     const document = application.documents.find(doc => doc.id === documentId);
     const memberId = document ? documentMemberId(application, document) : null;
     const member = application.members.find(member => member.id === memberId);
-    return member ? `${member.full_name} · ${labelFor(type)}` : labelFor(type);
+    return member ? `${member.full_name} · ${labelFor(type, memberId)}` : labelFor(type);
   });
   if (!["approved", "issued", "rejected", "cancelled"].includes(application.status) && next.kind !== "pay") {
     const missing = missingTravellerDocuments(application).filter(slot => !application.documents.some(doc => doc.is_current && doc.document_type === slot.key && documentMemberId(application, doc) === slot.memberId));
@@ -236,7 +236,7 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                     return (
                       <li key={doc.id} className="space-y-2 py-3">
                         <div className="flex flex-wrap items-center gap-3">
-                          <p className="min-w-0 flex-1 text-sm font-medium">{application.members.find(member => member.id === documentMemberId(application, doc))?.full_name ? `${application.members.find(member => member.id === documentMemberId(application, doc))!.full_name} · ` : ""}{labelFor(doc.document_type)}</p>
+                          <p className="min-w-0 flex-1 text-sm font-medium">{application.members.find(member => member.id === documentMemberId(application, doc))?.full_name ? `${application.members.find(member => member.id === documentMemberId(application, doc))!.full_name} · ` : ""}{labelFor(doc.document_type, documentMemberId(application, doc))}</p>
                           <Badge variant={status.variant}>{status.label}</Badge>
                           {doc.review_status === "rejected" ? (
                             <ReplaceUpload documentId={doc.id} applicationId={application.id} />

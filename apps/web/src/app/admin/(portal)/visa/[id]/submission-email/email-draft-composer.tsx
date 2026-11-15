@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, FileText, ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,23 +10,30 @@ export function EmailDraftComposer({ applicationId, subject, body, blocker, docu
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [gmail, setGmail] = useState<string | null>(null);
+  const [pack, setPack] = useState<string | null>(null);
+  const controller = useRef<AbortController | null>(null);
+  const version = useRef(0);
+  useEffect(() => () => { if (pack) URL.revokeObjectURL(pack); }, [pack]);
+  useEffect(() => () => controller.current?.abort(), []);
   async function download(form: FormData) {
-    if (pending) return;
+    if (controller.current) return;
+    const operation = new AbortController(); controller.current = operation;
+    const revision = version.current;
     setError(null); setPending(true);
     try {
-      const response = await fetch(`/api/visa/${applicationId}/submission-email`, { method: "POST", body: form, signal: AbortSignal.timeout(120000) });
+      const response = await fetch(`/api/visa/${applicationId}/submission-email`, { method: "POST", body: form, signal: AbortSignal.any([operation.signal, AbortSignal.timeout(120000)]) });
       if (!response.ok) { const result = await response.json(); throw new Error(result.error || "The email draft could not be generated."); }
       if (!response.headers.get("content-type")?.includes("application/zip")) throw new Error("Sign in again and refresh before preparing the submission.");
       const url = URL.createObjectURL(await response.blob());
-      const link = document.createElement("a"); link.href = url; link.download = `visa-${applicationId}-submission.zip`; link.click();
+      if (operation.signal.aborted || revision !== version.current) { URL.revokeObjectURL(url); return; }
+      setPack(url);
       const compose = new URL("https://mail.google.com/mail/");
       compose.search = new URLSearchParams({ view: "cm", fs: "1", to: String(form.get("email")), su: String(form.get("subject")), body: `${String(form.get("body"))}\n\nVisa office: ${String(form.get("officeName"))}\nOffice phone: ${String(form.get("phone"))}` }).toString();
       setGmail(compose.toString());
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "The email draft could not be generated."); }
-    finally { setPending(false); }
+    } catch (reason) { if (!operation.signal.aborted) setError(reason instanceof Error ? reason.message : "The submission pack could not be generated."); }
+    finally { if (controller.current === operation) { controller.current = null; setPending(false); } }
   }
-  return <form onSubmit={event => { event.preventDefault(); void download(new FormData(event.currentTarget)); }} onChange={() => setGmail(null)} className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+  return <form onSubmit={event => { event.preventDefault(); void download(new FormData(event.currentTarget)); }} onChange={() => { version.current++; controller.current?.abort(); setGmail(null); setPack(null); }} className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
     <section className="space-y-5 rounded-xl border border-border bg-card p-5">
       <h2 className="text-base font-semibold">Visa office</h2>
       <div className="space-y-2"><Label htmlFor="office-name">Office name *</Label><Input id="office-name" name="officeName" required maxLength={160} /></div>
@@ -37,12 +44,13 @@ export function EmailDraftComposer({ applicationId, subject, body, blocker, docu
       <div className="space-y-2"><Label htmlFor="email-subject">Subject *</Label><Input id="email-subject" name="subject" required maxLength={300} defaultValue={subject} /></div>
       <div className="space-y-2"><Label htmlFor="email-body">Message *</Label><Textarea id="email-body" name="body" rows={24} required maxLength={50000} defaultValue={body} className="text-sm leading-relaxed" /></div>
       {blocker || error ? <div role="alert" className="rounded-lg bg-destructive/5 p-3 text-sm text-destructive">{blocker || error}</div> : null}
-      <Button type="submit" loading={pending} disabled={pending || Boolean(blocker)}><Download className="size-4" />{pending ? "Preparing attachments…" : "1. Download submission pack"}</Button>
+      <Button type="submit" loading={pending} disabled={pending || Boolean(blocker)}><Download className="size-4" />{pending ? "Preparing attachments…" : "Prepare submission pack"}</Button>
+      {pending ? <Button type="button" variant="outline" onClick={() => controller.current?.abort()}>Cancel</Button> : null}
+      {pack ? <a href={pack} download={`visa-${applicationId}-submission.zip`} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold"><Download className="size-4" />Download submission pack</a> : null}
       {gmail ? <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
         <a href={gmail} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"><ExternalLink className="size-4" />2. Open Gmail draft</a>
         <div className="text-sm">Attach the downloaded submission pack, or its documents folder, in Gmail before sending.</div>
       </div> : null}
-      <div className="text-xs text-muted-foreground">The pack includes every listed document, the application summary and email text. Gmail opens with the recipient and message filled; attachments must be added in Gmail. Record submission after sending.</div>
     </section>
     <aside className="rounded-xl border border-border bg-card p-5">
       <h2 className="mb-3 text-base font-semibold">Attachments ({documents.length})</h2>
