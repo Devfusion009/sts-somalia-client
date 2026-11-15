@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
-import { FileCheck2, Flag, Inbox, Search } from "lucide-react";
+import { FileCheck2, Flag, Inbox, Search, CalendarDays, UserRound, Files, CheckCircle2, Check, Zap, ClipboardCheck } from "lucide-react";
 import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,9 +22,9 @@ import {
 } from "@/modules/visa/case-queries";
 import { ATTENTION_LABELS, VISA_QUEUE_GROUPS, VISA_QUEUE_LABELS, VISA_SORT_OPTIONS, parseVisaSort, isVisaQueue, type VisaQueue } from "@/modules/visa/queues";
 import { requireVisaPermission } from "@/modules/visa/staff-auth";
-import { PAYMENT_STATE_LABELS, daysSince, isPast, type PaymentState, type VisaStage } from "@/modules/visa/workflow";
+import { VISA_STAGE_LABELS, PAYMENT_STATE_LABELS, daysSince, isPast, type PaymentState, type VisaStage } from "@/modules/visa/workflow";
 import { visaReviewHandoff } from "@/modules/visa/review-handoff";
-import { StageBadge } from "./[id]/case-ui";
+
 import { RefreshOrdersButton } from "../orders/refresh-orders-button";
 import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
@@ -216,12 +216,12 @@ export default async function AdminVisaQueuePage({ searchParams }: { searchParam
         {(current.q || current.destination || current.owner || current.urgent || sort !== "newest" || queue !== "all") ? <Button variant="ghost" render={<Link href="/admin/visa" />}>Reset</Button> : null}
       </form>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-base font-semibold">{queue === "all" ? "All applications" : VISA_QUEUE_LABELS[queue]}</h2>
+        <h2 className="flex items-center gap-3 text-base font-semibold">{queue === "all" ? "All applications" : VISA_QUEUE_LABELS[queue]}<Badge variant="success" className="rounded-full tabular-nums">{total}</Badge></h2>
         <span className="text-xs text-muted-foreground">{total} {total === 1 ? "application" : "applications"} · {VISA_SORT_OPTIONS.find(option => option.key === sort)?.label}</span>
       </div>
 
-      <Card className="overflow-hidden py-0">
-        <Table>
+      <Card className="overflow-hidden rounded-2xl border-2 border-white/80 bg-card py-0 shadow-sm dark:border-border">
+        <Table className="min-w-[1050px] text-xs [&_td]:px-4 [&_td]:py-3 [&_th]:px-4 [&_th]:text-[10px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wide">
           <TableHeader>
             <TableRow>
               <TableHead>Applicant</TableHead>
@@ -256,77 +256,32 @@ export default async function AdminVisaQueuePage({ searchParams }: { searchParam
                 const overdue = !closed && isPast(row.sla_due_at);
                 const review = visaReviewHandoff(row.status, row.payment_state);
                 return (
-                  <TableRow key={row.id} className="group">
+                  <TableRow key={row.id} className="group bg-card hover:bg-primary/[0.025]">
                     <TableCell>
-                      <Link
-                        href={`/admin/visa/${row.id}`}
-                        className="block min-w-0 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                      >
-                        <span className="flex items-center gap-1.5 font-medium group-hover:underline">
-                          {row.priority === "urgent" ? (
-                            <Flag className="size-3 shrink-0 text-destructive" role="img" aria-label="Urgent" />
-                          ) : null}
-                          {row.applicant_name ?? "Applicant"}
-                        </span>
-                        <span className="font-mono text-xs text-muted-foreground">{row.application_ref}</span>
+                      <Link href={`/admin/visa/${row.id}`} className="flex items-center gap-3 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-100/80 text-xs font-bold text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200" aria-hidden="true">{(row.applicant_name ?? "Applicant").trim().split(/\s+/).filter(Boolean).slice(0,2).map(name=>name[0]).join("").toUpperCase()}</span>
+                        <span className="min-w-0"><span className="flex items-center gap-1.5 text-xs font-semibold group-hover:underline">{row.priority === "urgent" ? <Flag className="size-3 text-destructive" role="img" aria-label="Urgent" /> : null}{row.applicant_name ?? "Applicant"}</span><span className="mt-1 block text-[10px] text-muted-foreground">{row.application_ref}</span></span>
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <span className="flex items-center gap-1.5">
-                        <span aria-hidden>{countryFlag(row.destination_country_code ?? "")}</span>
-                        {countryName(row.destination_country_code ?? "")}
-                      </span>
-                      <span className="block max-w-44 truncate text-xs text-muted-foreground">{row.visa_type_name}</span>
+                      <div className="flex items-start gap-2"><span className="text-base leading-none" aria-hidden="true">{countryFlag(row.destination_country_code ?? "")}</span><span><span className="block font-semibold">{countryName(row.destination_country_code ?? "")}</span><span className="mt-1 block max-w-40 truncate text-[10px] text-muted-foreground" title={row.visa_type_name ?? undefined}>{row.visa_type_name}</span></span></div>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs tabular-nums">
-                      {row.submitted_at || row.created_at ? <time dateTime={(row.submitted_at ?? row.created_at)!}><span className="block">{format(new Date((row.submitted_at ?? row.created_at)!), "d MMM yyyy")}</span><span className="text-muted-foreground">{format(new Date((row.submitted_at ?? row.created_at)!), "HH:mm")}</span></time> : "—"}
+                    <TableCell className="whitespace-nowrap tabular-nums">
+                      {row.submitted_at || row.created_at ? <div className="flex items-start gap-2"><CalendarDays className="mt-0.5 size-3.5 text-muted-foreground" aria-hidden="true" /><time dateTime={(row.submitted_at ?? row.created_at)!}><span className="block text-[11px] font-medium">{format(new Date((row.submitted_at ?? row.created_at)!),"d MMM yyyy")}</span><span className="mt-1 block text-[10px] text-muted-foreground">{format(new Date((row.submitted_at ?? row.created_at)!),"HH:mm")}</span></time></div> : "—"}
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col items-start gap-1">
-                        <StageBadge stage={row.status as VisaStage} />
-                        {!closed && age !== null ? <span className="text-xs text-muted-foreground">{age}d in stage</span> : null}
-                        {row.requires_appointment ? <span className="text-xs"><AppointmentCell row={row} /></span> : null}
-                        {row.attention ? (
-                          <span className={cn("text-xs font-medium", WARN_TEXT)}>
-                            {ATTENTION_LABELS[row.attention] ?? row.attention}
-                          </span>
-                        ) : null}
+                      <div className="space-y-1.5"><Badge variant={["submitted","ready_for_processing"].includes(row.status ?? "") ? "success" : row.status === "in_review" ? "warning" : statusBadgeVariant(row.status ?? "draft")} className="gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold">{row.status === "ready_for_processing" ? <Zap className="size-3" aria-hidden="true" /> : row.status === "in_review" ? <ClipboardCheck className="size-3" aria-hidden="true" /> : <CheckCircle2 className="size-3" aria-hidden="true" />}{VISA_STAGE_LABELS[row.status as VisaStage] ?? row.status}</Badge>
+                        <div className="flex flex-wrap gap-x-1 text-[10px]">{!closed && age !== null ? <span className="text-muted-foreground">{age}d in stage{row.attention ? " ·" : ""}</span> : null}{row.attention ? <span className={cn("font-medium",WARN_TEXT)}>{ATTENTION_LABELS[row.attention] ?? row.attention}</span> : null}</div>
+                        {row.requires_appointment ? <span className="text-[10px]"><AppointmentCell row={row} /></span> : null}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={statusBadgeVariant(row.payment_state ?? "pending", { not_billed: "neutral" })}>
-                        {PAYMENT_STATE_LABELS[(row.payment_state ?? "pending") as PaymentState]}
-                      </Badge>
-                      {review ? <span className="mt-1.5 block max-w-40 text-xs font-medium text-primary">{review.message}</span> : null}
+                      <Badge variant={statusBadgeVariant(row.payment_state ?? "pending",{not_billed:"neutral"})} className="gap-1 rounded-full px-2 py-0.5 text-[10px]">{row.payment_state === "paid" ? <CheckCircle2 className="size-3" aria-hidden="true" /> : null}{PAYMENT_STATE_LABELS[(row.payment_state ?? "pending") as PaymentState]}</Badge>
+                      {review ? <span className="mt-1.5 flex items-center gap-1 whitespace-nowrap text-[10px] font-medium text-primary"><Check className="size-3" aria-hidden="true" />Payment received</span> : null}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap tabular-nums">
-                      <span className={cn((row.docs_rejected ?? 0) > 0 && "font-medium text-destructive")}>
-                        {row.docs_verified ?? 0}/{row.docs_total ?? 0}
-                      </span>
-                      {(row.docs_pending ?? 0) > 0 ? (
-                        <Badge variant="warning" className="ml-1.5">
-                          {row.docs_pending} new
-                        </Badge>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {row.assigned_to ? (
-                        row.assigned_to === profile.id ? "Me" : (row.assignee_name ?? "Staff")
-                      ) : (
-                        <span className="text-muted-foreground">Unassigned</span>
-                      )}
-                      {!closed && row.sla_due_at ? <span className={cn("mt-1 block text-xs", overdue ? "font-medium text-destructive" : "text-muted-foreground")}>Due {format(new Date(row.sla_due_at), "d MMM")}</span> : null}
-                    </TableCell>
-                    <TableCell numeric>
-                      <Button
-                        variant={review ? "default" : "outline"}
-                        size="sm"
-                        aria-label={`${review ? "Review documents" : "Open documents"} for ${row.application_ref}`}
-                        render={<Link href={`/admin/visa/${row.id}?tab=documents`} />}
-                      >
-                        <FileCheck2 className="size-3.5" /> {review ? review.label : "Documents"}
-                      </Button>
-                    </TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums"><span className={cn("flex items-center gap-2 font-medium",(row.docs_rejected ?? 0)>0 && "text-destructive")}><Files className="size-3.5 text-muted-foreground" aria-hidden="true" />{row.docs_verified ?? 0}/{row.docs_total ?? 0}</span>{(row.docs_pending ?? 0)>0 ? <Badge variant="warning" className="ml-5 mt-1 rounded-full px-2 py-0 text-[10px]">{row.docs_pending} new</Badge> : null}</TableCell>
+                    <TableCell className="whitespace-nowrap"><div className="flex items-center gap-2 text-[11px]"><UserRound className="size-3.5 text-muted-foreground" aria-hidden="true" />{row.assigned_to ? row.assigned_to === profile.id ? "Me" : row.assignee_name ?? "Staff" : "Unassigned"}</div>{!closed && row.sla_due_at ? <span className={cn("mt-1 flex items-center gap-2 text-[10px]",overdue ? "font-semibold text-destructive" : "text-muted-foreground")}><CalendarDays className="size-3.5" aria-hidden="true" />Due {format(new Date(row.sla_due_at),"d MMM")}</span> : null}</TableCell>
+                    <TableCell numeric><Button variant={review ? "default" : "outline"} size="sm" className={cn("min-w-32 justify-start rounded-lg text-[11px] shadow-sm",review && "bg-gradient-to-b from-primary to-primary/90")} aria-label={`${review ? "Review documents" : "Open documents"} for ${row.application_ref}`} render={<Link href={`/admin/visa/${row.id}?tab=documents`} />}><FileCheck2 className="size-3.5" />{review ? review.label : "Documents"}</Button></TableCell>
                   </TableRow>
                 );
               })

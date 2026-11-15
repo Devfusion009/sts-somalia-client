@@ -136,5 +136,24 @@ do $$ begin
  begin perform * from _admin_collection_entries(); raise exception 'Expected helper denial'; exception when insufficient_privilege then null; end;
 end $$;
 reset role;
+\ir ../../../supabase/migrations/20261115000007_order_service_categories.sql
+select set_config('test.admin','yes',true);
+insert into order_items(order_id,item_type) values
+ ('10000000-0000-4000-8000-000000000001','visa'),
+ ('10000000-0000-4000-8000-000000000001','hotel'),
+ ('10000000-0000-4000-8000-000000000002','hotel');
+do $$ declare result jsonb; begin
+ result:=admin_order_workspace_category('all',current_date,0,1,'newest','','hotel');
+ if (result->>'total')::int<>2 or (result->>'matching')::int<>2 or jsonb_array_length(result->'ids')<>1 then raise exception 'Category pagination mismatch'; end if;
+ if (result->>'settledRevenue')::numeric<>356 then raise exception 'Category collection mismatch'; end if;
+ result:=admin_order_workspace_category('all',current_date,0,20,'oldest','QA-1','visa');
+ if (result->>'matching')::int<>1 then raise exception 'Category search mismatch'; end if;
+ result:=admin_order_workspace_category('all',current_date,0,20,'newest','','hall');
+ if (result->>'matching')::int<>0 then raise exception 'Empty category mismatch'; end if;
+end $$;
+select set_config('test.admin','no',true);
+do $$ begin
+ begin perform admin_order_workspace_category('all',current_date,0,20,'newest','','all'); raise exception 'Expected denial'; exception when raise_exception then if sqlerrm<>'not authorised' then raise; end if; end;
+end $$;
 rollback;
 \echo 'PASS: bank/cash/online receipts, deposits, duplicate approval, refunds, receipt dates, USD scope, report parity and admin isolation'

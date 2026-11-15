@@ -1,4 +1,5 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getServerTrpc } from "@/lib/trpc/server";
@@ -275,10 +276,11 @@ export type OrderQueue = {
  * from admin_order_workspace(). `today` is the local calendar date the "travelling
  * within 30 days" window starts from.
  */
-export async function getOrderQueue(filter: OrderQueueFilter, page: number, today: string, options: { sort?: "newest" | "oldest"; search?: string } = {}): Promise<OrderQueue> {
+export async function getOrderQueue(filter: OrderQueueFilter, page: number, today: string, options: { sort?: "newest" | "oldest"; search?: string; category?: string } = {}): Promise<OrderQueue> {
   const supabase = await createClient();
   const { from } = pageRange(page);
-  const { data, error } = await supabase.rpc("admin_order_workspace", {
+  const { data, error } = await (supabase as SupabaseClient).rpc("admin_order_workspace_category", {
+    p_category: options.category ?? "all",
     p_filter: filter,
     p_sort: options.sort ?? "newest",
     p_search: options.search ?? "",
