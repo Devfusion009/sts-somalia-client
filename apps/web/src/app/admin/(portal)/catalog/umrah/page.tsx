@@ -26,7 +26,7 @@ export default async function AdminUmrahCatalogPage() {
             {packages.length}
           </Badge>
         }
-        actions={<UmrahPackageForm airports={airports} />}
+        actions={<div className="flex gap-2"><Button variant="outline" render={<Link href="/admin/umrah/pool" />}>Umrah pool</Button><UmrahPackageForm airports={airports} /></div>}
       />
 
       <Card className="overflow-hidden py-0">
@@ -74,6 +74,7 @@ export default async function AdminUmrahCatalogPage() {
                     <Badge variant={statusBadgeVariant(pkg.status)} className="capitalize">
                       {pkg.status.replace(/_/g, " ")}
                     </Badge>
+                    {pkg.package_type === "group" && !pkg.public_setup_complete ? <Badge variant="warning" className="ml-2">Setup incomplete</Badge> : null}
                   </TableCell>
                   <TableCell numeric>
                     <div className="flex justify-end gap-1">

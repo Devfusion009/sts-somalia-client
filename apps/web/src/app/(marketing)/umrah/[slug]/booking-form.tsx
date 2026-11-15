@@ -282,10 +282,10 @@ export function BookingForm({
             type="number"
             inputMode="numeric"
             min={1}
-            max={Math.max(seatsLeft, 1)}
+            max={Math.max(1, Math.min(seatsLeft, 60))}
             className="tabular-nums"
             value={numPilgrims}
-            onChange={(e) => setNumPilgrims(Math.max(1, Number(e.target.value) || 1))}
+            onChange={(e) => setNumPilgrims(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
           />
         </Field>
 
@@ -335,18 +335,6 @@ export function BookingForm({
           </p>
         </div>
         <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center">
-          {bookedForSlot && !requiresApproval ? (
-            <SubmitButton
-              name="intent"
-              value="hold"
-              size="lg"
-              variant="outline"
-              disabled={cannotBook}
-              pendingText="Holding…"
-            >
-              Hold 24h
-            </SubmitButton>
-          ) : null}
           <SubmitButton size="lg" disabled={cannotBook} pendingText="Creating booking…">
             {requiresApproval ? "Send booking request" : "Continue to payment"} <ArrowRight data-icon="inline-end" aria-hidden="true" />
           </SubmitButton>

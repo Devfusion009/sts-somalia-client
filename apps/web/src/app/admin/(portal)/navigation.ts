@@ -19,6 +19,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
       { href: "/admin/visa", label: "Visa applications", icon: "visa", searchTerms: "cases processing documents" },
       { href: "/admin/visa/appointments", label: "Visa appointments", icon: "calendar" },
       { href: "/admin/umrah/requests", label: "Private Umrah requests", icon: "bookings", searchTerms: "quotes custom" },
+      { href: "/admin/umrah/pool", label: "Umrah pool", icon: "bookings", searchTerms: "public packages seats capacity customers pilgrims available" },
       { href: "/admin/umrah/bookings", label: "Umrah bookings", icon: "umrah", searchTerms: "pilgrims group private" },
       { href: "/admin/umrah/departures", label: "Umrah departures", icon: "calendar", searchTerms: "seats manifests" },
     ],

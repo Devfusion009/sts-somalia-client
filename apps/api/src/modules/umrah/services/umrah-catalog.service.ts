@@ -10,8 +10,6 @@ import { toPackageCard, toPackageDetail } from "../mappers/package.mapper";
 import { RedisService } from "../../../infra/redis/redis.service";
 
 const CATALOG_TTL_SECONDS = 300;
-/** Cards carry seat counts, so they refresh faster than the add-on catalog. */
-const PACKAGE_CARD_TTL_SECONDS = 60;
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -40,29 +38,20 @@ export class UmrahCatalogService {
 
   /** Featured first, then cheapest — the landing band reads as a ladder from the entry package. */
   async featuredPackages(limit: number): Promise<PackageCard[]> {
-    // The rows are cached, not the cards: the card's "next departure" depends on today's date.
-    const rows = await this.cache.cachedRead(
-      `umrah:cards:featured:${limit}`,
-      PACKAGE_CARD_TTL_SECONDS,
-      () => this.packages.findPublishedCards({ featuredFirst: true, limit }),
-      { tags: ["umrah-packages"] }
-    );
-    return rows.map((r) => toPackageCard(r, today()));
+    const rows = await this.packages.findPublishedCards({ featuredFirst: true });
+    return rows.map((r) => toPackageCard(r, today()))
+      .filter((card) => card.package_type === "private" || card.nextDeparture !== null).slice(0, limit);
   }
 
   async allPackages(): Promise<PackageCard[]> {
-    const rows = await this.cache.cachedRead(
-      "umrah:cards:all",
-      PACKAGE_CARD_TTL_SECONDS,
-      () => this.packages.findPublishedCards({ featuredFirst: false }),
-      { tags: ["umrah-packages"] }
-    );
-    return rows.map((r) => toPackageCard(r, today()));
+    const rows = await this.packages.findPublishedCards({ featuredFirst: false });
+    return rows.map((r) => toPackageCard(r, today()))
+      .filter((card) => card.package_type === "private" || card.nextDeparture !== null);
   }
 
   async packageBySlug(slug: string): Promise<PackageDetail | null> {
     const id = await this.packages.findIdBySlug(slug);
-    if (id) await this.packages.releaseStaleSeats(id).catch(() => {});
+    if (id) await this.packages.releaseStaleSeats(id);
     const row = await this.packages.findPublishedDetail(slug);
     return row ? toPackageDetail(row) : null;
   }

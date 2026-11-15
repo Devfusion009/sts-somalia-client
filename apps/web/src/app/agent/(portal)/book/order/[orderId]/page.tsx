@@ -13,6 +13,7 @@ import {
   Plane,
   type LucideIcon,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyOrder, getAgencyTopupRequests } from "@/modules/agencies/queries";
 import { describeOrderItem } from "@/modules/orders/format";
@@ -51,6 +52,7 @@ export default async function DeskOrderPage({
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
 
+  await (await createClient()).rpc("release_public_umrah_checkouts");
   const [order, topups] = await Promise.all([
     getAgencyOrder(membership.agency.id, orderId),
     getAgencyTopupRequests(membership.agency.id),

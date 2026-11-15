@@ -9,6 +9,7 @@ function stringList(value: unknown): string[] {
 /** Package row (with departures and hotels) → card DTO; next departure is the soonest still on sale. */
 export function toPackageCard(pkg: Row, today: string): PackageCard {
   const upcoming = bookableDepartures((pkg.umrah_package_departures ?? []) as Array<Row & { departure_date: string }>, today);
+  const available = upcoming.filter((d) => Number(d.total_seats) - Number(d.booked_seats) - Number(d.offline_seats ?? 0) > 0);
   return packageCardSchema.parse({
     id: pkg.id,
     package_type: pkg.package_type,
@@ -26,7 +27,7 @@ export function toPackageCard(pkg: Row, today: string): PackageCard {
     includes: stringList(pkg.includes),
     images: stringList(pkg.images),
     hotels: pkg.umrah_package_hotels ?? [],
-    nextDeparture: upcoming[0] ?? null,
+    nextDeparture: (pkg.package_type === "private" ? upcoming : available)[0] ?? null,
   });
 }
 

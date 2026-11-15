@@ -16,6 +16,5 @@ export async function getUmrahOperations(): Promise<UmrahOperations> {
 
 /** When an unpaid group booking created at `createdAt` releases its seats. */
 export async function umrahSeatHoldEnd(createdAt: string): Promise<Date> {
-  const { unpaidHoldHours } = await getUmrahOperations();
-  return new Date(new Date(createdAt).getTime() + unpaidHoldHours * 60 * 60 * 1000);
+  return new Date(new Date(createdAt).getTime() + 30 * 60 * 1000);
 }

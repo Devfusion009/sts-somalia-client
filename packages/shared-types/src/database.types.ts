@@ -5197,6 +5197,14 @@ export type Database = {
       }
       umrah_packages: {
         Row: {
+          agent_contacts: Json
+          public_setup_complete: boolean
+          facilities: string | null
+          accommodation_details: string | null
+          flight_details: string | null
+          transport_details: string | null
+          nights_makkah: number | null
+          nights_madinah: number | null
           package_type: string
           deposit_percent: number | null
           balance_due_days: number
@@ -5227,6 +5235,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agent_contacts?: Json
+          public_setup_complete?: boolean
+          facilities?: string | null
+          accommodation_details?: string | null
+          flight_details?: string | null
+          transport_details?: string | null
+          nights_makkah?: number | null
+          nights_madinah?: number | null
           package_type?: string
           deposit_percent?: number | null
           balance_due_days?: number
@@ -5257,6 +5273,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agent_contacts?: Json
+          public_setup_complete?: boolean
+          facilities?: string | null
+          accommodation_details?: string | null
+          flight_details?: string | null
+          transport_details?: string | null
+          nights_makkah?: number | null
+          nights_madinah?: number | null
           package_type?: string
           deposit_percent?: number | null
           balance_due_days?: number
@@ -7404,6 +7428,13 @@ export type Database = {
       }
     }
     Functions: {
+      create_public_umrah_package: {
+        Args: { p_package: Json; p_departure_date: string; p_total_seats: number }
+        Returns: string
+      }
+      release_public_umrah_checkouts: { Args: Record<PropertyKey, never>; Returns: number }
+      admin_public_umrah_pool: { Args: Record<PropertyKey, never>; Returns: Json }
+
       flag_waafi_reconciliation: { Args: { p_reference_id: string }; Returns: undefined }
       record_waafi_review_event: { Args: { p_environment: string; p_merchant_uid: string; p_event_id: string; p_event_name: string; p_reference_id: string; p_transaction_id: string }; Returns: undefined }
       begin_waafi_attempt: { Args: { p_reference_id: string; p_order_id: string | null; p_topup_id: string | null; p_environment: string; p_merchant_uid: string }; Returns: Json }

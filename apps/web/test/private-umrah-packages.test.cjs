@@ -28,7 +28,7 @@ for(const kind of ['private','group']) test(`${kind} package booking returns the
  const orders={getActiveAgencyId:async()=> 'agency',assertAgencyCanBookProduct:async()=>({ok:true}),resolveBookedForCustomer:async()=> 'customer',createForBooking:async input=>{orderInput=input;return {id:'order'};}};
  const result=await new GroupBookingService(repo,orders).create('user',{departureId:'departure',numPilgrims:1,pilgrims:[{full_name:'Test Traveller',gender:'male'}],hold:true});
  assert.equal(result.requiresApproval,kind==='private');
- assert.equal(orderInput.hold,kind==='group');
+ assert.equal(orderInput.hold,false);
  assert.equal(orderInput.price,1200);
 });
 for(const methodId of ['wallet','card','waafi']) test(`pending private request cannot initiate ${methodId} payment`,async()=>{
@@ -58,4 +58,13 @@ for(const booking of [{booking_kind:'private',status:'confirmed'},{booking_kind:
  const result=await new PaymentsService({get:()=>db},{},{},{},{}).initiatePayment('user',{orderId:'order',methodId:'card'});
  assert.equal(paymentRead,true);
  assert.equal(result.error,'That payment method is not available.');
+});
+
+for (const failure of ['price','order']) test(`failed public ${failure} write cleans up the seat reservation`,async()=>{
+ let deleted;
+ const {GroupBookingService}=load('apps/api/src/modules/umrah/services/group-booking.service.ts',{'@sts/shared-types':{groupBookingErrorMessage:()=> 'Booking failed'}});
+ const repo={createGroupBooking:async()=>({id:'booking',error:null}),findPrice:async()=> failure==='price' ? null : {id:'booking',total_price:1200,currency:'USD',booking_kind:'group'},delete:async id=>{deleted=id;}};
+ const orders={getActiveAgencyId:async()=>null,assertAgencyCanBookProduct:async()=>({ok:true}),resolveBookedForCustomer:async()=>null,createForBooking:async()=>{throw Error('Order failed');}};
+ await assert.rejects(new GroupBookingService(repo,orders).create('user',{departureId:'departure',numPilgrims:1,pilgrims:[{full_name:'Test Traveller',gender:'male'}]}));
+ assert.equal(deleted,'booking');
 });

@@ -1,3 +1,4 @@
+import { PublicPackageDetails } from "@/modules/umrah/components/public-package-details";
 import { AgentMoney } from "@/components/portal/agent-money";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
@@ -58,6 +59,7 @@ export default async function AgentUmrahBookingPage({
         <StatRailItem label="Seats left" value={seatsOnSale} tone={seatsOnSale === 0 ? "warn" : undefined} />
       </StatRail>
 
+      {pkg.package_type === "group" ? <Card><CardContent><PublicPackageDetails pkg={pkg} /></CardContent></Card> : null}
       <Card>
         <CardContent>
           <BookingForm

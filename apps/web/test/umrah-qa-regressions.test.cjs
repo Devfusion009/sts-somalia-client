@@ -119,12 +119,11 @@ const full = { id: 'full', departure_date: '2027-03-10', return_date: '2027-03-1
 const available = { ...full, id: 'available', booked_seats: 0, offline_seats: 0 };
 const { BookingForm } = load('app/(marketing)/umrah/[slug]/booking-form.tsx');
 const formProps = { packageSlug: 'qa', currency: 'USD', basePrice: 1200, bookedForSlot: React.createElement('span'), pricing: [{ sharing: 2, price: 1300 }] };
-test('sold-out group departures cannot submit payment or a hold', () => {
+test('sold-out group departures cannot submit payment or a long hold', () => {
   const tree = BookingForm({ ...formProps, departures: [full] });
   const all = nodes(tree);
-  for (const pendingText of ['Creating booking…', 'Holding…']) {
-    assert.equal(all.find((node) => node.props.pendingText === pendingText).props.disabled, true);
-  }
+  assert.equal(all.find((node) => node.props.pendingText === 'Creating booking…').props.disabled, true);
+  assert.equal(all.some((node) => node.props.pendingText === 'Holding…'), false);
   assert.equal(all.find((node) => node.props.name === 'departure_id').props.value, '');
 });
 test('booking skips a sold-out first departure and checks batch size against total available seats', () => {
