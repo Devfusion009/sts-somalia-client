@@ -21,6 +21,7 @@ import { getServerTrpc } from "@/lib/trpc/server";
 const NAV_GROUPS: PortalNavGroup[] = [
   {
     label: "Travel",
+    alwaysOpen: true,
     items: [
       { href: "/account", label: "Overview", icon: "profile" },
       { href: "/account/bookings", label: "My Bookings", icon: "bookings" },
@@ -30,13 +31,15 @@ const NAV_GROUPS: PortalNavGroup[] = [
   },
   {
     label: "Travel profile",
+    alwaysOpen: true,
     items: [
       { href: "/account/travelers", label: "Saved Travelers", icon: "team" },
       { href: "/account/documents", label: "Document Vault", icon: "invoice" },
     ],
   },
   {
-    label: "Settings",
+    label: "Account settings",
+    alwaysOpen: true,
     items: [
       { href: "/account/payments", label: "Payments & Receipts", icon: "payments" },
       { href: "/account/preferences", label: "Preferences", icon: "integrations" },

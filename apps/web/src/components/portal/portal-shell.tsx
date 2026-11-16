@@ -150,7 +150,9 @@ function NavGroups({
   activeHref,
   query = "",
   onNavigate,
+  customerNavigation = false,
 }: {
+  customerNavigation?: boolean;
   navGroups: PortalNavGroup[];
   activeHref: string | undefined;
   query?: string;
@@ -220,8 +222,8 @@ function NavGroups({
       {visibleGroups.map((group) => {
         const isOpen = group.alwaysOpen || isSearching || iconOnly || openGroups.has(group.label);
         return (
-          <SidebarGroup key={group.label}>
-            {iconOnly ? null : group.alwaysOpen || isSearching ? <SidebarGroupLabel>{group.label}</SidebarGroupLabel> : <SidebarGroupLabel
+          <SidebarGroup key={group.label} className={customerNavigation ? "gap-2 px-3 py-4 [&+&]:border-t [&+&]:border-white/10" : undefined}>
+            {iconOnly ? null : group.alwaysOpen || isSearching ? <SidebarGroupLabel className={customerNavigation ? "h-7 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-100/75" : undefined}>{group.label}</SidebarGroupLabel> : <SidebarGroupLabel
               render={
                 <button
                   type="button"
@@ -252,7 +254,9 @@ function NavGroups({
                           // Active = filled row, white label, brand-teal icon.
                           className={cn(
                             "text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 [&_svg]:text-sidebar-foreground/60",
-                            active && "[&_svg]:text-sidebar-primary"
+                            active && "[&_svg]:text-sidebar-primary",
+                            customerNavigation && "relative h-11 gap-3 rounded-lg px-3 text-[14px] font-medium text-white/90 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-300 [&_svg]:size-5 [&_svg]:text-emerald-100/80",
+                            customerNavigation && active && "data-active:bg-emerald-400/15 data-active:font-semibold data-active:text-white ring-1 ring-inset ring-emerald-200/20 before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-full before:bg-emerald-300 [&_svg]:text-emerald-300"
                           )}
                           render={<Link href={item.href} onClick={onNavigate ? () => { onNavigate(); setOpenMobile(false); } : undefined} />}
                         >
@@ -406,7 +410,7 @@ export function PortalShell({
 
   return (
     <SidebarProvider className={className}>
-      <Sidebar collapsible="icon">
+      <Sidebar collapsible="icon" className={portalName === "My Account" ? "[&_[data-slot=sidebar-header]]:border-b [&_[data-slot=sidebar-header]]:border-white/10 [&_[data-slot=sidebar-header]]:p-4 [&_[data-slot=sidebar-footer]]:border-t [&_[data-slot=sidebar-footer]]:border-white/10 [&_[data-slot=sidebar-footer]]:p-3 [&_[data-slot=sidebar-menu]]:gap-1" : undefined}>
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -447,7 +451,7 @@ export function PortalShell({
           ) : null}
         </SidebarHeader>
         <SidebarContent>
-          <NavGroups navGroups={navGroups} activeHref={activeHref} query={navQuery} onNavigate={searchableNavigation ? () => setNavQuery("") : undefined} />
+          <NavGroups customerNavigation={portalName === "My Account"} navGroups={navGroups} activeHref={activeHref} query={navQuery} onNavigate={searchableNavigation ? () => setNavQuery("") : undefined} />
           {/* An exit hatch, not a destination — separated from real nav items
               and deliberately muted so it doesn't compete with them. A hotel
               manager's portal isn't a reskinned view of the public site the
@@ -460,11 +464,11 @@ export function PortalShell({
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       tooltip="Back to website"
-                      className="text-sidebar-foreground/55 hover:text-sidebar-foreground [&_svg]:size-3.5"
+                      className={portalName === "My Account" ? "h-11 gap-3 rounded-lg px-3 text-white/85 hover:bg-white/10 hover:text-white [&_svg]:size-5" : "text-sidebar-foreground/55 hover:text-sidebar-foreground [&_svg]:size-3.5"}
                       render={<Link href={websiteHref} />}
                     >
                       <ExternalLink />
-                      <span className="text-xs">Back to website</span>
+                      <span className={portalName === "My Account" ? "text-sm font-medium" : "text-xs"}>Back to website</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>

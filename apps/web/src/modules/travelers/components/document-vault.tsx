@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Download, FileText, FolderLock, ImageIcon, Plus, Trash2 } from "lucide-react";
@@ -91,6 +92,7 @@ export function DocumentVault({
   documents: VaultDocument[];
   travelers: TravelerProfile[];
 }) {
+  const router = useRouter();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<VaultDocument | null>(null);
   const utils = trpc.useUtils();
@@ -102,6 +104,7 @@ export function DocumentVault({
       setUploadOpen(false);
       setFormKey((k) => k + 1);
       toast.success("Document uploaded.");
+      router.refresh();
     },
   });
 
@@ -110,6 +113,7 @@ export function DocumentVault({
       utils.travelers.myDocuments.invalidate();
       setConfirmDelete(null);
       toast.success("Document deleted.");
+      router.refresh();
     },
     onError: (error) => toast.error(error.message),
   });

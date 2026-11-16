@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { CheckCircle2, Circle, KeyRound, LockKeyhole, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { PasswordInput } from "@/components/password-input";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { cn } from "@/lib/utils";
+import { passwordChecks, passwordScore } from "../password-feedback";
 import type { ActionState } from "@/lib/auth/actions";
 import {
   changePasswordAction,
@@ -33,16 +34,6 @@ import {
   withdrawDeletionRequestAction,
 } from "../security-actions";
 
-/** 0 too short · 1 weak · 2 fair · 3 good · 4 strong — length first, as NIST advises, with a nudge for variety. */
-function passwordScore(password: string): number {
-  if (password.length < 8) return 0;
-  let score = password.length >= 15 ? 3 : password.length >= 12 ? 2 : 1;
-  const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((re) => re.test(password)).length;
-  if (classes >= 3) score += 1;
-  if (/^(.)\1+$/.test(password) || /(password|qwerty|123456|abcdef|letmein)/i.test(password)) score = 1;
-  return Math.min(score, 4);
-}
-
 const STRENGTH = [
   { label: "Too short", className: "bg-destructive" },
   { label: "Weak", className: "bg-destructive" },
@@ -51,92 +42,97 @@ const STRENGTH = [
   { label: "Strong", className: "bg-primary" },
 ];
 
-function StrengthMeter({ password }: { password: string }) {
-  if (!password) return null;
+function StrengthMeter({ password, alwaysVisible = false }: { password: string; alwaysVisible?: boolean }) {
+  if (!password && !alwaysVisible) return null;
   const score = passwordScore(password);
   const level = STRENGTH[score];
   return (
-    <div className="flex items-center gap-3" aria-live="polite">
+    <div className="space-y-2" role="meter" aria-label="Password strength" aria-valuemin={0} aria-valuemax={4} aria-valuenow={score} aria-valuetext={password ? level.label : "Not entered"}>
       <div className="grid flex-1 grid-cols-4 gap-1" aria-hidden="true">
         {[1, 2, 3, 4].map((step) => (
           <span
             key={step}
-            className={cn("h-1.5 rounded-full", step <= Math.max(score, 1) ? level.className : "bg-muted")}
+            className={cn("h-1.5 rounded-full", password && step <= Math.max(score, 1) ? level.className : "bg-muted")}
           />
         ))}
       </div>
-      <span className="w-16 shrink-0 text-right text-xs font-medium text-muted-foreground">{level.label}</span>
+      <div className="text-xs font-medium text-muted-foreground" aria-live="polite">{password ? level.label : "Not entered"}</div>
     </div>
   );
 }
 
-export function ChangePasswordCard({ forgotHref = "/forgot-password" }: { forgotHref?: string }) {
+export function ChangePasswordCard({
+  forgotHref = "/forgot-password",
+  dashboard = false,
+}: { forgotHref?: string; dashboard?: boolean }) {
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
   const [state, formAction] = useActionState<ActionState, FormData>(async (prev, formData) => {
     const result = await changePasswordAction(prev, formData);
     if (!result?.error) {
+      setCurrentPassword("");
       setNewPassword("");
+      setConfirmation("");
       toast.success("Password changed.", { position: "top-center" });
     }
     return result;
   }, null);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Password</CardTitle>
-        <CardAction>
-          <Link href={forgotHref} className="text-sm font-medium text-primary hover:underline">
-            Forgot password?
-          </Link>
-        </CardAction>
+    <Card id={dashboard ? "password-signin" : undefined} className="scroll-mt-20">
+      <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+        <CardTitle className="flex items-center gap-3">
+          {dashboard ? <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary"><LockKeyhole className="size-5" aria-hidden /></span> : null}
+          Password & sign-in
+        </CardTitle>
+        <Link href={forgotHref} className="text-xs font-medium text-primary hover:underline">Forgot password?</Link>
       </CardHeader>
       <CardContent>
-        <form action={formAction}>
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="currentPassword">Current password</FieldLabel>
-              <PasswordInput id="currentPassword" name="currentPassword" required autoComplete="current-password" />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="newPassword">New password</FieldLabel>
-              <PasswordInput
-                id="newPassword"
-                name="newPassword"
-                required
-                minLength={8}
-                maxLength={72}
-                autoComplete="new-password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-              />
-              <StrengthMeter password={newPassword} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="confirmPassword">Confirm new password</FieldLabel>
-              <PasswordInput
-                id="confirmPassword"
-                name="confirmPassword"
-                required
-                minLength={8}
-                maxLength={72}
-                autoComplete="new-password"
-              />
-            </Field>
-            <label className="flex cursor-pointer items-center gap-2.5 text-sm">
-              <input type="checkbox" name="signOutOthers" defaultChecked className="size-4 accent-primary" />
+        <form action={formAction} className="space-y-5">
+          <div className={cn(dashboard && "grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(170px,1fr)]")}>
+            <FieldGroup className="gap-4">
+              <Field>
+                <FieldLabel htmlFor="currentPassword">Current password</FieldLabel>
+                <PasswordInput id="currentPassword" name="currentPassword" required autoComplete="current-password"
+                  value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="newPassword">New password</FieldLabel>
+                <PasswordInput id="newPassword" name="newPassword" required minLength={8} maxLength={72}
+                  autoComplete="new-password" value={newPassword} onChange={event => setNewPassword(event.target.value)} />
+                {!dashboard ? <StrengthMeter password={newPassword} /> : null}
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="confirmPassword">Confirm new password</FieldLabel>
+                <PasswordInput id="confirmPassword" name="confirmPassword" required minLength={8} maxLength={72}
+                  autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)} />
+              </Field>
+            </FieldGroup>
+            {dashboard ? (
+              <div className="space-y-4 rounded-xl bg-muted/30 p-4 lg:border-l lg:bg-transparent lg:pl-5 lg:pr-0">
+                <div className="flex items-center gap-2 text-xs font-semibold"><KeyRound className="size-4 text-primary" aria-hidden />Password strength</div>
+                <StrengthMeter password={newPassword} alwaysVisible />
+                <ul className="space-y-3">
+                  {passwordChecks(currentPassword, newPassword, confirmation).map(check => {
+                    const Icon = check.met ? CheckCircle2 : Circle;
+                    return <li key={check.label} className="flex items-start gap-2 text-xs">
+                      <Icon className={cn("mt-0.5 size-3.5 shrink-0", check.met ? "text-primary" : "text-muted-foreground")} aria-hidden />
+                      <span className="sr-only">{check.met ? "Met: " : "Not met: "}</span>{check.label}
+                    </li>;
+                  })}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-4">
+            <label className="flex cursor-pointer items-start gap-2.5 text-xs">
+              <input type="checkbox" name="signOutOthers" defaultChecked className="mt-0.5 size-4 shrink-0 accent-primary" />
               Sign out of other devices
             </label>
-
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-              {state?.error ? (
-                <p role="alert" className="text-sm text-destructive sm:mr-auto">
-                  {state.error}
-                </p>
-              ) : null}
-              <SubmitButton pendingText="Updating…">Change password</SubmitButton>
-            </div>
-          </FieldGroup>
+            <SubmitButton pendingText="Updating…">Update password</SubmitButton>
+          </div>
+          {state?.error ? <p role="alert" className="text-sm text-destructive">{state.error}</p> : null}
         </form>
       </CardContent>
     </Card>
@@ -191,8 +187,8 @@ export function SignOutEverywhereButton() {
         title="Sign out everywhere, including this device?"
         confirmLabel="Sign out everywhere"
         icon="x"
-        variant="ghost"
-        className="text-destructive hover:text-destructive"
+        variant="outline"
+        className="border-destructive/20 text-destructive hover:text-destructive"
       >
         Sign out everywhere
       </ConfirmButton>

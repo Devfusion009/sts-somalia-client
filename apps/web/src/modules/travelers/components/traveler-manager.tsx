@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Pencil, Plus, Trash2, UsersRound } from "lucide-react";
 import { toast } from "sonner";
@@ -40,6 +41,7 @@ import type { TravelerProfile } from "../queries";
 export function TravelerManager({ travelers }: { travelers: TravelerProfile[] }) {
   const [editing, setEditing] = useState<TravelerProfile | null | "new">(null);
   const [confirmDelete, setConfirmDelete] = useState<TravelerProfile | null>(null);
+  const router = useRouter();
   const utils = trpc.useUtils();
 
   const save = trpc.travelers.save.useMutation({
@@ -47,6 +49,7 @@ export function TravelerManager({ travelers }: { travelers: TravelerProfile[] })
       utils.travelers.myTravelers.invalidate();
       setEditing(null);
       toast.success("Traveler saved.");
+      router.refresh();
     },
   });
 
@@ -55,6 +58,7 @@ export function TravelerManager({ travelers }: { travelers: TravelerProfile[] })
       utils.travelers.myTravelers.invalidate();
       setConfirmDelete(null);
       toast.success("Traveler removed.");
+      router.refresh();
     },
     onError: (error) => toast.error(error.message),
   });

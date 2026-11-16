@@ -46,9 +46,9 @@ type View = "trips" | "list";
 export default async function AccountBookingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ success?: string; filter?: string; view?: string }>;
+  searchParams: Promise<{ success?: string; filter?: string; view?: string; type?: string }>;
 }) {
-  const { success, filter: filterParam, view: viewParam } = await searchParams;
+  const { success, filter: filterParam, view: viewParam, type: typeParam } = await searchParams;
 
   // Default to upcoming: the reason someone opens this page is almost always a
   // trip they are about to take, not one they took last year.
@@ -68,17 +68,19 @@ export default async function AccountBookingsPage({
     return <UnavailableNotice label="My Bookings" />;
   }
 
+  const relevant = typeParam ? bookings.filter(b => b.type === typeParam) : bookings;
   const counts: Record<BookingTimeframe, number> = { upcoming: 0, past: 0, cancelled: 0 };
-  for (const booking of bookings) counts[bookingTimeframe(booking)] += 1;
+  for (const booking of relevant) counts[bookingTimeframe(booking)] += 1;
 
   const visible =
-    filter === "all" ? bookings : bookings.filter((b) => bookingTimeframe(b) === filter);
+    filter === "all" ? relevant : relevant.filter((b) => bookingTimeframe(b) === filter);
   const { trips, ungrouped } = groupIntoTrips(visible, orderMeta);
 
-  const href = (next: { filter?: string; view?: string }) => {
+  const href = (next: { filter?: string; view?: string; type?: string }) => {
     const params = new URLSearchParams();
     params.set("filter", next.filter ?? filter);
     params.set("view", next.view ?? view);
+    if (typeParam) params.set("type", typeParam);
     return `/account/bookings?${params.toString()}`;
   };
 

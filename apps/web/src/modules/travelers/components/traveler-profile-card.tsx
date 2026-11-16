@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SubmitButton } from "@/components/submit-button";
@@ -16,12 +17,14 @@ import type { TravelerProfile } from "../queries";
  * passport-date check blocks a phone-number change.
  */
 export function TravelerProfileCard({ traveler }: { traveler: TravelerProfile | null }) {
+  const router = useRouter();
   const utils = trpc.useUtils();
   const save = trpc.travelers.saveSelf.useMutation({
     onSuccess: () => {
       utils.travelers.selfTraveler.invalidate();
       utils.travelers.myTravelers.invalidate();
       toast.success("Passport details saved.");
+      router.refresh();
     },
   });
 

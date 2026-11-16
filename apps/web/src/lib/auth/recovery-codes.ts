@@ -39,11 +39,12 @@ export async function generateRecoveryCodes(profileId: string): Promise<string[]
 
 export async function countUnusedRecoveryCodes(profileId: string): Promise<number> {
   const admin = createAdminClient();
-  const { count } = await admin
+  const { count, error } = await admin
     .from("mfa_recovery_codes")
     .select("id", { count: "exact", head: true })
     .eq("profile_id", profileId)
     .is("used_at", null);
+  if (error) throw new Error("Recovery codes could not be loaded.");
   return count ?? 0;
 }
 

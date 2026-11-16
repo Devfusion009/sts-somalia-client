@@ -17,26 +17,27 @@ export class AccountPaymentsService {
   }
 
   async getMySavedPaymentMethods(profileId: string) {
-    const { data } = await this.rls
+    const { data, error } = await this.rls
       .get()
       .from("payment_methods")
       .select("*")
       .eq("customer_id", profileId)
       .order("is_default", { ascending: false })
       .order("created_at", { ascending: false });
+    if (error) throw new Error("Saved wallets could not be loaded.");
     return data ?? [];
   }
 
-  /** Receipt history: every order with a payment or invoice, newest first. pending_payment orders excluded (nothing received yet). */
+  /** The customer's orders, collected receipts and unpaid invoices in one workspace. */
   async getMyReceipts(profileId: string) {
-    const { data } = await this.db()
+    const { data, error } = await this.db()
       .from("orders")
       .select(
-        "id, order_number, status, total, currency, created_at, paid_at, invoices(invoice_number, status, issued_at), payments(id, provider, status, amount, currency, created_at)"
+        "id, order_number, status, total, currency, created_at, paid_at, invoices(invoice_number, status, issued_at), payments(id, provider, status, amount, currency, created_at, paid_at), order_items(id, item_type), booking_requests(kind, status, approved_amount, currency)"
       )
       .or(`customer_id.eq.${profileId},booked_by.eq.${profileId}`)
-      .neq("status", "pending_payment")
       .order("created_at", { ascending: false });
+    if (error) throw new Error("Payments and invoices could not be loaded.");
     return data ?? [];
   }
 
@@ -63,6 +64,7 @@ export class AccountPaymentsService {
         .order("updated_at", { ascending: false }),
     ]);
 
+    if (requestsRes.error || paymentsRes.error) throw new Error("Refunds could not be loaded.");
     return {
       requests: requestsRes.data ?? [],
       // The !inner join with .or() can still admit agency-visible rows;
