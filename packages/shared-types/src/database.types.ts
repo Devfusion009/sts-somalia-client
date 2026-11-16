@@ -5197,6 +5197,8 @@ export type Database = {
       }
       umrah_packages: {
         Row: {
+          pool_visibility: string
+          organizer_name: string
           agent_contacts: Json
           public_setup_complete: boolean
           facilities: string | null
@@ -5235,6 +5237,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          pool_visibility?: string
+          organizer_name?: string
           agent_contacts?: Json
           public_setup_complete?: boolean
           facilities?: string | null
@@ -5273,6 +5277,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          pool_visibility?: string
+          organizer_name?: string
           agent_contacts?: Json
           public_setup_complete?: boolean
           facilities?: string | null

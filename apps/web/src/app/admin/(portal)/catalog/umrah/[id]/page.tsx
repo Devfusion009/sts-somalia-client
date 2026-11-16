@@ -52,7 +52,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
   return (
     <div className="space-y-6">
       <div className="space-y-5">
-        <BackLink href="/admin/catalog/umrah" label="All packages" />
+        <BackLink href="/admin/umrah/pool" label="Umrah pool" />
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -86,15 +86,15 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
 
         <StatRail>
           <StatRailItem label="Starting price" value={formatMoney(Number(pkg.base_price), pkg.currency)} />
-          <StatRailItem label="Departures" value={departures.length} />
+          <StatRailItem label="Capacity" value={departures.reduce((sum,d) => sum+d.total_seats,0)} />
           <StatRailItem label="Seats left" value={seatsLeftTotal} tone={departures.length > 0 && seatsLeftTotal <= 0 ? "destructive" : undefined} />
-          <StatRailItem label="Rate card" value={hasRateCard ? `${pricing.length} rates` : "Not set"} tone={hasRateCard ? undefined : "warn"} />
+          <StatRailItem label="Filled seats" value={departures.reduce((sum,d) => sum+d.booked_seats+d.offline_seats,0)} />
         </StatRail>
       </div>
 
-      {pkg.package_type === "group" ? <Card><CardHeader><CardTitle>Public package</CardTitle><CardAction><Button variant="outline" size="sm" render={<Link href="/admin/umrah/pool" />}>Umrah pool</Button></CardAction></CardHeader><CardContent><PublicPackageDetails pkg={pkg} /></CardContent></Card> : null}
+      {pkg.package_type === "group" ? <Card><CardHeader><CardTitle>{pkg.organizer_name}</CardTitle><CardAction><Button variant="outline" size="sm" render={<Link href="/admin/umrah/pool" />}>Umrah pool</Button></CardAction></CardHeader><CardContent><PublicPackageDetails pkg={pkg} /></CardContent></Card> : null}
       <nav aria-label="Package configuration" className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-3">
-        {[["overview", "Package & publishing"], ["photos", "Photos"], ["details", "Route & details"], ["hotels", "Hotels"], ["pricing", "Pricing"], ["itinerary", "Itinerary"], ["agencies", "Agencies"], ["departures", "Departures"]].map(([id, label]) => <Button key={id} variant="outline" size="sm" render={<a href={`#${id}`} />}>{label}</Button>)}
+        {[["overview", "Package & publishing"], ["departures", "Capacity & travel dates"], ["agencies", "Assigned agencies"], ["details", "Additional settings"]].map(([id, label]) => <Button key={id} variant="outline" size="sm" render={<a href={`#${id}`} />}>{label}</Button>)}
       </nav>
       <Card id="overview" className="scroll-mt-24">
         <CardHeader>

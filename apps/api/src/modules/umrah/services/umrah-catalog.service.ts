@@ -43,6 +43,10 @@ export class UmrahCatalogService {
       .filter((card) => card.package_type === "private" || card.nextDeparture !== null).slice(0, limit);
   }
 
+  async assignedPackages(): Promise<PackageCard[]> {
+    return (await this.packages.findAssignedCards()).map(row => toPackageCard(row, today()));
+  }
+
   async allPackages(): Promise<PackageCard[]> {
     const rows = await this.packages.findPublishedCards({ featuredFirst: false });
     return rows.map((r) => toPackageCard(r, today()))

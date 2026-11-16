@@ -1,3 +1,4 @@
+import { getServerTrpc } from "@/lib/trpc/server";
 import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -34,7 +35,7 @@ export default async function AgentUmrahDeskPage() {
   const customer = await getBookingCustomer(supabase, membership.agency.id);
   if (!customer) redirect("/agent/book?service=umrah");
 
-  const packages = (await Promise.all([getAllPackages(), getAllPackages("private")])).flat();
+  const packages = (await Promise.all([getAllPackages(), getAllPackages("private"), (await getServerTrpc()).umrah.assignedPackages.query()])).flat();
 
   return (
     <div className="space-y-6">

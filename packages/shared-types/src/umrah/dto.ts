@@ -130,6 +130,9 @@ export const publicUmrahAgentContactSchema = z.object({
 
 export const packageUpsertSchema = z.object({
   packageType: z.enum(["group", "private"]).optional(),
+  poolVisibility: z.enum(["public", "private"]).optional(),
+  organizerName: optionalText(160),
+  organizerEmail: z.string().trim().email("Enter the organizer contact email.").optional(),
   id: uuid.optional(),
   name: z.string().trim().min(2, "Enter the package name.").max(160),
   description: optionalText(4000),
@@ -154,6 +157,8 @@ export const packageUpsertSchema = z.object({
   departureDate: isoDay.optional(),
 }).superRefine((value, ctx) => {
   if (value.packageType === "private") return;
+  if (!value.organizerName?.trim()) ctx.addIssue({ code: "custom", path: ["organizerName"], message: "Enter the organizer name." });
+  if (!value.organizerEmail) ctx.addIssue({ code: "custom", path: ["organizerEmail"], message: "Enter the organizer contact email." });
   const required = { description: "package description", contactPersonName: "responsible person's name", contactPersonPhone: "contact number", facilities: "facilities", accommodationDetails: "accommodation details", flightDetails: "flight details", transportDetails: "transport details", mealsNote: "food and meal details" } as const;
   for (const key of Object.keys(required) as Array<keyof typeof required>) {
     if (!value[key]?.trim()) ctx.addIssue({ code: "custom", path: [key], message: `Enter the ${required[key]}.` });

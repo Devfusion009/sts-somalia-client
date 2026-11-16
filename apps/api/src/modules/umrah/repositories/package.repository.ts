@@ -50,7 +50,7 @@ export class PackageRepository {
     const client = createAnonClient();
     const { error: releaseError } = await client.rpc("release_public_umrah_checkouts");
     throwIfDbError(releaseError, "Seat availability could not be checked.");
-    let query = client.from("umrah_packages").select(CARD_SELECT).eq("status", "published")
+    let query = client.from("umrah_packages").select(CARD_SELECT).eq("status", "published").eq("pool_visibility", "public")
       .or("package_type.eq.private,public_setup_complete.eq.true");
     query = opts.featuredFirst
       ? query.order("is_featured", { ascending: false }).order("base_price", { ascending: true })
@@ -62,7 +62,7 @@ export class PackageRepository {
   }
 
   async findIdBySlug(slug: string): Promise<string | null> {
-    const { data } = await createAnonClient().from("umrah_packages").select("id").eq("slug", slug).maybeSingle();
+    const { data } = await this.rls.getOrAnon().from("umrah_packages").select("id").eq("slug", slug).maybeSingle();
     return data?.id ?? null;
   }
 
@@ -75,15 +75,20 @@ export class PackageRepository {
   }
 
   async findPublishedDetail(slug: string) {
-    const { data, error } = await createAnonClient()
-      .from("umrah_packages")
-      .select(DETAIL_SELECT)
-      .eq("slug", slug)
-      .eq("status", "published")
-      .or("package_type.eq.private,public_setup_complete.eq.true")
-      .maybeSingle();
+    const { data, error } = await this.rls.getOrAnon().from("umrah_packages").select(DETAIL_SELECT)
+      .eq("slug", slug).eq("status", "published")
+      .or("package_type.eq.private,public_setup_complete.eq.true").maybeSingle();
     throwIfDbError(error, "The package could not be loaded.");
     return data;
+  }
+
+  async findAssignedCards() {
+    const { error: releaseError } = await this.rls.get().rpc("release_public_umrah_checkouts");
+    throwIfDbError(releaseError, "Seat availability could not be checked.");
+    const { data, error } = await this.rls.get().from("umrah_packages").select(CARD_SELECT)
+      .eq("status", "published").eq("pool_visibility", "private");
+    throwIfDbError(error, "Agency pools could not be loaded.");
+    return data ?? [];
   }
 
   // ---- admin ----

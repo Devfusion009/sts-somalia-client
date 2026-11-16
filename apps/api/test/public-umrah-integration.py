@@ -42,6 +42,8 @@ with tempfile.TemporaryDirectory(prefix='sts-public-umrah-') as folder:
         assert any('not enough seats left' in r.stderr for r in results)
         remaining=run(args+['-tAc',"select total_seats-booked_seats-offline_seats from umrah_package_departures where id=(select id from test_ids where name='departure')"]).stdout.strip()
         assert remaining=='0',remaining
+        run(args+['-f',ROOT/'supabase/migrations/20261116000002_unified_umrah_pool.sql'])
+        run(args+['-f',ROOT/'apps/api/test/unified-umrah-pool.sql'])
         print('PASS: package validation, publication, customer and agent inventory, payment gate, expiry, bank review, confirmation, pool totals, concurrent last-seat race.')
     except subprocess.CalledProcessError as error:
         print(error.stdout);print(error.stderr);
