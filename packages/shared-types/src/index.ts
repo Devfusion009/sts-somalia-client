@@ -146,9 +146,9 @@ export type SavePreferencesInput = z.infer<typeof savePreferencesSchema>;
  * validation — not redesigned.
  */
 export const updateProfileSchema = z.object({
-  fullName: z.string().min(2, "Enter your full name."),
-  phone: z.string().optional(),
-  countryCode: z.string().optional(),
+  fullName: z.string().trim().min(2, "Enter your full name.").max(160),
+  phone: z.string().trim().transform(value => value.replace(/[ ()-]/g, "")).refine(value => value === "" || /^\+[1-9]\d{6,14}$/.test(value), "Enter a valid international phone number.").optional(),
+  countryCode: z.string().trim().toUpperCase().refine(value => value === "" || /^[A-Z]{2}$/.test(value), "Select a country.").optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

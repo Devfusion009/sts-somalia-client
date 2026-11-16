@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { AlertTriangle, CheckCircle2, Inbox, MessageSquareWarning, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Inbox, MessageSquareWarning, XCircle, Plane, Building2, CalendarDays, Handshake, ArrowUpRight, FileText, Clock3 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -101,7 +101,7 @@ function RecentApplicationsSection({
               const label = rejectedKeys.length > 0 ? "Re-upload" : editable ? editLabel : "View";
 
               return (
-                <li key={app.id} className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-start sm:gap-4">
+                <li key={app.id} className="flex flex-col gap-4 px-5 py-5 transition-colors hover:bg-muted/30 sm:flex-row sm:items-center sm:gap-5">
                   <div className="min-w-0 flex-1 space-y-1">
                     <p className="flex flex-wrap items-center gap-2 font-medium">
                       {cfg.label}
@@ -134,7 +134,7 @@ function RecentApplicationsSection({
                     className="self-start"
                     render={<Link href={href} />}
                   >
-                    {label}
+                    {label} <ArrowUpRight className="size-4" aria-hidden />
                   </Button>
                 </li>
               );
@@ -222,7 +222,7 @@ function ProgramPanel({
   }
 
   if (status === "pending" || status === "under_review") {
-    return <PanelRow title={cfg.label} status={<StatusPill status={status} />} meta={reference} />;
+    return <PanelRow title={cfg.label} status={<StatusPill status={status} />} meta={reference} action={app ? <Button variant="outline" render={<Link href={`/account/become/${kind}/${app.id}/view`} />}>View application <ArrowUpRight className="size-4" /></Button> : null} />;
   }
 
   if (status === "draft" || status === "more_info_requested") {
@@ -342,8 +342,13 @@ export default async function BecomePartnerPage({
   ] as const;
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <PageHeader title="Become a partner" />
+    <div className="mx-auto w-full max-w-7xl space-y-6">
+      <PageHeader title="Partner applications" />
+      <div className="grid gap-4 sm:grid-cols-3">{[
+        {label:"Partner programs",value:programs.length,icon:FileText},
+        {label:"Under review",value:programs.filter(program=>program.app && ["pending","under_review"].includes(program.app.status)).length,icon:Clock3},
+        {label:"Action needed",value:programs.filter(program=>program.app && (program.app.status==="more_info_requested" || (rejectedDocKeys[program.app.id]?.length ?? 0)>0)).length,icon:MessageSquareWarning},
+      ].map(metric=><Card key={metric.label} className="flex-row items-center gap-4 p-5"><span className="grid size-12 place-items-center rounded-xl bg-primary/10 text-primary"><metric.icon className="size-6" aria-hidden /></span><div><div className="text-sm text-muted-foreground">{metric.label}</div><div className="mt-1 text-2xl font-semibold tabular-nums">{metric.value}</div></div></Card>)}</div>
 
       {submitted ? (
         <Alert>
@@ -369,19 +374,20 @@ export default async function BecomePartnerPage({
 
       <Tabs defaultValue={defaultTab}>
         <div className="-mx-4 overflow-x-auto overflow-y-hidden px-4 pb-1 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0">
-          <TabsList>
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-3 bg-transparent p-0 lg:grid-cols-4">
             {programs.map((p) => (
-              <TabsTrigger key={p.tab} value={p.tab} className="whitespace-nowrap">
-                {p.label}
+              <TabsTrigger key={p.tab} value={p.tab} className="h-auto min-h-24 justify-start gap-3 rounded-xl border border-border bg-card px-4 py-5 text-left shadow-none data-active:border-primary data-active:bg-primary/5">
+                {p.tab === "agent" ? <Plane className="size-6 text-primary" /> : p.tab === "partner" ? <Building2 className="size-6 text-primary" /> : p.tab === "venue" ? <CalendarDays className="size-6 text-primary" /> : <Handshake className="size-6 text-primary" />}
+                <span className="flex min-w-0 flex-col items-start gap-2"><span className="font-semibold">{p.label}</span><span className="text-xs text-muted-foreground">{p.isMember ? "Workspace available" : p.app ? (STATUS_LABEL[p.app.status] ?? p.app.status) : "Start application"}</span></span>
               </TabsTrigger>
             ))}
           </TabsList>
         </div>
 
         {programs.map((p) => (
-          <TabsContent key={p.tab} value={p.tab} className="mt-4">
-            <Card>
-              <CardContent>
+          <TabsContent key={p.tab} value={p.tab} className="mt-5">
+            <Card className="border-primary/20 bg-primary/[0.025]">
+              <CardContent className="p-5 sm:p-6">
                 <ProgramPanel kind={TAB_TO_KIND[p.tab]} app={p.app} isMember={p.isMember} isApproved={false} now={now} />
               </CardContent>
             </Card>

@@ -68,6 +68,8 @@ export const umrahRouter = router({
     .output(z.array(packageCardSchema))
     .query(async ({ ctx, input }) => (await ctx.resolve(UmrahCatalogService)).featuredPackages(input.limit)),
 
+  assignedPackages: protectedProcedure.output(z.array(packageCardSchema)).query(async ({ ctx }) => (await ctx.resolve(UmrahCatalogService)).assignedPackages()),
+
   packages: publicProcedure
     .output(z.array(packageCardSchema))
     .query(async ({ ctx }) => (await ctx.resolve(UmrahCatalogService)).allPackages()),

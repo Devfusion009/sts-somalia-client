@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { packageUpsertSchema } from '../dist/index.js';
 const valid = {
- packageType:'group',name:'Ramadan Umrah',description:'Ten-day group pilgrimage',durationDays:10,
+ organizerName:'STS Somalia',organizerEmail:'organizer@example.com',packageType:'group',name:'Ramadan Umrah',description:'Ten-day group pilgrimage',durationDays:10,
  includes:['hotel','transport','meals','flights'],basePrice:1500,currency:'USD',status:'draft',
  contactPersonName:'Trip coordinator',contactPersonPhone:'+252 611 444 420',
  facilities:'Guide and wheelchair assistance',accommodationDetails:'Makkah and Madinah hotels, quad sharing',

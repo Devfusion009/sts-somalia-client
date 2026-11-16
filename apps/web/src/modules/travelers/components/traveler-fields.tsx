@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CountrySearchSelect } from "@/components/ui/country-select";
 import { Input } from "@/components/ui/input";
 import { Field as FieldRoot, FieldLabel } from "@/components/ui/field";
 import {
@@ -10,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { COUNTRY_OPTIONS, countryFlag } from "@/lib/countries";
 import { RELATIONSHIPS } from "@/modules/visa/schemas";
 import { PassportExpiryAlert } from "./passport-alert";
 import type { TravelerProfile } from "../queries";
@@ -25,10 +25,7 @@ import type { TravelerProfile } from "../queries";
  * the markup is how those quietly drift apart.
  */
 
-const COUNTRY_ITEMS = COUNTRY_OPTIONS.map(([code, label]) => ({
-  value: code,
-  label: `${countryFlag(code)} ${label}`,
-}));
+
 
 const RELATIONSHIP_ITEMS = RELATIONSHIPS.filter((r) => r !== "self").map((value) => ({
   value,
@@ -138,22 +135,7 @@ export function TravelerFields({
         </Field>
 
         <Field label="Nationality" htmlFor={id("nationality")}>
-          <Select
-            name="nationality"
-            defaultValue={traveler?.nationality ?? undefined}
-            items={COUNTRY_ITEMS}
-          >
-            <SelectTrigger id={id("nationality")} className="w-full">
-              <SelectValue placeholder="Select a nationality" />
-            </SelectTrigger>
-            <SelectContent>
-              {COUNTRY_ITEMS.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CountrySearchSelect id={id("nationality")} name="nationality" defaultValue={traveler?.nationality ?? ""} placeholder="Select nationality" className="h-10 text-sm" />
         </Field>
 
         <Field label="Passport number" htmlFor={id("passportNumber")}>

@@ -20,7 +20,7 @@ create table umrah_pilgrims(id uuid primary key default gen_random_uuid(),bookin
 create table orders(id uuid primary key default gen_random_uuid(),status order_status default 'pending_payment',total numeric,currency text default 'USD',created_at timestamptz default now(),hold_expires_at timestamptz,min_first_payment numeric,balance_due_at date,paid_at timestamptz,agency_customer_id uuid);
 create table order_items(order_id uuid references orders,umrah_booking_id uuid references umrah_bookings);
 create table payments(id uuid primary key default gen_random_uuid(),order_id uuid references orders,amount numeric,status text,paid_at timestamptz,created_at timestamptz default now());
-create table umrah_custom_requests(id uuid,reference text,departure_date date);
+create table umrah_custom_requests(id uuid,reference text,departure_date date,package_snapshot jsonb);
 create table agency_members(agency_id uuid,profile_id uuid,status text);
 create table umrah_booking_stage_history(booking_id uuid,stage umrah_fulfillment_stage,note text,actor uuid);
 create table notifications(profile_id uuid,type text,title text,body text,data jsonb);
@@ -35,3 +35,8 @@ grant usage on schema auth to authenticated;
 alter table umrah_bookings enable row level security;
 grant insert,select on umrah_bookings to authenticated;
 create policy "own bookings read" on umrah_bookings for select to authenticated using (booked_by=auth.uid());
+
+create table umrah_package_agencies(package_id uuid,agency_id uuid);
+alter table umrah_packages enable row level security;
+create policy "umrah_packages: public reads published" on umrah_packages for select to anon,authenticated using(status='published');
+grant select on umrah_packages,umrah_package_agencies to anon,authenticated;

@@ -30,7 +30,7 @@ type UmrahPackage = Database["public"]["Tables"]["umrah_packages"]["Row"];
 export function UmrahPackageForm({ pkg, airports = [] }: { pkg?: UmrahPackage; airports?: Airport[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [packageType, setPackageType] = useState(pkg?.package_type ?? "group");
+  const [packageType] = useState(pkg?.package_type ?? "group");
   const isPublic = packageType === "group";
   const [agentContacts, setAgentContacts] = useState(() => {
     const parsed = publicUmrahAgentContactSchema.array().safeParse(pkg?.agent_contacts ?? []);
@@ -76,13 +76,7 @@ export function UmrahPackageForm({ pkg, airports = [] }: { pkg?: UmrahPackage; a
                 <AlertDescription>{state.error}</AlertDescription>
               </Alert>
             ) : null}
-            <Field>
-              <FieldLabel htmlFor="packageType">Package type</FieldLabel>
-              <select id="packageType" name="packageType" value={packageType} onChange={event => setPackageType(event.target.value)} disabled={Boolean(pkg)} className={NATIVE_SELECT_CLASS}>
-                <option value="group">Group package</option><option value="private">Private package · admin confirmation</option>
-              </select>
-            </Field>
-            {pkg ? <input type="hidden" name="packageType" value={packageType} /> : null}
+            <input type="hidden" name="packageType" value={packageType} />
             <Field>
               <FieldLabel htmlFor="name">Name</FieldLabel>
               <Input id="name" name="name" defaultValue={pkg?.name} required />
@@ -122,6 +116,11 @@ export function UmrahPackageForm({ pkg, airports = [] }: { pkg?: UmrahPackage; a
                 <FieldLabel htmlFor="currency">Currency</FieldLabel>
                 <Input id="currency" name="currency" maxLength={3} className="uppercase" defaultValue={pkg?.currency ?? "USD"} required />
               </Field>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field><FieldLabel htmlFor="poolVisibility">Pool visibility</FieldLabel><select id="poolVisibility" name="poolVisibility" defaultValue={pkg?.pool_visibility ?? "public"} className={NATIVE_SELECT_CLASS}><option value="public">Public · customer bookings</option><option value="private">Private · assigned agency</option></select></Field>
+              <Field><FieldLabel htmlFor="organizerName">Organizer</FieldLabel><Input id="organizerName" name="organizerName" defaultValue={pkg?.organizer_name ?? "STS Somalia"} required /></Field>
+              <Field><FieldLabel htmlFor="organizerEmail">Organizer contact email</FieldLabel><Input id="organizerEmail" name="organizerEmail" type="email" defaultValue={pkg?.contact_person_email ?? ""} required={isPublic} /></Field>
             </div>
             {isPublic ? <>
               <div className="grid gap-4 sm:grid-cols-2">

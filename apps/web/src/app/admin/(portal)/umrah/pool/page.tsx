@@ -1,44 +1,48 @@
 import Link from "next/link";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { CalendarDays, Building2, Package, Users, ArrowRight } from "lucide-react";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { getServerTrpc } from "@/lib/trpc/server";
 import { PageHeader } from "@/components/ui/page-header";
-import { Badge, statusBadgeVariant } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 import { Empty, EmptyTitle } from "@/components/ui/empty";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-
-type Pool = {
-  package_id: string; name: string; package_status: string;
-  contact_person_name: string | null; contact_person_phone: string | null;
-  departure_id: string | null; departure_date: string | null; return_date: string | null;
-  departure_status: string | null; total_seats: number | null; booked_seats: number | null;
-  offline_seats: number | null; available_seats: number; confirmed_seats: number; held_seats: number;
-  bookings: number; customers: number;
-};
+import { UmrahPackageForm } from "../../catalog/umrah/umrah-package-form";
+import { poolCapacity, poolStatus, type UmrahPoolRow } from "@/modules/umrah/pool";
 
 export const metadata = { title: "Umrah pool" };
+const date = (value: string | null) => value ? new Date(`${value}T00:00:00Z`).toLocaleDateString("en-GB", {day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"}) : "—";
 
 export default async function UmrahPoolPage() {
   await requirePlatformAdmin();
   const client = await createClient();
-  const { data, error } = await (client as SupabaseClient).rpc("admin_public_umrah_pool");
+  const [{ data, error }, airports] = await Promise.all([
+    client.rpc("admin_public_umrah_pool"),
+    (await getServerTrpc()).flights.airports.query(),
+  ]);
   if (error) throw new Error("Umrah pool could not be loaded.");
-  const rows = (data ?? []) as Pool[];
-  const sum = (key: "total_seats" | "confirmed_seats" | "held_seats" | "available_seats") => rows.reduce((n, row) => n + Number(row[key] ?? 0), 0);
+  const rows = (data ?? []) as unknown as UmrahPoolRow[];
+  const totals = rows.reduce((sum,row) => { const c=poolCapacity(row); return {total:sum.total+c.total,filled:sum.filled+c.filled,held:sum.held+c.held,remaining:sum.remaining+c.remaining}; }, {total:0,filled:0,held:0,remaining:0});
   return <div className="space-y-6">
-    <PageHeader title="Umrah pool" actions={<Button variant="outline" render={<Link href="/admin/catalog/umrah" />}>Manage packages</Button>} />
-    <StatRail><StatRailItem label="Total seats" value={sum("total_seats")} /><StatRailItem label="Confirmed seats" value={sum("confirmed_seats")} /><StatRailItem label="Checkout holds" value={sum("held_seats")} /><StatRailItem label="Seats remaining" value={sum("available_seats")} /></StatRail>
-    <Card className="overflow-hidden py-0">{rows.length === 0 ? <Empty><EmptyTitle>No public Umrah packages</EmptyTitle></Empty> : <Table>
-      <TableHeader><TableRow>{["Package · departure", "Status", "Responsible person", "Capacity", "Confirmed", "Held", "Offline", "Remaining", "Applicants", "Bookings", "Customers"].map(label => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader>
-      <TableBody>{rows.map(row => <TableRow key={row.departure_id ?? row.package_id}>
-        <TableCell><Link className="font-medium text-primary hover:underline" href={`/admin/catalog/umrah/${row.package_id}`}>{row.name}</Link>{row.departure_id ? <Link className="mt-1 block text-xs text-muted-foreground hover:underline" href={`/admin/umrah/departures/${row.departure_id}`}>{row.departure_date} – {row.return_date}</Link> : <span className="mt-1 block text-xs text-muted-foreground">No departures</span>}</TableCell>
-        <TableCell><Badge variant={statusBadgeVariant(row.package_status)}>{row.package_status}</Badge>{row.departure_status ? <span className="mt-1 block text-xs text-muted-foreground">{row.departure_status}</span> : null}</TableCell>
-        <TableCell><span className="block">{row.contact_person_name ?? "—"}</span>{row.contact_person_phone ? <a className="text-xs text-primary" href={`tel:${row.contact_person_phone.replace(/[^+0-9]/g, "")}`}>{row.contact_person_phone}</a> : null}</TableCell>
-        {[row.total_seats ?? 0, row.confirmed_seats, row.held_seats, row.offline_seats ?? 0, row.available_seats, row.booked_seats ?? 0, row.bookings, row.customers].map((value,index) => <TableCell key={index} className="tabular-nums">{value}</TableCell>)}
-      </TableRow>)}</TableBody>
+    <PageHeader title="Umrah pool" actions={<UmrahPackageForm airports={airports} />} />
+    <StatRail><StatRailItem label="Total capacity" value={totals.total} /><StatRailItem label="Filled" value={totals.filled} /><StatRailItem label="Held" value={totals.held} /><StatRailItem label="Remaining" value={totals.remaining} /></StatRail>
+    <Card className="overflow-hidden py-0">{rows.length === 0 ? <Empty><EmptyTitle>No Umrah pools</EmptyTitle></Empty> : <Table>
+      <TableHeader><TableRow>{["Package", "Travel dates", "Organizer", "Capacity", "Status", "Action"].map(label => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader>
+      <TableBody>{rows.map(row => {
+        const capacity=poolCapacity(row), status=poolStatus(row);
+        return <TableRow key={row.departure_id ?? row.package_id}>
+          <TableCell><div className="flex items-start gap-3">{row.pool_visibility === "private" ? <Users className="mt-1 size-5 text-primary" aria-hidden /> : <Package className="mt-1 size-5 text-primary" aria-hidden />}<div><Link className="font-semibold hover:underline" href={`/admin/umrah/pool/${row.package_id}`}>{row.name}</Link><div className="mt-1"><Badge variant={row.pool_visibility === "private" ? "info" : "success"}>{row.pool_visibility === "private" ? "Private" : "Public"}</Badge></div></div></div></TableCell>
+          <TableCell><div className="flex items-start gap-2 text-sm"><CalendarDays className="mt-0.5 size-4 text-muted-foreground" aria-hidden /><div>{date(row.departure_date)}<span className="block text-muted-foreground">{date(row.return_date)}</span></div></div></TableCell>
+          <TableCell><div className="flex items-center gap-2 font-medium"><Building2 className="size-4 text-muted-foreground" aria-hidden />{row.organizer_name}</div><div className="mt-1 text-xs text-muted-foreground">{row.contact_person_name ?? "—"}</div>{row.contact_person_phone ? <a className="block text-xs text-primary" href={`tel:${row.contact_person_phone.replace(/[^+0-9]/g,"")}`}>{row.contact_person_phone}</a> : null}{row.contact_person_email ? <a className="block text-xs text-primary" href={`mailto:${row.contact_person_email}`}>{row.contact_person_email}</a> : null}</TableCell>
+          <TableCell className="min-w-56"><div className="mb-2 font-semibold tabular-nums">{capacity.filled} / {capacity.total} filled</div><Progress value={capacity.percent} aria-label={`${row.name} filled capacity`} /><div className="mt-2 text-xs text-muted-foreground tabular-nums">{capacity.remaining} remaining · {capacity.held} held</div>{Number(row.offline_seats)>0 ? <div className="text-xs text-muted-foreground">{row.offline_seats} offline sales</div> : null}</TableCell>
+          <TableCell><Badge variant={status === "Open" ? "success" : status === "Private" ? "warning" : "neutral"}>{status}</Badge></TableCell>
+          <TableCell><div className="flex flex-col items-start gap-2"><Button size="sm" variant="outline" render={<Link href={`/admin/umrah/pool/${row.package_id}`} />}>Manage <ArrowRight className="size-3" /></Button>{row.departure_id ? <Link className="text-xs text-primary hover:underline" href={`/admin/umrah/departures/${row.departure_id}`}>{row.bookings} bookings · {row.customers} customers</Link> : null}</div></TableCell>
+        </TableRow>;
+      })}</TableBody>
     </Table>}</Card>
   </div>;
 }

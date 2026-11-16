@@ -41,31 +41,34 @@ export class TravelersService {
   }
 
   async getMyTravelers(userId: string): Promise<TravelerProfile[]> {
-    const { data } = await this.db()
+    const { data, error } = await this.db()
       .from("traveler_profiles")
       .select("*")
       .eq("owner_id", userId)
       .order("is_self", { ascending: false })
       .order("full_name");
+    if (error) throw new Error("Travelers could not be loaded.");
     return data ?? [];
   }
 
   async getSelfTraveler(userId: string): Promise<TravelerProfile | null> {
-    const { data } = await this.db()
+    const { data, error } = await this.db()
       .from("traveler_profiles")
       .select("*")
       .eq("owner_id", userId)
       .eq("is_self", true)
       .maybeSingle();
+    if (error) throw new Error("Travel details could not be loaded.");
     return data ?? null;
   }
 
   async getMyDocuments(userId: string): Promise<VaultDocument[]> {
-    const { data } = await this.db()
+    const { data, error } = await this.db()
       .from("traveler_documents")
       .select("*, traveler:traveler_profiles(id, full_name, is_self)")
       .eq("owner_id", userId)
       .order("created_at", { ascending: false });
+    if (error) throw new Error("Documents could not be loaded.");
     return (data ?? []) as VaultDocument[];
   }
 

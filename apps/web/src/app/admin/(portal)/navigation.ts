@@ -1,16 +1,18 @@
 import type { PortalNavGroup } from "@/components/portal/portal-shell";
 
-/** Daily work first, then fulfilment, inventory, counterparties, money and platform administration. */
+/** Inventory first; secondary workspace tools remain available at the bottom. */
 export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
   {
-    label: "Workspace",
+    label: "Catalog & inventory",
     alwaysOpen: true,
     items: [
-      { href: "/admin", label: "Dashboard", icon: "overview" },
-      { href: "/admin/queue", label: "Order queue", icon: "bookings", searchTerms: "requests pending decisions" },
-      { href: "/admin/calendar", label: "Booking calendar", icon: "calendar", searchTerms: "events reminders appointments" },
+      { href: "/admin/hotels", label: "Hotels", icon: "hotels", searchTerms: "properties rooms rates availability managers" },
+      { href: "/admin/events", label: "Events & halls", icon: "events", searchTerms: "venues availability managers" },
+      { href: "/admin/catalog/visa", label: "Visa products", icon: "catalog", searchTerms: "catalog countries pricing" },
+      { href: "/admin/umrah/pool", label: "Umrah pool", icon: "catalog", searchTerms: "catalog group pricing" },
     ],
   },
+
   {
     label: "Bookings & fulfilment",
     items: [
@@ -19,18 +21,8 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
       { href: "/admin/visa", label: "Visa applications", icon: "visa", searchTerms: "cases processing documents" },
       { href: "/admin/visa/appointments", label: "Visa appointments", icon: "calendar" },
       { href: "/admin/umrah/requests", label: "Private Umrah requests", icon: "bookings", searchTerms: "quotes custom" },
-      { href: "/admin/umrah/pool", label: "Umrah pool", icon: "bookings", searchTerms: "public packages seats capacity customers pilgrims available" },
       { href: "/admin/umrah/bookings", label: "Umrah bookings", icon: "umrah", searchTerms: "pilgrims group private" },
       { href: "/admin/umrah/departures", label: "Umrah departures", icon: "calendar", searchTerms: "seats manifests" },
-    ],
-  },
-  {
-    label: "Catalog & inventory",
-    items: [
-      { href: "/admin/hotels", label: "Hotels", icon: "hotels", searchTerms: "properties rooms rates availability managers" },
-      { href: "/admin/events", label: "Events & halls", icon: "events", searchTerms: "venues availability managers" },
-      { href: "/admin/catalog/visa", label: "Visa products", icon: "catalog", searchTerms: "catalog countries pricing" },
-      { href: "/admin/catalog/umrah", label: "Umrah packages", icon: "catalog", searchTerms: "catalog group pricing" },
     ],
   },
   {
@@ -59,6 +51,14 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
       { href: "/admin/integrations", label: "Integrations", icon: "integrations", searchTerms: "providers API credentials payment gateways" },
       { href: "/admin/site-settings", label: "Site settings", icon: "settings", searchTerms: "configuration contact branding" },
       { href: "/admin/audit-log", label: "Audit log", icon: "audit", searchTerms: "activity history changes" },
+    ],
+  },
+  {
+    label: "Workspace",
+    items: [
+      { href: "/admin", label: "Dashboard", icon: "overview" },
+      { href: "/admin/queue", label: "Order queue", icon: "bookings", searchTerms: "requests pending decisions" },
+      { href: "/admin/calendar", label: "Booking calendar", icon: "calendar", searchTerms: "events reminders appointments" },
     ],
   },
 ];

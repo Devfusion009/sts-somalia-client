@@ -103,7 +103,7 @@ export function InvoiceDocument({
   proforma?: boolean;
 }) {
   const succeededPayment = order.payments.find((p) => p.status === "succeeded");
-  const paid = order.payments.filter(payment => payment.status === "succeeded").reduce((total, payment) => total + Number(payment.amount), 0);
+  const paid = order.payments.filter(payment => ["succeeded", "partially_refunded", "refunded"].includes(payment.status) && payment.currency === order.currency).reduce((total, payment) => total + Math.round(Number(payment.amount) * 100), 0) / 100;
   const closed = order.status === "cancelled" || order.status === "refunded";
   const balance = closed ? 0 : Math.max(0, Number(order.total) - paid);
   const logo = stsLogo();
@@ -205,6 +205,18 @@ export function InvoiceDocument({
             <View style={styles.totalsRow}>
               <Text style={styles.totalsLabel}>Service fee</Text>
               <Text style={styles.totalsValue}>{money(order.markup_amount, order.currency)}</Text>
+            </View>
+          ) : null}
+          {Number(order.fee_total) > 0 ? (
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Processing fee</Text>
+              <Text style={styles.totalsValue}>{money(order.fee_total, order.currency)}</Text>
+            </View>
+          ) : null}
+          {Number(order.tax_total) > 0 ? (
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Taxes</Text>
+              <Text style={styles.totalsValue}>{money(order.tax_total, order.currency)}</Text>
             </View>
           ) : null}
           {Number(order.discount_total) > 0 ? (

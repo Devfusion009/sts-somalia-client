@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -104,26 +103,19 @@ export function SavedMethodsManager({ methods }: { methods: SavedPaymentMethod[]
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Saved wallets</CardTitle>
-        {methods.length > 0 ? <CardAction>{addButton}</CardAction> : null}
+        <CardTitle className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary"><Smartphone className="size-5" aria-hidden /></span>Saved wallets</CardTitle>
+        <CardAction>{addButton}</CardAction>
       </CardHeader>
-      <CardContent className="px-0">
+      <CardContent>
         {methods.length === 0 ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Smartphone />
-              </EmptyMedia>
-              <EmptyTitle>No saved wallets</EmptyTitle>
-            </EmptyHeader>
-            <EmptyContent>{addButton}</EmptyContent>
-          </Empty>
+          <div className="flex items-center gap-4 rounded-xl border border-dashed bg-muted/20 p-5"><span className="grid size-11 place-items-center rounded-xl bg-background text-muted-foreground"><Smartphone className="size-5" aria-hidden /></span><span className="text-sm text-muted-foreground">No saved mobile wallets</span></div>
         ) : (
-          <ul className="divide-y divide-border border-t border-border">
+          <ul className="grid gap-3 sm:grid-cols-2">
             {methods.map((method) => {
               const name = WALLET_LABELS.get(method.provider) ?? method.provider;
               return (
-                <li key={method.id} className="flex items-center gap-3 px-4 py-3.5">
+                <li key={method.id} className={`flex flex-wrap items-center gap-3 rounded-xl border p-4 ${method.is_default ? "border-primary/50 bg-primary/[0.025]":"border-border"}`}>
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Smartphone className="size-5" aria-hidden /></span>
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2 font-medium">
                       {name}
