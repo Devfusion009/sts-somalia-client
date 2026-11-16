@@ -301,6 +301,9 @@ function umrahPackageInput(formData: FormData) {
     destinationIata: String(formData.get("destinationIata") ?? "").trim() || undefined,
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? "") || undefined,
+    poolVisibility: String(formData.get("poolVisibility") ?? "public") as "public" | "private",
+    organizerName: String(formData.get("organizerName") ?? "").trim(),
+    organizerEmail: String(formData.get("organizerEmail") ?? "").trim() || undefined,
     contactPersonName: String(formData.get("contactPersonName") ?? ""),
     contactPersonPhone: String(formData.get("contactPersonPhone") ?? ""),
     agentContacts: formData.getAll("agentContactName").map((name, index) => ({ name: String(name).trim(), phone: String(formData.getAll("agentContactPhone")[index] ?? "").trim() })).filter(contact => contact.name || contact.phone),
@@ -330,8 +333,10 @@ export async function createUmrahPackage(_prev: ActionState, formData: FormData)
   } catch (error) {
     return { error: trpcErrorMessage(error, "The package could not be saved.") };
   }
+  revalidatePath("/admin/umrah/pool");
+  revalidatePath("/admin/umrah/pool", "layout");
   revalidatePath("/admin/catalog/umrah");
-  redirect(`/admin/catalog/umrah/${packageId}`);
+  redirect(`/admin/umrah/pool/${packageId}`);
 }
 
 export async function updateUmrahPackage(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -344,12 +349,16 @@ export async function updateUmrahPackage(_prev: ActionState, formData: FormData)
   } catch (error) {
     return { error: trpcErrorMessage(error, "The package could not be saved.") };
   }
+  revalidatePath("/admin/umrah/pool");
+  revalidatePath("/admin/umrah/pool", "layout");
   revalidatePath("/admin/catalog/umrah");
   revalidatePath(`/admin/catalog/umrah/${String(formData.get("id"))}`);
   revalidatePath("/umrah", "layout");
   return { error: null };
 }
 function revalidateUmrahPackage(packageId: string) {
+  revalidatePath("/admin/umrah/pool");
+  revalidatePath("/admin/umrah/pool", "layout");
   revalidatePath("/admin/catalog/umrah");
   revalidatePath(`/admin/catalog/umrah/${packageId}`);
 }
