@@ -11,6 +11,7 @@ import { trpc } from "@/lib/trpc/react";
 import { cn } from "@/lib/utils";
 import { useBellAlert } from "@/components/portal/use-bell-alert";
 import { ACTIONABLE_TYPES } from "@/lib/notifications/actionable-types";
+import { customerNotificationHref } from "@/lib/notifications/links";
 
 type NotificationRow = {
   id: string;
@@ -20,35 +21,6 @@ type NotificationRow = {
   data?: unknown;
   created_at: string;
 };
-
-function targetHref(n: NotificationRow): string | null {
-  // A decided application opens its own page, where the progress track shows the outcome.
-  if (n.type === "application_approved" || n.type === "application_rejected") {
-    const d = n.data as { applicationType?: string; applicationId?: string } | null;
-    if (d?.applicationType && d.applicationId) return `/account/become/${d.applicationType}/${d.applicationId}/view`;
-  }
-  if (ACTIONABLE_TYPES.has(n.type)) return "/account/become";
-  if (
-    n.type === "booking_waitlisted" ||
-    n.type === "booking_confirmed" ||
-    n.type === "booking_declined" ||
-    n.type.startsWith("booking_request_")
-  ) {
-    const orderId = (n.data as { order_id?: string } | null)?.order_id;
-    return orderId ? `/account/bookings/${orderId}` : "/account/bookings";
-  }
-  // Every umrah_* notification (stage, cancellation, quote, documents,
-  // reminders, travel changes) carries the order it belongs to.
-  if (n.type.startsWith("umrah_")) {
-    const orderId = (n.data as { orderId?: string } | null)?.orderId;
-    return orderId ? `/account/bookings/${orderId}` : "/account/bookings";
-  }
-  if (n.type === "visa_status_changed") {
-    const applicationId = (n.data as { applicationId?: string } | null)?.applicationId;
-    return applicationId ? `/account/visa/${applicationId}` : "/account/visa";
-  }
-  return null;
-}
 
 const POLL_MS = 30_000;
 
@@ -116,9 +88,9 @@ export function CustomerNotificationBell({ notifications }: { notifications: Not
             {notifications.map((n) => (
               <div key={n.id} className="flex items-start justify-between gap-2 px-3 py-2.5">
                 <div className="min-w-0">
-                  {targetHref(n) ? (
+                  {customerNotificationHref(n) ? (
                     <Link
-                      href={targetHref(n)!}
+                      href={customerNotificationHref(n)!}
                       className={cn(
                         "block truncate rounded-sm text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50",
                         ACTIONABLE_TYPES.has(n.type) ? "text-destructive" : "text-primary"

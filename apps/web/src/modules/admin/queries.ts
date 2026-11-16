@@ -1,4 +1,5 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getServerTrpc } from "@/lib/trpc/server";
@@ -16,7 +17,7 @@ export async function getDashboardStats() {
   const supabase = await createClient();
 
   const [
-    { data: totals },
+    { data: totals, error: totalsError },
     { count: pendingAgency },
     { count: pendingPartner },
     { count: pendingAffiliate },
@@ -29,6 +30,7 @@ export async function getDashboardStats() {
     supabase.from("venue_partner_applications").select("*", { count: "exact", head: true }).eq("status", "pending"),
   ]);
 
+  if (totalsError) throw new Error("Dashboard totals are unavailable. Refresh and try again.");
   const raw = (totals ?? {}) as {
     usersByRole?: Record<string, number | string>;
     totalUsers?: number | string;
@@ -271,18 +273,22 @@ export type OrderQueue = {
 
 /**
  * Filter chip counts, stat tiles and the ids of one page of the Orders queue,
- * from admin_order_queue(). `today` is the local calendar date the "travelling
+ * from admin_order_workspace(). `today` is the local calendar date the "travelling
  * within 30 days" window starts from.
  */
-export async function getOrderQueue(filter: OrderQueueFilter, page: number, today: string): Promise<OrderQueue> {
+export async function getOrderQueue(filter: OrderQueueFilter, page: number, today: string, options: { sort?: "newest" | "oldest"; search?: string; category?: string } = {}): Promise<OrderQueue> {
   const supabase = await createClient();
   const { from } = pageRange(page);
-  const { data } = await supabase.rpc("admin_order_queue", {
+  const { data, error } = await (supabase as SupabaseClient).rpc("admin_order_workspace_category", {
+    p_category: options.category ?? "all",
     p_filter: filter,
+    p_sort: options.sort ?? "newest",
+    p_search: options.search ?? "",
     p_today: today,
     p_offset: from,
     p_limit: ADMIN_PAGE_SIZE,
   });
+  if (error) throw new Error("Orders could not be loaded. Refresh and try again.");
   const raw = (data ?? {}) as Partial<Record<keyof OrderQueue, unknown>>;
   const byStatus: Record<string, number> = {};
   for (const [status, n] of Object.entries((raw.byStatus ?? {}) as Record<string, number | string>)) byStatus[status] = Number(n);
@@ -314,13 +320,14 @@ export async function getOrderQueue(filter: OrderQueueFilter, page: number, toda
 export async function getOrdersByIds(ids: string[]) {
   if (ids.length === 0) return [];
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, currency, subtotal, discount_total, total, created_at, paid_at, notes, customer:profiles!orders_customer_id_fkey(full_name, email, phone), agency:agencies(name), agency_customer:agency_customer_id(full_name, phone), payments(id, provider, method_label, amount, currency, status, payer_phone, created_at), invoices(invoice_number, status), order_items(id, item_type, quantity, total_price, hotel_booking:hotel_booking_id(check_in, check_out, num_rooms, num_adults, status, hotel:hotel_id(name, city)), flight_booking:flight_booking_id(origin_iata, destination_iata, depart_at, return_at, status), visa_application:visa_application_id(application_ref, status, travel_details, visa_type:visa_type_id(name, destination_country_code)), umrah_booking:umrah_booking_id(num_pilgrims, status, package:package_id(name, duration_days), departure:departure_id(departure_date, return_date)), hall_booking:hall_booking_id(event_type, start_date, end_date, status, venue:venue_id(name, city)))"
+      "id, order_number, status, currency, subtotal, discount_total, total, created_at, paid_at, notes, customer:profiles!orders_customer_id_fkey(full_name, email, phone), agency:agencies(name), agency_customer:agency_customer_id(full_name, phone), payments(id, provider, method_label, amount, currency, status, payer_phone, created_at), invoices(invoice_number, status), order_items(id, item_type, quantity, total_price, hotel_booking:hotel_booking_id(id, check_in, check_out, num_rooms, num_adults, num_children, status, guest_details, stay_details, room_occupancy, special_requests, rate_plan, extras, total_price, currency, room:room_id(name), hotel:hotel_id(name, city)), flight_booking:flight_booking_id(origin_iata, destination_iata, depart_at, return_at, status, provider_booking_ref, ticketing_status), visa_application:visa_application_id(id, application_ref, status, travel_details, visa_type:visa_type_id(name, destination_country_code)), umrah_booking:umrah_booking_id(num_pilgrims, status, package:package_id(name, duration_days), departure:departure_id(departure_date, return_date)), hall_booking:hall_booking_id(event_type, start_date, end_date, status, venue:venue_id(name, city)))"
     )
     .in("id", ids);
 
+  if (error) throw new Error("Order details could not be loaded. Refresh and try again.");
   // `in` has no order of its own; keep the caller's (newest first) ordering.
   const position = new Map(ids.map((id, index) => [id, index]));
   return (data ?? []).sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
@@ -477,7 +484,7 @@ export async function getVisaOrderAdmin(applicationId: string) {
   const { data } = await supabase
     .from("order_items")
     .select(
-      "order:order_id (id, order_number, status, subtotal, markup_amount, fee_total, total, currency, payments(status, method_label, amount))"
+      "order:order_id (id, order_number, status, subtotal, markup_amount, fee_total, total, currency, payments(status, method_label, amount), invoices(invoice_number))"
     )
     .eq("visa_application_id", applicationId)
     .maybeSingle();
@@ -765,7 +772,7 @@ export async function getAuditLogEntityTypes() {
   return (data ?? []).map((r) => r.entity_type);
 }
 
-/** [orders, paid+completed count, paid+completed revenue, settled count, settled revenue, B2B count, B2B revenue] per hour. */
+/** Booking counts by creation time; USD collections less completed refunds by receipt/refund time. */
 type OrderActivityHour = [number, number, number, number, number, number, number];
 
 /**
@@ -774,7 +781,8 @@ type OrderActivityHour = [number, number, number, number, number, number, number
  */
 const getOrderActivity = cache(async (fromIso: string, toIso: string) => {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("admin_order_activity", { p_from: fromIso, p_to: toIso });
+  const { data, error } = await supabase.rpc("admin_order_activity", { p_from: fromIso, p_to: toIso });
+  if (error) throw new Error("Revenue figures are unavailable. Refresh and try again.");
   const hours = (data ?? {}) as Record<string, (number | string)[]>;
   return Object.entries(hours).map(([hour, values]) => [hour, values.map(Number) as OrderActivityHour] as const);
 });
@@ -831,7 +839,7 @@ export async function getB2BvsB2C(from: Date, to: Date) {
   ];
 }
 
-/** Top agencies by revenue within the range, paid+completed only. */
+/** Top agencies by net USD collections within the range. */
 export async function getAgentLeaderboard(from: Date, to: Date, limit = 10) {
   const supabase = await createClient();
   const { data } = await supabase.rpc("admin_agent_leaderboard", {

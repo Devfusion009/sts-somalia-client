@@ -1,90 +1,132 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { Interval } from "@nestjs/schedule";
+import { queryWaafiTransaction, validWaafiRedirect, type WaafiVerifiedTransaction, type WaafiConfig } from "@sts/shared-types/dist/waafi-server";
 import { AdminSupabaseService } from "../../infra/supabase/admin-supabase.service";
-import { getPaymentGateways } from "../../infra/payment-config";
+import { getWaafiForSettlement } from "../../infra/payment-config";
 
 export type WaafiSettlement = "paid" | "pending" | "failed" | "ignored";
-
-type ResultInfo = {
-  responseCode?: string;
-  params?: { referenceId?: string; transactionId?: string; txAmount?: string; currencyCode?: string; state?: string };
+export type WaafiWebhook = {
+  event?: string; merchant_uid?: string;
+  payment?: { reference_id?: string; transaction_id?: string; original_transaction_id?: string; amount?: number; currency?: string; status?: string };
 };
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/**
- * Settles WaafiPay hosted-page payments. The browser return carries
- * unauthenticated input, so it only names the payment: every settlement
- * re-reads the result from WaafiPay (HPP_GETRESULTINFO) and requires state
- * APPROVED plus the exact amount, currency and reference of the payment row.
- */
 @Injectable()
 export class WaafiService {
   private readonly logger = new Logger(WaafiService.name);
-
+  private reconciling = false;
   constructor(private readonly admin: AdminSupabaseService) {}
 
-  async settle(paymentId: string): Promise<WaafiSettlement> {
-    const gateway = (await getPaymentGateways()).waafi;
-    if (!gateway?.hpp || !paymentId) return "ignored";
+  async getStatus(referenceId: string): Promise<{ status: WaafiSettlement; redirectUrl?: string }> {
+    const gateway = await getWaafiForSettlement();
+    if (!gateway) return { status: "ignored" };
+    const { data: attempt, error } = await this.admin.get().from("waafi_payment_attempts").select("status, result")
+      .eq("reference_id", referenceId).eq("environment", gateway.environment).eq("merchant_uid", gateway.merchantUid).maybeSingle();
+    if (error) throw new Error("Payment status is unavailable.");
+    if (!attempt) return { status: "ignored" };
+    const status = attempt.status === "succeeded" ? "paid" : attempt.status === "failed" ? "failed" : "pending";
+    const result = attempt.result as { type?: string; url?: string } | null;
+    return { status, ...(status === "pending" && result?.type === "redirect" && validWaafiRedirect(result.url, gateway.environment) ? { redirectUrl: result.url } : {}) };
+  }
 
+  /** Browser returns and reconciliation always obtain fresh provider evidence. */
+  async settle(referenceId: string): Promise<WaafiSettlement> {
+    const gateway = await getWaafiForSettlement();
+    if (!gateway || !uuid.test(referenceId)) return "ignored";
+    const { data: receipt, error } = await this.admin.get().from("waafi_receipts").select("reference_id")
+      .eq("reference_id", referenceId).eq("environment", gateway.environment).eq("merchant_uid", gateway.merchantUid).maybeSingle();
+    if (error) throw new Error("Payment receipt lookup failed.");
+    if (receipt) return "paid";
+    const transaction = await queryWaafiTransaction(referenceId, gateway);
+    return transaction ? this.apply(transaction, gateway) : "pending";
+  }
+
+  /** Only the signature-verifying controller calls this with a webhook body. */
+  async processWebhook(event: WaafiWebhook, eventId: string, gateway: WaafiConfig): Promise<WaafiSettlement> {
+    if (event.merchant_uid !== gateway.merchantUid) return "ignored";
     const db = this.admin.get();
-    const { data: payment } = await db
-      .from("payments")
-      .select("id, provider, status, amount, currency, provider_ref")
-      .eq("id", paymentId)
-      .maybeSingle();
-    if (!payment || payment.provider !== "waafi" || !payment.provider_ref) return "ignored";
-    if (payment.status === "succeeded") return "paid";
-
-    let result: ResultInfo;
-    try {
-      const res = await fetch(gateway.apiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          schemaVersion: "1.0",
-          requestId: `${payment.id}-result`,
-          timestamp: new Date().toISOString(),
-          channelName: "WEB",
-          serviceName: "HPP_GETRESULTINFO",
-          serviceParams: {
-            merchantUid: gateway.merchantUid,
-            storeId: gateway.hpp.storeId,
-            hppKey: gateway.hpp.hppKey,
-            referenceId: payment.id,
-            hppRequestId: payment.provider_ref,
-          },
-        }),
-        signal: AbortSignal.timeout(30_000),
+    const { data: seen, error } = await db.from("waafi_webhook_events").select("event_id")
+      .eq("environment", gateway.environment).eq("merchant_uid", gateway.merchantUid).eq("event_id", eventId).maybeSingle();
+    if (error) throw new Error("Webhook receipt lookup failed.");
+    if (seen) return "ignored";
+    const payment = event.payment;
+    if (event.event === "refund" || event.event === "void") {
+      const { error: reviewError } = await db.rpc("record_waafi_review_event", {
+        p_environment: gateway.environment, p_merchant_uid: gateway.merchantUid, p_event_id: eventId,
+        p_event_name: event.event, p_reference_id: payment?.reference_id ?? "",
+        p_transaction_id: payment?.original_transaction_id ?? payment?.transaction_id ?? "",
       });
-      result = (await res.json()) as ResultInfo;
-    } catch {
-      this.logger.warn(`WaafiPay result lookup unreachable for payment ${paymentId}`);
-      return "pending";
+      if (reviewError) throw new Error("Payment review event could not be recorded.");
+      return "ignored";
     }
+    if (!payment?.reference_id || !uuid.test(payment.reference_id) || payment.amount == null || !payment.currency || !payment.status) return "ignored";
+    const state = payment.status.toUpperCase();
+    if (event.event !== "authorization" && event.event !== "declined") return "ignored";
+    if (state === "APPROVED" && event.event !== "authorization") return "ignored";
+    return this.apply({ referenceId: payment.reference_id, transactionId: payment.transaction_id ?? "",
+      amount: Number(payment.amount), currency: payment.currency.toUpperCase(), status: state }, gateway, eventId);
+  }
 
-    if (result.responseCode !== "2001" || !result.params) return "pending";
-    const { state, referenceId, txAmount, currencyCode } = result.params;
-    if (referenceId !== payment.id) return "ignored";
-
-    if (state === "APPROVED") {
-      const amountMatches = Math.abs(Number(txAmount) - Number(payment.amount)) < 0.01;
-      const currencyMatches = (currencyCode ?? "").toUpperCase() === payment.currency.toUpperCase();
-      if (!amountMatches || !currencyMatches) {
-        this.logger.error(`WaafiPay amount mismatch on payment ${paymentId}: ${txAmount} ${currencyCode}`);
-        return "ignored";
-      }
-      await db
-        .from("payments")
-        .update({ status: "succeeded", method_label: "EVC Plus / ZAAD / Sahal (WaafiPay)" })
-        .eq("id", paymentId)
-        .neq("status", "succeeded");
+  private async apply(tx: WaafiVerifiedTransaction, gateway: WaafiConfig, eventId?: string): Promise<WaafiSettlement> {
+    const db = this.admin.get();
+    const { data: attempt, error } = await db.from("waafi_payment_attempts").select("reference_id, amount, currency, status")
+      .eq("reference_id", tx.referenceId).eq("environment", gateway.environment).eq("merchant_uid", gateway.merchantUid).maybeSingle();
+    if (error) throw new Error("Payment attempt lookup failed.");
+    if (!attempt) return "ignored";
+    if (!Number.isFinite(tx.amount) || tx.amount <= 0 || tx.amount !== Number(attempt.amount) || tx.currency !== attempt.currency) {
+      this.logger.error(`WaafiPay verification mismatch: ${tx.referenceId}`);
+      throw new Error("Payment verification mismatch.");
+    }
+    if (tx.status === "APPROVED") {
+      if (!tx.transactionId || tx.transactionId === "0") throw new Error("Missing payment transaction reference.");
+      const { error: settlementError } = await db.rpc("settle_waafi_transaction", {
+        p_reference_id: tx.referenceId, p_environment: gateway.environment, p_merchant_uid: gateway.merchantUid,
+        p_transaction_id: tx.transactionId, p_amount: tx.amount, p_currency: tx.currency,
+        ...(eventId ? { p_event_id: eventId } : {}),
+      });
+      if (settlementError) throw new Error("Payment settlement needs reconciliation.");
       return "paid";
     }
-
-    // An open, unpaid hosted session also reads DECLINED, so that state stays pending.
-    if (state === "FAILED" || state === "CANCELLED" || state === "EXPIRED") {
-      await db.from("payments").update({ status: "failed" }).eq("id", paymentId).neq("status", "succeeded");
+    if (attempt.status === "succeeded") return "paid"; // late failures cannot reverse an authorization
+    // A declined lookup may describe an open HPP session; a signed declined event is final.
+    if (["FAILED", "CANCELLED", "EXPIRED"].includes(tx.status) || (eventId && tx.status === "DECLINED")) {
+      const { error: failError } = await db.rpc("fail_waafi_attempt", { p_reference_id: tx.referenceId });
+      if (failError) throw new Error("Payment failure could not be recorded.");
+      if (eventId) {
+        const { error: receiptError } = await db.from("waafi_webhook_events").upsert({
+          environment: gateway.environment, merchant_uid: gateway.merchantUid, event_id: eventId,
+          event_name: "declined", reference_id: tx.referenceId, transaction_id: tx.transactionId,
+        }, { onConflict: "environment,merchant_uid,event_id", ignoreDuplicates: true });
+        if (receiptError) throw new Error("Webhook result could not be recorded.");
+      }
       return "failed";
     }
     return "pending";
+  }
+
+  /** Always-on API worker: payment completion never depends on keeping a browser open. */
+  @Interval(60_000)
+  async reconcilePending(): Promise<void> {
+    if (this.reconciling) return;
+    this.reconciling = true;
+    try {
+      const gateway = await getWaafiForSettlement();
+      if (!gateway?.hpp) return;
+      const db = this.admin.get();
+      const { data, error } = await db.from("waafi_payment_attempts").select("reference_id")
+        .eq("environment", gateway.environment).eq("merchant_uid", gateway.merchantUid)
+        .in("status", ["initiating", "pending"]).lt("created_at", new Date(Date.now() - 30_000).toISOString())
+        .order("checked_at", { ascending: true, nullsFirst: true }).limit(5);
+      if (error) throw new Error("Pending payment lookup failed.");
+      for (const row of data ?? []) {
+        // Mark the visit before network I/O so an unreachable reference cannot starve newer ones.
+        const { error: checkError } = await db.from("waafi_payment_attempts").update({ checked_at: new Date().toISOString() }).eq("reference_id", row.reference_id);
+        if (checkError) continue;
+        await db.rpc("flag_waafi_reconciliation", { p_reference_id: row.reference_id });
+        try { await this.settle(row.reference_id); }
+        catch { this.logger.warn(`WaafiPay reconciliation pending: ${row.reference_id}`); }
+      }
+    } catch { this.logger.warn("WaafiPay reconciliation is unavailable."); }
+    finally { this.reconciling = false; }
   }
 }

@@ -63,6 +63,7 @@ export class CheckoutService {
 
   /** Order + items (with human labels) + payment history for checkout/receipts. */
   async getOrderForCheckout(orderId: string): Promise<CheckoutOrderRow | null> {
+    await this.db().rpc("release_public_umrah_checkouts");
     const { data: order } = await this.db()
       .from("orders")
       .select(

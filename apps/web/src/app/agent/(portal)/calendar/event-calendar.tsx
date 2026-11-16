@@ -1,5 +1,8 @@
 "use client";
 
+import { AgentMoney } from "@/components/portal/agent-money";
+
+
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -314,7 +317,7 @@ export function EventCalendar({
                     ))}
                     <div>
                       <dt className="text-muted-foreground">Price</dt>
-                      <dd className="font-medium tabular-nums">{money(b.price, b.currency)}</dd>
+                      <dd className="font-medium tabular-nums">{<AgentMoney value={money(b.price, b.currency)} />}</dd>
                     </div>
                   </dl>
                 </div>

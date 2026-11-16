@@ -3,6 +3,7 @@ import { portalHref } from "@/lib/subdomain";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "./email";
 import { getIntegrations } from "@/lib/integrations";
+import { renderEmail } from "./email-layout";
 
 export type SecurityEmailKind =
   | "new_sign_in"
@@ -18,10 +19,6 @@ const SUBJECT: Record<SecurityEmailKind, string> = {
   mfa_disabled: "Two-factor authentication is off",
   recovery_code_used: "A recovery code was used on your STS account",
 };
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
-}
 
 /**
  * Security notice after a sign-in from a new device or a change to the
@@ -49,27 +46,22 @@ export async function sendSecurityEmail(input: {
     timeZone: "UTC",
     timeZoneName: "short",
   });
-  const rows = [
-    ["When", when],
-    ["Device", input.device],
-    ...(input.location ? [["Location", input.location]] : []),
-    ...(input.ip ? [["IP address", input.ip]] : []),
-  ]
-    .map(
-      ([label, value]) =>
-        `<tr><td style="padding:4px 16px 4px 0;color:#6b7280;">${label}</td><td style="padding:4px 0;">${escapeHtml(value)}</td></tr>`
-    )
-    .join("");
-  const html = `
-    <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #1a2e29;">
-      <h1 style="color: #00947c; font-size: 20px;">${SUBJECT[input.kind]}</h1>
-      <table style="margin:16px 0;border-collapse:collapse;font-size:14px;">${rows}</table>
-      <p>If this wasn't you, change your password and sign out of other devices.</p>
-      <p><a href="${escapeHtml(securityUrl)}" style="background:#00947c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;">Review account security</a></p>
-      <p style="margin-top: 24px; font-size: 12px; color: #6b7280;">
-        STS Somalia &middot; Sultan Business Park, Waaberi District, 21 Oct Street, Muqdisho
-      </p>
-    </div>`;
+  const details = [
+    { label: "When", value: when },
+    { label: "Device", value: input.device },
+    ...(input.location ? [{ label: "Location", value: input.location }] : []),
+    ...(input.ip ? [{ label: "IP address", value: input.ip, mono: true }] : []),
+  ];
+  const html = renderEmail({
+    preheader: "If this wasn't you, change your password and sign out of other devices.",
+    label: "Security alert",
+    tone: input.kind === "new_sign_in" || input.kind === "password_changed" || input.kind === "mfa_enabled" ? "neutral" : "warning",
+    heading: SUBJECT[input.kind],
+    paragraphs: [],
+    details,
+    button: { label: "Review account security", href: securityUrl },
+    audience: portal === "agent" ? "Agent Portal" : portal === "manager" ? "Partner Portal" : "Account security",
+  });
   try {
     let to = input.to;
     if (to.endsWith("@agent-login.scoutsts.invalid")) {

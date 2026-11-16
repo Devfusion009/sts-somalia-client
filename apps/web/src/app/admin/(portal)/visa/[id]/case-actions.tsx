@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { trpc } from "@/lib/trpc/react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -68,18 +70,45 @@ function TabAction({ action }: { action: VisaAction }) {
 }
 
 function StageButton({ action, applicationId, run }: { action: VisaAction; applicationId: string; run: ServerAction }) {
-  const [state, formAction] = useActionState(run, null);
+  const utils = trpc.useUtils();
+  const [state, setState] = useState<ActionState>(null);
+  const [pending, setPending] = useState(false);
+  const submitting = useRef(false);
+  const router = useRouter();
   const Icon = ICONS[action.key as keyof typeof ICONS] ?? ArrowRight;
   return (
-    <form action={formAction} className="contents">
+    <form className="contents" onSubmit={(event) => {
+      event.preventDefault();
+      if (submitting.current || action.disabledReason) return;
+      const data = new FormData(event.currentTarget);
+      submitting.current = true;
+      setPending(true);
+      setState(null);
+      startTransition(() => {
+        void run(null, data).then((result) => {
+          setState(result);
+          if (result && !result.error) {
+            void utils.notifications.adminNavCounts.invalidate();
+            if (action.key === "start_review") router.push("?tab=documents", { scroll: false });
+            else if (action.afterTab) router.push(`?tab=${action.afterTab}`, { scroll: false });
+            else router.refresh();
+          }
+        }).catch(() => {
+          setState({ error: "The case could not be updated. Refresh to check its status before retrying." });
+        }).finally(() => {
+          submitting.current = false;
+          setPending(false);
+        });
+      });
+    }}>
       <input type="hidden" name="applicationId" value={applicationId} />
-      <SubmitButton
-        pendingText="Working…"
-        disabled={Boolean(action.disabledReason)}
+      <Button type="submit"
+        loading={pending}
+        disabled={pending || Boolean(action.disabledReason)}
         title={action.disabledReason}
       >
-        <Icon data-icon="inline-start" /> {action.label}
-      </SubmitButton>
+        {!pending ? <Icon data-icon="inline-start" /> : null} {pending ? "Working…" : action.label}
+      </Button>
       {state?.error ? (
         <p role="alert" className="basis-full text-xs text-destructive">
           {state.error}
@@ -89,7 +118,7 @@ function StageButton({ action, applicationId, run }: { action: VisaAction; appli
   );
 }
 
-function CancelCase({ applicationId }: { applicationId: string }) {
+function CancelCase({ applicationId, refundNote }: { applicationId: string; refundNote: string }) {
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(adminCancelCase, null);
   const [lastState, setLastState] = useState(state);
@@ -111,6 +140,7 @@ function CancelCase({ applicationId }: { applicationId: string }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel this case?</AlertDialogTitle>
           </AlertDialogHeader>
+          <p className="rounded-lg bg-secondary/60 px-3 py-2 text-sm font-medium">{refundNote}</p>
           <Field>
             <FieldLabel htmlFor="cancel-reason">Reason</FieldLabel>
             <Textarea id="cancel-reason" name="reason" rows={3} minLength={5} required />
@@ -133,7 +163,16 @@ function CancelCase({ applicationId }: { applicationId: string }) {
 }
 
 /** Stage-derived actions — the only way a case moves outside decisions and lodgement. */
-export function CaseActions({ applicationId, actions }: { applicationId: string; actions: VisaAction[] }) {
+export function CaseActions({
+  applicationId,
+  actions,
+  refundNote,
+}: {
+  applicationId: string;
+  actions: VisaAction[];
+  /** What cancelling refunds: full before filing, nothing after. */
+  refundNote: string;
+}) {
   if (actions.length === 0) return null;
 
   return (
@@ -158,7 +197,7 @@ export function CaseActions({ applicationId, actions }: { applicationId: string;
           case "cancel":
             return (
               <span key={action.key} className="ml-auto">
-                <CancelCase applicationId={applicationId} />
+                <CancelCase applicationId={applicationId} refundNote={refundNote} />
               </span>
             );
           default:

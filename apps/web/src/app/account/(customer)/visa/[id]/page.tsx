@@ -1,3 +1,4 @@
+import { CaseLiveSync } from "@/modules/visa/components/case-live-sync";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,8 +10,8 @@ import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/ba
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusTimeline } from "@/modules/bookings/components/status-timeline";
-import { getApplicationDetail, getOrderForVisaApplication } from "@/modules/visa/queries";
-import { applicationDocumentSlots } from "@/modules/visa/schemas";
+import { getApplicationDetail, getOrderForVisaApplication, getReapplyCredit } from "@/modules/visa/queries";
+import { travellerDocumentSlots, documentMemberId, missingTravellerDocuments, reviewUploadsComplete, parseRequirementSections, sectionFileLabel } from "@/modules/visa/schemas";
 import { visaCustomerProgress, visaNextAction } from "@/modules/visa/progress";
 import { formatInZone } from "@/modules/visa/time";
 import {
@@ -23,9 +24,11 @@ import { VisaStatusBadge, fmtMoney } from "@/modules/visa/components/visa-shared
 import { NextActionCard } from "@/modules/visa/components/next-action-card";
 import { MessageThread } from "@/modules/visa/components/message-thread";
 import { MessageComposer } from "@/modules/visa/components/message-composer";
+import { PortalDocumentUpload } from "@/modules/visa/components/portal-document-upload";
 import { RequestUpload } from "@/modules/visa/components/request-upload";
 import { ReplaceUpload } from "@/modules/visa/components/replace-upload";
-import { sendVisaMessage } from "@/modules/visa/actions";
+import { reapplyVisa, sendVisaMessage } from "@/modules/visa/actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export const metadata: Metadata = { title: "Visa Application" };
 
@@ -62,10 +65,13 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
   const visaType = application.visa_type;
   const order = await getOrderForVisaApplication(application.id);
 
-  const slots = applicationDocumentSlots(application);
+  const slots = travellerDocumentSlots(application);
   const slotLabel = new Map(slots.map((s) => [s.key, s.label]));
-  const labelFor = (type: string) =>
-    type.startsWith("request:") ? type.slice(8) : (slotLabel.get(type) ?? type.replace(/_/g, " "));
+  const sections = parseRequirementSections(visaType.application_sections);
+  const labelFor = (type: string, memberId?: string | null) =>
+    type.startsWith("request:")
+      ? type.slice(8)
+      : (slots.find(slot => slot.key === type && slot.memberId === memberId)?.label ?? slotLabel.get(type) ?? sectionFileLabel(sections, type) ?? type.replace(/_/g, " "));
 
   const decisions = application.decisions;
   const superseded = new Set(decisions.map((d) => d.supersedes_id).filter(Boolean));
@@ -74,6 +80,8 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
   const input = {
     status: application.status as VisaStage,
     workflow: application.workflow,
+    memberIds: application.members.map(member => member.id),
+    documentsComplete: reviewUploadsComplete(application),
     orderStatus: order?.status ?? null,
     orderId: order?.id ?? null,
     orderTotal: order ? fmtMoney(order.total, order.currency) : null,
@@ -84,7 +92,16 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
     decisionOutcome: (decision?.outcome as "approved" | "refused" | undefined) ?? null,
   };
   const progress = visaCustomerProgress(input);
-  const next = visaNextAction(input, labelFor);
+  let next = visaNextAction(input, (type, documentId) => {
+    const document = application.documents.find(doc => doc.id === documentId);
+    const memberId = document ? documentMemberId(application, document) : null;
+    const member = application.members.find(member => member.id === memberId);
+    return member ? `${member.full_name} · ${labelFor(type, memberId)}` : labelFor(type);
+  });
+  if (!["approved", "issued", "rejected", "cancelled"].includes(application.status) && next.kind !== "pay") {
+    const missing = missingTravellerDocuments(application).filter(slot => !application.documents.some(doc => doc.is_current && doc.document_type === slot.key && documentMemberId(application, doc) === slot.memberId));
+    if (missing.length) next = { kind: "upload", items: [...(next.kind === "upload" ? next.items : []), ...missing.map(slot => ({ label: `${slot.memberName} · ${slot.label}`, reason: null, due: null }))] };
+  }
 
   const currentDocs = application.documents
     .filter((d) => d.is_current && !STAFF_DOCS.has(d.document_type) && !d.request_id)
@@ -101,6 +118,7 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
   const balance = order ? Number(order.total) - Number(order.paid) : 0;
   const balanceDue = !!order && balance > 0.005 && ["pending_payment", "held", "partially_paid"].includes(order.status);
   const approved = application.status === "approved" || application.status === "issued";
+  const credit = application.status === "rejected" ? await getReapplyCredit(application) : null;
   const travellers = application.applicant_type === "single" ? 1 : Math.max(application.members.length, 1);
 
   return (
@@ -132,6 +150,16 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
         </div>
       </header>
 
+      {application.status === "rejected" ? (
+        <form action={reapplyVisa} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
+          <input type="hidden" name="applicationId" value={application.id} />
+          <p className="text-sm font-medium">
+            {credit ? `Re-application credit · ${fmtMoney(credit.amount, credit.currency)}` : "Visa refused"}
+          </p>
+          <SubmitButton pendingText="Starting…">Apply again</SubmitButton>
+        </form>
+      ) : null}
+
       <NextActionCard action={next} />
 
       <Card>
@@ -139,6 +167,7 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
           <CardTitle>{progress.stepLabel}</CardTitle>
         </CardHeader>
         <CardContent>
+          <CaseLiveSync enabled={!["issued", "rejected", "cancelled"].includes(application.status)} />
           <StatusTimeline stages={progress.stages} currentIndex={progress.index} outcome={progress.outcome} />
         </CardContent>
       </Card>
@@ -211,7 +240,7 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                     return (
                       <li key={doc.id} className="space-y-2 py-3">
                         <div className="flex flex-wrap items-center gap-3">
-                          <p className="min-w-0 flex-1 text-sm font-medium">{labelFor(doc.document_type)}</p>
+                          <p className="min-w-0 flex-1 text-sm font-medium">{application.members.find(member => member.id === documentMemberId(application, doc))?.full_name ? `${application.members.find(member => member.id === documentMemberId(application, doc))!.full_name} · ` : ""}{labelFor(doc.document_type, documentMemberId(application, doc))}</p>
                           <Badge variant={status.variant}>{status.label}</Badge>
                           {doc.review_status === "rejected" ? (
                             <ReplaceUpload documentId={doc.id} applicationId={application.id} />
@@ -226,6 +255,7 @@ export default async function VisaTrackingPage({ params }: { params: Promise<{ i
                   {currentDocs.length === 0 && application.document_requests.length === 0 ? (
                     <li className="py-6 text-center text-sm text-muted-foreground">No documents</li>
                   ) : null}
+                  {!["approved", "issued", "rejected", "cancelled"].includes(application.status) ? missingTravellerDocuments(application).filter(slot => slot.memberId && !application.documents.some(doc => doc.is_current && doc.document_type === slot.key && documentMemberId(application, doc) === slot.memberId)).map(slot => <li key={`${slot.key}-${slot.memberId}`} className="flex flex-wrap items-center justify-between gap-3 py-3"><span className="text-sm font-medium">{slot.memberName} · {slot.label}<span className="ml-2 text-xs text-destructive">Required</span></span><PortalDocumentUpload applicationId={application.id} targetId={slot.memberId!} slotKey={slot.key} kind="missing" /></li>) : null}
                   {application.document_requests.map((request) => (
                     <li key={request.id} className="flex flex-wrap items-center gap-3 py-3">
                       <div className="min-w-0 flex-1">

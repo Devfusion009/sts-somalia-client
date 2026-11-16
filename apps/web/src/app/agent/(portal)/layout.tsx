@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Building2, Plus } from "lucide-react";
@@ -5,7 +6,7 @@ import { requireUserForPortal } from "@/lib/auth/session";
 import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { agencyLogoUrl } from "@/modules/agencies/logo";
-import { getMyPartnerAccountId, getPartnerAccount } from "@/modules/admin/partner-accounts";
+import { getAgencyOnboardingChecklist } from "@/modules/admin/partner-accounts";
 import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
 import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
 import { OnboardingStatusBanner } from "@/components/portal/onboarding-status-banner";
@@ -13,9 +14,8 @@ import { AgentNotificationBell } from "@/components/portal/agent-notification-be
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { getServerTrpc } from "@/lib/trpc/server";
-import { AGENT_SERVICES } from "@/modules/agencies/services";
 import styles from "@/components/portal/operations-shell.module.css";
+import typography from "@/components/portal/agent-typography.module.css";
 
 /** Portal-scoped title — see the admin portal layout for why this lives on the layout. */
 export const metadata: Metadata = {
@@ -36,19 +36,14 @@ const NAV_GROUPS: PortalNavGroup[] = [
       { href: "/agent/customers", label: "Customers", icon: "profile" },
       { href: "/agent/finance", label: "Wallet", icon: "payouts" },
       { href: "/agent/reports", label: "Commissions & earnings", icon: "earnings" },
+      { href: "/agent/calendar", label: "Booking calendar", icon: "calendar" },
+      { href: "/agent/finance/transactions", label: "Transactions", icon: "payments" },
     ],
-  },
-  {
-    label: "Book travel",
-    alwaysOpen: true,
-    items: AGENT_SERVICES.map((service) => ({ href: service.href, label: service.label, icon: service.icon })),
   },
   {
     label: "Operations",
     items: [
-      { href: "/agent/calendar", label: "Event calendar", icon: "calendar" },
       { href: "/agent/finance/top-up", label: "Top up wallet", icon: "bank" },
-      { href: "/agent/finance/transactions", label: "Transactions", icon: "payments" },
       { href: "/agent/finance/withdrawals", label: "Withdraw earnings", icon: "bank" },
       { href: "/agent/finance/billing", label: "Billing", icon: "invoice" },
       { href: "/agent/markups", label: "Markups", icon: "catalog" },
@@ -103,17 +98,8 @@ export default async function AgentLayout({ children }: { children: React.ReactN
     return <PortalSuspendedNotice portalLabel="Agent Portal" />;
   }
 
-  const trpc = await getServerTrpc();
-  const [accountId, contexts, notifications] = await Promise.all([
-    getMyPartnerAccountId("agency", membership.agency.id),
-    getMyPartnerContexts(profile.id, profile.full_name),
-    // apps/api is a separate deployment (not yet reachable from every
-    // environment) — the rest of the agent portal has nothing to do with
-    // notifications, so it shouldn't 500 just because that one dependency
-    // is down.
-    trpc.notifications.unread.query({ limit: 10 }).catch(() => []),
-  ]);
-  const account = accountId ? await getPartnerAccount(accountId) : null;
+  // Account discovery is optional shell content; it must not block bookings or the wallet.
+  const contexts = getMyPartnerContexts(profile.id, profile.full_name).catch(() => []);
 
   return (
     <PortalShell
@@ -138,12 +124,21 @@ export default async function AgentLayout({ children }: { children: React.ReactN
       brandLogoUrl={agencyLogoUrl(membership.agency.logo_path)}
       brandName={membership.agency.name}
       headerExtra={<>
-        <Button size="sm" render={<Link href="/agent/book" />}><Plus className="size-3.5" aria-hidden="true" /><span className="max-sm:sr-only">New booking</span></Button>
-        <AgentNotificationBell notifications={notifications} />
+        {["owner", "admin", "booking_staff"].includes(membership.roleInAgency) ? <Button size="sm" render={<Link href="/agent/book" />}><Plus className="size-3.5" aria-hidden="true" /><span className="max-sm:sr-only">New booking</span></Button> : null}
+        <AgentNotificationBell />
       </>}
     >
-      {account ? <OnboardingStatusBanner checklist={account.checklist} /> : null}
-      {children}
+      <Suspense fallback={null}>
+        <AgencyOnboarding agency={membership.agency} />
+      </Suspense>
+      <div className={typography.portal}>{children}</div>
     </PortalShell>
   );
+}
+
+async function AgencyOnboarding({ agency }: {
+  agency: Parameters<typeof getAgencyOnboardingChecklist>[0];
+}) {
+  const checklist = await getAgencyOnboardingChecklist(agency);
+  return checklist ? <OnboardingStatusBanner checklist={checklist} /> : null;
 }

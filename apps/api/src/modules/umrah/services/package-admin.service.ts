@@ -68,6 +68,12 @@ export class PackageAdminService {
 
   async upsert(input: PackageUpsertInput) {
     const row = {
+      ...(input.originIata !== undefined ? { origin_iata: input.originIata } : {}),
+      ...(input.destinationIata !== undefined ? { destination_iata: input.destinationIata } : {}),
+      ...(input.packageType ? { package_type: input.packageType } : {}),
+      pool_visibility: input.poolVisibility ?? "public",
+      organizer_name: input.organizerName ?? "STS Somalia",
+      ...(input.organizerEmail ? { contact_person_email: input.organizerEmail } : {}),
       name: input.name,
       description: input.description || null,
       duration_days: input.durationDays,
@@ -76,12 +82,39 @@ export class PackageAdminService {
       base_price: input.basePrice,
       currency: input.currency.toUpperCase(),
       status: input.status,
+      ...(input.packageType !== "private" ? {
+        contact_person_name: input.contactPersonName,
+        contact_person_phone: input.contactPersonPhone,
+        agent_contacts: input.agentContacts ?? [],
+        facilities: input.facilities,
+        accommodation_details: input.accommodationDetails,
+        flight_details: input.flightDetails,
+        transport_details: input.transportDetails,
+        meals_note: input.mealsNote,
+        nights_makkah: input.nightsMakkah,
+        nights_madinah: input.nightsMadinah,
+        deposit_percent: 100,
+        full_payment_before_documents: true,
+      } : {}),
     };
-    if (input.id) await this.packages.updatePackage(input.id, row);
-    else await this.packages.insertPackage({ ...row, slug: slugify(input.name) });
+    if (input.id) {
+      const existing = await this.get(input.id);
+      if (input.packageType && input.packageType !== existing.package_type) throw new BadRequestException("The package type cannot be changed.");
+      await this.packages.updatePackage(input.id, row);
+      return { id: input.id };
+    }
+    const record = { ...row, slug: slugify(input.name), package_type: input.packageType ?? "group" };
+    return { id: input.packageType === "private"
+      ? await this.packages.insertPackage(record)
+      : await this.packages.insertPublicPackage(record, input.departureDate!, input.totalSeats!) };
+
   }
 
   async updateDetails(d: PackageDetailsInput) {
+    const current = await this.get(d.packageId);
+    if (current.package_type === "group" && (!d.contactPersonName?.trim() || !/^\+?[0-9 ()-]{7,40}$/.test(d.contactPersonPhone ?? "") || !d.mealsNote?.trim())) {
+      throw new BadRequestException("Enter the responsible person's name, phone number and meal details.");
+    }
     await this.packages.updatePackage(d.packageId, {
       tagline: d.tagline || null,
       tier: d.tier || null,
@@ -95,9 +128,9 @@ export class PackageAdminService {
       contact_person_phone: d.contactPersonPhone || null,
       contact_person_email: d.contactPersonEmail || null,
       contact_whatsapp: d.contactWhatsapp || null,
-      deposit_percent: d.depositPercent,
+      deposit_percent: current.package_type === "group" ? 100 : d.depositPercent,
       balance_due_days: d.balanceDueDays,
-      full_payment_before_documents: d.fullPaymentBeforeDocuments,
+      full_payment_before_documents: current.package_type === "group" ? true : d.fullPaymentBeforeDocuments,
     });
   }
 

@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import type { Metadata } from "next";
 import { Receipt } from "lucide-react";
 import { getServerTrpc } from "@/lib/trpc/server";
@@ -76,7 +77,7 @@ export default async function AgentPersonalBookingsPage() {
                       {booking.status.replace(/_/g, " ")}
                     </Badge>
                     <span className="min-w-28 text-right text-sm font-medium tabular-nums">
-                      {money(booking.price, booking.currency)}
+                      {<AgentMoney value={money(booking.price, booking.currency)} />}
                     </span>
                   </div>
                 </li>

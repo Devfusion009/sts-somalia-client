@@ -95,6 +95,7 @@ export type VisaAction = {
   disabledReason?: string;
   /** Opens the tab where the action's form lives. */
   tab?: string;
+  afterTab?: string;
 };
 
 function isPaid(state: PaymentState) {
@@ -133,6 +134,7 @@ export function visaAvailableActions(ctx: VisaCaseContext, can: (perm: VisaPermi
       actions.push({
         key: "mark_ready",
         label: "Mark ready for submission",
+        afterTab: ctx.workflow.requires_appointment || ctx.workflow.requires_biometrics ? "appointments" : "submission",
         permission: "visa.documents.review",
         tone: "primary",
         disabledReason: docs && !docs.ok ? docs.detail ?? "Documents outstanding" : undefined,
@@ -220,9 +222,9 @@ export function visaAvailableActions(ctx: VisaCaseContext, can: (perm: VisaPermi
       break;
   }
 
-  const appointment = readiness.get("appointment");
+  const appointment = [readiness.get("appointment"), readiness.get("biometrics")].find(item => item?.applies && !item.ok);
   if (
-    ctx.workflow.requires_appointment &&
+    (ctx.workflow.requires_appointment || ctx.workflow.requires_biometrics) &&
     ["in_review", "additional_info_required", "ready_for_processing"].includes(ctx.stage) &&
     appointment &&
     !appointment.ok &&

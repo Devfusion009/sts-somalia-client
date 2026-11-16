@@ -26,7 +26,7 @@ export type GalleryTarget = {
   table: "hotels" | "hotel_rooms" | "event_venues";
   bucket: "hotel-images" | "venue-images";
   pathPrefix: (id: string) => string;
-  revalidate: (id: string) => void;
+  revalidate: (id: string) => void | Promise<void>;
 };
 
 async function getImages(supabase: Awaited<ReturnType<typeof createClient>>, target: GalleryTarget, id: string) {
@@ -98,7 +98,7 @@ async function commitUpload(target: GalleryTarget, id: string, formData: FormDat
     return { error: error.message };
   }
 
-  target.revalidate(id);
+  await target.revalidate(id);
   return { error: null };
 }
 
@@ -148,7 +148,7 @@ export async function uploadImages(target: GalleryTarget, formData: FormData): P
     return { error: error.message };
   }
 
-  target.revalidate(id);
+  await target.revalidate(id);
   return { error: null };
 }
 
@@ -163,7 +163,7 @@ export async function removeImage(target: GalleryTarget, formData: FormData): Pr
 
   await supabase.from(target.table).update({ images: next }).eq("id", id);
   await supabase.storage.from(target.bucket).remove([path]);
-  target.revalidate(id);
+  await target.revalidate(id);
 }
 
 export async function setCoverImage(target: GalleryTarget, formData: FormData): Promise<void> {
@@ -177,7 +177,7 @@ export async function setCoverImage(target: GalleryTarget, formData: FormData): 
   const next = [path, ...existing.filter((p) => p !== path)];
 
   await supabase.from(target.table).update({ images: next }).eq("id", id);
-  target.revalidate(id);
+  await target.revalidate(id);
 }
 
 export async function uploadHotelImages(_prev: ActionState, formData: FormData): Promise<GalleryUploadState> {

@@ -1,7 +1,8 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
-import { AlertCircle, Banknote, FileText, Pencil, Undo2 } from "lucide-react";
+import { AlertCircle, Banknote, Check, FileText, Landmark, Undo2, WalletCards, X } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -15,13 +16,13 @@ import { payoutMethodLabel } from "@/modules/payments/payout";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { PageHeader } from "@/components/ui/page-header";
-import { StatStrip, StatStripItem } from "@/components/dashboard/filter-chips";
 import { money } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { WithdrawForm } from "./withdraw-form";
+import styles from "./withdrawals.module.css";
 
 export const metadata: Metadata = { title: "Withdraw Earnings" };
 
@@ -82,46 +83,30 @@ function stepsFor(request: AgencyPayoutRequest): TimelineStep[] {
   return steps;
 }
 
-function RequestTimeline({ request, receiptUrl }: { request: AgencyPayoutRequest; receiptUrl?: string }) {
+/** Connect each checkpoint to the next without crossing its marker. */
+function RequestProgress({ request }: { request: AgencyPayoutRequest }) {
+  const steps = stepsFor(request);
+  const currentIndex = steps.findLastIndex((step) => step.state !== "idle");
   return (
-    <ol className="space-y-2.5 border-l border-border pl-4">
-      {stepsFor(request).map((step) => (
-        <li key={step.label} className="relative text-sm">
-          <span
-            aria-hidden="true"
-            className={cn(
-              "absolute top-1.5 -left-[21px] size-2 rounded-full ring-2 ring-card",
-              step.state === "done" ? "bg-primary" : step.state === "failed" ? "bg-destructive" : "bg-border"
-            )}
-          />
-          <p className={cn("font-medium", step.state === "idle" && "text-muted-foreground")}>
-            {step.label}
-            {step.at ? (
-              <span className="ml-2 font-normal text-muted-foreground tabular-nums">
-                {format(new Date(step.at), "d MMM yyyy")}
-              </span>
-            ) : null}
-          </p>
-          {step.detail ? (
-            <p className={cn("text-xs", step.state === "failed" ? "text-destructive" : "text-muted-foreground")}>
-              {step.detail}
-            </p>
-          ) : null}
+    <ol className={styles.progress} aria-label="Withdrawal progress">
+      {steps.map((step, index) => (
+        <li
+          key={step.label}
+          className={styles.step}
+          data-state={step.state}
+          data-connected={steps[index + 1]?.state === "done" ? "done" : undefined}
+          aria-current={index === currentIndex ? "step" : undefined}
+        >
+          <span className={styles.marker} aria-hidden="true">
+            {step.state === "done" ? <Check className="size-3.5" strokeWidth={3} /> : step.state === "failed" ? <X className="size-3.5" strokeWidth={3} /> : index + 1}
+          </span>
+          <span className={styles.stepContent}>
+            <span className={styles.stepLabel}>{step.label}</span>
+            <span className="sr-only">{step.state === "done" ? " — completed" : step.state === "failed" ? " — unsuccessful" : " — pending"}</span>
+            {step.at ? <time className={styles.stepDate} dateTime={step.at}>{format(new Date(step.at), "d MMM yyyy")}</time> : null}
+          </span>
         </li>
       ))}
-      {receiptUrl ? (
-        <li className="relative text-sm">
-          <span aria-hidden="true" className="absolute top-1.5 -left-[21px] size-2 rounded-full bg-primary ring-2 ring-card" />
-          <a
-            href={receiptUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-sm font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            <FileText className="size-3.5" aria-hidden="true" /> Receipt
-          </a>
-        </li>
-      ) : null}
     </ol>
   );
 }
@@ -148,130 +133,132 @@ export default async function AgentWithdrawalsPage() {
   }
 
   const agency = membership.agency;
+  const facts = [
+    { label: "In review by STS", value: earnings.inReview },
+    { label: "Requested", value: earnings.requested },
+    { label: "Paid out", value: earnings.paidOut },
+  ];
 
   return (
     <div className="space-y-6">
       <PageHeader title="Withdraw earnings" />
 
-      <StatStrip cols={3}>
-        <StatStripItem label="Available to withdraw" value={money(earnings.available, "USD")} tone="primary" />
-        <StatStripItem
-          label="In review by STS"
-          value={money(earnings.inReview, "USD")}
-          tone={earnings.inReview > 0 ? "warn" : undefined}
-        />
-        <StatStripItem label="Already requested" value={money(earnings.requested, "USD")} />
-      </StatStrip>
+      <section aria-label="Earnings balance" className="relative overflow-hidden rounded-2xl bg-[linear-gradient(120deg,color-mix(in_oklch,var(--primary),black_35%),var(--primary))] p-5 text-primary-foreground shadow-[0_18px_40px_-24px_var(--primary)] sm:p-7">
+        <WalletCards aria-hidden="true" className="pointer-events-none absolute -right-6 -bottom-8 size-44 opacity-10" />
+        <div className="relative flex flex-wrap items-end justify-between gap-6">
+          <dl>
+            <dt className="text-sm font-medium opacity-80">Available to withdraw</dt>
+            <dd className="mt-1 font-heading text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
+              <AgentMoney value={money(earnings.available, "USD")} />
+            </dd>
+          </dl>
+          <dl className="grid w-full grid-cols-3 gap-3 sm:w-auto sm:gap-8">
+            {facts.map((fact) => (
+              <div key={fact.label} className="min-w-0 border-l border-primary-foreground/25 pl-3">
+                <dt className="truncate text-xs opacity-75">{fact.label}</dt>
+                <dd className="mt-0.5 truncate text-base font-semibold tabular-nums">
+                  <AgentMoney value={money(fact.value, "USD")} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <Card className="lg:sticky lg:top-24 lg:order-2">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
+        <Card className="min-w-0 lg:sticky lg:top-24 lg:order-2">
           <CardHeader>
-            <CardTitle>Request a transfer</CardTitle>
-            {hasBankDetails ? (
-              <CardAction>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label="Edit bank details"
-                  title="Edit bank details"
-                  render={<Link href="/agent/bank-details" />}
-                >
-                  <Pencil aria-hidden="true" />
-                </Button>
-              </CardAction>
-            ) : null}
+            <CardTitle className="font-heading text-base">New withdrawal</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             {!hasBankDetails ? (
-              <Alert>
-                <AlertCircle />
-                <AlertDescription className="flex flex-wrap items-center gap-2">
-                  <span>Add your payout account first.</span>
-                  <Button size="sm" variant="outline" render={<Link href="/agent/bank-details" />}>
-                    Bank details
-                  </Button>
-                </AlertDescription>
-              </Alert>
+              <Empty className="rounded-xl border border-dashed border-border py-8">
+                <EmptyMedia variant="icon"><Landmark /></EmptyMedia>
+                <EmptyTitle>No payout account</EmptyTitle>
+                <Button render={<Link href="/agent/bank-details" />}>Add bank details</Button>
+              </Empty>
             ) : !canRequest ? (
               <Alert>
                 <AlertCircle />
                 <AlertDescription>Only the agency owner or an admin can request a payout.</AlertDescription>
               </Alert>
             ) : (
-              <WithdrawForm available={earnings.available} />
+              <WithdrawForm
+                available={earnings.available}
+                bank={{ name: agency.bank_name, holder: agency.bank_account_name, accountNumber: agency.bank_account_number ?? "" }}
+              />
             )}
-            {hasBankDetails ? (
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border pt-4 text-sm">
-                <div className="col-span-2 min-w-0">
-                  <dt className="text-xs text-muted-foreground">Bank</dt>
-                  <dd className="truncate font-medium">{agency.bank_name ?? "—"}</dd>
-                </div>
-                <div className="col-span-2 min-w-0">
-                  <dt className="text-xs text-muted-foreground">Account name</dt>
-                  <dd className="truncate font-medium">{agency.bank_account_name ?? "—"}</dd>
-                </div>
-                <div className="col-span-2 min-w-0">
-                  <dt className="text-xs text-muted-foreground">Account number</dt>
-                  <dd className="truncate font-mono font-medium">{agency.bank_account_number}</dd>
-                </div>
-                <div className="min-w-0">
-                  <dt className="text-xs text-muted-foreground">Branch</dt>
-                  <dd className="truncate font-medium">{agency.bank_branch ?? "—"}</dd>
-                </div>
-                <div className="min-w-0">
-                  <dt className="text-xs text-muted-foreground">SWIFT/BIC</dt>
-                  <dd className="truncate font-mono font-medium">{agency.bank_swift_code ?? "—"}</dd>
-                </div>
-              </dl>
-            ) : null}
           </CardContent>
         </Card>
 
-        <section className="min-w-0 space-y-3">
+        <section className="min-w-0 space-y-3" aria-labelledby="withdrawal-history">
           <div className="flex items-center gap-2">
-            <h2 className="font-heading text-base font-semibold">Requests</h2>
+            <h2 id="withdrawal-history" className="font-heading text-base font-semibold">Withdrawal history</h2>
             {requests.length > 0 ? (
-              <Badge variant="neutral" className="tabular-nums">
-                {requests.length}
-              </Badge>
+              <Badge variant="neutral" className="tabular-nums">{requests.length}</Badge>
             ) : null}
           </div>
-          <Card className="overflow-hidden py-0">
-            {requests.length === 0 ? (
+          {requests.length === 0 ? (
+            <Card>
               <Empty>
-                <EmptyMedia variant="icon">
-                  <Banknote />
-                </EmptyMedia>
-                <EmptyTitle>No withdrawal requests</EmptyTitle>
+                <EmptyMedia variant="icon"><Banknote /></EmptyMedia>
+                <EmptyTitle>No withdrawals yet</EmptyTitle>
               </Empty>
-            ) : (
-              <ul className="divide-y divide-border">
-                {requests.map((request) => (
-                  <li key={request.id} className="grid gap-4 p-4 sm:grid-cols-[minmax(0,12rem)_1fr] sm:p-5">
-                    <div className="flex items-start justify-between gap-2 sm:flex-col sm:justify-start">
-                      <div className="space-y-1.5">
-                        <p className="font-heading text-lg font-semibold tabular-nums">
-                          {money(Number(request.amount), "USD")}
+            </Card>
+          ) : (
+            <ul className="space-y-3">
+              {requests.map((request) => {
+                const receiptUrl = receiptUrls.get(request.id);
+                const detail = request.status === "rejected"
+                  ? request.review_note
+                  : request.status === "failed"
+                    ? request.failure_reason
+                    : [payoutMethodLabel(request.method), request.reference].filter(Boolean).join(" · ");
+                return (
+                  <li key={request.id} className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-heading text-xl font-semibold tabular-nums">
+                          <AgentMoney value={money(Number(request.amount), "USD")} />
                         </p>
-                        <Badge variant={statusBadgeVariant(request.status, STATUS_VARIANT)}>
-                          {STATUS_LABEL[request.status] ?? request.status}
-                        </Badge>
+                        <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                          {format(new Date(request.requested_at), "d MMM yyyy, HH:mm")}
+                        </p>
                       </div>
-                      {request.status === "pending" && canRequest ? (
-                        <form action={cancelAgencyPayoutRequest}>
-                          <input type="hidden" name="requestId" value={request.id} />
-                          <Button type="submit" size="sm" variant="outline">
-                            <Undo2 data-icon="inline-start" aria-hidden="true" /> Cancel request
-                          </Button>
-                        </form>
-                      ) : null}
+                      <Badge variant={statusBadgeVariant(request.status, STATUS_VARIANT)}>
+                        {STATUS_LABEL[request.status] ?? request.status}
+                      </Badge>
                     </div>
-                    <RequestTimeline request={request} receiptUrl={receiptUrls.get(request.id)} />
+                    <div className="mt-5">
+                      <RequestProgress request={request} />
+                    </div>
+                    {detail || receiptUrl || (request.status === "pending" && canRequest) ? (
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+                        <p className={cn("min-w-0 text-xs", ["rejected", "failed"].includes(request.status) ? "text-destructive" : "text-muted-foreground")}>
+                          {detail}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {receiptUrl ? (
+                            <Button size="sm" variant="outline" render={<a href={receiptUrl} target="_blank" rel="noreferrer" />}>
+                              <FileText data-icon="inline-start" aria-hidden="true" />Receipt
+                            </Button>
+                          ) : null}
+                          {request.status === "pending" && canRequest ? (
+                            <form action={cancelAgencyPayoutRequest}>
+                              <input type="hidden" name="requestId" value={request.id} />
+                              <Button type="submit" size="sm" variant="ghost">
+                                <Undo2 data-icon="inline-start" aria-hidden="true" />Cancel
+                              </Button>
+                            </form>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
                   </li>
-                ))}
-              </ul>
-            )}
-          </Card>
+                );
+              })}
+            </ul>
+          )}
         </section>
       </div>
     </div>

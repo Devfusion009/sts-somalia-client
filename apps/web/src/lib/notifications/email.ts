@@ -1,13 +1,18 @@
 import "server-only";
+import nodemailer, { type Transporter } from "nodemailer";
 import { getIntegrations } from "@/lib/integrations";
+import { getSocialLinks } from "@/lib/site-settings";
+import { SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/social-platforms";
+import { SOCIAL_SLOT, socialBadge, wrapEmailHtml } from "./email-layout";
 
 /**
  * Transactional email, one entry point for the whole app.
  *
  * Configuration (see apps/web/.env.example, "Email"):
- *   EMAIL_PROVIDER   "resend" today; empty means no provider is connected.
+ *   EMAIL_PROVIDER   "smtp" or "resend"; empty means no provider is connected.
  *   EMAIL_FROM       Sender, e.g. "STS Somalia <no-reply@scoutsts.com>".
- *   EMAIL_REPLY_TO   Where replies go, e.g. "info@scoutsts.com".
+ *   EMAIL_REPLY_TO   Where replies go, e.g. "support@scoutsts.com".
+ *   SMTP_HOST/PORT/SECURE/USER/PASS  Mailbox login for the "smtp" provider.
  *   RESEND_API_KEY   Credential for the "resend" provider.
  *
  * Every caller builds and hands over the full message regardless of
@@ -17,8 +22,8 @@ import { getIntegrations } from "@/lib/integrations";
  * Sending never throws; a failed email must not undo the action that
  * triggered it.
  *
- * Plain fetch against the provider's REST API, no SDK — the codebase's
- * convention for third-party providers.
+ * Resend is a plain fetch against its REST API. SMTP (e.g. a Hostinger
+ * mailbox) goes through nodemailer, since SMTP has no HTTP equivalent.
  */
 export type SendEmailInput = {
   to: string | string[];
@@ -34,7 +39,7 @@ export type EmailStatus = "sent" | "not_configured" | "failed";
 
 export type SendEmailResult = { sent: boolean; status: EmailStatus; error?: string };
 
-const DEFAULT_FROM = "STS Somalia <notifications@sts-somalia.example>";
+const DEFAULT_FROM = "Scout Travel Solution <no-reply@scoutsts.com>";
 
 function fromAddress(): string {
   return process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || DEFAULT_FROM;
@@ -44,10 +49,73 @@ function asList(value: string | string[]): string[] {
   return (Array.isArray(value) ? value : [value]).filter(Boolean);
 }
 
+let smtpTransport: Transporter | null = null;
+
+function smtp(): Transporter {
+  if (!smtpTransport) {
+    const port = Number(process.env.SMTP_PORT || 465);
+    smtpTransport = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port,
+      secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === "true" : port === 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      pool: true,
+      maxConnections: 3,
+    });
+  }
+  return smtpTransport;
+}
+
+const SOCIAL_SHORT: Record<SocialPlatform, string> = {
+  instagram: "IG",
+  tiktok: "TT",
+  facebook: "f",
+  x: "X",
+  youtube: "YT",
+  linkedin: "in",
+};
+
+/**
+ * Every message leaves in the branded frame: bare HTML fragments are wrapped,
+ * and the footer's social slot gets the links an admin set in Site settings.
+ */
+async function finishHtml(subject: string, html: string): Promise<string> {
+  const framed = wrapEmailHtml(subject, html);
+  if (!framed.includes(SOCIAL_SLOT)) return framed;
+  const links = await getSocialLinks().catch(() => []);
+  const badges = links
+    .map((link) => socialBadge({ label: SOCIAL_PLATFORMS[link.platform].label, short: SOCIAL_SHORT[link.platform], href: link.url }))
+    .join("");
+  return framed.replace(SOCIAL_SLOT, badges);
+}
+
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const { email } = getIntegrations();
   const to = asList(input.to);
   const replyTo = input.replyTo ?? process.env.EMAIL_REPLY_TO ?? undefined;
+
+  if (email.provider === "smtp" || email.provider === "resend") {
+    input = { ...input, html: await finishHtml(input.subject, input.html) };
+  }
+
+  if (email.provider === "smtp") {
+    try {
+      await smtp().sendMail({
+        from: fromAddress(),
+        to,
+        cc: input.cc?.length ? input.cc : undefined,
+        replyTo,
+        subject: input.subject,
+        html: input.html,
+        text: input.text,
+      });
+      return { sent: true, status: "sent" };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "SMTP send failed.";
+      console.error(`[email] smtp send failed · subject="${input.subject}" · ${message}`);
+      return { sent: false, status: "failed", error: message };
+    }
+  }
 
   if (email.provider !== "resend") {
     console.info(`[email] not sent, no provider configured · to=${to.join(",")} · subject="${input.subject}"`);

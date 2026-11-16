@@ -72,6 +72,12 @@ function nightsBetween(checkIn: string, checkOut: string) {
   );
 }
 
+function guestEmail(raw: unknown): string | null {
+  if (!Array.isArray(raw)) return null;
+  const lead = raw[0] as { email?: unknown } | undefined;
+  return typeof lead?.email === "string" && lead.email.trim() ? lead.email.trim() : null;
+}
+
 function readGuests(raw: unknown): BookingDetail["guests"] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -151,8 +157,10 @@ export async function getBookingDetail(hotelId: string, bookingId: string): Prom
     numChildren: booking.num_children,
     guests: readGuests(booking.guest_details),
     customerId: booking.customer_id,
-    customerName: booking.customer?.full_name ?? null,
-    customerEmail: booking.customer?.email ?? null,
+    customerName: booking.source === "offline" ? null : (booking.customer?.full_name ?? null),
+    // A desk (offline) booking is placed under the staff member's own
+    // account, so that account's email is not the guest's.
+    customerEmail: guestEmail(booking.guest_details) ?? (booking.source === "offline" ? null : (booking.customer?.email ?? null)),
     specialRequests: booking.special_requests,
     ratePlan: readRatePlanSnapshot(booking.rate_plan),
     extras: readExtrasSnapshot(booking.extras),

@@ -2,6 +2,7 @@ import { getCurrentProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveAgencyId } from "@/modules/orders/helpers";
 import { getAgencyCustomers } from "@/modules/agencies/booked-for";
+import { getBookingCustomer } from "@/modules/agencies/booking-context";
 import { BookedForFields } from "./booked-for-fields";
 
 /**
@@ -16,8 +17,11 @@ export async function AgencyBookingSlot() {
 
   const supabase = await createClient();
 
-  const customers = await getAgencyCustomers(supabase, agencyId);
-  return <BookedForFields customers={customers} />;
+  const [customers, selectedCustomer] = await Promise.all([
+    getAgencyCustomers(supabase, agencyId),
+    getBookingCustomer(supabase, agencyId),
+  ]);
+  return <BookedForFields key={selectedCustomer?.id ?? "self"} customers={customers} initialCustomerId={selectedCustomer?.id} />;
 }
 
 /**

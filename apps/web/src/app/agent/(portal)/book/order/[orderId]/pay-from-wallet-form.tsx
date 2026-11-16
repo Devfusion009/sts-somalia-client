@@ -1,5 +1,8 @@
 "use client";
 
+import { AgentMoney } from "@/components/portal/agent-money";
+
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -64,7 +67,7 @@ export function PayFromWalletForm({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size="lg" className="w-full tabular-nums" />}>
-        Pay {money(amount, currency)}
+        Pay {<AgentMoney value={money(amount, currency)} />}
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
@@ -73,17 +76,17 @@ export function PayFromWalletForm({
 
         <dl className="space-y-2 text-sm">
           <div className="flex items-baseline justify-between gap-3">
-            <dt className="text-muted-foreground">Agency balance now</dt>
-            <dd className="tabular-nums">{money(available, currency)}</dd>
+            <dt className="text-muted-foreground">Available to spend</dt>
+            <dd className="tabular-nums">{<AgentMoney value={money(available, currency)} />}</dd>
           </div>
           <div className="flex items-baseline justify-between gap-3">
             <dt className="text-muted-foreground">Amount</dt>
-            <dd className="tabular-nums">− {money(amount, currency)}</dd>
+            <dd className="tabular-nums">− {<AgentMoney value={money(amount, currency)} />}</dd>
           </div>
           <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2">
-            <dt className="font-medium">Balance after</dt>
+            <dt className="font-medium">Available after</dt>
             <dd className="font-heading text-base font-semibold tabular-nums text-primary">
-              {money(remaining, currency)}
+              {<AgentMoney value={money(remaining, currency)} />}
             </dd>
           </div>
         </dl>

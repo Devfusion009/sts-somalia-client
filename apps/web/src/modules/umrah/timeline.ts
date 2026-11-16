@@ -1,4 +1,4 @@
-import { FileText, Landmark, Plane, Send, Ticket, Users } from "lucide-react";
+import { FileText, Landmark, Plane, Send, Ticket, Users, X } from "lucide-react";
 import type { TimelineStage } from "@/modules/bookings/components/status-timeline";
 
 export { UMRAH_STAGE_LABEL, UMRAH_DOC_TYPE_LABEL, type UmrahFulfillmentStage } from "@sts/shared-types";
@@ -29,10 +29,6 @@ export function umrahTimeline(
   ];
   const last = stages.length - 1;
 
-  if (["cancelled", "refunded", "no_show", "failed"].includes(status)) {
-    return { stages, index: last, outcome: "failed" };
-  }
-
   const effective: UmrahFulfillmentStage =
     stage ?? (status === "completed" ? "completed" : status === "confirmed" ? "confirmed" : "booked");
   const index: Record<UmrahFulfillmentStage, number> = {
@@ -44,6 +40,21 @@ export function umrahTimeline(
     documents_ready: 4,
     completed: 5,
   };
+  const terminalLabels: Record<string, string> = {
+    cancelled: "Cancelled",
+    refunded: "Refunded",
+    no_show: "No show",
+    failed: "Failed",
+  };
+  if (terminalLabels[status]) {
+    // Keep only stages actually reached, then show how the booking ended.
+    const reached = stages.slice(0, index[effective] + 1);
+    return {
+      stages: [...reached, { key: status, label: terminalLabels[status], icon: X }],
+      index: reached.length,
+      outcome: "failed",
+    };
+  }
   if (effective === "completed" || status === "completed") {
     return { stages, index: last, outcome: "success" };
   }

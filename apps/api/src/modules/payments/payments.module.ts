@@ -1,3 +1,4 @@
+import { WaafiWebhookController } from "./waafi-webhook.controller";
 import { Module } from "@nestjs/common";
 import { PaymentsService } from "./payments.service";
 import { AccountPaymentsService } from "./account.service";
@@ -11,7 +12,7 @@ import { OrdersModule } from "../orders/orders.module";
 
 @Module({
   imports: [OrdersModule],
-  controllers: [StripeWebhookController, RazorpayWebhookController, SifaloWebhookController],
+  controllers: [WaafiWebhookController, StripeWebhookController, RazorpayWebhookController, SifaloWebhookController],
   providers: [PaymentsService, AccountPaymentsService, CheckoutService, SifaloService, WaafiService],
   exports: [PaymentsService, AccountPaymentsService, CheckoutService],
 })

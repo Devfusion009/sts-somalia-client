@@ -1,3 +1,4 @@
+import { resolveWaafiConfig, waafiDeployment, type WaafiConfig } from "@sts/shared-types/dist/waafi-server";
 import "server-only";
 import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -14,7 +15,7 @@ import { getBankTransfer, type BankTransferDetails } from "@/lib/site-settings";
 
 export type StripeGateway = { secretKey: string; webhookSecret: string | null };
 export type RazorpayGateway = { keyId: string; keySecret: string; webhookSecret: string | null };
-export type WaafiGateway = { merchantUid: string; apiUserId: string; apiKey: string; apiUrl: string };
+export type WaafiGateway = WaafiConfig;
 export type EdahabGateway = { apiKey: string; agentCode: string; apiUrl: string };
 
 export type PaymentGateways = {
@@ -29,20 +30,21 @@ export type PaymentGateways = {
 
 const bool = (v: string | undefined) => v === "true" || v === "1";
 
-async function activeCredentials(): Promise<Record<string, Record<string, string>>> {
+async function activeCredentials(): Promise<Record<string, Record<string, string> | null>> {
   const admin = createAdminClient();
-  const { data } = await admin
+  const { data, error } = await admin
     .from("platform_api_integrations")
-    .select("provider_key, credentials_encrypted")
-    .eq("category", "payments")
-    .eq("is_active", true);
+    .select("provider_key, credentials_encrypted, is_active")
+    .eq("category", "payments").abortSignal(AbortSignal.timeout(5000));
+  if (error) throw new Error("Payment credentials are unavailable.");
 
-  const out: Record<string, Record<string, string>> = {};
+  const out: Record<string, Record<string, string> | null> = {};
   for (const row of data ?? []) {
-    if (!row.credentials_encrypted) continue;
+    if (!row.is_active || !row.credentials_encrypted) { out[row.provider_key] = null; continue; }
     try {
       out[row.provider_key] = decryptCredentials(row.credentials_encrypted);
     } catch {
+      out[row.provider_key] = null;
       // An undecryptable row is treated as not connected rather than failing checkout.
     }
   }
@@ -50,18 +52,13 @@ async function activeCredentials(): Promise<Record<string, Record<string, string
 }
 
 export const getPaymentGateways = cache(async (): Promise<PaymentGateways> => {
-  const [db, bankTransfer] = await Promise.all([activeCredentials().catch((): Record<string, Record<string, string>> => ({})), getBankTransfer()]);
+  const [db, bankTransfer] = await Promise.all([activeCredentials().catch((): Record<string, Record<string, string> | null> => ({ waafi: null })), getBankTransfer()]);
   const env = process.env;
 
   const stripeDb = db.stripe;
   const stripeSecret = stripeDb?.secret_key ?? env.STRIPE_SECRET_KEY;
   const razorDb = db.razorpay;
   const waafiDb = db.waafi;
-  const waafi = {
-    merchantUid: waafiDb?.merchant_uid ?? env.WAAFI_MERCHANT_UID,
-    apiUserId: waafiDb?.api_user_id ?? env.WAAFI_API_USER_ID,
-    apiKey: waafiDb?.api_key ?? env.WAAFI_API_KEY,
-  };
   const edahabDb = db.edahab;
   const edahab = {
     apiKey: edahabDb?.api_key ?? env.EDAHAB_API_KEY,
@@ -75,15 +72,12 @@ export const getPaymentGateways = cache(async (): Promise<PaymentGateways> => {
   return {
     stripe: stripeSecret && !stripeOverridden ? { secretKey: stripeSecret, webhookSecret: stripeDb?.webhook_secret ?? env.STRIPE_WEBHOOK_SECRET ?? null } : null,
     razorpay: razorDb?.key_id && razorDb?.key_secret ? { keyId: razorDb.key_id, keySecret: razorDb.key_secret, webhookSecret: razorDb.webhook_secret ?? null } : null,
-    waafi:
-      waafi.merchantUid && waafi.apiUserId && waafi.apiKey
-        ? { merchantUid: waafi.merchantUid, apiUserId: waafi.apiUserId, apiKey: waafi.apiKey, apiUrl: env.WAAFI_API_URL ?? (waafiDb?.environment === "sandbox" ? "https://sandbox.waafipay.net/asm" : "https://api.waafipay.net/asm") }
-        : null,
+    waafi: resolveWaafiConfig(waafiDb, env, true),
     edahab:
       edahab.apiKey && edahab.agentCode
         ? { apiKey: edahab.apiKey, agentCode: edahab.agentCode, apiUrl: env.EDAHAB_API_URL ?? "https://edahab.net/api/api/issueinvoice" }
         : null,
-    testMode: explicitTestMode !== undefined ? bool(explicitTestMode) : env.NODE_ENV !== "production",
+    testMode: waafiDeployment(env) === "development" && (explicitTestMode !== undefined ? bool(explicitTestMode) : env.NODE_ENV !== "production"),
     siteUrl: env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
     bankTransfer,
   };

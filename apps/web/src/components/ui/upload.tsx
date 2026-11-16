@@ -193,6 +193,7 @@ export function FileField({
   compact,
   onFilesChange,
   autoSubmit,
+  uploading,
   className,
 }: {
   id?: string;
@@ -210,6 +211,8 @@ export function FileField({
   onFilesChange?: (files: File[]) => void;
   /** Submit the form as soon as a valid file is picked. */
   autoSubmit?: boolean;
+  /** Pending state for forms that submit through an explicit event handler. */
+  uploading?: boolean;
   className?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -277,7 +280,7 @@ export function FileField({
   }, []);
 
   const showZone = multiple || picked.length === 0;
-  const busy = pending && picked.length > 0;
+  const busy = (uploading ?? pending) && picked.length > 0;
 
   return (
     <MotionConfig reducedMotion="user">

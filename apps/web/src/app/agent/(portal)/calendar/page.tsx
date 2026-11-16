@@ -7,7 +7,7 @@ import { getPublicHolidaysInRange } from "@/lib/provider-runtime/holidays";
 import { PageHeader } from "@/components/ui/page-header";
 import { EventCalendar } from "./event-calendar";
 
-export const metadata: Metadata = { title: "Event Calendar" };
+export const metadata: Metadata = { title: "Booking calendar" };
 
 export default async function AgentCalendarPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const profile = await requireUser();
@@ -29,7 +29,7 @@ export default async function AgentCalendarPage({ searchParams }: { searchParams
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Event calendar" />
+      <PageHeader title="Booking calendar" />
       <EventCalendar month={month} bookings={bookings} holidays={holidays} />
     </div>
   );

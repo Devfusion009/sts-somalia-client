@@ -1,3 +1,5 @@
+import { PublicPackageDetails } from "@/modules/umrah/components/public-package-details";
+import { AgentMoney } from "@/components/portal/agent-money";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -10,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 import { money } from "@/lib/money";
+import { getAgencyMarkupRule } from "@/modules/agencies/markup";
 
 export default async function AgentUmrahBookingPage({
   params,
@@ -23,13 +26,14 @@ export default async function AgentUmrahBookingPage({
 
   const supabase = await createClient();
   const customers = await getBookingCustomers(supabase, membership.agency.id);
-  if (customers.length === 0) redirect("/agent/book");
+  if (customers.length === 0) redirect("/agent/book?service=umrah");
   const isGroup = customers.length > 1;
 
   const pkg = await getPackageBySlug(slug);
   if (!pkg) notFound();
 
   const upcomingDepartures = bookableDepartures(pkg.umrah_package_departures ?? []);
+  const markup = await getAgencyMarkupRule(supabase, membership.agency.id, "umrah");
 
   const seatsOnSale = upcomingDepartures.reduce(
     (sum, d) => sum + Math.max(d.total_seats - d.booked_seats - d.offline_seats, 0),
@@ -49,21 +53,24 @@ export default async function AgentUmrahBookingPage({
       />
 
       <StatRail>
-        <StatRailItem label="Nights" value={pkg.duration_days} />
-        <StatRailItem label="From / pilgrim" value={money(Number(pkg.base_price), pkg.currency)} />
+        <StatRailItem label="Days" value={pkg.duration_days} />
+        <StatRailItem label="From / pilgrim" value={<AgentMoney value={money(Number(pkg.base_price), pkg.currency)} />} />
         <StatRailItem label="Departures" value={upcomingDepartures.length} />
         <StatRailItem label="Seats left" value={seatsOnSale} tone={seatsOnSale === 0 ? "warn" : undefined} />
       </StatRail>
 
+      {pkg.package_type === "group" ? <Card><CardContent><PublicPackageDetails pkg={pkg} /></CardContent></Card> : null}
       <Card>
         <CardContent>
           <BookingForm
+            requiresApproval={pkg.package_type === "private"}
             packageSlug={pkg.slug}
             currency={pkg.currency}
             basePrice={Number(pkg.base_price)}
             departures={upcomingDepartures}
             pricing={pkg.umrah_package_pricing}
             action={isGroup ? createBatchBooking : undefined}
+            desk={{ customers, markup }}
             bookedForSlot={
               <>
                 <input type="hidden" name="agencyCustomerId" value={customers[0].id} />

@@ -161,7 +161,6 @@ export async function completeMfaEnrollmentAction(): Promise<RecoveryCodesState>
   const { data } = await supabase.auth.mfa.listFactors();
   const verified = data?.totp.filter((f) => f.status === "verified") ?? [];
   const firstFactor = verified.length === 1;
-  const hasCodes = (await countUnusedRecoveryCodes(profile.id)) > 0;
 
   if (firstFactor) {
     await recordSecurityEvent(profile.id, "mfa_enabled", {
@@ -170,12 +169,13 @@ export async function completeMfaEnrollmentAction(): Promise<RecoveryCodesState>
     });
   }
   revalidatePath("/account/security");
-  if (firstFactor || !hasCodes) {
-    try {
+  try {
+    const hasCodes = (await countUnusedRecoveryCodes(profile.id)) > 0;
+    if (firstFactor || !hasCodes) {
       return { error: null, codes: await generateRecoveryCodes(profile.id) };
-    } catch {
-      return { error: "Two-factor is on, but recovery codes could not be created. Generate them again below." };
     }
+  } catch {
+    return { error: "Two-factor is enabled. Recovery codes are unavailable." };
   }
   return { error: null };
 }

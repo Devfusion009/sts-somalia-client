@@ -1,3 +1,5 @@
+import { chargeWaafi, type WaafiAttempt } from "@sts/shared-types/dist/waafi-server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import "server-only";
 import { getPaymentGateways, type EdahabGateway, type PaymentGateways, type RazorpayGateway, type StripeGateway, type WaafiGateway } from "@/lib/provider-runtime/payments";
 import { portalOrigin } from "@/lib/subdomain";
@@ -59,7 +61,7 @@ export async function initiateWithProvider(input: InitiationInput): Promise<Init
     description: input.description,
     method: input.method,
     payerPhone: input.payerPhone,
-    successUrl: `${siteUrl}/checkout/${input.orderId}/success`,
+    successUrl: `${siteUrl}/checkout/${input.orderId}/success?order_id=${input.paymentId}&gateway=${input.method.provider}`,
     cancelUrl: `${siteUrl}/checkout/${input.orderId}`,
     metadata: { order_id: input.orderId, payment_id: input.paymentId },
   });
@@ -90,7 +92,8 @@ export async function initiateTopupWithProvider(input: TopupInitiationInput): Pr
   // host is exactly what proxy.ts blocks — the agent would finish paying and
   // land on the storefront. portalOrigin() returns "" while portals are still
   // path-based, which correctly falls back to the single origin.
-  const agentOrigin = portalOrigin("agent") || siteUrl;
+  const agentOrigin = portalOrigin("agent");
+  const topupPath = `${agentOrigin || siteUrl}${agentOrigin ? "" : "/agent"}/finance/top-up`;
   return chargeWithProvider({
     recordId: input.topupId,
     reference: `TOPUP-${input.topupId.slice(0, 8).toUpperCase()}`,
@@ -99,8 +102,12 @@ export async function initiateTopupWithProvider(input: TopupInitiationInput): Pr
     description: `STS wallet top-up · ${input.agencyName}`,
     method: input.method,
     payerPhone: input.payerPhone,
-    successUrl: `${agentOrigin}/agent/finance/top-up?status=success`,
-    cancelUrl: `${agentOrigin}/agent/finance/top-up?status=cancelled`,
+    successUrl: input.method.provider === "waafi"
+      ? `${topupPath}/waafi-return?topupId=${input.topupId}`
+      : `${topupPath}?status=success&topupId=${input.topupId}`,
+    cancelUrl: input.method.provider === "waafi"
+      ? `${topupPath}/waafi-return?topupId=${input.topupId}`
+      : `${topupPath}?status=cancelled&topupId=${input.topupId}`,
     metadata: { topup_id: input.topupId },
   });
 }
@@ -133,17 +140,17 @@ function initiateManual(input: GatewayCharge, { bankTransfer }: PaymentGateways)
     return {
       type: "instructions",
       instructions:
-        `Transfer ${input.currency} ${input.amount.toFixed(2)} to ${bankTransfer.bankName}, ` +
+        `Transfer ${input.currency} ${input.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} to ${bankTransfer.bankName}, ` +
         `account "${bankTransfer.accountName}", account no. ${bankTransfer.accountNumber}. ` +
-        `Use ${input.reference} as the transfer reference, then share the receipt with our team ` +
-        `on +252 611 444 420. We confirm transfers within one working day.`,
+        `Use ${input.reference} as the transfer reference, then upload the transfer receipt or bank statement here. ` +
+        `STS will verify the funds before confirming your booking.`,
     };
   }
   return {
     type: "instructions",
     instructions:
       `Visit any STS office and quote ${input.reference} to pay ` +
-      `${input.currency} ${input.amount.toFixed(2)} in cash. Head office: Sultan Business Park, ` +
+      `${input.currency} ${input.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} in cash. Head office: Sultan Business Park, ` +
       `Waaberi District, 21 Oct Street, Muqdisho — open Sat–Thu, 8:00–17:00.`,
   };
 }
@@ -202,47 +209,26 @@ async function initiateRazorpay(input: GatewayCharge, gateway: RazorpayGateway):
   return { type: "redirect", url: link.short_url, providerRef: link.id };
 }
 
-/** WaafiPay wallet purchase (EVC Plus / ZAAD / Sahal) — pushes a USSD approval to the payer. */
 async function initiateWaafi(input: GatewayCharge, gateway: WaafiGateway): Promise<InitiationResult> {
-  const body = {
-    schemaVersion: "1.0",
-    requestId: input.recordId,
-    timestamp: new Date().toISOString(),
-    channelName: "WEB",
-    serviceName: "API_PURCHASE",
-    serviceParams: {
-      merchantUid: gateway.merchantUid,
-      apiUserId: gateway.apiUserId,
-      apiKey: gateway.apiKey,
-      paymentMethod: "MWALLET_ACCOUNT",
-      payerInfo: { accountNo: input.payerPhone },
-      transactionInfo: {
-        referenceId: input.reference,
-        invoiceId: input.recordId,
-        amount: input.amount.toFixed(2),
-        currency: input.currency,
-        description: input.description,
-      },
+  const admin = createAdminClient();
+  return chargeWaafi({
+    referenceId: input.recordId, amount: input.amount, currency: input.currency,
+    description: input.description, payerPhone: input.payerPhone,
+    successUrl: input.successUrl, cancelUrl: input.cancelUrl,
+  }, gateway, {
+    async begin() {
+      const { data, error } = await admin.rpc("begin_waafi_attempt", {
+        p_reference_id: input.recordId, p_order_id: input.metadata.order_id ?? null, p_topup_id: input.metadata.topup_id ?? null,
+        p_environment: gateway.environment, p_merchant_uid: gateway.merchantUid,
+      });
+      if (error) throw new Error("Payment attempt could not be reserved.");
+      return data as unknown as WaafiAttempt;
     },
-  };
-
-  const res = await fetch(gateway.apiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    async save(result) {
+      const { error } = await admin.rpc("record_waafi_attempt", { p_reference_id: input.recordId, p_result: result });
+      if (error) throw new Error("Payment result could not be recorded.");
+    },
   });
-  const payload = (await res.json()) as {
-    responseCode?: string;
-    responseMsg?: string;
-    params?: { transactionId?: string; state?: string };
-  };
-  if (payload.responseCode === "2001") {
-    return { type: "success", providerRef: payload.params?.transactionId };
-  }
-  return {
-    type: "error",
-    message: payload.responseMsg ?? "The mobile money payment was not approved.",
-  };
 }
 
 /** eDahab invoice — customer approves it from the eDahab app/USSD menu. */
@@ -270,7 +256,7 @@ async function initiateEdahab(input: GatewayCharge, gateway: EdahabGateway): Pro
       type: "instructions",
       providerRef: String(payload.InvoiceId),
       instructions:
-        `We sent invoice #${payload.InvoiceId} for ${input.currency} ${input.amount.toFixed(2)} ` +
+        `We sent invoice #${payload.InvoiceId} for ${input.currency} ${input.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ` +
         `to eDahab number ${input.payerPhone}. Approve it in your eDahab app or dial the eDahab ` +
         `USSD menu to complete payment.`,
     };

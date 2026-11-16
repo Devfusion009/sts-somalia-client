@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireVisaPermission } from "./staff-auth";
@@ -11,10 +12,13 @@ import { submitToPartner, syncPartnerStatus, mapPartnerStatus } from "./partner/
 import { parkForUnmappedPartnerStatus, parkForRefusedPartnerTransition } from "./partner/sync";
 import type { Json } from "@/lib/types/database.types";
 
-export type ActionState = { error: string | null } | null;
+export type ActionState = { error: string | null; requiresRefresh?: boolean } | null;
 
 function revalidateVisaViews(applicationId: string) {
   revalidatePath("/admin/visa");
+  revalidatePath("/admin/visa/appointments");
+  revalidatePath("/admin");
+  revalidatePath("/account/visa");
   revalidatePath(`/admin/visa/${applicationId}`);
   revalidatePath(`/account/visa/${applicationId}`);
 }
@@ -118,7 +122,7 @@ export async function adminRequestDocument(
   });
   if (error) return { error: rpcMessage(error.message) };
   if (parsed.data.requirement === "required") {
-    await notifyVisaCustomer(parsed.data.applicationId, "documents_requested", `Please upload: ${parsed.data.title}.`);
+    after(() => notifyVisaCustomer(parsed.data.applicationId, "documents_requested", `Please upload: ${parsed.data.title}.`));
   }
 
   revalidateVisaViews(parsed.data.applicationId);
@@ -147,8 +151,14 @@ export async function adminReviewDocument(
       reason: formData.get("reason")?.toString().trim() || undefined,
     });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-  if (parsed.data.decision === "reject" && !parsed.data.reason) {
-    return { error: "Enter what is wrong with this document." };
+  // One "check:<key>" field per standard check: "pass" or "fail".
+  const checks: Record<string, boolean> = {};
+  for (const [name, value] of formData.entries()) {
+    if (name.startsWith("check:")) checks[name.slice(6)] = value === "pass";
+  }
+  const failed = Object.values(checks).some((ok) => !ok);
+  if (parsed.data.decision === "reject" && !parsed.data.reason && !failed) {
+    return { error: "Mark the failed checks or enter what is wrong." };
   }
 
   await requireVisaPermission("visa.documents.review");
@@ -157,10 +167,16 @@ export async function adminReviewDocument(
     p_document_id: parsed.data.documentId,
     p_decision: parsed.data.decision,
     p_reason: parsed.data.reason,
+    p_checks: checks,
   });
   if (error) return { error: rpcMessage(error.message) };
   if (parsed.data.decision === "reject") {
-    await notifyVisaCustomer(parsed.data.applicationId, "documents_requested", `A document needs to be replaced: ${parsed.data.reason}`);
+    const { data: doc } = await supabase.from("visa_documents").select("rejection_reason").eq("id", parsed.data.documentId).maybeSingle();
+    after(() => notifyVisaCustomer(
+      parsed.data.applicationId,
+      "documents_requested",
+      `A document needs to be replaced: ${doc?.rejection_reason ?? parsed.data.reason ?? ""}`
+    ));
   }
 
   revalidateVisaViews(parsed.data.applicationId);
@@ -188,7 +204,7 @@ export async function adminAddInternalNote(_prev: ActionState, formData: FormDat
 }
 
 /** Mark a requested document received (accepting its upload) or waive it. */
-export async function adminResolveDocumentRequest(formData: FormData): Promise<void> {
+export async function adminResolveDocumentRequest(_previous: ActionState, formData: FormData): Promise<ActionState> {
   await requireVisaPermission("visa.documents.review");
   const parsed = z
     .object({
@@ -203,11 +219,17 @@ export async function adminResolveDocumentRequest(formData: FormData): Promise<v
     });
 
   const supabase = await createClient();
-  await supabase.rpc("visa_resolve_document_request", {
+  const { data: request, error: requestError } = await supabase.from("visa_document_requests")
+    .select("application_id,status,document_id").eq("id", parsed.requestId).eq("application_id", parsed.applicationId).maybeSingle();
+  if (requestError || !request) return { error: "Document request could not be loaded." };
+  if (parsed.resolution === "received" && (request.status !== "uploaded" || !request.document_id)) return { error: "The customer must upload the document before it can be verified." };
+  const { error } = await supabase.rpc("visa_resolve_document_request", {
     p_request_id: parsed.requestId,
     p_resolution: parsed.resolution,
   });
+  if (error) return { error: rpcMessage(error.message) };
   revalidateVisaViews(parsed.applicationId);
+  return { error: null };
 }
 
 /** Attach the final visa document (shown as "Download Visa" to the customer). */
@@ -441,9 +463,12 @@ export async function adminRecordSubmission(_prev: ActionState, formData: FormDa
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   if (!parsed.data.centreId && !parsed.data.lodgedWith) return { error: "Choose a centre or enter where it was lodged." };
 
+  const receiptFile = formData.get("receipt");
+  if (!(receiptFile instanceof File) || receiptFile.size === 0) return { error: "Attach the submission receipt." };
+
   await requireVisaPermission("visa.submission.record");
   const supabase = await createClient();
-  const receipt = await uploadStaffFile(supabase, parsed.data.applicationId, "submission_receipt", formData.get("receipt"));
+  const receipt = await uploadStaffFile(supabase, parsed.data.applicationId, "submission_receipt", receiptFile);
   if (receipt.error) return { error: receipt.error };
 
   const { error } = await supabase.rpc("visa_record_submission", {
@@ -536,6 +561,7 @@ export async function adminRecordDecision(_prev: ActionState, formData: FormData
   const letter = await uploadStaffFile(supabase, parsed.data.applicationId, "decision_letter", formData.get("letter"));
   if (letter.error) return { error: letter.error };
   if (!parsed.data.reference && !letter.id) return { error: "Enter the authority's reference or attach the decision letter." };
+  if (parsed.data.outcome === "refused" && !letter.id) return { error: "Attach the refusal letter." };
 
   const { error } = await supabase.rpc("visa_record_decision", {
     p_application_id: parsed.data.applicationId,

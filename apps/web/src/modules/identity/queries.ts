@@ -1,11 +1,11 @@
 import "server-only";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { getMyPartnerId, getMyPartner } from "@/modules/hotels/partner-queries";
 import { getMyManagedHotels } from "@/modules/hotels/manager-queries";
 import { getMyManagedVenues } from "@/modules/events/venue-manager-queries";
 import { getMyVenuePartnerId, getMyVenuePartner } from "@/modules/events/venue-partner-queries";
-import { getMyPartnerAccountId } from "@/modules/admin/partner-accounts";
 import { ACCOUNT_TYPE_LABEL, type PartnerAccountType, type PartnerAccountStatus } from "@/modules/admin/partner-account-shared";
 import { portalHref } from "@/lib/subdomain";
 
@@ -45,13 +45,6 @@ const PORTAL_HREF_FOR_TYPE: Record<PartnerAccountType, string> = {
   venue_partner: portalHref("venue"),
 };
 
-async function statusFor(type: PartnerAccountType, entityId: string): Promise<PartnerAccountStatus | null> {
-  const accountId = await getMyPartnerAccountId(type, entityId);
-  if (!accountId) return null;
-  const supabase = await createClient();
-  const { data } = await supabase.from("partner_accounts").select("status").eq("id", accountId).maybeSingle();
-  return (data?.status as PartnerAccountStatus | undefined) ?? null;
-}
 
 /**
  * Every partner identity this profile currently holds, across all four
@@ -91,17 +84,12 @@ async function getMyAffiliateId(profileId: string): Promise<{ id: string } | nul
   return data;
 }
 
-export async function getMyPartnerContexts(profileId: string, fallbackName: string | null): Promise<PartnerContext[]> {
-  const [agency, hotelPartnerId, affiliate, venuePartnerId] = await Promise.all([
+export const getMyPartnerContexts = cache(async (profileId: string, fallbackName: string | null): Promise<PartnerContext[]> => {
+  const [agency, hotelPartner, affiliate, venuePartner] = await Promise.all([
     getMyAgency(profileId),
-    getMyPartnerId(profileId),
+    getMyPartnerId(profileId).then((id) => id ? getMyPartner(id) : null),
     getMyAffiliateId(profileId),
-    getMyVenuePartnerId(profileId),
-  ]);
-
-  const [hotelPartner, venuePartner] = await Promise.all([
-    hotelPartnerId ? getMyPartner(hotelPartnerId) : null,
-    venuePartnerId ? getMyVenuePartner(venuePartnerId) : null,
+    getMyVenuePartnerId(profileId).then((id) => id ? getMyVenuePartner(id) : null),
   ]);
 
   const candidates: { type: PartnerAccountType; entityId: string; name: string }[] = [];
@@ -110,9 +98,13 @@ export async function getMyPartnerContexts(profileId: string, fallbackName: stri
   if (affiliate) candidates.push({ type: "affiliate", entityId: affiliate.id, name: fallbackName || "Affiliate Program" });
   if (venuePartner) candidates.push({ type: "venue_partner", entityId: venuePartner.id, name: venuePartner.name });
 
-  const withStatus = await Promise.all(
-    candidates.map(async (c) => ({ ...c, status: await statusFor(c.type, c.entityId) }))
-  );
+  if (candidates.length === 0) return [];
+  const supabase = await createClient();
+  const { data: accounts, error } = await supabase.from("partner_accounts")
+    .select("type, entity_id, status").in("entity_id", candidates.map((c) => c.entityId));
+  if (error) return [];
+  const statuses = new Map((accounts ?? []).map((account) => [`${account.type}:${account.entity_id}`, account.status]));
+  const withStatus = candidates.map((c) => ({ ...c, status: statuses.get(`${c.type}:${c.entityId}`) ?? null }));
 
   const contexts = withStatus
     .filter((c) => c.status !== "offboarded")
@@ -125,4 +117,4 @@ export async function getMyPartnerContexts(profileId: string, fallbackName: stri
     }));
 
   return contexts;
-}
+});

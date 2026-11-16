@@ -9,8 +9,10 @@ import { getServerTrpcForActions, trpcErrorMessage } from "@/lib/trpc/server";
 
 function revalidatePackage(packageId: string) {
   revalidatePath(`/admin/catalog/umrah/${packageId}`);
+  revalidatePath("/admin/umrah/pool");
+  revalidatePath("/admin/umrah/pool", "layout");
   revalidatePath("/admin/catalog/umrah");
-  revalidatePath("/umrah");
+  revalidatePath("/umrah", "layout");
 }
 
 function str(formData: FormData, key: string) {

@@ -31,6 +31,9 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
+      DEPLOYMENT_ENV: production
+      WAAFI_ENVIRONMENT: production
+      PAYMENTS_TEST_MODE: "false"
       # Heap cap at about 75% of the container limit so V8 collects before the OOM killer acts.
       NODE_OPTIONS: --max-old-space-size=1200
       # Server-side calls to the api stay on the Docker network.
@@ -56,6 +59,9 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
+      DEPLOYMENT_ENV: production
+      WAAFI_ENVIRONMENT: production
+      PAYMENTS_TEST_MODE: "false"
       PORT: "4000"
       NODE_OPTIONS: --max-old-space-size=675
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379

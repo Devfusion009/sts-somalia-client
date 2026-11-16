@@ -1,5 +1,5 @@
 import "server-only";
-import { createTRPCClient, httpBatchLink, TRPCClientError } from "@trpc/client";
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRouter } from "./shared";
 import { apiUrl } from "./shared";
@@ -41,20 +41,7 @@ export function getServerTrpcForActions() {
   return getServerTrpc({ timeoutMs: 20000 });
 }
 
-/** The API's own message for a refused call (already one plain line), or the fallback. */
-export function trpcErrorMessage(error: unknown, fallback: string): string {
-  if (!(error instanceof TRPCClientError) || !error.message) return fallback;
-  // A refused input arrives as the JSON list of zod issues; show the first one's message.
-  if (error.message.startsWith("[")) {
-    try {
-      const issues = JSON.parse(error.message) as { message?: string }[];
-      return issues[0]?.message || fallback;
-    } catch {
-      return fallback;
-    }
-  }
-  return error.message;
-}
+export { trpcErrorMessage } from "./errors";
 
 /**
  * Multipart POST to an apps/api REST route (file uploads — tRPC doesn't carry
@@ -81,4 +68,4 @@ export async function apiUpload(path: string, body: FormData): Promise<{ error: 
   }
 }
 
-export { TRPCClientError };
+export { TRPCClientError } from "@trpc/client";

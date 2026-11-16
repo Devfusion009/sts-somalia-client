@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useOptimistic, useState, useTransition } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { CheckCircle2, XCircle, ExternalLink, Trash2, ChevronDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,6 +31,7 @@ import {
   setIntegrationActive,
   deleteIntegrationCredentials,
   testIntegrationConnection,
+  setupWaafiWebhook,
 } from "@/modules/admin/integrations/actions";
 import { CustomPartnerConfigForm } from "./custom-partner-config-form";
 
@@ -52,9 +53,10 @@ const PHASE_STYLE: Record<Phase, { label: string; variant: BadgeVariant }> = {
 export function IntegrationCard({ status }: { status: IntegrationStatus }) {
   const { provider } = status;
   const [saveState, saveAction] = useActionState(saveIntegrationCredentials, null);
-  const [isActive, setIsActive] = useState(status.isActive);
+  const [isActive, setIsActive] = useOptimistic(status.isActive);
   const [pending, startTransition] = useTransition();
   const [testing, startTest] = useTransition();
+  const [registering, startRegister] = useTransition();
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(
     status.lastTestOk === null ? null : { ok: status.lastTestOk, message: status.lastTestMessage ?? "" }
   );
@@ -63,9 +65,10 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
   const phaseStyle = PHASE_STYLE[phase];
 
   function toggleActive(next: boolean) {
-    setIsActive(next);
     startTransition(async () => {
-      await setIntegrationActive(provider.key, next);
+      setIsActive(next);
+      const result = await setIntegrationActive(provider.key, next);
+      if (result.error) setTestResult({ ok: false, message: result.error });
     });
   }
 
@@ -77,10 +80,11 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
   }
 
   function removeCredentials() {
-    setIsActive(false);
     setTestResult(null);
     startTransition(async () => {
-      await deleteIntegrationCredentials(provider.key);
+      setIsActive(false);
+      const result = await deleteIntegrationCredentials(provider.key);
+      if (result.error) setTestResult({ ok: false, message: result.error });
     });
   }
 
@@ -93,7 +97,7 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-heading text-base font-semibold">{provider.name}</h3>
-              <Badge variant={phaseStyle.variant}>{phaseStyle.label}</Badge>
+              <Badge variant={phaseStyle.variant}>{provider.key === "waafi" && phase === "live" && status.fieldValues.environment === "sandbox" ? "Sandbox" : phaseStyle.label}</Badge>
               <Badge variant="outline" className="text-muted-foreground">
                 {provider.selfServe ? "Self-serve" : "Requires approval"}
               </Badge>
@@ -116,7 +120,7 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
             <Switch
               id={`active-${provider.key}`}
               checked={isActive}
-              disabled={!status.hasCredentials || pending}
+              disabled={!status.hasCredentials || pending || registering}
               onCheckedChange={toggleActive}
             />
           </div>
@@ -233,12 +237,18 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
               size="sm"
               variant="outline"
               loading={testing}
-              disabled={!status.hasCredentials || pending}
+              disabled={!status.hasCredentials || pending || registering}
               onClick={runTest}
             >
               Test connection
             </Button>
-            <SubmitButton size="sm" pendingText="Saving…">
+            {provider.key === "waafi" ? (
+              <Button type="button" size="sm" variant="outline" loading={registering} disabled={!status.hasCredentials || pending || testing || registering}
+                onClick={() => startRegister(async () => { setTestResult(await setupWaafiWebhook()); })}>
+                Register webhook
+              </Button>
+            ) : null}
+            <SubmitButton size="sm" pendingText="Saving…" disabled={testing || registering || pending}>
               {status.hasCredentials ? "Replace credentials" : "Save credentials"}
             </SubmitButton>
           </div>

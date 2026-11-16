@@ -15,6 +15,7 @@ import {
   ComboboxValue,
 } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   COUNTRY_OPTIONS,
   countryDialCode,
@@ -55,6 +56,8 @@ export function PhoneInput({
   defaultCountry = "SO",
   placeholder,
   required,
+  validateNumber = false,
+  className,
 }: {
   name: string;
   id?: string;
@@ -63,6 +66,9 @@ export function PhoneInput({
   defaultCountry?: string;
   placeholder?: string;
   required?: boolean;
+  validateNumber?: boolean;
+  /** Applied to both the calling-code trigger and the number input, so they share a height. */
+  className?: string;
 }) {
   const initial = useMemo(() => splitPhone(defaultValue, defaultCountry), [defaultValue, defaultCountry]);
   const [country, setCountry] = useState(initial.country);
@@ -79,7 +85,7 @@ export function PhoneInput({
           onValueChange={(next) => next && setCountry(next)}
           autoHighlight
         >
-          <ComboboxTrigger aria-label="Country calling code">
+          <ComboboxTrigger aria-label="Country calling code" className={className}>
             <ComboboxValue>
               {(code: string) => (
                 <span className="flex items-center gap-1.5">
@@ -117,7 +123,9 @@ export function PhoneInput({
         onChange={(e) => setLocal(e.target.value)}
         placeholder={placeholder}
         required={required}
-        className="flex-1"
+        pattern={validateNumber ? `[0-9]{${Math.max(6, 8 - countryDialCode(country).length + 1)},${15 - countryDialCode(country).length + 1}}` : undefined}
+        title={validateNumber ? "Enter a valid mobile number using digits only (8–15 digits including the country code)." : undefined}
+        className={cn("flex-1", className)}
       />
       <input type="hidden" name={name} value={combined} />
     </div>

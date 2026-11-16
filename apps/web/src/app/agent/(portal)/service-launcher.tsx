@@ -1,20 +1,22 @@
 import Link from "next/link";
-import { ArrowRight, Hotel, Landmark, PartyPopper, Plane, Stamp } from "lucide-react";
+import type { CSSProperties } from "react";
+import { ArrowRight } from "lucide-react";
 import { AGENT_SERVICES, agentServiceStartHref } from "@/modules/agencies/services";
+import { SERVICE_STYLE } from "./service-palette";
 import styles from "./workspace.module.css";
 
-const ICONS = { flights: Plane, hotels: Hotel, visa: Stamp, umrah: Landmark, events: PartyPopper };
+const ITEM_TYPE = { flights: "flight", hotels: "hotel", visa: "visa", umrah: "umrah", events: "hall" } as const;
 
-export function ServiceLauncher({ hasCustomer = false }: { hasCustomer?: boolean }) {
+export function ServiceLauncher({ hasCustomer = false, desk = false, row = false }: { hasCustomer?: boolean; desk?: boolean; row?: boolean }) {
   return (
-    <nav aria-label="Book travel services" className={styles.serviceGrid}>
+    <nav aria-label="Book travel services" className={desk ? `${styles.serviceGrid} ${styles.deskServices}` : row ? `${styles.serviceGrid} ${styles.serviceRow}` : styles.serviceGrid}>
       {AGENT_SERVICES.map((service) => {
-        const Icon = ICONS[service.key];
+        const { icon: Icon, color } = SERVICE_STYLE[ITEM_TYPE[service.key]];
         return (
-          <Link key={service.key} href={hasCustomer ? service.href : agentServiceStartHref(service.key)} className={styles.service}>
-            <Icon aria-hidden="true" />
-            <span>{service.label}</span>
-            <ArrowRight aria-hidden="true" />
+          <Link key={service.key} href={hasCustomer ? service.href : agentServiceStartHref(service.key)} className={styles.service} style={{ "--svc": color } as CSSProperties}>
+            <span className={styles.serviceIcon}><Icon aria-hidden="true" /></span>
+            <span className={styles.serviceName}>{service.label}</span>
+            <span className={styles.serviceAction}>{desk ? "Select service" : service.action}<ArrowRight aria-hidden="true" /></span>
           </Link>
         );
       })}

@@ -146,9 +146,9 @@ export type SavePreferencesInput = z.infer<typeof savePreferencesSchema>;
  * validation — not redesigned.
  */
 export const updateProfileSchema = z.object({
-  fullName: z.string().min(2, "Enter your full name."),
-  phone: z.string().optional(),
-  countryCode: z.string().optional(),
+  fullName: z.string().trim().min(2, "Enter your full name.").max(160),
+  phone: z.string().trim().transform(value => value.replace(/[ ()-]/g, "")).refine(value => value === "" || /^\+[1-9]\d{6,14}$/.test(value), "Enter a valid international phone number.").optional(),
+  countryCode: z.string().trim().toUpperCase().refine(value => value === "" || /^[A-Z]{2}$/.test(value), "Select a country.").optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
@@ -591,13 +591,72 @@ export type FlightOffer = {
   changeable: boolean | null;
   changePenalty: FarePenalty;
   checkedBagsIncluded: number | null;
+  /** Inbound leg of a round trip; totalAmount already covers both legs. */
+  returnLeg: FlightLeg | null;
+  /** Flight numbers per leg, e.g. ["QR 1350", "QR 1"]. */
+  flightNumbers: string[];
+};
+
+export type FlightLeg = {
+  departAt: string;
+  arriveAt: string;
+  durationMinutes: number | null;
+  stops: number;
 };
 
 export type FlightSearchResult = {
+  /** false when no booking provider is connected. */
   live: boolean;
   offers: FlightOffer[];
   providerError?: string;
 };
+
+/** Ticketing lifecycle of an instantly booked flight (flight_bookings.ticketing_status). */
+export const flightTicketingStatusValues = ["awaiting_payment", "queued", "booking", "booked", "ticketed", "failed", "expired"] as const;
+export type FlightTicketingStatus = (typeof flightTicketingStatusValues)[number];
+
+const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+
+export const flightPassengerSchema = z.object({
+  firstName: z.string().trim().min(1, "Enter the first name as on the passport.").max(60).regex(/^[A-Za-z][A-Za-z' -]*$/, "Use Latin letters as on the passport."),
+  lastName: z.string().trim().min(1, "Enter the last name as on the passport.").max(60).regex(/^[A-Za-z][A-Za-z' -]*$/, "Use Latin letters as on the passport."),
+  gender: z.enum(["male", "female"], { message: "Select a gender." }),
+  dateOfBirth: z.string().regex(isoDate, "Enter the date of birth."),
+  nationality: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, "Select a nationality."),
+  passportNumber: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{5,20}$/, "Enter a valid passport number."),
+  passportExpiry: z.string().regex(isoDate, "Enter the passport expiry date."),
+  passportCountry: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, "Select the issuing country."),
+});
+export type FlightPassengerInput = z.infer<typeof flightPassengerSchema>;
+
+export const bookFlightSchema = z.object({
+  offerId: z.string().uuid(),
+  passengers: z.array(flightPassengerSchema).min(1).max(9),
+  contactEmail: z.string().trim().email("Enter a valid email."),
+  contactPhone: z.string().trim().regex(/^\+[1-9][0-9]{6,14}$/, "Enter the phone number with country code."),
+  /** Agency desk: debit the agency wallet immediately. */
+  payFromWallet: z.boolean().default(false),
+  agencyCustomerId: z.string().optional(),
+  newCustomerName: z.string().optional(),
+  newCustomerPhone: z.string().optional(),
+});
+export type BookFlightInput = z.infer<typeof bookFlightSchema>;
+
+export type BookFlightResult =
+  | { error: string; orderId?: undefined; paid?: undefined; paymentError?: undefined }
+  | { error: null; orderId: string; paid: boolean; paymentError?: string };
+
+/** Minutes a priced fare stays payable before the traveller must search again. */
+export const FLIGHT_FARE_HOLD_MINUTES = 30;
+
+/** Customer-facing message for a payment blocked by the flight guards. */
+export function flightPaymentErrorMessage(message: string | undefined): string | null {
+  if (!message) return null;
+  if (message.includes("offer_expired")) return "This fare has expired. Search again for the latest price.";
+  if (message.includes("flight_full_payment_required")) return "Flight fares are paid in full.";
+  if (message.includes("flight_not_payable")) return "This flight booking can no longer be paid.";
+  return null;
+}
 
 export const flightOffersFilterSchema = z.object({
   origin: z.string().optional(),
@@ -606,42 +665,6 @@ export const flightOffersFilterSchema = z.object({
 });
 export type FlightOffersFilter = z.infer<typeof flightOffersFilterSchema>;
 
-export const requestFlightQuoteSchema = z
-  .object({
-    origin: z.string().regex(/^[A-Z]{3}$/, "Select a departure airport."),
-    destination: z.string().regex(/^[A-Z]{3}$/, "Select a destination airport."),
-    departDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a departure date."),
-    returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-    tripType: z.enum(["one_way", "round_trip"]),
-    cabinClass: z.enum(["economy", "premium_economy", "business", "first"]),
-    adults: z.coerce.number().int().min(1, "At least one passenger.").max(9, "Maximum 9 passengers."),
-    contactPhone: z.string().min(7, "Enter a contact phone number."),
-    notes: z.string().max(1000).optional(),
-    // Agent-only "Booking for" fields, same vocabulary as
-    // resolveBookedForCustomerSchema; ignored for non-agency callers.
-    agencyCustomerId: z.string().optional(),
-    newCustomerName: z.string().optional(),
-    newCustomerPhone: z.string().optional(),
-  })
-  .refine((d) => d.origin !== d.destination, {
-    message: "Origin and destination must be different.",
-    path: ["destination"],
-  })
-  .refine((d) => d.tripType !== "round_trip" || !!d.returnDate, {
-    message: "Choose a return date for a round trip.",
-    path: ["returnDate"],
-  })
-  // Dates are YYYY-MM-DD, so string order is date order. "Today" is UTC's,
-  // which is never later than the traveller's local date in East Africa.
-  .refine((d) => d.departDate >= new Date().toISOString().slice(0, 10), {
-    message: "Departure date can't be in the past.",
-    path: ["departDate"],
-  })
-  .refine((d) => !d.returnDate || d.returnDate >= d.departDate, {
-    message: "Return date must be on or after the departure date.",
-    path: ["returnDate"],
-  });
-export type RequestFlightQuoteInput = z.infer<typeof requestFlightQuoteSchema>;
 
 export * from "./events";
 export * from "./umrah";

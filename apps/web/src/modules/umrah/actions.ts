@@ -41,9 +41,10 @@ export async function createUmrahBooking(_prevState: ActionState, formData: Form
   }
 
   let orderId: string;
+  let requiresApproval: boolean | undefined;
   try {
     const trpc = await getServerTrpcForActions();
-    ({ orderId } = await trpc.umrah.createGroupBooking.mutate({
+    ({ orderId, requiresApproval } = await trpc.umrah.createGroupBooking.mutate({
       departureId: String(formData.get("departure_id") ?? ""),
       numPilgrims,
       roomSharing: roomSharing ? Number(roomSharing) : undefined,
@@ -62,5 +63,5 @@ export async function createUmrahBooking(_prevState: ActionState, formData: Form
   if (formData.get("desk") === "1") {
     return { error: null, destination: deskOrderPath(orderId), orderId };
   }
-  redirect(`/checkout/${orderId}`);
+  redirect(requiresApproval ? `/account/bookings/${orderId}?requested=1` : `/checkout/${orderId}`);
 }

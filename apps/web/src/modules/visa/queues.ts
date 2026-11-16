@@ -19,7 +19,7 @@ export const VISA_QUEUE_GROUPS = [
     label: "In progress",
     queues: [
       { key: "payment_pending", label: "Awaiting payment" },
-      { key: "new", label: "New" },
+      { key: "new", label: "Ready for review" },
       { key: "document_review", label: "Document review" },
       { key: "customer_action", label: "Waiting on applicant" },
       { key: "appointment_pending", label: "Appointment pending" },
@@ -69,3 +69,14 @@ export const OPEN_STAGES = [
   "ready_for_processing",
   "processing",
 ] as const;
+
+export const VISA_SORT_OPTIONS = [
+  { key: "newest", label: "Newest first" },
+  { key: "oldest", label: "Oldest first" },
+  { key: "due", label: "Due soonest" },
+  { key: "priority", label: "Urgent first" },
+] as const;
+export type VisaSort = (typeof VISA_SORT_OPTIONS)[number]["key"];
+export function parseVisaSort(value?: string): VisaSort {
+  return VISA_SORT_OPTIONS.find(option => option.key === value)?.key ?? "newest";
+}

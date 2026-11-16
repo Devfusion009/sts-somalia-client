@@ -1,3 +1,5 @@
+import { getServerTrpc } from "@/lib/trpc/server";
+import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
@@ -33,7 +35,7 @@ export default async function AgentUmrahDeskPage() {
   const customer = await getBookingCustomer(supabase, membership.agency.id);
   if (!customer) redirect("/agent/book?service=umrah");
 
-  const packages = await getAllPackages();
+  const packages = (await Promise.all([getAllPackages(), getAllPackages("private"), (await getServerTrpc()).umrah.assignedPackages.query()])).flat();
 
   return (
     <div className="space-y-6">
@@ -53,17 +55,17 @@ export default async function AgentUmrahDeskPage() {
             <EmptyMedia variant="icon">
               <Landmark />
             </EmptyMedia>
-            <EmptyTitle>No group packages</EmptyTitle>
+            <EmptyTitle>No Umrah packages</EmptyTitle>
           </Empty>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Package</TableHead>
-                <TableHead numeric>Nights</TableHead>
+                <TableHead numeric>Days</TableHead>
                 <TableHead numeric>Next departure</TableHead>
                 <TableHead numeric>Seats left</TableHead>
-                <TableHead numeric>From</TableHead>
+                <TableHead numeric>From / person</TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
                 </TableHead>
@@ -106,7 +108,7 @@ export default async function AgentUmrahDeskPage() {
                       )}
                     </TableCell>
                     <TableCell numeric className="text-sm font-medium">
-                      {money(Number(pkg.base_price), pkg.currency)}
+                      {<AgentMoney value={money(Number(pkg.base_price), pkg.currency)} />}
                     </TableCell>
                     <TableCell numeric>
                       <Button
@@ -114,7 +116,7 @@ export default async function AgentUmrahDeskPage() {
                         variant="outline"
                         render={<Link href={`/agent/book/umrah/${pkg.slug}`} />}
                       >
-                        Select
+                        View package
                       </Button>
                     </TableCell>
                   </TableRow>

@@ -1,6 +1,23 @@
+import { getPaymentProofs } from "@/modules/payments/proof-actions";
+import { BankTransferProof } from "@/modules/payments/components/bank-transfer-proof";
+import { WaafiPaymentStatus } from "@/modules/payments/components/waafi-payment-status";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { CalendarClock, Hourglass, X } from "lucide-react";
+import {
+  BadgeCheck,
+  BedDouble,
+  CalendarClock,
+  Check,
+  FileText,
+  Headset,
+  Hourglass,
+  Landmark,
+  Lock,
+  Plane,
+  Receipt,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -11,6 +28,7 @@ import { describeOrderItem } from "@/modules/orders/format";
 import { MIN_DEPOSIT_FRACTION } from "@/modules/payments/constants";
 import { CheckoutForm, type CheckoutMethod } from "@/modules/payments/components/checkout-form";
 import { CancelPendingPaymentButton } from "@/modules/payments/components/cancel-pending-payment-button";
+import { ManualPaymentStatus } from "@/modules/payments/components/manual-payment-status";
 import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 import { WhatsAppInlineLink } from "@/components/marketing/whatsapp-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,6 +39,16 @@ import { umrahSeatHoldEnd } from "@/modules/umrah/settings";
 import { hallAwaitingQuote } from "@sts/shared-types";
 
 export const metadata: Metadata = { title: "Checkout" };
+
+const CHECKOUT_STEPS = ["Details", "Payment", "Confirmation"] as const;
+
+const ITEM_ICONS: Record<string, LucideIcon> = {
+  visa: FileText,
+  hotel: BedDouble,
+  flight: Plane,
+  umrah: Landmark,
+  hall: Landmark,
+};
 
 export default async function CheckoutPage({
   params,
@@ -47,7 +75,7 @@ export default async function CheckoutPage({
   if (!order) notFound();
   // A customer who paid on WaafiPay's page but never came back still has a
   // processing payment; re-reading its result settles it.
-  const unsettledWaafi = order.payments.filter((p) => p.provider === "waafi" && p.status === "processing");
+  const unsettledWaafi = order.payments.filter((p) => p.provider === "waafi" && ["processing", "requires_action"].includes(p.status));
   if (unsettledWaafi.length > 0) {
     await Promise.all(unsettledWaafi.map((p) => trpc.payments.confirmWaafi.mutate({ paymentId: p.id }).catch(() => null)));
     order = (await trpc.payments.orderForCheckout.query({ orderId })) as unknown as CheckoutOrderRow | null;
@@ -59,7 +87,7 @@ export default async function CheckoutPage({
   // A booking request waiting for an admin decision is not payable yet.
   if (
     order.order_items.some(
-      (item) => item.hotel_booking?.status === "waitlisted" || item.hall_booking?.status === "waitlisted"
+      (item) => item.hotel_booking?.status === "waitlisted" || item.hall_booking?.status === "waitlisted" || (item.umrah_booking?.booking_kind === "private" && item.umrah_booking.status === "pending")
     )
   ) {
     redirect(`/account/bookings/${orderId}`);
@@ -115,7 +143,8 @@ export default async function CheckoutPage({
     }
   }
 
-  const pendingPayment = order.payments.find((p) => p.status === "requires_action");
+  const pendingPayment = order.payments.find((p) => p.status === "requires_action" || (p.provider === "waafi" && p.status === "processing"));
+  const bankProofs = pendingPayment?.provider === "manual" && pendingPayment.method_label === "Bank Transfer" ? await getPaymentProofs([pendingPayment.id]) : [];
   const availableMethods = await trpc.payments.methods.query({ agencyWallet });
   const methods: CheckoutMethod[] = availableMethods.map(
     ({ id, label, description, kind, group, badges, requiresPhone, simulated }) => ({
@@ -131,68 +160,118 @@ export default async function CheckoutPage({
   );
 
   const ROW = "flex items-baseline justify-between gap-4";
+  const support = (
+    <>
+    <section aria-labelledby="checkout-help" className="flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-4 text-sm">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <Headset className="size-[18px]" aria-hidden />
+      </span>
+      <div className="min-w-0">
+        <h2 id="checkout-help" className="font-semibold">Need help?</h2>
+        <p className="text-muted-foreground">
+          <a
+            href="tel:+252611444420"
+            className="rounded-sm font-medium whitespace-nowrap text-foreground tabular-nums hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            +252 611 444 420
+          </a>{" "}
+          ·{" "}
+          <WhatsAppInlineLink message={`Hello STS! I need help paying for order ${order.order_number}.`}>
+            WhatsApp
+          </WhatsAppInlineLink>
+        </p>
+      </div>
+    </section>
+
+    <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+      <span className="flex items-center gap-1.5">
+        <Lock className="size-3.5" aria-hidden /> SSL encrypted
+      </span>
+      <span className="flex items-center gap-1.5">
+        <BadgeCheck className="size-3.5" aria-hidden /> ISO certified
+      </span>
+    </div>
+    </>
+  );
   const holdUntil = order.hold_expires_at
-    ? new Date(order.hold_expires_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+    ? new Date(order.hold_expires_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Mogadishu" })
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
-      <header className="mb-6 flex flex-wrap items-baseline gap-x-3 gap-y-1 lg:mb-8">
-        <h1 className="font-heading text-2xl font-bold tracking-tight lg:text-3xl">Payment</h1>
-        <span className="font-mono text-sm text-muted-foreground">{order.order_number}</span>
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <header className="mb-6 flex flex-col gap-5 border-b border-border pb-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-1.5">
+          <h1 className="font-heading text-2xl font-bold tracking-tight lg:text-3xl">Checkout</h1>
+          <p className="text-sm text-muted-foreground">
+            Order <span className="font-mono font-medium text-foreground">{order.order_number}</span>
+          </p>
+        </div>
+        <ol aria-label="Checkout progress" className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+          {CHECKOUT_STEPS.map((label, i) => {
+            const done = i < 1;
+            const current = i === 1;
+            return (
+              <li key={label} className="flex items-center gap-2">
+                {i > 0 ? <span aria-hidden className={`h-px w-6 sm:w-10 ${done || current ? "bg-primary" : "bg-border"}`} /> : null}
+                <span
+                  aria-current={current ? "step" : undefined}
+                  className={`flex size-6 items-center justify-center rounded-full text-xs font-semibold ${
+                    done ? "bg-primary text-primary-foreground" : current ? "bg-primary text-primary-foreground ring-4 ring-primary/15" : "border border-border text-muted-foreground"
+                  }`}
+                >
+                  {done ? <Check className="size-3.5" strokeWidth={3} aria-hidden /> : i + 1}
+                </span>
+                <span className={current ? "font-semibold" : `hidden sm:inline ${done ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+              </li>
+            );
+          })}
+        </ol>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-10">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8">
         {/* Summary first in reading order (phones see what they pay before how);
             lg places it in the right column. */}
-        <aside aria-labelledby="order-summary-heading" className="lg:col-start-2 lg:row-start-1">
-          <section className="rounded-2xl border border-border bg-card shadow-xs lg:sticky lg:top-24">
-            <h2 id="order-summary-heading" className="border-b border-border px-5 py-4 font-heading text-base font-semibold">
-              Order summary
+        <aside aria-labelledby="order-summary-heading" className="order-2 space-y-4 lg:sticky lg:top-24 lg:order-none lg:col-start-2 lg:row-start-1">
+          <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+            <h2 id="order-summary-heading" className="border-b border-border bg-muted/30 px-5 py-4 font-heading text-base font-semibold tracking-tight">
+              Price details
             </h2>
-            <ul className="divide-y divide-border px-5">
-              {order.order_items.map((item) => {
-                const info = describeOrderItem(item);
-                return (
-                  <li key={item.id} className="flex items-start justify-between gap-4 py-3 text-sm">
-                    <div className="min-w-0">
-                      <p className="font-medium">{info.title}</p>
-                      {info.subtitle ? <p className="text-xs text-muted-foreground">{info.subtitle}</p> : null}
+              <dl className="space-y-4 px-5 py-5 text-sm tabular-nums">
+                <div className={ROW}>
+                  <dt className="text-muted-foreground">Subtotal</dt>
+                  <dd>{money(order.order_items.reduce((sum, item) => sum + Number(item.total_price), 0), order.currency)}</dd>
+                </div>
+                {Number(order.markup_amount) > 0 ? (
+                  <div className={ROW}>
+                    <dt className="text-muted-foreground">Service fee</dt>
+                    <dd>{money(order.markup_amount, order.currency)}</dd>
+                  </div>
+                ) : null}
+                {Number(order.fee_total) > 0 ? (
+                  <div className={ROW}>
+                    <dt className="text-muted-foreground">Processing fee</dt>
+                    <dd>{money(order.fee_total, order.currency)}</dd>
+                  </div>
+                ) : null}
+                {paidTotal > 0 ? (
+                  <>
+                    <div className={ROW}>
+                      <dt className="text-muted-foreground">Order total</dt>
+                      <dd>{money(order.total, order.currency)}</dd>
                     </div>
-                    <p className="shrink-0 font-medium tabular-nums">{money(item.total_price, order.currency)}</p>
-                  </li>
-                );
-              })}
-            </ul>
-            <dl className="space-y-2 border-t border-border px-5 py-4 text-sm tabular-nums">
-              {Number(order.markup_amount) > 0 ? (
-                <div className={ROW}>
-                  <dt className="text-muted-foreground">Service fee</dt>
-                  <dd>{money(order.markup_amount, order.currency)}</dd>
-                </div>
-              ) : null}
-              {Number(order.fee_total) > 0 ? (
-                <div className={ROW}>
-                  <dt className="text-muted-foreground">Processing fee</dt>
-                  <dd>{money(order.fee_total, order.currency)}</dd>
-                </div>
-              ) : null}
-              <div className={`${ROW} font-semibold`}>
-                <dt>Total</dt>
-                <dd>{money(order.total, order.currency)}</dd>
-              </div>
-              {paidTotal > 0 ? (
-                <div className={ROW}>
-                  <dt className="text-muted-foreground">Paid so far</dt>
-                  <dd>−{money(paidTotal, order.currency)}</dd>
-                </div>
-              ) : null}
-            </dl>
-            <div className="rounded-b-2xl border-t border-border bg-secondary/40 px-5 py-4">
+                    <div className={ROW}>
+                      <dt className="text-muted-foreground">Paid</dt>
+                      <dd className="text-primary">−{money(paidTotal, order.currency)}</dd>
+                    </div>
+                  </>
+                ) : null}
+              </dl>
+            <div className="border-t border-border bg-primary/5 px-5 py-5">
               <div className={ROW}>
-                <span className="text-sm font-semibold">{paidTotal > 0 ? "Balance due" : "Amount due"}</span>
-                <span className="font-heading text-2xl font-bold text-primary tabular-nums">
-                  {money(remaining, order.currency)}
+                <span className="text-sm font-semibold">{paidTotal > 0 ? "Balance due" : "Total due"}</span>
+                <span className="font-heading text-2xl font-bold tracking-tight text-primary tabular-nums">
+                  <span className="mr-1 align-top text-sm font-semibold text-muted-foreground">{order.currency}</span>
+                  {Number(remaining).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               {order.balance_due_at && umrahItem ? (
@@ -200,12 +279,46 @@ export default async function CheckoutPage({
                   Balance due by {format(parseISO(order.balance_due_at), "d MMM yyyy")}
                 </p>
               ) : null}
-              {umrahItem ? null : <p className="mt-2 text-xs text-muted-foreground">All fees are non-refundable.</p>}
+              {/* Visa refund eligibility ends when STS files the application. */}
+              {order.order_items.some((item) => item.item_type === "visa") ? (
+                <p className="mt-2 text-right text-xs text-muted-foreground">Visa fees are refundable before STS files the application.</p>
+              ) : null}
             </div>
           </section>
+
+          <div className="hidden space-y-4 lg:block">{support}</div>
         </aside>
 
-        <div className="min-w-0 space-y-6 lg:col-start-1 lg:row-start-1">
+        <div className="order-1 min-w-0 space-y-5 lg:order-none lg:col-start-1 lg:row-start-1">
+          <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
+              <h2 className="font-heading text-base font-semibold">Your booking</h2>
+              <span className="text-xs text-muted-foreground">{order.order_items.length} {order.order_items.length === 1 ? "service" : "services"}</span>
+            </div>
+            <ul className="divide-y divide-border px-5">
+              {order.order_items.map((item) => {
+                const info = describeOrderItem(item);
+                const ItemIcon = ITEM_ICONS[item.item_type] ?? Receipt;
+                return (
+                  <li key={item.id} className="flex items-start gap-3 py-4 text-sm">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <ItemIcon className="size-[18px]" aria-hidden />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold leading-snug">{info.title}</p>
+                      {info.subtitle ? <p className="mt-0.5 text-xs text-muted-foreground">{info.subtitle}</p> : null}
+                    </div>
+                    <p className="shrink-0 font-medium tabular-nums">{money(item.total_price, order.currency)}</p>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border bg-muted/20 px-5 py-3 text-xs">
+              <span className="font-semibold">Booking contact</span>
+              <span>{profile.full_name}</span><span className="break-all text-muted-foreground">{profile.email}</span>
+            </div>
+          </section>
           {holdExpired ? (
             <Alert variant="destructive">
               <X />
@@ -228,15 +341,22 @@ export default async function CheckoutPage({
             </section>
           ) : pendingPayment ? (
             <section className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+              {pendingPayment.provider === "manual" ? <ManualPaymentStatus /> : null}
               <Alert variant="warning">
                 <Hourglass />
-                <AlertTitle>{pendingPayment.method_label} — awaiting payment</AlertTitle>
+                <AlertTitle>{pendingPayment.provider === "manual"
+                  ? pendingPayment.method_label === "Pay at Office" ? "Office payment pending" : bankProofs[0]?.status === "rejected" ? "Bank transfer — correction requested" : bankProofs.length ? "Transfer proof under review" : "Bank transfer — awaiting proof"
+                  : `${pendingPayment.method_label} — awaiting payment`}</AlertTitle>
+                {pendingPayment.provider === "manual" ? (
+                  <AlertDescription>Booking confirmation and your receipt follow staff approval of the payment.</AlertDescription>
+                ) : null}
               </Alert>
               {pendingPayment.instructions ? (
                 <p className="mt-4 text-sm leading-relaxed whitespace-pre-line">{pendingPayment.instructions}</p>
               ) : null}
+              {pendingPayment.provider === "manual" && pendingPayment.method_label === "Bank Transfer" ? <BankTransferProof paymentId={pendingPayment.id} proofs={bankProofs} /> : null}
               <div className="mt-4">
-                <CancelPendingPaymentButton paymentId={pendingPayment.id} />
+                {pendingPayment.provider === "waafi" ? <WaafiPaymentStatus kind="payment" referenceId={pendingPayment.id} /> : <CancelPendingPaymentButton paymentId={pendingPayment.id} />}
               </div>
             </section>
           ) : awaitingQuote ? (
@@ -256,11 +376,11 @@ export default async function CheckoutPage({
                   <CalendarClock />
                   <AlertTitle className="tabular-nums">
                     Seats held until{" "}
-                    {umrahSeatsHeldUntil.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                    {umrahSeatsHeldUntil.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Mogadishu" })}
                   </AlertTitle>
                 </Alert>
               ) : null}
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-6">
+              <section className="rounded-xl border border-border bg-card p-5 shadow-xs sm:p-6">
                 <CheckoutForm
                   orderId={order.id}
                   methods={methods}
@@ -269,33 +389,22 @@ export default async function CheckoutPage({
                   remaining={remaining}
                   isFirstPayment={isFirstPayment}
                   minDeposit={minDeposit}
+                  allowPartial={Boolean(umrahItem)}
                 />
               </section>
-              <div className="flex justify-end">
-                <CancelOrderButton orderId={order.id} redirectTo="/account/bookings" />
+              <div className="flex justify-start border-t border-border/70 pt-5">
+                <CancelOrderButton
+                  orderId={order.id}
+                  redirectTo="/account/bookings"
+                  label="Cancel order"
+                  size="default"
+                  className="min-h-11 rounded-xl border-border bg-transparent px-5 font-medium text-muted-foreground shadow-none transition-colors hover:border-destructive/30 hover:bg-destructive/5 hover:text-destructive focus-visible:border-destructive/50 focus-visible:ring-destructive/15"
+                />
               </div>
+              <div className="space-y-4 lg:hidden">{support}</div>
             </>
           )}
 
-          <section aria-labelledby="checkout-help" className="rounded-2xl bg-secondary/40 p-5 text-sm">
-            <h2 id="checkout-help" className="font-semibold">
-              Questions about this payment?
-            </h2>
-            <p className="mt-1 text-muted-foreground">
-              Call{" "}
-              <a
-                href="tel:+252611444420"
-                className="rounded-sm font-medium whitespace-nowrap text-foreground tabular-nums hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-              >
-                +252 611 444 420
-              </a>{" "}
-              or{" "}
-              <WhatsAppInlineLink message={`Hello STS! I need help paying for order ${order.order_number}.`}>
-                chat on WhatsApp
-              </WhatsAppInlineLink>
-              .
-            </p>
-          </section>
         </div>
       </div>
     </div>

@@ -1,0 +1,55 @@
+{
+  "source_page": "https://scouttravel.so/umrah/",
+  "retrieved": "2026-11-09",
+  "generator": "Built-in image_gen imagegen",
+  "assets": [
+    {
+      "key": "coach",
+      "prompt": "Use case: lighting-weather\nAsset type: authentic Umrah service photograph for a professional travel website, landscape 4:3.\nInput image: edit target, an original service photograph from scouttravel.so/umrah/.\nPrimary request: conservatively restore this exact photograph for a polished editorial photo gallery. Improve clarity, natural exposure, subtle white balance and compression artifacts only. Keep the exact lime-green and black Lumi coach, its existing branding, three-quarter angle, vehicle details, parked setting and sky. Preserve the complete vehicle silhouette; do not crop wheels or roof. Gently lift the dark windscreen shadows without changing glass reflections.\nStyle: natural documentary photography, crisp but not oversharpened, realistic material texture and restrained color.\nConstraints: same subject and real service, same composition as far as possible; no replacement vehicles, no invented facilities, no new people, no scene reimagining, no dramatic light, no luxury upgrades. No text overlays, no borders, no graphics, no collage, no watermark. Preserve existing identifying details faithfully rather than inventing replacements.",
+      "generated_file": "/home/subhadip-sasmal/.codex/generated_images/01a1befd-0ee7-7782-a656-b6326fa64d35/exec-635f54a7-37c9-4b30-a54d-23d113c78d15.png",
+      "source": "https://scouttravel.so/umrah/img/bus1.jpg",
+      "archived_original": "originals/bus1.jpg"
+    },
+    {
+      "key": "intercity",
+      "prompt": "Use case: lighting-weather\nAsset type: authentic Umrah service photograph for a professional travel website, landscape 4:3.\nInput image: edit target, an original service photograph from scouttravel.so/umrah/.\nPrimary request: conservatively restore this exact photograph for a polished editorial photo gallery. Improve clarity, natural exposure, subtle white balance and compression artifacts only. Keep the exact bronze-brown intercity coach, its existing gold markings, wheels, orientation, proportions, building and road. Preserve the complete vehicle silhouette. Restore compression artifacts and softness without inventing lettering or changing markings.\nStyle: natural documentary photography, crisp but not oversharpened, realistic material texture and restrained color.\nConstraints: same subject and real service, same composition as far as possible; no replacement vehicles, no invented facilities, no new people, no scene reimagining, no dramatic light, no luxury upgrades. No text overlays, no borders, no graphics, no collage, no watermark. Preserve existing identifying details faithfully rather than inventing replacements.",
+      "generated_file": "/home/subhadip-sasmal/.codex/generated_images/01a1befd-0ee7-7782-a656-b6326fa64d35/exec-c158f58f-bd98-4d25-9a98-9f86c31beb05.png",
+      "source": "https://scouttravel.so/umrah/img/bus2.jpg",
+      "archived_original": "originals/bus2.jpg"
+    },
+    {
+      "key": "private-car",
+      "prompt": "Use case: lighting-weather\nAsset type: authentic Umrah service photograph for a professional travel website, landscape 4:3.\nInput image: edit target, an original service photograph from scouttravel.so/umrah/.\nPrimary request: conservatively restore this exact photograph for a polished editorial photo gallery. Improve clarity, natural exposure, subtle white balance and compression artifacts only. Keep the exact cream-white Toyota sedan, its grille, existing Toyota badge, wheels, angle, seats, anonymous obscured plate and original ochre wall and road setting. Preserve the complete car in a landscape crop by retaining the existing surroundings, not changing the car. Correct the strong yellow/pink cast very gently while retaining the evening lighting.\nStyle: natural documentary photography, crisp but not oversharpened, realistic material texture and restrained color.\nConstraints: same subject and real service, same composition as far as possible; no replacement vehicles, no invented facilities, no new people, no scene reimagining, no dramatic light, no luxury upgrades. No text overlays, no borders, no graphics, no collage, no watermark. Preserve existing identifying details faithfully rather than inventing replacements.",
+      "generated_file": "/home/subhadip-sasmal/.codex/generated_images/01a1befd-0ee7-7782-a656-b6326fa64d35/exec-5624fb06-b4de-4e81-b396-b3bd7768985d.png",
+      "source": "https://scouttravel.so/umrah/img/car.jpg",
+      "archived_original": "originals/car.jpg"
+    },
+    {
+      "key": "hotel-view",
+      "prompt": "Use case: lighting-weather\nAsset type: authentic Umrah service photograph for a professional travel website, landscape 4:3.\nInput image: edit target, an original service photograph from scouttravel.so/umrah/.\nPrimary request: conservatively restore this exact photograph for a polished editorial photo gallery. Improve clarity, natural exposure, subtle white balance and compression artifacts only. Keep the identical hotel room: EXACTLY three single beds, turquoise runners and cushions, wood headboard, wall art, window and curtains, chairs, table and the actual clock tower view. Do not make the room larger or more luxurious. Preserve the real architecture and furnishings, with no new objects.\nStyle: natural documentary photography, crisp but not oversharpened, realistic material texture and restrained color.\nConstraints: same subject and real service, same composition as far as possible; no replacement vehicles, no invented facilities, no new people, no scene reimagining, no dramatic light, no luxury upgrades. No text overlays, no borders, no graphics, no collage, no watermark. Preserve existing identifying details faithfully rather than inventing replacements.",
+      "generated_file": "/home/subhadip-sasmal/.codex/generated_images/01a1befd-0ee7-7782-a656-b6326fa64d35/exec-c20a20b2-efff-4c58-9757-3579d03ae1f0.png",
+      "source": "https://scouttravel.so/umrah/img/h_view.jpg",
+      "archived_original": "originals/h_view.jpg"
+    },
+    {
+      "key": "airport-pickup",
+      "source": "https://scouttravel.so/umrah/img/bus3.jpg",
+      "treatment": "Original photograph; WebP encoding only."
+    },
+    {
+      "key": "triple-room",
+      "source": "https://scouttravel.so/umrah/img/h_triple.jpg",
+      "treatment": "Original photograph; WebP encoding only."
+    },
+    {
+      "key": "quad-room",
+      "source": "https://scouttravel.so/umrah/img/h_quad.jpg",
+      "treatment": "Original photograph; WebP encoding only."
+    },
+    {
+      "key": "hotel-lobby",
+      "source": "https://scouttravel.so/umrah/img/h_lobby.jpg",
+      "treatment": "Original photograph; WebP encoding only."
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { PublicPackageDetails } from "@/modules/umrah/components/public-package-details";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarDays, ExternalLink } from "lucide-react";
@@ -13,6 +14,7 @@ import { getServerTrpc } from "@/lib/trpc/server";
 import { umrahImagePaths } from "@/modules/umrah/images";
 import { formatMoney } from "@/modules/umrah/pricing";
 import { cn } from "@/lib/utils";
+import { UmrahPackageForm } from "../umrah-package-form";
 import { DepartureDialog, DeleteDepartureButton } from "./departures-form";
 import { GalleryManager } from "./gallery-manager";
 import { PackageDetailsForm } from "./package-details-form";
@@ -50,7 +52,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
   return (
     <div className="space-y-6">
       <div className="space-y-5">
-        <BackLink href="/admin/catalog/umrah" label="All packages" />
+        <BackLink href="/admin/umrah/pool" label="Umrah pool" />
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -58,6 +60,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
               <Badge variant={statusBadgeVariant(pkg.status)} className="capitalize">
                 {pkg.status.replace(/_/g, " ")}
               </Badge>
+              {pkg.package_type === "group" && !pkg.public_setup_complete ? <Badge variant="warning">Setup incomplete</Badge> : null}
               {pkg.is_featured ? <Badge variant="info">Most popular</Badge> : null}
             </div>
             <p className="text-sm text-muted-foreground tabular-nums">
@@ -83,13 +86,28 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
 
         <StatRail>
           <StatRailItem label="Starting price" value={formatMoney(Number(pkg.base_price), pkg.currency)} />
-          <StatRailItem label="Departures" value={departures.length} />
+          <StatRailItem label="Capacity" value={departures.reduce((sum,d) => sum+d.total_seats,0)} />
           <StatRailItem label="Seats left" value={seatsLeftTotal} tone={departures.length > 0 && seatsLeftTotal <= 0 ? "destructive" : undefined} />
-          <StatRailItem label="Rate card" value={hasRateCard ? `${pricing.length} rates` : "Not set"} tone={hasRateCard ? undefined : "warn"} />
+          <StatRailItem label="Filled seats" value={departures.reduce((sum,d) => sum+d.booked_seats+d.offline_seats,0)} />
         </StatRail>
       </div>
 
-      <Card>
+      {pkg.package_type === "group" ? <Card><CardHeader><CardTitle>{pkg.organizer_name}</CardTitle><CardAction><Button variant="outline" size="sm" render={<Link href="/admin/umrah/pool" />}>Umrah pool</Button></CardAction></CardHeader><CardContent><PublicPackageDetails pkg={pkg} /></CardContent></Card> : null}
+      <nav aria-label="Package configuration" className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-3">
+        {[["overview", "Package & publishing"], ["departures", "Capacity & travel dates"], ["agencies", "Assigned agencies"], ["details", "Additional settings"]].map(([id, label]) => <Button key={id} variant="outline" size="sm" render={<a href={`#${id}`} />}>{label}</Button>)}
+      </nav>
+      <Card id="overview" className="scroll-mt-24">
+        <CardHeader>
+          <CardTitle className="text-base">Package & publishing</CardTitle>
+          <CardAction><UmrahPackageForm pkg={pkg} /></CardAction>
+        </CardHeader>
+        <CardContent className="grid gap-4 text-sm sm:grid-cols-3">
+          <div><span className="text-xs text-muted-foreground">Description</span><div className="mt-1 whitespace-pre-wrap">{pkg.description || "—"}</div></div>
+          <div><span className="text-xs text-muted-foreground">Includes</span><div className="mt-1">{Array.isArray(pkg.includes) ? pkg.includes.join(" · ") : "—"}</div></div>
+          <div><span className="text-xs text-muted-foreground">Visibility</span><div className="mt-1">{pkg.status === "published" ? "Published" : "Not published"}</div></div>
+        </CardContent>
+      </Card>
+      <Card id="photos" className="scroll-mt-24">
         <CardHeader>
           <CardTitle className="text-base">Photo gallery</CardTitle>
         </CardHeader>
@@ -98,13 +116,14 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="details" className="scroll-mt-24">
         <CardHeader>
-          <CardTitle className="text-base">Package details</CardTitle>
+          <CardTitle className="text-base">Route & package details</CardTitle>
         </CardHeader>
         <CardContent>
           <PackageDetailsForm
             packageId={pkg.id}
+            packageType={pkg.package_type}
             tagline={pkg.tagline}
             tier={pkg.tier}
             isFeatured={pkg.is_featured}
@@ -127,7 +146,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <Card>
+        <Card id="hotels" className="scroll-mt-24">
           <CardHeader>
             <CardTitle className="text-base">Hotels</CardTitle>
           </CardHeader>
@@ -136,7 +155,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
           </CardContent>
         </Card>
 
-        <Card>
+        <Card id="pricing" className="scroll-mt-24">
           <CardHeader>
             <CardTitle className="text-base">Rate card</CardTitle>
           </CardHeader>
@@ -146,7 +165,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
         </Card>
       </div>
 
-      <Card>
+      <Card id="itinerary" className="scroll-mt-24">
         <CardHeader>
           <CardTitle className="text-base">Day-by-day plan</CardTitle>
         </CardHeader>
@@ -155,7 +174,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="agencies" className="scroll-mt-24">
         <CardHeader>
           <CardTitle className="text-base">Local agencies</CardTitle>
         </CardHeader>
@@ -164,7 +183,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden pb-0">
+      <Card id="departures" className="scroll-mt-24 overflow-hidden pb-0">
         <CardHeader className="pb-1">
           <CardTitle className="text-base">Departures</CardTitle>
           <CardAction>

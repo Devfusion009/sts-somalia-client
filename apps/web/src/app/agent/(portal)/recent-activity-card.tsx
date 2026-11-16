@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Ticket, Wallet, HandCoins, History } from "lucide-react";
@@ -59,7 +60,7 @@ export function RecentActivityCard({ items }: { items: AgencyActivityItem[] }) {
                   </span>
                   <span className={cn("shrink-0 text-right text-sm font-semibold tabular-nums", negative && "text-destructive")}>
                     {negative ? "−" : ""}
-                    {money(Math.abs(item.amount), item.currency)}
+                    {<AgentMoney value={money(Math.abs(item.amount), item.currency)} />}
                   </span>
                 </Link>
               </li>

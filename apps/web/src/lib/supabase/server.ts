@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/lib/types/database.types";
@@ -9,7 +10,8 @@ import { cookieDomain } from "@/lib/subdomain";
  * calling user (RLS enforced via their JWT) — never use this for
  * privileged/service-role access.
  */
-export async function createClient() {
+/** Reuse the cookie-bound client within this server render only. */
+export const createClient = cache(async () => {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(
@@ -38,4 +40,4 @@ export async function createClient() {
       },
     }
   );
-}
+});

@@ -1,3 +1,4 @@
+import { PublicPackageDetails } from "@/modules/umrah/components/public-package-details";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
@@ -43,6 +44,10 @@ export default async function UmrahPackagePage({
   if (!pkg) notFound();
 
   const upcomingDepartures = bookableDepartures(pkg.umrah_package_departures ?? []);
+  const hasSeats = upcomingDepartures.some((departure) =>
+    departure.total_seats - departure.booked_seats - departure.offline_seats > 0
+  );
+  const bookingLabel = hasSeats ? (pkg.package_type === "private" ? "Request booking" : "Book now") : upcomingDepartures.length > 0 ? "Fully booked" : "No departures";
 
   const includes: string[] = Array.isArray(pkg.includes) ? (pkg.includes as string[]) : [];
   const tier = packageTier(pkg);
@@ -58,7 +63,7 @@ export default async function UmrahPackagePage({
 
   const priceLabel = (n: number) => `${pkg.currency} ${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
   const sectionTitle = "font-heading text-xl font-bold tracking-tight sm:text-2xl";
-  const contactPhone = pkg.contact_person_phone ?? "+252 611 444 420";
+  const contactPhone = pkg.contact_person_phone ?? "";
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -66,7 +71,7 @@ export default async function UmrahPackagePage({
         className="mb-4"
         items={[
           { label: "Umrah", href: "/umrah" },
-          { label: "Group", href: "/umrah/group" },
+          { label: pkg.package_type === "private" ? "Private" : "Group", href: pkg.package_type === "private" ? "/umrah/private" : "/umrah/group" },
           { label: pkg.name },
         ]}
       />
@@ -94,7 +99,7 @@ export default async function UmrahPackagePage({
           <Badge className="border-transparent bg-card font-semibold text-foreground">
             {tier.label} package
           </Badge>
-          <Badge className="border-transparent bg-card font-semibold text-primary">Group · fixed price</Badge>
+          <Badge className="border-transparent bg-card font-semibold text-primary">{pkg.package_type === "private" ? "Private · admin confirmation" : "Group · fixed price"}</Badge>
         </div>
       </div>
 
@@ -145,8 +150,8 @@ export default async function UmrahPackagePage({
                 </span>
                 <span className="text-xs text-muted-foreground"> / pilgrim</span>
               </p>
-              <Button render={<a href="#book" />} size="lg" className="shrink-0">
-                Book now
+              <Button render={hasSeats ? <a href="#book" /> : undefined} disabled={!hasSeats} size="lg" className="shrink-0">
+                {bookingLabel}
               </Button>
             </div>
           </header>
@@ -189,7 +194,8 @@ export default async function UmrahPackagePage({
             </section>
           ) : null}
 
-          {pkg.meal_plan !== "none" || pkg.meals_note ? (
+          {pkg.package_type === "group" ? <section aria-labelledby="package-services"><h2 id="package-services" className={sectionTitle}>Package details</h2><div className="mt-4"><PublicPackageDetails pkg={pkg} /></div></section> : null}
+          {pkg.package_type !== "group" && (pkg.meal_plan !== "none" || pkg.meals_note) ? (
             <section aria-labelledby="pkg-food">
               <h2 id="pkg-food" className={sectionTitle}>
                 Food
@@ -294,6 +300,7 @@ export default async function UmrahPackagePage({
             className="scroll-mt-24 rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7"
           >
             <BookingForm
+              requiresApproval={pkg.package_type === "private"}
               packageSlug={pkg.slug}
               currency={pkg.currency}
               basePrice={pkg.base_price}
@@ -334,8 +341,8 @@ export default async function UmrahPackagePage({
                 <dd className="font-semibold">{tier.label}</dd>
               </div>
             </dl>
-            <Button render={<a href="#book" />} size="lg" className="mt-5 hidden w-full lg:inline-flex">
-              Book now
+            <Button render={hasSeats ? <a href="#book" /> : undefined} disabled={!hasSeats} size="lg" className="mt-5 hidden w-full lg:inline-flex">
+              {bookingLabel}
             </Button>
           </div>
 

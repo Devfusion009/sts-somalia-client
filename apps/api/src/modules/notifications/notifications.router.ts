@@ -4,6 +4,20 @@ import { sendBroadcastSchema } from "@sts/shared-types";
 import { NotificationsService } from "./notifications.service";
 
 export const notificationsRouter = router({
+  adminNavCounts: protectedProcedure.query(async ({ ctx }) => {
+    const svc = await ctx.resolve(NotificationsService);
+    return svc.getAdminNavCounts();
+  }),
+  unreadOrderCount: protectedProcedure.query(async ({ ctx }) => {
+    const svc = await ctx.resolve(NotificationsService);
+    return svc.getUnreadOrderCount(ctx.user!.id);
+  }),
+
+  readOrder: protectedProcedure.input(z.object({ orderId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+    const svc = await ctx.resolve(NotificationsService);
+    return svc.readOrder(ctx.user!.id, input.orderId);
+  }),
+
   unread: protectedProcedure
     .input(z.object({ type: z.string().optional(), limit: z.number().int().min(1).max(100).optional() }).optional())
     .query(async ({ ctx, input }) => {

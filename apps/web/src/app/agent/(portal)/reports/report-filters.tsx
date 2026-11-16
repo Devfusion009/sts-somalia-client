@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
+import styles from "./reports.module.css";
 import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -43,36 +44,17 @@ export function ReportFilters({
         event.preventDefault();
         push(from, to);
       }}
-      className="flex flex-wrap items-center gap-2"
+      className={styles.dateFilters}
     >
-      <label htmlFor="reportFrom" className="sr-only">
-        From
-      </label>
-      <Input
-        id="reportFrom"
-        type="date"
-        value={from}
-        max={to || undefined}
-        onChange={(e) => setFrom(e.target.value)}
-        className="w-auto min-w-0 flex-1 tabular-nums sm:w-40 sm:flex-none"
-      />
-      <span className="text-sm text-muted-foreground" aria-hidden="true">
-        –
-      </span>
-      <label htmlFor="reportTo" className="sr-only">
-        To
-      </label>
-      <Input
-        id="reportTo"
-        type="date"
-        value={to}
-        min={from || undefined}
-        onChange={(e) => setTo(e.target.value)}
-        className="w-auto min-w-0 flex-1 tabular-nums sm:w-40 sm:flex-none"
-      />
-      <Button type="submit" variant="outline">
-        Apply
-      </Button>
+      <div className={styles.dateField}>
+        <label htmlFor="reportFrom">From</label>
+        <Input id="reportFrom" type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
+      </div>
+      <div className={styles.dateField}>
+        <label htmlFor="reportTo">To</label>
+        <Input id="reportTo" type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
+      </div>
+      <Button type="submit">Apply</Button>
       {defaultFrom || defaultTo ? (
         <Button type="button" variant="ghost" size="icon" aria-label="Clear dates" title="Clear dates" onClick={clear}>
           <X aria-hidden="true" />

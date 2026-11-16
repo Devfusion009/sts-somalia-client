@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getReapplyCredit } from "@/modules/visa/queries";
 import { notFound, redirect } from "next/navigation";
 import Image from "next/image";
 import { ArrowUpRight, ShieldCheck } from "lucide-react";
@@ -120,7 +121,7 @@ export default async function VisaWizardPage({
         </div>
 
         {/* A <section>, not <main>: the marketing layout already owns <main>. */}
-        <section aria-label="Application step" className="min-w-0 rounded-[1.5rem] border border-border bg-card p-5 shadow-[0_12px_36px_-24px_rgba(7,60,52,0.2)] sm:p-8 lg:p-9">
+        <section aria-label="Application step" className="@container/visa-form min-w-0 rounded-[1.5rem] border border-border bg-card p-5 shadow-[0_12px_36px_-24px_rgba(7,60,52,0.2)] sm:p-8 lg:p-9">
           {step === 1 ? (
             <StepApplicantType application={application} backHref={`/visa/${visaType.id}`} />
           ) : step === 2 ? (
@@ -130,7 +131,7 @@ export default async function VisaWizardPage({
           ) : step === 4 ? (
             <StepDocuments application={application} vaultOptions={vaultOptions} />
           ) : (
-            <StepReview application={application} />
+            <StepReview application={application} credit={step >= 5 ? await getReapplyCredit(application) : null} />
           )}
         </section>
       </div>

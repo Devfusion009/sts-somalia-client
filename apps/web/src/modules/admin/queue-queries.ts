@@ -74,7 +74,7 @@ async function getTravellerNames(ids: {
 export async function getBookingQueue(): Promise<QueueEntry[]> {
   const supabase = await createClient();
 
-  const [{ data: hotelRows }, { data: hallRows }, { data: umrahRows }] = await Promise.all([
+  const [{ data: hotelRows, error: hotelError }, { data: hallRows, error: hallError }, { data: umrahRows, error: umrahError }] = await Promise.all([
     supabase
       .from("hotel_bookings")
       .select(
@@ -101,6 +101,8 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
       .eq("status", "pending")
       .order("created_at", { ascending: false }),
   ]);
+
+  if (hotelError || hallError || umrahError) throw new Error("Booking queue could not be loaded. Refresh and try again.");
 
   // Who the agency is actually booking for. It hangs off the order rather
   // than the booking row (only visa/flight carry agency_customer_id

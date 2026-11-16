@@ -26,7 +26,8 @@ export async function getIntegrationsForAdmin(): Promise<IntegrationStatus[]> {
 
   return PROVIDER_CATALOG.map((provider) => {
     const row = rowByKey.get(provider.key);
-    const fieldValues: Record<string, string> = {};
+    const fieldValues: Record<string, string> = provider.key === "waafi"
+      ? { environment: process.env.DEPLOYMENT_ENV === "production" ? "production" : "sandbox" } : {};
     if (row?.credentials_encrypted && provider.credentialFields.some((f) => f.options)) {
       try {
         const saved = decryptCredentials(row.credentials_encrypted);

@@ -139,7 +139,11 @@ export default async function PartnerAccountConsolePage({
       ) : null}
       {agentDelivery?.approved_at ? <AgentCredentialDelivery applicationId={application.id} agentId={agentDelivery.agent_id} email={agentDelivery.contact_email} sent={!!agentDelivery.email_sent_at} /> : null}
       <div className="space-y-5">
-        <BackLink href="/admin/partners" label="All partner accounts" />
+        {type === "agency" ? (
+          <BackLink href={`/admin/agencies/${account.entity_id}`} label={entity.name} />
+        ) : (
+          <BackLink href="/admin/partners" label="All partner accounts" />
+        )}
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">

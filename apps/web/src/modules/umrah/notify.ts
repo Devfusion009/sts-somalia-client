@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dispatchToCustomer } from "@/lib/notifications/dispatch";
 import { portalOrigin, rootOrigin } from "@/lib/subdomain";
+import { renderNotice, type EmailTone } from "@/lib/notifications/email-layout";
 
 /**
  * Email / WhatsApp for the Umrah moments a traveller has to act on or wants
@@ -54,9 +55,14 @@ const DEFAULT_LINES: Partial<Record<UmrahNotifyKind, string>> = {
   request_declined: "We could not arrange this trip.",
 };
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-}
+const TONES: Partial<Record<UmrahNotifyKind, EmailTone>> = {
+  document_rejected: "warning",
+  balance_due: "warning",
+  booking_cancelled: "warning",
+  flight_changed: "warning",
+  request_declined: "neutral",
+  request_quoted: "success",
+};
 
 export async function notifyUmrahBooking(
   bookingId: string,
@@ -107,7 +113,15 @@ export async function notifyUmrahBooking(
       : `${rootOrigin()}/account/bookings/${order.id}`;
     const subject = `${SUBJECTS[kind]} — ${order.order_number}`;
     const body = `${order.order_number}: ${text}\n${url}`;
-    const html = `<p><strong>${escapeHtml(order.order_number)}</strong></p><p>${escapeHtml(text)}</p><p><a href="${escapeHtml(url)}">Open your booking</a></p>`;
+    const html = renderNotice({
+      label: "Umrah booking",
+      tone: TONES[kind] ?? "success",
+      heading: SUBJECTS[kind],
+      line: text,
+      reference: { label: "Booking", value: order.order_number },
+      button: { label: "Open your booking", href: url },
+      audience: booking.agency_id ? "Agent Portal" : "Hajj & Umrah",
+    });
 
     await dispatchToCustomer({
       profileId: booking.customer_id,

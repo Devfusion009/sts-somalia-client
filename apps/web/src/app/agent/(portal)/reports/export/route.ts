@@ -20,7 +20,8 @@ export async function GET() {
       markup_usd: Number(e.markup_amount).toFixed(2),
       total_usd: Number(e.amount).toFixed(2),
       status: e.status,
-    }))
+    })),
+    ["order_number", "date", "rate_percent", "commission_usd", "markup_usd", "total_usd", "status"]
   );
 
   const filename = `commission-report-${new Date().toISOString().slice(0, 10)}.csv`;

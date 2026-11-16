@@ -448,6 +448,7 @@ export function HeaderSearch() {
   const onHotelDetail = pathname.startsWith("/hotels/");
   // Visa pages carry their own destination search; the hotel bar is noise there.
   const onVisa = pathname === "/visa" || pathname.startsWith("/visa/");
+  const onCheckout = pathname === "/checkout" || pathname.startsWith("/checkout/");
   // Cached + hysteresis store, same reasoning as the header shell: revealing
   // this bar adds ~47px of layout, which feeds back into scroll position. A
   // live `window.scrollY` snapshot would make React's commit-time re-read
@@ -456,7 +457,7 @@ export function HeaderSearch() {
   // Flights has its own route search; this bar submits hotel destinations.
   const onFlights = pathname === "/flights";
   const hasCollectionSearch = pathname === "/hotels" || pathname === "/umrah" || pathname.startsWith("/umrah/");
-  const visible = !onHotelDetail && !onVisa && !onFlights && !hasCollectionSearch && (!isHome || scrolledPast);
+  const visible = !onHotelDetail && !onVisa && !onCheckout && !onFlights && !hasCollectionSearch && (!isHome || scrolledPast);
 
   return (
     <AnimatePresence initial={false}>

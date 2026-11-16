@@ -1,17 +1,19 @@
+import { UmrahIcon } from "@/components/portal/umrah-icon";
+import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import {
   AlertCircle,
-  Building2,
+  BedDouble,
   CheckCircle2,
   Download,
   FileText,
-  Landmark,
   PartyPopper,
   Plane,
   type LucideIcon,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyOrder, getAgencyTopupRequests } from "@/modules/agencies/queries";
 import { describeOrderItem } from "@/modules/orders/format";
@@ -27,10 +29,10 @@ import { PayFromWalletForm } from "./pay-from-wallet-form";
 import { hallAwaitingQuote } from "@sts/shared-types";
 
 const ITEM_ICON: Record<string, LucideIcon> = {
-  hotel: Building2,
+  hotel: BedDouble,
   flight: Plane,
   visa: FileText,
-  umrah: Landmark,
+  umrah: UmrahIcon,
   hall: PartyPopper,
 };
 
@@ -43,13 +45,14 @@ export default async function DeskOrderPage({
   searchParams,
 }: {
   params: Promise<{ orderId: string }>;
-  searchParams: Promise<{ topup?: string }>;
+  searchParams: Promise<{ topup?: string; wallet?: string }>;
 }) {
-  const [{ orderId }, { topup }] = await Promise.all([params, searchParams]);
+  const [{ orderId }, { topup, wallet }] = await Promise.all([params, searchParams]);
   const profile = await requireUser();
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
 
+  await (await createClient()).rpc("release_public_umrah_checkouts");
   const [order, topups] = await Promise.all([
     getAgencyOrder(membership.agency.id, orderId),
     getAgencyTopupRequests(membership.agency.id),
@@ -124,6 +127,13 @@ export default async function DeskOrderPage({
         }
       />
 
+      {wallet === "failed" && order.status !== "paid" ? (
+        <Alert variant="warning">
+          <AlertCircle />
+          <AlertDescription>Wallet payment did not go through. Check the balance and pay below.</AlertDescription>
+        </Alert>
+      ) : null}
+
       {topup === "success" ? (
         <Alert>
           <CheckCircle2 />
@@ -172,7 +182,7 @@ export default async function DeskOrderPage({
                       {awaitingPrice ? (
                         <span className="font-normal text-muted-foreground">On request</span>
                       ) : (
-                        money(Number(item.total_price), order.currency)
+                        <AgentMoney value={money(Number(item.total_price), order.currency)} />
                       )}
                     </span>
                   </li>
@@ -189,19 +199,19 @@ export default async function DeskOrderPage({
             </CardHeader>
             <CardContent>
               <dl className="space-y-2 text-sm">
-                <SummaryRow label="Net" value={money(Number(order.subtotal), order.currency)} />
-                <SummaryRow label="Your margin" value={money(margin, order.currency)} />
+                <SummaryRow label="Net" value={<AgentMoney value={money(Number(order.subtotal), order.currency)} />} />
+                <SummaryRow label="Your margin" value={<AgentMoney value={money(margin, order.currency)} />} />
                 <SummaryRow
                   label="Customer pays"
-                  value={awaitingPrice ? "On request" : money(total, order.currency)}
+                  value={awaitingPrice ? "On request" : <AgentMoney value={money(total, order.currency)} />}
                   strong
                   divided
                 />
-                {paid > 0 ? <SummaryRow label="Paid" value={money(paid, order.currency)} /> : null}
+                {paid > 0 ? <SummaryRow label="Paid" value={<AgentMoney value={money(paid, order.currency)} />} /> : null}
                 {!awaitingPrice ? (
                   <SummaryRow
                     label="Balance due"
-                    value={money(balance, order.currency)}
+                    value={<AgentMoney value={money(balance, order.currency)} />}
                     strong
                     divided={paid > 0}
                     tone={balance > 0 ? "warn" : undefined}
@@ -242,7 +252,7 @@ function SummaryRow({
   tone,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   strong?: boolean;
   divided?: boolean;
   tone?: "warn";

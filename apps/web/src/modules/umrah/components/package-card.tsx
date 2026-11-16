@@ -16,6 +16,7 @@ export type PackageCardHotel = {
 };
 
 export type PackageCardData = {
+  package_type?: "group" | "private";
   id: string;
   slug: string;
   name: string;

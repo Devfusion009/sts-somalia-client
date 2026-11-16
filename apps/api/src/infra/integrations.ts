@@ -10,9 +10,12 @@ import { env } from "../config/env";
 
 const bool = (v: string | undefined) => v === "true" || v === "1";
 
-/** Same rule as apps/web's lib/integrations.ts: EMAIL_PROVIDER, or a lone RESEND_API_KEY. */
-function emailProvider(): "resend" | null {
+/** Same rule as apps/web's lib/integrations.ts: EMAIL_PROVIDER ("smtp" or "resend"), or a lone RESEND_API_KEY. */
+function emailProvider(): "resend" | "smtp" | null {
   const named = (env().EMAIL_PROVIDER ?? "").trim().toLowerCase();
+  if (named === "smtp") {
+    return env().SMTP_HOST && env().SMTP_USER && env().SMTP_PASS ? "smtp" : null;
+  }
   if (named === "resend" || (!named && env().RESEND_API_KEY)) {
     return env().RESEND_API_KEY ? "resend" : null;
   }

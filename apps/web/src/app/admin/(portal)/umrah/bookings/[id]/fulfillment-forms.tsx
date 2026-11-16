@@ -18,7 +18,6 @@ import {
 import { SubmitButton } from "@/components/submit-button";
 import {
   advanceUmrahStage,
-  cancelUmrahBooking,
   deleteUmrahDocument,
   deleteUmrahSegment,
   reviewUmrahDocument,
@@ -31,6 +30,8 @@ import { useRestoreOnError } from "@/lib/use-restore-on-error";
 import { UMRAH_DOC_TYPES, UMRAH_DOC_TYPE_LABELS, UMRAH_STAGE_LABELS, type UmrahStage } from "../stages";
 import { FileField } from "@/components/ui/upload";
 import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
+import { trpc } from "@/lib/trpc/react";
+import { trpcErrorMessage } from "@/lib/trpc/errors";
 
 function useRefreshOnSuccess(state: FulfillmentActionState, onSuccess?: () => void) {
   const router = useRouter();
@@ -189,11 +190,14 @@ export function CancelBookingButton({
   paid: number;
   currency: string;
 }) {
-  const [state, formAction] = useActionState(cancelUmrahBooking, null);
   const [open, setOpen] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
-  useRestoreOnError(formRef, state);
-  useRefreshOnSuccess(state, () => setOpen(false));
+  const router = useRouter();
+  const cancel = trpc.umrah.admin.bookings.cancel.useMutation({
+    onSuccess() {
+      setOpen(false);
+      router.refresh();
+    },
+  });
 
   return (
     <>
@@ -209,14 +213,20 @@ export function CancelBookingButton({
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
-          <form ref={formRef} action={formAction} className="space-y-4">
+          <form onSubmit={(event) => {
+            event.preventDefault();
+            if (cancel.isPending) return;
+            const data = new FormData(event.currentTarget);
+            const amount = String(data.get("refundAmount") ?? "").trim();
+            cancel.mutate({ bookingId, reason: String(data.get("reason") ?? "").trim(), refundAmount: amount ? Number(amount) : undefined });
+          }} className="space-y-4">
             <input type="hidden" name="bookingId" value={bookingId} />
             <AlertDialogHeader>
               <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
             </AlertDialogHeader>
-            {state?.error ? (
+            {cancel.error ? (
               <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
+                <AlertDescription>{trpcErrorMessage(cancel.error, "The booking could not be cancelled.")}</AlertDescription>
               </Alert>
             ) : null}
             <Field>
@@ -245,9 +255,9 @@ export function CancelBookingButton({
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Keep booking
               </Button>
-              <SubmitButton variant="destructive" pendingText="Cancelling…">
-                Cancel booking
-              </SubmitButton>
+              <Button type="submit" variant="destructive" disabled={cancel.isPending} loading={cancel.isPending}>
+                {cancel.isPending ? "Cancelling…" : "Cancel booking"}
+              </Button>
             </AlertDialogFooter>
           </form>
         </AlertDialogContent>

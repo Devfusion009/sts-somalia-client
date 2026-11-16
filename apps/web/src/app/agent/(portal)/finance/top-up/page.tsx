@@ -1,20 +1,23 @@
+import { AgentMoney } from "@/components/portal/agent-money";
+import { WaafiPaymentStatus } from "@/modules/payments/components/waafi-payment-status";
 import type { Metadata } from "next";
 import { format } from "date-fns";
-import { AlertCircle, CheckCircle2, CreditCard, Undo2, Wallet } from "lucide-react";
+import { AlertCircle, CheckCircle2, Undo2, Wallet } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyTopupRequests } from "@/modules/agencies/queries";
 import { cancelTopupRequest } from "@/modules/agencies/topup-actions";
+import { reconcileWaafiTopup } from "@/modules/payments/waafi-topup";
 import { getTopupOptions } from "@/modules/payments/topup";
 import { BackLink } from "@/components/back-link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { money } from "@/lib/money";
-import { BankTransferDetails, OfflineTopupForm, OnlineTopupForm } from "./top-up-forms";
+import { TopUpPanel } from "./top-up-panel";
 
 export const metadata: Metadata = { title: "Add Money" };
 
@@ -31,15 +34,26 @@ const METHOD_LABELS: Record<string, string> = {
   card: "Card",
 };
 
-export default async function AgentTopUpPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+export default async function AgentTopUpPage({ searchParams }: { searchParams: Promise<{ status?: string; topupId?: string }> }) {
   const profile = await requireUser();
   const membership = await getMyAgency(profile.id);
   if (!membership) return null;
 
-  const { status } = await searchParams;
+  const { status: requestedStatus, topupId } = await searchParams;
   const canTopUp = membership.roleInAgency === "owner" || membership.roleInAgency === "admin";
   const options = await getTopupOptions();
-  const requests = await getAgencyTopupRequests(membership.agency.id);
+  let requests = await getAgencyTopupRequests(membership.agency.id);
+  // Recover paid hosted sessions even if the customer closed the return page.
+  const unsettled = requests.filter((r) => r.provider === "waafi" && r.rail === "online" && r.status === "pending" && r.provider_ref).slice(0, 3);
+  if (unsettled.length > 0) {
+    const results = await Promise.all(unsettled.map((r) => reconcileWaafiTopup(r.id, membership.agency.id)));
+    if (results.some((r) => r === "success" || r === "failed")) requests = await getAgencyTopupRequests(membership.agency.id);
+  }
+
+  const returnedRequest = requests.find((r) => r.id === topupId);
+  const status = returnedRequest?.status === "approved" ? "success"
+    : returnedRequest?.status === "failed" ? "failed"
+    : requestedStatus === "success" ? "pending" : requestedStatus;
 
   return (
     <div className="space-y-6">
@@ -53,15 +67,15 @@ export default async function AgentTopUpPage({ searchParams }: { searchParams: P
           <CheckCircle2 />
           <AlertDescription>Wallet topped up.</AlertDescription>
         </Alert>
-      ) : status === "cancelled" ? (
+      ) : status === "cancelled" || status === "failed" ? (
         <Alert>
           <AlertCircle />
-          <AlertDescription>Payment cancelled.</AlertDescription>
+          <AlertDescription>Payment was not completed.</AlertDescription>
         </Alert>
       ) : status === "pending" ? (
         <Alert variant="warning">
           <AlertCircle />
-          <AlertDescription>Approve the payment on your phone to finish this top-up.</AlertDescription>
+          <AlertDescription>Payment confirmation pending.</AlertDescription>
         </Alert>
       ) : null}
 
@@ -71,40 +85,18 @@ export default async function AgentTopUpPage({ searchParams }: { searchParams: P
           <AlertDescription>Only the agency owner or an admin can add money.</AlertDescription>
         </Alert>
       ) : (
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>I sent money to STS</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <BankTransferDetails bankTransfer={options.bankTransfer} />
-              <OfflineTopupForm methods={options.offline} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Pay now</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {options.online.length === 0 ? (
-                <Empty>
-                  <EmptyMedia variant="icon">
-                    <CreditCard />
-                  </EmptyMedia>
-                  <EmptyTitle>No online payment method</EmptyTitle>
-                </Empty>
-              ) : (
-                <OnlineTopupForm methods={options.online} />
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <TopUpPanel
+          balance={Number(membership.agency.credit_balance ?? 0)}
+          available={Number(membership.agency.credit_balance ?? 0) + Number(membership.agency.credit_limit ?? 0)}
+          online={options.online}
+          offline={options.offline}
+          bankTransfer={options.bankTransfer}
+        />
       )}
 
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <h2 className="font-heading text-base font-semibold">Top-ups</h2>
+          <h2 className="font-heading text-base font-semibold">Top-up history</h2>
           {requests.length > 0 ? (
             <Badge variant="neutral" className="tabular-nums">
               {requests.length}
@@ -152,7 +144,7 @@ export default async function AgentTopUpPage({ searchParams }: { searchParams: P
                       {request.reference ?? request.provider_ref ?? "—"}
                     </TableCell>
                     <TableCell className="text-right font-medium whitespace-nowrap tabular-nums">
-                      {money(Number(request.amount), "USD")}
+                      {<AgentMoney value={money(Number(request.amount), "USD")} />}
                     </TableCell>
                     <TableCell>
                       <Badge variant={statusBadgeVariant(request.status, STATUS_OVERRIDES)} className="capitalize">
@@ -166,7 +158,9 @@ export default async function AgentTopUpPage({ searchParams }: { searchParams: P
                       {request.review_note ?? request.note ?? "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      {request.status === "pending" && canTopUp ? (
+                      {request.status === "pending" && request.provider === "waafi" ? (
+                        <WaafiPaymentStatus kind="topup" referenceId={request.id} agencyId={membership.agency.id} autoPoll={request.id === topupId} />
+                      ) : request.status === "pending" && canTopUp ? (
                         <form action={cancelTopupRequest}>
                           <input type="hidden" name="requestId" value={request.id} />
                           <Button

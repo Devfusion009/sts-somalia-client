@@ -18,9 +18,10 @@ import { uploadImages } from "@/modules/admin/property-gallery-actions";
 import { TARGETS } from "@/modules/admin/gallery-targets";
 import { repriceQuotedOrder } from "@/modules/orders/helpers";
 import { commaList, parseLinks, replacePropertyLinks } from "@/modules/hotels/listing-fields";
-import { sanitizeKey, parseDocumentSlotsJson } from "./visa-type-utils";
+import { parseDocumentSlotsJson, parseRequirementSectionsJson } from "./visa-type-utils";
 import { COUNTRY_NAMES } from "@/lib/countries";
 import { invalidateCache } from "@/lib/redis";
+import { departureInput } from "@/modules/umrah/departure-input";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type ListingStatus = Database["public"]["Enums"]["listing_status"];
@@ -48,7 +49,16 @@ export async function updateOrderStatus(_prev: ActionState, formData: FormData):
   const status = String(formData.get("status")) as OrderStatus;
   if (!orderStatuses.includes(status)) return { error: "Invalid status." };
 
+  if (["paid", "partially_paid", "refunded"].includes(status)) {
+    return { error: "Use payment approval, record payment or the refund workflow to update payment status." };
+  }
   const supabase = await createClient();
+  if (["processing", "completed"].includes(status)) {
+    const { data: current } = await supabase.from("orders").select("status").eq("id", orderId).maybeSingle();
+    if (!current || !["paid", "partially_paid", "processing", "completed"].includes(current.status)) {
+      return { error: "Approve the payment before processing or completing this order." };
+    }
+  }
   const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
   if (error) return { error: error.message };
   revalidatePath("/admin/orders");
@@ -72,7 +82,7 @@ const visaTypeSchema = z.object({
   price: z.coerce.number().min(0),
   currency: z.string().min(3).max(3),
   requiredDocuments: z.string().optional(),
-  applicationQuestions: z.string().optional(),
+  applicationSections: z.string().optional(),
   processingFee: z.coerce.number().min(0).optional(),
   eligibilityRequirements: z.string().optional(),
   termsAndConditions: z.string().optional(),
@@ -98,35 +108,6 @@ const visaTypeSchema = z.object({
       data.processingDaysMax >= data.processingDaysMin,
     { message: "Maximum processing days can't be less than the minimum.", path: ["processingDaysMax"] },
   );
-
-/** Rows from the admin's structured application-questions editor — same JSON + key-sanitization approach as document slots. */
-function parseApplicationQuestionsJson(input: string | undefined) {
-  if (!input) return [];
-  let rows: unknown;
-  try {
-    rows = JSON.parse(input);
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(rows)) return [];
-  return rows
-    .map((row, i) => {
-      const r = (row ?? {}) as Record<string, string>;
-      const key = sanitizeKey(r.key ?? "", `question_${i + 1}`);
-      const label = (r.label ?? "").trim();
-      const type = r.type === "yesno" || r.type === "select" ? r.type : "text";
-      const options =
-        type === "select" ? (r.options ?? "").split(",").map((o) => o.trim()).filter(Boolean) : undefined;
-      return {
-        key,
-        label,
-        type,
-        ...(options && options.length > 0 ? { options } : {}),
-        required: r.required !== "false",
-      };
-    })
-    .filter((q) => q.label);
-}
 
 const VISA_IMAGE_EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 const MAX_VISA_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -192,7 +173,7 @@ function visaTypeInput(formData: FormData) {
     price: formData.get("price"),
     currency: formData.get("currency"),
     requiredDocuments: formData.get("requiredDocuments") || undefined,
-    applicationQuestions: formData.get("applicationQuestions") || undefined,
+    applicationSections: formData.get("applicationSections") || undefined,
     processingFee: formData.get("processingFee") || undefined,
     eligibilityRequirements: formData.get("eligibilityRequirements") || undefined,
     termsAndConditions: formData.get("termsAndConditions") || undefined,
@@ -224,7 +205,7 @@ function visaTypeRow(data: z.infer<typeof visaTypeSchema>) {
     price: data.price,
     currency: data.currency.toUpperCase(),
     required_documents: parseDocumentSlotsJson(data.requiredDocuments),
-    application_questions: parseApplicationQuestionsJson(data.applicationQuestions),
+    application_sections: parseRequirementSectionsJson(data.applicationSections),
     processing_fee: data.processingFee ?? null,
     eligibility_requirements: data.eligibilityRequirements ?? null,
     terms_and_conditions: data.termsAndConditions ?? null,
@@ -315,8 +296,26 @@ function slugify(input: string) {
 
 function umrahPackageInput(formData: FormData) {
   return {
+    packageType: String(formData.get("packageType") ?? "group") as "group" | "private",
+    originIata: String(formData.get("originIata") ?? "").trim() || undefined,
+    destinationIata: String(formData.get("destinationIata") ?? "").trim() || undefined,
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? "") || undefined,
+    poolVisibility: String(formData.get("poolVisibility") ?? "public") as "public" | "private",
+    organizerName: String(formData.get("organizerName") ?? "").trim(),
+    organizerEmail: String(formData.get("organizerEmail") ?? "").trim() || undefined,
+    contactPersonName: String(formData.get("contactPersonName") ?? ""),
+    contactPersonPhone: String(formData.get("contactPersonPhone") ?? ""),
+    agentContacts: formData.getAll("agentContactName").map((name, index) => ({ name: String(name).trim(), phone: String(formData.getAll("agentContactPhone")[index] ?? "").trim() })).filter(contact => contact.name || contact.phone),
+    facilities: String(formData.get("facilities") ?? ""),
+    accommodationDetails: String(formData.get("accommodationDetails") ?? ""),
+    flightDetails: String(formData.get("flightDetails") ?? ""),
+    transportDetails: String(formData.get("transportDetails") ?? ""),
+    mealsNote: String(formData.get("mealsNote") ?? ""),
+    nightsMakkah: formData.has("nightsMakkah") ? Number(formData.get("nightsMakkah")) : undefined,
+    nightsMadinah: formData.has("nightsMadinah") ? Number(formData.get("nightsMadinah")) : undefined,
+    totalSeats: formData.has("totalSeats") ? Number(formData.get("totalSeats")) : undefined,
+    departureDate: String(formData.get("departureDate") ?? "") || undefined,
     durationDays: Number(formData.get("durationDays")),
     includes: formData.getAll("includes").map(String),
     basePrice: Number(formData.get("basePrice")),
@@ -327,13 +326,17 @@ function umrahPackageInput(formData: FormData) {
 
 export async function createUmrahPackage(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requirePlatformAdmin();
+  let packageId: string;
   try {
-    await (await getServerTrpcForActions()).umrah.admin.packages.upsert.mutate(umrahPackageInput(formData));
+    const saved = await (await getServerTrpcForActions()).umrah.admin.packages.upsert.mutate({ ...umrahPackageInput(formData), status: "draft" });
+    packageId = saved.id;
   } catch (error) {
     return { error: trpcErrorMessage(error, "The package could not be saved.") };
   }
+  revalidatePath("/admin/umrah/pool");
+  revalidatePath("/admin/umrah/pool", "layout");
   revalidatePath("/admin/catalog/umrah");
-  return { error: null };
+  redirect(`/admin/umrah/pool/${packageId}`);
 }
 
 export async function updateUmrahPackage(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -346,37 +349,16 @@ export async function updateUmrahPackage(_prev: ActionState, formData: FormData)
   } catch (error) {
     return { error: trpcErrorMessage(error, "The package could not be saved.") };
   }
+  revalidatePath("/admin/umrah/pool");
+  revalidatePath("/admin/umrah/pool", "layout");
   revalidatePath("/admin/catalog/umrah");
+  revalidatePath(`/admin/catalog/umrah/${String(formData.get("id"))}`);
+  revalidatePath("/umrah", "layout");
   return { error: null };
 }
-
-function departureInput(formData: FormData) {
-  const text = (key: string) => String(formData.get(key) ?? "").trim();
-  const orNull = (key: string) => text(key) || null;
-  return {
-    departureId: text("departureId") || undefined,
-    packageId: text("packageId"),
-    departureDate: text("departureDate"),
-    returnDate: text("returnDate"),
-    totalSeats: Number(text("totalSeats")),
-    offlineSeats: Number(text("offlineSeats") || 0),
-    priceOverride: text("priceOverride") === "" ? null : Number(text("priceOverride")),
-    outboundAirline: orNull("outboundAirline"),
-    outboundFlightNumber: orNull("outboundFlightNumber"),
-    outboundDepartsAt: orNull("outboundDepartsAt"),
-    outboundArrivesAt: orNull("outboundArrivesAt"),
-    returnAirline: orNull("returnAirline"),
-    returnFlightNumber: orNull("returnFlightNumber"),
-    returnDepartsAt: orNull("returnDepartsAt"),
-    returnArrivesAt: orNull("returnArrivesAt"),
-    baggageNote: orNull("baggageNote"),
-    salesCloseDays: Number(text("salesCloseDays") || 0),
-    // A cancelled departure posts no status (the field is disabled) and stays cancelled.
-    status: (text("status") || null) as "open" | null,
-  };
-}
-
 function revalidateUmrahPackage(packageId: string) {
+  revalidatePath("/admin/umrah/pool");
+  revalidatePath("/admin/umrah/pool", "layout");
   revalidatePath("/admin/catalog/umrah");
   revalidatePath(`/admin/catalog/umrah/${packageId}`);
 }
@@ -1111,90 +1093,3 @@ export async function deletePropertyReview(formData: FormData): Promise<void> {
   revalidatePath(hotelId ? `/admin/hotels/${hotelId}` : `/admin/events/${venueId}`);
 }
 
-// ---------------------------------------------------------------------------
-// Onboard a hotel partner directly — for a real-world partner STS already
-// has a deal with, who won't be self-applying through /account/become. This
-// deliberately reuses the exact same path a normal application takes rather
-// than inventing a second, parallel way for a hotel_partners row to come
-// into existence: it files a hotel_partner_applications row on the owner's
-// behalf, then calls the same approve_hotel_partner_application() RPC the
-// real applicant-review flow calls (see application-actions.ts:
-// approveApplication). The result is indistinguishable from an
-// applicant-submitted, admin-approved partner — same partner_accounts row,
-// same activity-log "account_created" event, same console at
-// /admin/partners/hotel-partner/[id].
-//
-// The owner must already have an STS account (same requirement the
-// existing "Add a team member" form states) — their profile email becomes
-// the org's contact_email via the RPC, exactly like a real applicant's
-// email does, so there's no separate "org contact email" field to keep in
-// sync with it.
-// ---------------------------------------------------------------------------
-const onboardPartnerSchema = z.object({
-  partnerName: z.string().min(2, "Enter a business name."),
-  ownerEmail: z.string().email("Enter the owner's STS account email."),
-  contactPhone: z.string().optional(),
-  countryCode: z.string().max(2).optional(),
-  commissionRate: z.coerce.number().min(0).max(100).default(0),
-});
-
-export async function onboardHotelPartner(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePlatformAdmin();
-  const parsed = onboardPartnerSchema.safeParse({
-    partnerName: formData.get("partnerName"),
-    ownerEmail: formData.get("ownerEmail"),
-    contactPhone: formData.get("contactPhone") || undefined,
-    countryCode: formData.get("countryCode") || undefined,
-    commissionRate: formData.get("commissionRate") || 0,
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
-  const supabase = await createClient();
-
-  const { data: owner } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("email", parsed.data.ownerEmail)
-    .maybeSingle();
-  if (!owner) {
-    return { error: "No STS account found for that email — ask them to sign up first, then try again." };
-  }
-
-  const { data: refNumber, error: refError } = await supabase.rpc("generate_hotel_partner_application_ref");
-  if (refError || !refNumber) return { error: refError?.message ?? "Could not generate a reference number." };
-
-  const { data: application, error: appError } = await supabase
-    .from("hotel_partner_applications")
-    .insert({
-      applicant_id: owner.id,
-      business_name: parsed.data.partnerName,
-      business_details: { contactMobile: parsed.data.contactPhone ?? null },
-      status: "pending",
-      reference_number: refNumber,
-      submitted_at: new Date().toISOString(),
-    })
-    .select("id")
-    .single();
-  if (appError || !application) return { error: appError?.message ?? "Could not create the application." };
-
-  const { data: partnerId, error: approveError } = await supabase.rpc("approve_hotel_partner_application", {
-    application_id: application.id,
-    p_note: "Onboarded directly by admin.",
-  });
-  if (approveError) return { error: approveError.message };
-
-  if (partnerId) {
-    await supabase
-      .from("hotel_partners")
-      .update({
-        contact_phone: parsed.data.contactPhone ?? null,
-        country_code: parsed.data.countryCode ?? null,
-        commission_rate: parsed.data.commissionRate,
-      })
-      .eq("id", partnerId);
-  }
-
-  revalidatePath("/admin/hotels");
-  revalidatePath("/admin/partners");
-  redirect(`/admin/partners/hotel-partner/${refNumber}`);
-}

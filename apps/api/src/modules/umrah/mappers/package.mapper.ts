@@ -1,4 +1,4 @@
-import { packageCardSchema, packageDetailSchema, type PackageCard, type PackageDetail } from "@sts/shared-types";
+import { bookableDepartures, packageCardSchema, packageDetailSchema, type PackageCard, type PackageDetail } from "@sts/shared-types";
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -6,13 +6,13 @@ function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string" && v.length > 0) : [];
 }
 
-/** Package row (with departures and hotels) → card DTO; next departure is the soonest from today. */
+/** Package row (with departures and hotels) → card DTO; next departure is the soonest still on sale. */
 export function toPackageCard(pkg: Row, today: string): PackageCard {
-  const upcoming = ((pkg.umrah_package_departures ?? []) as Row[])
-    .filter((d) => d.departure_date >= today)
-    .sort((a, b) => String(a.departure_date).localeCompare(String(b.departure_date)));
+  const upcoming = bookableDepartures((pkg.umrah_package_departures ?? []) as Array<Row & { departure_date: string }>, today);
+  const available = upcoming.filter((d) => Number(d.total_seats) - Number(d.booked_seats) - Number(d.offline_seats ?? 0) > 0);
   return packageCardSchema.parse({
     id: pkg.id,
+    package_type: pkg.package_type,
     slug: pkg.slug,
     name: pkg.name,
     tagline: pkg.tagline,
@@ -27,7 +27,7 @@ export function toPackageCard(pkg: Row, today: string): PackageCard {
     includes: stringList(pkg.includes),
     images: stringList(pkg.images),
     hotels: pkg.umrah_package_hotels ?? [],
-    nextDeparture: upcoming[0] ?? null,
+    nextDeparture: (pkg.package_type === "private" ? upcoming : available)[0] ?? null,
   });
 }
 

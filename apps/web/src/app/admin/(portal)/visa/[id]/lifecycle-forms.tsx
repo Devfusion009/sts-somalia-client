@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import { CalendarClock, CheckCircle2, CircleX, RotateCcw, Undo2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +36,10 @@ import {
   PASSPORT_STATUS_LABELS,
   PROCESSING_STAGE_LABELS,
 } from "@/modules/visa/workflow";
+import { useCaseActionState } from "@/modules/visa/components/use-case-action-state";
 import { FileField } from "@/components/ui/upload";
+
+
 
 type Option = { value: string; label: string };
 
@@ -159,7 +162,7 @@ export function BookAppointmentForm({
   members: Option[];
   biometricsDefault: boolean;
 }) {
-  const [state, formAction] = useActionState(adminBookAppointment, null);
+  const [state, formAction] = useCaseActionState(adminBookAppointment, null);
   if (centres.length === 0) {
     return <p className="text-sm text-muted-foreground">No active application centres</p>;
   }
@@ -213,7 +216,7 @@ export function AppointmentOutcome({
   biometricsRequired: boolean;
   due: boolean;
 }) {
-  const [state, formAction] = useActionState(adminRecordAppointmentOutcome, null);
+  const [state, formAction] = useCaseActionState(adminRecordAppointmentOutcome, null);
   const [open, setOpen] = useState(false);
   useCloseOnSuccess(state, setOpen);
   return (
@@ -258,7 +261,7 @@ export function RescheduleAppointment({
   centreId: string;
   centres: Option[];
 }) {
-  const [state, formAction] = useActionState(adminRescheduleAppointment, null);
+  const [state, formAction] = useCaseActionState(adminRescheduleAppointment, null);
   const [open, setOpen] = useState(false);
   useCloseOnSuccess(state, setOpen);
   return (
@@ -301,7 +304,7 @@ export function RescheduleAppointment({
 }
 
 export function CancelAppointment({ applicationId, appointmentId }: { applicationId: string; appointmentId: string }) {
-  const [state, formAction] = useActionState(adminCancelAppointment, null);
+  const [state, formAction] = useCaseActionState(adminCancelAppointment, null);
   const [open, setOpen] = useState(false);
   useCloseOnSuccess(state, setOpen);
   return (
@@ -356,7 +359,7 @@ export function RecordSubmissionForm({
   centres: Option[];
   appointments: Option[];
 }) {
-  const [state, formAction] = useActionState(adminRecordSubmission, null);
+  const [state, formAction] = useCaseActionState(adminRecordSubmission, null);
   const [centre, setCentre] = useState(centres[0]?.value ?? "");
   return (
     <form action={formAction} className="space-y-4">
@@ -387,7 +390,7 @@ export function RecordSubmissionForm({
           </Field>
         ) : null}
         <Field label="Receipt" htmlFor="sub-receipt">
-          <FileField id="sub-receipt" name="receipt" accept=".pdf,.jpg,.jpeg,.png" compact />
+          <FileField id="sub-receipt" name="receipt" accept=".pdf,.jpg,.jpeg,.png" compact required />
         </Field>
       </div>
       <div className="flex items-center justify-between gap-3">
@@ -401,8 +404,8 @@ export function RecordSubmissionForm({
 }
 
 export function CentreResponse({ applicationId, accepted }: { applicationId: string; accepted: boolean }) {
-  const [acceptState, acceptAction] = useActionState(adminUpdateSubmission, null);
-  const [returnState, returnAction] = useActionState(adminUpdateSubmission, null);
+  const [acceptState, acceptAction] = useCaseActionState(adminUpdateSubmission, null);
+  const [returnState, returnAction] = useCaseActionState(adminUpdateSubmission, null);
   const [open, setOpen] = useState(false);
   useCloseOnSuccess(returnState, setOpen);
   return (
@@ -448,7 +451,7 @@ export function CentreResponse({ applicationId, accepted }: { applicationId: str
 }
 
 export function ProcessingUpdateForm({ applicationId, current }: { applicationId: string; current: string }) {
-  const [state, formAction] = useActionState(adminRecordProcessingUpdate, null);
+  const [state, formAction] = useCaseActionState(adminRecordProcessingUpdate, null);
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="applicationId" value={applicationId} />
@@ -486,7 +489,7 @@ const OUTCOMES = [
 ];
 
 export function RecordDecisionForm({ applicationId, authority }: { applicationId: string; authority: string }) {
-  const [state, formAction] = useActionState(adminRecordDecision, null);
+  const [state, formAction] = useCaseActionState(adminRecordDecision, null);
   const [outcome, setOutcome] = useState("approved");
   return (
     <form action={formAction} className="space-y-4">
@@ -503,7 +506,7 @@ export function RecordDecisionForm({ applicationId, authority }: { applicationId
           <Input id="dec-date" name="decisionDate" type="date" max={todayIso()} defaultValue={todayIso()} required />
         </Field>
         <Field label="Decision letter" htmlFor="dec-letter">
-          <FileField id="dec-letter" name="letter" accept=".pdf,.jpg,.jpeg,.png" compact />
+          <FileField id="dec-letter" name="letter" accept=".pdf,.jpg,.jpeg,.png" compact required={outcome === "refused"} />
         </Field>
       </div>
       <Field label="Notes" htmlFor="dec-notes">
@@ -528,7 +531,7 @@ export function CorrectDecisionDialog({
   decisionId: string;
   currentOutcome: string;
 }) {
-  const [state, formAction] = useActionState(adminCorrectDecision, null);
+  const [state, formAction] = useCaseActionState(adminCorrectDecision, null);
   const [open, setOpen] = useState(false);
   const [outcome, setOutcome] = useState(currentOutcome === "approved" ? "refused" : "approved");
   useCloseOnSuccess(state, setOpen);
@@ -584,7 +587,7 @@ export function PassportMoveForm({
   next: string[];
   deliveryModes: string[];
 }) {
-  const [state, formAction] = useActionState(adminRecordPassportEvent, null);
+  const [state, formAction] = useCaseActionState(adminRecordPassportEvent, null);
   const [to, setTo] = useState(next[0] ?? "");
   const collectModes = deliveryModes.filter((m) => m !== "courier");
   const [mode, setMode] = useState(collectModes[0] ?? "counter");

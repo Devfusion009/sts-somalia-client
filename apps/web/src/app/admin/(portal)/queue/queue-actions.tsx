@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { trpc } from "@/lib/trpc/react";
 import { Check, X } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { SubmitButton } from "@/components/submit-button";
@@ -21,12 +22,13 @@ import { money } from "@/lib/money";
  */
 function withToast(
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>,
-  message: (formData: FormData) => string
+  message: (formData: FormData) => string,
+  onSuccess?: () => void
 ) {
   return async (prev: ActionState, formData: FormData) => {
     const result = await action(prev, formData);
     if (result?.error) toast.error(result.error, { position: "top-center" });
-    else toast.success(message(formData), { position: "top-center" });
+    else { onSuccess?.(); toast.success(message(formData), { position: "top-center" }); }
     return result;
   };
 }
@@ -47,13 +49,15 @@ const STATUS_ACTIONS = {
  * so a stale waitlist entry can't silently double-book.
  */
 export function QueueEntryActions({ kind, bookingId }: { kind: QueueKind; bookingId: string }) {
+  const utils = trpc.useUtils();
+  const refreshCount = () => { void utils.notifications.adminNavCounts.invalidate(); };
   const action = STATUS_ACTIONS[kind];
   const [confirmState, confirmAction] = useActionState(
-    withToast(action, () => "Booking confirmed."),
+    withToast(action, () => "Booking confirmed.", refreshCount),
     null
   );
   const [declineState, declineAction] = useActionState(
-    withToast(action, () => "Request declined."),
+    withToast(action, () => "Request declined.", refreshCount),
     null
   );
   const error = confirmState?.error ?? declineState?.error;

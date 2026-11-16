@@ -197,6 +197,41 @@ export async function getMyPartnerAccountId(type: PartnerAccountType, entityId: 
   return data?.id ?? null;
 }
 
+/** Agent shell: reuse its active membership snapshot and omit admin history. */
+export async function getAgencyOnboardingChecklist(agency: {
+  id: string;
+  credit_balance: number;
+  credit_limit: number;
+  commission_rate_set_at: string | null;
+}): Promise<ChecklistItem[] | null> {
+  const supabase = await createClient();
+  const { data: account } = await supabase.from("partner_accounts")
+    .select("application_id").eq("type", "agency").eq("entity_id", agency.id).maybeSingle();
+  if (!account) return null;
+
+  const [{ data: application }, { data: reviews }] = await Promise.all([
+    supabase.from("agency_applications").select("id").eq("id", account.application_id).maybeSingle(),
+    supabase.from("partner_document_reviews").select("doc_key, status")
+      .eq("application_type", "agency").eq("application_id", account.application_id),
+  ]);
+  if (!application) return null;
+
+  return computeChecklist("agency", {
+    businessDetails: {},
+    documentRefs: [],
+    docReviews: new Map((reviews ?? []).map((r) => [r.doc_key, { status: r.status }])),
+    hotels: [], venues: [], affiliateSnapshot: null,
+    agencySnapshot: {
+      creditBalance: Number(agency.credit_balance),
+      creditLimit: Number(agency.credit_limit),
+      commissionRateSetAt: agency.commission_rate_set_at,
+      tierName: null,
+    },
+    // The layout has already verified an active agency membership.
+    memberCount: 1,
+  });
+}
+
 export async function getPartnerAccount(accountId: string): Promise<PartnerAccountDetail | null> {
   const supabase = await createClient();
 

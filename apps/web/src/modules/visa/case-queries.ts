@@ -1,9 +1,9 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getVisaOrderAdmin, getVisaProcessingWorkspace } from "@/modules/admin/queries";
-import { applicationDocumentSlots } from "./schemas";
+import { travellerDocumentSlots, documentMemberId, parseRequirementSections, sectionFileSlots } from "./schemas";
 import type { PaymentState, ReadinessItem } from "./workflow";
-import type { VisaQueue } from "./queues";
+import { parseVisaSort, type VisaQueue, type VisaSort } from "./queues";
 
 const STAFF_DOC_LABELS: Record<string, string> = {
   visa_result: "Issued visa",
@@ -20,6 +20,7 @@ export async function getVisaCase(id: string) {
     .select(
       `*,
        visa_type:visa_type_id (*),
+       agency:agency_id (name),
        submitter:profiles!visa_applications_submitted_by_fkey (full_name, email, phone),
        members:visa_members (*),
        documents:visa_documents (*),
@@ -90,31 +91,67 @@ export async function getVisaCase(id: string) {
   app.document_requests.sort((a, b) => a.created_at.localeCompare(b.created_at));
 
   // Group every version under its slot, newest first; the head is current.
-  const slots = applicationDocumentSlots(app);
+  // Section file fields (admin-defined requirements) can repeat per
+  // traveller, so their uploads group by type and traveller.
+  const slots = travellerDocumentSlots(app);
+  const fileSlots = sectionFileSlots(parseRequirementSections(app.visa_type?.application_sections), app.members);
+  const sectionTypes = new Set(fileSlots.map((f) => f.documentType));
+  const standardTypes = new Set(slots.map(slot => slot.key));
+  const groupKey = (type: string, memberId: string | null) => (memberId || sectionTypes.has(type) || standardTypes.has(type) ? `${type}|${memberId ?? ""}` : type);
   const byType = new Map<string, typeof app.documents>();
   for (const doc of [...app.documents].sort((a, b) => b.version - a.version || b.created_at.localeCompare(a.created_at))) {
-    const list = byType.get(doc.document_type) ?? [];
+    const key = groupKey(doc.document_type, documentMemberId(app, doc));
+    const list = byType.get(key) ?? [];
     list.push(doc);
-    byType.set(doc.document_type, list);
+    byType.set(key, list);
   }
+  const multipleTravellers = app.members.length > 1;
+  const sectionSlots = fileSlots.map((f) => ({
+    key: groupKey(f.documentType, f.memberId),
+    documentType: f.documentType,
+    label: `${f.sectionTitle}: ${f.label}${f.memberName && multipleTravellers ? ` — ${f.memberName}` : ""}`,
+    required: f.required,
+    staff: false,
+    versions: byType.get(groupKey(f.documentType, f.memberId)) ?? [],
+  }));
+  const knownKeys = new Set([...slots.map((s) => groupKey(s.key, s.memberId)), ...sectionSlots.map((s) => s.key)]);
   const documentSlots = [
     ...slots.map((slot) => ({
-      key: slot.key,
-      label: slot.label,
+      key: groupKey(slot.key, slot.memberId),
+      documentType: slot.key,
+      label: slot.memberName ? `${slot.memberName} · ${slot.label}` : slot.label,
       required: slot.required,
       staff: false,
-      versions: byType.get(slot.key) ?? [],
+      versions: byType.get(groupKey(slot.key, slot.memberId)) ?? [],
     })),
+    ...sectionSlots,
     ...[...byType.entries()]
-      .filter(([type]) => !slots.some((s) => s.key === type))
-      .map(([type, versions]) => ({
-        key: type,
-        label: STAFF_DOC_LABELS[type] ?? (type.startsWith("request:") ? type.slice(8) : type.replace(/_/g, " ")),
-        required: false,
-        staff: type in STAFF_DOC_LABELS,
-        versions,
-      })),
+      .filter(([key]) => !knownKeys.has(key))
+      .map(([key, versions]) => {
+        const type = versions[0]?.document_type ?? key;
+        return {
+          key,
+          documentType: type,
+          label: STAFF_DOC_LABELS[type] ?? (type.startsWith("request:") ? type.slice(8) : type.replace(/_/g, " ")),
+          required: false,
+          staff: type in STAFF_DOC_LABELS,
+          versions,
+        };
+      }),
   ];
+
+  // The standard review checklist for each applicant-uploaded slot.
+  const checklistByType = new Map(
+    await Promise.all(
+      documentSlots
+        .filter((slot) => !slot.staff)
+        .map(async (slot) => {
+          const { data } = await supabase.rpc("visa_document_checklist", { p_document_type: slot.documentType });
+          return [slot.key, (data ?? []) as Array<{ key: string; label: string }>] as const;
+        })
+    )
+  );
+  const slotsWithChecks = documentSlots.map((slot) => ({ ...slot, checklist: checklistByType.get(slot.key) ?? [] }));
 
   // Decision chain: the current one is the row nobody supersedes.
   const decisions = decisionsRes.data ?? [];
@@ -136,7 +173,7 @@ export async function getVisaCase(id: string) {
     readiness: (readinessRes.data ?? []) as ReadinessItem[],
     paymentState: ((paymentRes.data as string | null) ?? "not_billed") as PaymentState,
     events: eventsRes.data ?? [],
-    documentSlots,
+    documentSlots: slotsWithChecks,
     appointments: appointmentsRes.data ?? [],
     jobs: jobsRes.data ?? [],
     activeJob: (jobsRes.data ?? []).find((j) => j.status === "active") ?? null,
@@ -160,6 +197,7 @@ export const QUEUE_PAGE_SIZE = 25;
 
 export type QueueFilters = {
   queue: VisaQueue;
+  sort?: VisaSort;
   q?: string;
   destination?: string;
   owner?: string;
@@ -176,7 +214,7 @@ export async function getVisaCaseQueue(filters: QueueFilters, meId: string) {
 
   switch (filters.queue) {
     case "needs_action":
-      query = query.not("attention", "is", null);
+      query = query.not("attention", "is", null).in("status", ["submitted", "in_review", "additional_info_required", "ready_for_processing"]);
       break;
     case "mine":
       query = query.eq("assigned_to", meId).not("status", "in", CLOSED);
@@ -244,13 +282,19 @@ export async function getVisaCaseQueue(filters: QueueFilters, meId: string) {
   if (filters.urgent) query = query.eq("priority", "urgent");
 
   const from = (filters.page - 1) * QUEUE_PAGE_SIZE;
-  const closedQueue = ["approved", "refused", "issued", "cancelled", "all"].includes(filters.queue);
-  query = query.order("priority", { ascending: false });
-  query = closedQueue
-    ? query.order("submitted_at", { ascending: false, nullsFirst: false })
-    : query.order("sla_due_at", { ascending: true, nullsFirst: false });
+  const sort = parseVisaSort(filters.sort);
+  if (sort === "due") {
+    query = query.order("sla_due_at", { ascending: true, nullsFirst: false });
+  } else if (sort === "priority") {
+    query = query.order("priority", { ascending: false });
+  }
+  query = query
+    .order("submitted_at", { ascending: sort === "oldest", nullsFirst: false })
+    .order("created_at", { ascending: sort === "oldest" })
+    .order("id", { ascending: sort === "oldest" });
 
-  const { data, count } = await query.range(from, from + QUEUE_PAGE_SIZE - 1);
+  const { data, count, error } = await query.range(from, from + QUEUE_PAGE_SIZE - 1);
+  if (error) throw new Error("Visa applications could not be loaded. Refresh and try again.");
   return { rows: data ?? [], total: count ?? 0 };
 }
 
@@ -258,7 +302,8 @@ export type QueueRow = Awaited<ReturnType<typeof getVisaCaseQueue>>["rows"][numb
 
 export async function getVisaQueueCounts() {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("visa_queue_counts");
+  const { data, error } = await supabase.rpc("visa_queue_counts");
+  if (error) throw new Error("Visa queue counts are unavailable.");
   return (data ?? {}) as Record<string, number>;
 }
 
@@ -295,4 +340,12 @@ export async function getUpcomingVisaAppointments(centreId?: string) {
   if (centreId) query = query.eq("centre_id", centreId);
   const { data } = await query.limit(300);
   return data ?? [];
+}
+
+export type AppointmentHandoff = { id: string; application_ref: string; applicant_name: string | null; visa_name: string; destination_country_code: string; booked: boolean };
+export async function getAppointmentHandoffs(page = 1) {
+  const db = await createClient();
+  const { data, error } = await (db as unknown as import("@supabase/supabase-js").SupabaseClient).rpc("admin_visa_appointment_handoffs", { p_offset: (page - 1) * 20, p_limit: 20 });
+  if (error) throw new Error("Appointment handoffs are unavailable. Refresh and try again.");
+  return data as { count: number; rows: AppointmentHandoff[] };
 }

@@ -40,6 +40,7 @@ import {
   planStayPrice,
 } from "@/modules/hotels/booking-options";
 import { HotelGallery } from "./hotel-gallery";
+import { hotelLocation } from "@/modules/hotels/location";
 
 export async function generateMetadata({
   params,
@@ -171,8 +172,7 @@ export default async function HotelDetailPage({
               </div>
               <p className="mt-1 flex items-start gap-1 text-sm text-muted-foreground sm:text-base">
                 <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
-                {hotel.address_line ? `${hotel.address_line}, ` : ""}
-                {hotel.city}, {hotel.country_code}
+                {hotelLocation(hotel)}
               </p>
             </div>
             {averageRating !== null ? (
@@ -537,7 +537,7 @@ export default async function HotelDetailPage({
                 <p className="flex items-start gap-2 text-muted-foreground">
                   <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
                   {hotel.address_line ? `${hotel.address_line}, ` : ""}
-                  {hotel.city}, {hotel.country_code}
+                  {hotelLocation(hotel)}
                 </p>
                 {hotel.phone ? (
                   <a

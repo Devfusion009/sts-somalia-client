@@ -3,24 +3,31 @@
 import { useRouter } from "next/navigation";
 import { BadgeCheck } from "lucide-react";
 import { trpc } from "@/lib/trpc/react";
-import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 /** Admin marks a manual payment (bank transfer / cash) as received. */
-export function ConfirmPaymentButton({ paymentId }: { paymentId: string }) {
+export function ConfirmPaymentButton({ paymentId, amount, orderNumber }: { paymentId: string; amount?: string; orderNumber?: string }) {
   const router = useRouter();
   const confirmPayment = trpc.payments.admin.confirmPayment.useMutation({
-    onSuccess: () => router.refresh(),
+    onSuccess: () => { router.refresh(); window.location.reload(); },
   });
 
   return (
-    <Button
-      size="sm"
-      type="button"
-      loading={confirmPayment.isPending}
-      onClick={() => confirmPayment.mutate({ paymentId })}
-    >
-      {confirmPayment.isPending ? null : <BadgeCheck aria-hidden="true" />}
-      Confirm funds received
-    </Button>
+    <div className="space-y-1.5">
+      <ConfirmButton
+        size="sm"
+        disabled={confirmPayment.isPending}
+        loading={confirmPayment.isPending}
+        title="Confirm cash received?"
+        description={`Confirm ${amount ?? "the cash payment"} was collected at an STS office${orderNumber ? ` for ${orderNumber}` : ""}. This records the payment against the booking.`}
+        confirmLabel="Confirm cash received"
+        destructive={false}
+        icon="check"
+        onConfirm={() => confirmPayment.mutate({ paymentId })}
+      >
+        <BadgeCheck aria-hidden="true" /> Confirm cash received
+      </ConfirmButton>
+      {confirmPayment.error ? <p role="alert" className="text-xs text-destructive">{confirmPayment.error.message}</p> : null}
+    </div>
   );
 }

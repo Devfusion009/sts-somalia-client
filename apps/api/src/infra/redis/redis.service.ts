@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import Redis from "ioredis";
 import { env } from "../../config/env";
@@ -10,7 +11,7 @@ import { env } from "../../config/env";
  * Redis is only ever a cache: every value can be rebuilt from Supabase, and
  * any failure degrades to a direct read, never an error. Commands time out
  * fast and a circuit breaker skips Redis for 30 s after repeated failures,
- * so a sick Redis can never make a request slower than the database.
+ * keeping cache failures bounded before falling back to the database.
  *
  * Only cache data every visitor sees the same (read through the anonymous
  * client): never availability, dated prices, balances or anything per user.
@@ -20,7 +21,35 @@ const COMMAND_TIMEOUT_MS = 250;
 const CONNECT_TIMEOUT_MS = 1000;
 const BREAKER_THRESHOLD = 3;
 const BREAKER_MS = 30_000;
-const TAG_PREFIX = "tag:";
+
+// Both apps share this wire format. Random tag generations remain safe after eviction.
+const READ_CACHE = `
+local out = { redis.call('GET', KEYS[1]) or '' }
+for i = 2, #KEYS do
+  local version = redis.call('GET', KEYS[i])
+  if not version then
+    version = ARGV[1] .. ':' .. i
+    redis.call('SET', KEYS[i], version)
+  end
+  out[#out + 1] = version
+end
+return out`;
+const WRITE_CACHE = `
+for i = 2, #KEYS do
+  if redis.call('GET', KEYS[i]) ~= ARGV[i + 1] then return 0 end
+end
+redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+return 1`;
+const INVALIDATE_CACHE = `
+for i = 1, #KEYS do redis.call('SET', KEYS[i], ARGV[1] .. ':' .. i) end
+return 1`;
+
+function cacheScope(): string {
+  const source = env().SUPABASE_URL;
+  const project = createHash('sha256').update(source.replace(/\/$/, '')).digest('hex').slice(0, 12);
+  return `sts:cache:v2:${env().DEPLOYMENT_ENV ?? 'development'}:${project}:`;
+}
+
 
 export type CacheOptions = {
   /** Tags the key can be invalidated under, e.g. ["events"]. */
@@ -56,7 +85,8 @@ export class RedisService implements OnModuleDestroy {
       this.client.on("error", (err) => this.recordFailure(`connection error: ${err.message}`));
       this.client.on("ready", () => this.recordSuccess());
     }
-    return this.client;
+    if (this.client?.status === 'wait') void this.client.connect().catch(() => {});
+    return this.client?.status === 'ready' ? this.client : null;
   }
 
   private recordFailure(message: string) {
@@ -91,58 +121,68 @@ export class RedisService implements OnModuleDestroy {
     fetchFresh: () => Promise<T>,
     options: CacheOptions = {}
   ): Promise<T> {
+    const tags = [...new Set(options.tags ?? [])].sort();
+    const prefix = cacheScope();
+    const keys = [`${prefix}data:${key}`, ...tags.map((tag) => `${prefix}tag:${tag}`)];
     const redis = this.getClient();
-
+    let versions: string[] | null = null;
     if (redis) {
       try {
-        const hit = await redis.get(key);
-        this.recordSuccess();
-        if (hit !== null) return JSON.parse(hit) as T;
+        const [raw, ...current] = await redis.eval(READ_CACHE, keys.length, ...keys, randomUUID()) as string[];
+        versions = current;
+        if (raw) {
+          try {
+            const entry = JSON.parse(raw) as { tags: string[]; versions: string[]; value: T };
+            if (Object.prototype.hasOwnProperty.call(entry, "value") && JSON.stringify(entry.tags) === JSON.stringify(tags) && JSON.stringify(entry.versions) === JSON.stringify(versions)) {
+              this.recordSuccess();
+              return entry.value;
+            }
+          } catch { /* Corrupt entries are replaced by a fresh read. */ }
+        }
       } catch (err) {
-        this.recordFailure(`read failed for "${key}": ${(err as Error).message}`);
+        this.recordFailure(`cache read failed: ${(err as Error).message}`);
       }
     }
-
-    const pending = this.inFlight.get(key) as Promise<T> | undefined;
+    // A read after invalidation must not join a fill from an older generation.
+    const flightKey = `${keys[0]}:${JSON.stringify(tags)}:${JSON.stringify(versions)}`;
+    const pending = this.inFlight.get(flightKey) as Promise<T> | undefined;
     if (pending) return pending;
-
     const fill = (async () => {
       const value = await fetchFresh();
-      const writer = this.getClient();
-      if (writer && value !== undefined && (options.cacheIf?.(value) ?? true)) {
+      // Never retry Redis after a failed read or publish an unversioned fill.
+      if (redis && versions && value !== undefined && (options.cacheIf?.(value) ?? true)) {
         const ttl = Math.max(1, Math.round(ttlSeconds * (0.9 + Math.random() * 0.2)));
         try {
-          const pipeline = writer.multi().set(key, JSON.stringify(value), "EX", ttl);
-          for (const tag of options.tags ?? []) {
-            pipeline.sadd(`${TAG_PREFIX}${tag}`, key).expire(`${TAG_PREFIX}${tag}`, ttlSeconds * 2);
-          }
-          await pipeline.exec();
-        } catch (err) {
-          this.recordFailure(`write failed for "${key}": ${(err as Error).message}`);
-        }
-      }
+          await redis.eval(WRITE_CACHE, keys.length, ...keys,
+            JSON.stringify({ tags, versions, value }), ttl, ...versions);
+          this.recordSuccess();
+        } catch (err) { this.recordFailure(`cache write failed: ${(err as Error).message}`); }
+      } else if (redis && versions) { this.recordSuccess(); }
       return value;
-    })().finally(() => this.inFlight.delete(key));
-
-    this.inFlight.set(key, fill);
+    })().finally(() => this.inFlight.delete(flightKey));
+    this.inFlight.set(flightKey, fill);
     return fill;
   }
 
-  /** Deletes every cached key stored under these tags, in this app and in apps/web. */
+  /** Advances shared tag generations without enumerating keys or racing active fills. */
   async invalidate(...tags: string[]): Promise<void> {
-    const redis = this.getClient();
+    if (tags.length === 0) return;
+    let redis = this.getClient();
+    if (!redis && this.client && Date.now() >= this.breakerOpenUntil) {
+      const connecting = this.client;
+      await new Promise<void>((resolve) => {
+        const finish = () => { clearTimeout(timer); connecting.off('ready', finish); connecting.off('error', finish); resolve(); };
+        const timer = setTimeout(finish, COMMAND_TIMEOUT_MS);
+        connecting.once('ready', finish).once('error', finish);
+      });
+      redis = this.getClient();
+    }
     if (!redis || tags.length === 0) return;
     try {
-      for (const tag of tags) {
-        const setKey = `${TAG_PREFIX}${tag}`;
-        const keys = await redis.smembers(setKey);
-        if (keys.length > 0) await redis.del(...keys);
-        await redis.del(setKey);
-      }
-    } catch (err) {
-      // The TTL still expires the entries; a missed invalidation only delays an edit.
-      this.recordFailure(`invalidate failed for ${tags.join(", ")}: ${(err as Error).message}`);
-    }
+      const keys = [...new Set(tags)].sort().map((tag) => `${cacheScope()}tag:${tag}`);
+      await redis.eval(INVALIDATE_CACHE, keys.length, ...keys, randomUUID());
+      this.recordSuccess();
+    } catch (err) { this.recordFailure(`cache invalidation failed: ${(err as Error).message}`); }
   }
 
   onModuleDestroy() {

@@ -68,7 +68,7 @@ export const createGroupBookingSchema = bookedForSchema.extend({
 });
 export type CreateGroupBookingInput = z.infer<typeof createGroupBookingSchema>;
 
-export const orderResultSchema = z.object({ orderId: z.string() });
+export const orderResultSchema = z.object({ orderId: z.string(), requiresApproval: z.boolean().optional() });
 export type OrderResult = z.infer<typeof orderResultSchema>;
 
 // ---------------------------------------------------------------------------
@@ -122,15 +122,59 @@ export type SubmitTripInput = z.infer<typeof submitTripSchema>;
 
 export const packageRefSchema = z.object({ packageId: uuid });
 
+export const publicUmrahAgentContactSchema = z.object({
+  name: z.string().trim().min(2, "Enter the agent's name.").max(120),
+  phone: z.string().trim().regex(/^\+?[0-9 ()-]{7,40}$/, "Enter a valid agent phone number.")
+    .refine(value => value.replace(/\D/g, "").length >= 7, "Enter a valid agent phone number."),
+});
+
 export const packageUpsertSchema = z.object({
+  packageType: z.enum(["group", "private"]).optional(),
+  poolVisibility: z.enum(["public", "private"]).optional(),
+  organizerName: optionalText(160),
+  organizerEmail: z.string().trim().email("Enter the organizer contact email.").optional(),
   id: uuid.optional(),
-  name: z.string().trim().min(2, "Enter the package name."),
-  description: z.string().optional(),
+  name: z.string().trim().min(2, "Enter the package name.").max(160),
+  description: optionalText(4000),
+  originIata: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Select the departure airport.").optional(),
+  destinationIata: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Select the arrival airport.").optional(),
   durationDays: z.number().int().min(1, "Duration must be at least 1 day."),
   includes: z.array(z.string()),
   basePrice: z.number().min(0, "The price can't be negative."),
   currency: z.string().trim().regex(/^[A-Za-z]{3}$/, "Enter a 3-letter currency code."),
   status: z.enum(["draft", "pending_review", "published", "suspended"]),
+  contactPersonName: optionalText(120),
+  contactPersonPhone: optionalText(40),
+  agentContacts: z.array(publicUmrahAgentContactSchema).max(20).optional(),
+  facilities: optionalText(4000),
+  accommodationDetails: optionalText(2000),
+  flightDetails: optionalText(2000),
+  transportDetails: optionalText(2000),
+  mealsNote: optionalText(500),
+  nightsMakkah: z.number().int().min(0).max(120).optional(),
+  nightsMadinah: z.number().int().min(0).max(120).optional(),
+  totalSeats: z.number().int().min(1).max(10000).optional(),
+  departureDate: isoDay.optional(),
+}).superRefine((value, ctx) => {
+  if (value.packageType === "private") return;
+  if (!value.organizerName?.trim()) ctx.addIssue({ code: "custom", path: ["organizerName"], message: "Enter the organizer name." });
+  if (!value.organizerEmail) ctx.addIssue({ code: "custom", path: ["organizerEmail"], message: "Enter the organizer contact email." });
+  const required = { description: "package description", contactPersonName: "responsible person's name", contactPersonPhone: "contact number", facilities: "facilities", accommodationDetails: "accommodation details", flightDetails: "flight details", transportDetails: "transport details", mealsNote: "food and meal details" } as const;
+  for (const key of Object.keys(required) as Array<keyof typeof required>) {
+    if (!value[key]?.trim()) ctx.addIssue({ code: "custom", path: [key], message: `Enter the ${required[key]}.` });
+  }
+  if ((value.contactPersonName?.trim().length ?? 0) < 2) ctx.addIssue({ code: "custom", path: ["contactPersonName"], message: "Enter the responsible person's full name." });
+  if (!/^\+?[0-9 ()-]{7,40}$/.test(value.contactPersonPhone ?? "") || (value.contactPersonPhone?.replace(/\D/g, "").length ?? 0) < 7) {
+    ctx.addIssue({ code: "custom", path: ["contactPersonPhone"], message: "Enter a valid responsible person's phone number." });
+  }
+  if (value.durationDays < 2 || value.durationDays > 120) ctx.addIssue({ code: "custom", path: ["durationDays"], message: "Duration must be 2 to 120 days." });
+  if (value.basePrice <= 0) ctx.addIssue({ code: "custom", path: ["basePrice"], message: "Enter a price greater than zero." });
+  if (!value.includes.length) ctx.addIssue({ code: "custom", path: ["includes"], message: "Select the included services." });
+  const nights = (value.nightsMakkah ?? 0) + (value.nightsMadinah ?? 0);
+  if (value.nightsMakkah === undefined || value.nightsMadinah === undefined || nights < 1 || nights >= value.durationDays) {
+    ctx.addIssue({ code: "custom", path: ["nightsMakkah"], message: "Stay nights must total at least one and be fewer than the trip days." });
+  }
+  if (!value.id && (!value.totalSeats || !value.departureDate)) ctx.addIssue({ code: "custom", path: ["totalSeats"], message: "Enter the departure date and total seats." });
 });
 export type PackageUpsertInput = z.infer<typeof packageUpsertSchema>;
 
@@ -354,6 +398,7 @@ const stringList = z
   .transform((items) => items.filter((v): v is string => typeof v === "string" && v.length > 0));
 
 export const packageCardSchema = z.object({
+  package_type: z.enum(["group", "private"]).default("group"),
   id: z.string(),
   slug: z.string(),
   name: z.string(),
@@ -410,6 +455,7 @@ const departurePublic = z.object({
 });
 
 export const packageDetailSchema = z.object({
+  package_type: z.enum(["group", "private"]).default("group"),
   id: z.string(),
   slug: z.string(),
   name: z.string(),
@@ -428,6 +474,13 @@ export const packageDetailSchema = z.object({
   status: z.string(),
   meal_plan: z.string().catch("none"),
   meals_note: z.string().nullable(),
+  agent_contacts: z.array(publicUmrahAgentContactSchema).default([]),
+  facilities: z.string().nullable().default(null),
+  accommodation_details: z.string().nullable().default(null),
+  flight_details: z.string().nullable().default(null),
+  transport_details: z.string().nullable().default(null),
+  nights_makkah: z.number().nullable().default(null),
+  nights_madinah: z.number().nullable().default(null),
   contact_person_name: z.string().nullable(),
   contact_person_phone: z.string().nullable(),
   contact_person_email: z.string().nullable(),
@@ -478,6 +531,7 @@ const categoryEnum = z.enum(["hotel_makkah", "hotel_madinah", "flight", "visa", 
 const priceUnitEnum = z.enum(["per_person", "per_person_per_night", "per_night", "per_booking"]);
 
 export const customRequestSchema = z.object({
+  package_snapshot: z.object({ packageId: z.string(), name: z.string(), origin: z.string(), destination: z.string(), departureDate: z.string(), returnDate: z.string(), includes: z.array(z.string()).default([]), images: z.array(z.string()).default([]) }).nullable().optional(),
   id: z.string(),
   reference: z.string(),
   status: z.string(),

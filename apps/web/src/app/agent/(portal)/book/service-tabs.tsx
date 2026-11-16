@@ -1,29 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { Hotel, Landmark, PartyPopper, Plane, Stamp } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { BedDouble, PartyPopper, Plane, Stamp } from "lucide-react";
+import { UmrahIcon } from "@/components/portal/umrah-icon";
 import { stripPortalPrefix } from "@/lib/subdomain";
 import { AGENT_SERVICES, agentServiceStartHref } from "@/modules/agencies/services";
-import styles from "../workspace.module.css";
 
-const ICONS = { flights: Plane, hotels: Hotel, visa: Stamp, umrah: Landmark, events: PartyPopper };
+const ICONS = { flights: Plane, hotels: BedDouble, visa: Stamp, umrah: UmrahIcon, events: PartyPopper };
 
 export function ServiceTabs({ hasCustomer }: { hasCustomer: boolean }) {
   const pathname = stripPortalPrefix(usePathname()) ?? "/";
-  const serviceKey = useSearchParams().get("service");
+  if (pathname === "/book") return null;
+  const selected = AGENT_SERVICES.find((service) => {
+    const route = stripPortalPrefix(service.href)!;
+    return pathname === route || pathname.startsWith(`${route}/`);
+  });
+  if (!selected) return null;
+  const Icon = ICONS[selected.key];
   return (
-    <nav aria-label="Travel services" className={styles.serviceTabs}>
-      {AGENT_SERVICES.map((service) => {
-        const Icon = ICONS[service.key];
-        const route = stripPortalPrefix(service.href)!;
-        const active = pathname === route || pathname.startsWith(`${route}/`) || (pathname === "/book" && serviceKey === service.key);
-        return (
-          <Link key={service.key} href={hasCustomer ? service.href : agentServiceStartHref(service.key)} aria-current={active ? "page" : undefined} className={styles.serviceTab}>
-            <Icon className="size-4 shrink-0" aria-hidden="true" />{service.label}
-          </Link>
-        );
-      })}
+    <nav aria-label="Selected service" className="flex items-center justify-between gap-4 text-sm">
+      <Link href={hasCustomer ? selected.href : agentServiceStartHref(selected.key)} aria-current="page" className="inline-flex items-center gap-2 font-semibold"><Icon className="size-4 text-primary" aria-hidden="true" />{selected.label}</Link>
+      <Link href="/agent/book" className="text-muted-foreground hover:text-foreground">Change service</Link>
     </nav>
   );
 }

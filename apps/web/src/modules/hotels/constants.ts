@@ -27,8 +27,6 @@ export const ROOM_AMENITIES = [
   { value: "city_view", label: "City view" },
   { value: "garden_view", label: "Garden view" },
   { value: "air_conditioning", label: "Air conditioning" },
-  { value: "private_bathroom", label: "Private bathroom" },
-  { value: "free_wifi", label: "Free WiFi" },
   { value: "minibar", label: "Minibar" },
   { value: "safe_box", label: "Safe box" },
   { value: "flat_screen_tv", label: "Flat-screen TV" },

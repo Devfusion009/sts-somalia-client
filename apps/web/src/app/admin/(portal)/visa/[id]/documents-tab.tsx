@@ -1,16 +1,18 @@
-import { Check, ExternalLink, FileStack, X } from "lucide-react";
+import { ExternalLink, FileStack } from "lucide-react";
+import Link from "next/link";
 import { Badge, statusBadgeVariant, type BadgeVariant } from "@/components/ui/badge";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { adminResolveDocumentRequest } from "@/modules/visa/admin-actions";
+import { ResolveRequestControls } from "./resolve-request-controls";
 import { DocumentStatusBadge } from "@/modules/visa/components/visa-shared";
 import type { VisaCase } from "@/modules/visa/case-queries";
 import { DocumentReviewControls } from "./document-review-controls";
 import { RequestDocumentDialog } from "./visa-controls";
 import { SectionHeading, formatBytes, formatDay, formatWhen } from "./case-ui";
+import { CaseActions } from "./case-actions";
+import type { VisaAction } from "@/modules/visa/workflow";
 
 type Slot = VisaCase["documentSlots"][number];
 type Doc = Slot["versions"][number];
@@ -62,6 +64,10 @@ function SlotRow({ slot, applicationId, reviewable }: { slot: Slot; applicationI
               documentId={current.id}
               applicationId={applicationId}
               reviewStatus={current.review_status}
+              label={slot.label}
+              fileName={current.file_name ?? undefined}
+              fileSizeLabel={formatBytes(current.file_size) || undefined}
+              checklist={slot.checklist}
             />
           ) : null}
         </div>
@@ -101,17 +107,29 @@ const REQUEST_VARIANT: Partial<Record<string, BadgeVariant>> = {
   waived: "neutral",
 };
 
-export function DocumentsTab({ data, reviewable }: { data: VisaCase; reviewable: boolean }) {
+export function DocumentsTab({ data, reviewable: hasReviewPermission, actions = [] }: { data: VisaCase; reviewable: boolean; actions?: VisaAction[] }) {
   const { application, documentSlots } = data;
+  const paid = ["paid", "partially_paid"].includes(data.paymentState);
+  const reviewable = hasReviewPermission && paid;
   const requests = application.document_requests;
   const slots = documentSlots.filter((s) => !s.key.startsWith("request:"));
+  const currentStatuses = slots.filter(slot => !slot.staff).map(slot => slot.versions.find(doc => doc.is_current)?.review_status ?? "missing");
+  const pending = currentStatuses.filter(status => status === "pending").length;
+  const verified = currentStatuses.filter(status => status === "accepted").length;
+  const replacements = currentStatuses.filter(status => status === "rejected" || status === "missing").length;
+  const reviewComplete = data.readiness.some(item => item.key === "documents_reviewed" && item.ok)
+    && data.readiness.some(item => item.key === "documents_complete" && item.ok);
 
   return (
     <div className="space-y-8">
+      {!paid && hasReviewPermission ? <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30"><span className="text-sm font-semibold">Payment required before document review</span><Button size="sm" variant="outline" render={<Link href={data.order ? `/admin/orders?order=${data.order.id}#order-${data.order.id}` : "?tab=payment"} />}>Check payment</Button></div> : null}
       <section className="space-y-3">
         <SectionHeading action={reviewable ? <RequestDocumentDialog applicationId={application.id} /> : null}>
           Documents
         </SectionHeading>
+        {paid && reviewComplete ? <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm font-semibold text-primary">Document review complete</div> : null}
+        {actions.some(action => ["start_review", "mark_ready", "resume"].includes(action.key)) ? <CaseActions applicationId={application.id} refundNote="" actions={actions.filter(action => ["start_review", "mark_ready", "resume"].includes(action.key))} /> : null}
+        <div className="flex flex-wrap gap-2" aria-label="Document review progress"><Badge variant={pending ? "warning" : "neutral"}>{pending} awaiting review</Badge><Badge variant="success">{verified} verified</Badge>{replacements ? <Badge variant="warning">{replacements} missing or need replacement</Badge> : null}</div>
         <Card className="py-0">
           {slots.length === 0 ? (
             <Empty>
@@ -181,30 +199,7 @@ export function DocumentsTab({ data, reviewable }: { data: VisaCase; reviewable:
                       </TableCell>
                       <TableCell>
                         {open && reviewable ? (
-                          <div className="flex justify-end gap-1">
-                            <form action={adminResolveDocumentRequest}>
-                              <input type="hidden" name="requestId" value={request.id} />
-                              <input type="hidden" name="applicationId" value={application.id} />
-                              <input type="hidden" name="resolution" value="received" />
-                              <SubmitButton
-                                size="icon-sm"
-                                variant="outline"
-                                aria-label="Mark received"
-                                title="Mark received"
-                                pendingText=""
-                              >
-                                <Check className="text-primary" />
-                              </SubmitButton>
-                            </form>
-                            <form action={adminResolveDocumentRequest}>
-                              <input type="hidden" name="requestId" value={request.id} />
-                              <input type="hidden" name="applicationId" value={application.id} />
-                              <input type="hidden" name="resolution" value="waived" />
-                              <SubmitButton size="icon-sm" variant="ghost" aria-label="Waive" title="Waive" pendingText="">
-                                <X />
-                              </SubmitButton>
-                            </form>
-                          </div>
+                          <ResolveRequestControls requestId={request.id} applicationId={application.id} uploaded={Boolean(upload)} />
                         ) : null}
                       </TableCell>
                     </TableRow>

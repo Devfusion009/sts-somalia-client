@@ -23,8 +23,7 @@ export class GroupBookingService {
     const access = await this.orders.assertAgencyCanBookProduct(agencyId, "umrah");
     if (!access.ok) throw new BadRequestException(access.message);
     const agencyCustomerId = await this.orders.resolveBookedForCustomer(agencyId, input);
-    // Only agents may reserve without paying; the hold expires like any other.
-    const hold = Boolean(agencyId) && input.hold;
+    // Public seats use the same short checkout reservation for customers and agents.
 
     const { id: bookingId, error } = await this.bookings.createGroupBooking({
       p_departure_id: input.departureId,
@@ -45,10 +44,9 @@ export class GroupBookingService {
     });
     if (error || !bookingId) throw new BadRequestException(groupBookingErrorMessage(error?.message));
 
-    const booking = await this.bookings.findPrice(bookingId);
-    if (!booking) throw new BadRequestException("Could not create the booking.");
-
     try {
+      const booking = await this.bookings.findPrice(bookingId);
+      if (!booking) throw new BadRequestException("Could not create the booking.");
       const order = await this.orders.createForBooking({
         customerId: userId,
         bookedBy: userId,
@@ -58,12 +56,12 @@ export class GroupBookingService {
         itemType: "umrah",
         price: Number(booking.total_price),
         umrahBookingId: booking.id,
-        hold,
+        hold: false,
       });
-      return { orderId: order.id };
+      return { orderId: order.id, requiresApproval: booking.booking_kind === "private" };
     } catch {
       // Undo the booking so its seats are not held by a booking with no order.
-      await this.bookings.delete(booking.id);
+      await this.bookings.delete(bookingId);
       throw new BadRequestException("Could not create the order.");
     }
   }

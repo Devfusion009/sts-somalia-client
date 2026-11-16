@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
+import { cn } from "@/lib/utils";
 
 /**
  * Cancels a held/unpaid order — the underlying booking and any reserved
@@ -27,12 +28,16 @@ export function CancelOrderButton({
   redirectTo,
   label = "Cancel Order",
   size = "sm",
+  variant = "outline",
+  className,
 }: {
   orderId: string;
   redirectTo?: string;
   label?: string;
   /** Trigger size; "default" when it sits among page-header actions. */
   size?: "sm" | "default";
+  variant?: "outline" | "ghost";
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -54,7 +59,7 @@ export function CancelOrderButton({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" size={size} className="text-destructive hover:text-destructive" />}>
+      <DialogTrigger render={<Button variant={variant} size={size} className={cn(variant === "ghost" ? "text-muted-foreground hover:text-destructive" : "text-destructive hover:text-destructive", className)} />}>
         <X data-icon="inline-start" aria-hidden="true" /> {label}
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">

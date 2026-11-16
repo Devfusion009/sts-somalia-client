@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { RlsSupabaseService } from "../../../infra/supabase/rls-supabase.service";
 import { throwIfDbError } from "../../../common/errors/db-error";
 
-const REQUEST_SELECT = `id, reference, status, current_step, tier, num_pilgrims, room_sharing, departure_date,
+const REQUEST_SELECT = `package_snapshot, id, reference, status, current_step, tier, num_pilgrims, room_sharing, departure_date,
   nights_makkah, nights_madinah, notes, pilgrims, subtotal, currency, customer_id, booked_by,
   agency_id, created_at,
   services:umrah_custom_request_services(id, service_id, category, name, price_unit, unit_price, quantity, line_total)`;

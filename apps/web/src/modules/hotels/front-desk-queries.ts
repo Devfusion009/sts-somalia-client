@@ -86,6 +86,7 @@ type AssignmentRow = {
     total_price: number;
     special_requests: string | null;
     guest_details: unknown;
+    source: string;
     checked_in_at: string | null;
     checked_out_at: string | null;
     customer: { email: string | null } | null;
@@ -124,7 +125,7 @@ export async function getFrontDeskBoard(hotelId: string, startDate: string, days
         .from("hotel_booking_room_units")
         .select(
           `room_unit_id, locked,
-           booking:hotel_bookings!inner(id, hotel_id, check_in, check_out, status, num_rooms, num_adults, num_children, total_price, special_requests, guest_details, checked_in_at, checked_out_at,
+           booking:hotel_bookings!inner(id, hotel_id, check_in, check_out, status, num_rooms, num_adults, num_children, total_price, special_requests, guest_details, source, checked_in_at, checked_out_at,
              customer:profiles!hotel_bookings_customer_id_fkey(email),
              order_items(order:orders(status, order_number, payments(method_label, status))))`
         )
@@ -161,7 +162,11 @@ export async function getFrontDeskBoard(hotelId: string, startDate: string, days
       bookingReference: order?.order_number ?? null,
       roomUnitId: row.room_unit_id,
       guestName: hotelGuestNames(b.guest_details)[0] ?? "Guest",
-      guestEmail: b.customer?.email ?? null,
+      // Desk bookings sit under the staff account; only a typed guest email belongs to the guest.
+      guestEmail:
+        (Array.isArray(b.guest_details) && typeof (b.guest_details[0] as { email?: unknown })?.email === "string"
+          ? ((b.guest_details[0] as { email: string }).email || null)
+          : null) ?? (b.source === "offline" ? null : (b.customer?.email ?? null)),
       checkIn: b.check_in,
       checkOut: b.check_out,
       status:

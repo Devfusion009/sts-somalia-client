@@ -6,6 +6,7 @@ import { BookingContextBar } from "@/modules/agencies/components/booking-context
 import { DeskSteps } from "./desk-steps";
 import { Suspense } from "react";
 import { ServiceTabs } from "./service-tabs";
+import { BookingContextVisibility } from "./booking-context-visibility";
 
 export default async function BookingDeskLayout({
   children,
@@ -24,10 +25,10 @@ export default async function BookingDeskLayout({
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <Suspense fallback={<div className="h-13 rounded-xl bg-card" />}><ServiceTabs hasCustomer={customers.length > 0} /></Suspense>
-        <DeskSteps hasCustomer={customers.length > 0} />
+        <Suspense fallback={<div className="h-24 rounded-xl bg-card" />}><DeskSteps /></Suspense>
+        <ServiceTabs hasCustomer={customers.length > 0} />
         {customers.length > 0 ? (
-          <BookingContextBar customers={customers} available={available} />
+          <BookingContextVisibility><BookingContextBar customers={customers} available={available} /></BookingContextVisibility>
         ) : null}
       </div>
       {children}

@@ -50,14 +50,23 @@ touch.
   concrete and specific, never generic travel-marketing cliché
   ("unlock your dream journey", "experience the magic of...").
 - Internal consoles (admin, partner, agent, affiliate, venue, account)
-  follow the stricter, more detailed standard in
-  `.claude/skills/sts-admin-ui/SKILL.md` (zero `CardDescription`/`<p>`
-  helper text under headings or fields, no exceptions) — that skill
-  auto-loads when editing those paths; invoke it explicitly if it doesn't.
+  follow a stricter standard: zero `CardDescription`/`<p>` helper text
+  under headings or fields, no exceptions.
 
 Read any new sentence back and ask whether the surrounding UI already
 makes it obvious. It almost always does — cut it rather than keep it.
 <!-- CUSTOM:copy-standard:END -->
+
+<!-- CUSTOM:skills-disabled:START -->
+## Project skills are deactivated (since 2026-11-12)
+
+Do not load, invoke or follow any project skill — this applies to Codex,
+Claude Code and every other agent. The skill folders were moved out of
+the discovery paths to `.agents/skills.disabled/` and
+`.claude/skills.disabled/`. Do not move them back, read them for
+instructions, or recreate `.agents/skills/` or `.claude/skills/` unless
+the user explicitly asks to reactivate skills.
+<!-- CUSTOM:skills-disabled:END -->
 
 <!-- CUSTOM:git-attribution:START -->
 ## Git commit / PR attribution
@@ -77,32 +86,43 @@ Environments
 | QA | `main` | `deploy.yml` (AWS) | http://54.74.179.142:3000 | Demo logins on |
 | Production | `production` | `deploy-production.yml` (GHCR + SSH, Mogadishu) | https://scoutsts.com | No demo logins, ever |
 
-Supabase: QA and production currently share one project
-(`uvmxxtdneryuuiqcwegx`). The separate production project
-(`mdhftphdyqsbxpoblzsd`) stays unused until the split is scheduled.
+Supabase: separate projects per environment. QA uses
+`uvmxxtdneryuuiqcwegx` (us-east-1, demo data). Production uses
+`mdhftphdyqsbxpoblzsd` (eu-west-1, live customer data) since 2026-11-03.
+Never point local or QA work at the production project.
 
 Change flow, in order, with no step skipped:
 
-1. **Branch.** Cut a new branch from an up-to-date `origin/main` for each
-   piece of work: `feat/…`, `fix/…`, `perf/…`, `chore/…`, `docs/…`. Never
-   edit on `main` or `production`; never stack unrelated work on one branch.
-   Local `main` is kept fast-forwarded to `origin/main`.
-2. **Commit.** Conventional Commits (`feat(scope): …`), one logical change
-   per commit, no attribution trailers. Never commit secrets, `.env*`,
-   `.secrets/`, or credentials files.
-3. **Verify locally.** From `apps/web`: `npx tsc --noEmit -p .` and
+1. **Work locally, uncommitted.** Make every change (features, fixes, QA
+   feedback, small tweaks) in the working tree and leave it uncommitted.
+   Never commit, branch, push, open a PR or merge on your own initiative,
+   not even after a small change. Many small changes accumulate locally
+   until the user says "push" or "commit".
+2. **Verify locally.** From `apps/web`: `npx tsc --noEmit -p .` and
    `npx eslint <touched paths>`. From `apps/api`: `npx tsc --noEmit -p .`.
    Do not start dev servers or builds unless the user asks.
-4. **Pull request into `main`.** CI (`.github/workflows/ci.yml`: `api` and
-   `web` jobs — lint, build, type check) must be green. Merge with a merge
-   commit. Merging deploys QA automatically.
-5. **Verify on QA.** The deploy run is green, then spot-check the changed
-   pages on the QA URL. Fix forward on a new branch; never push fixes
-   straight to `main`.
-6. **Promote.** Open a PR `main` → `production` and merge it only when the
+3. **On "push" or "commit" only**, run this sequence, in order:
+   1. Bring local `main` up to date with `origin/main` (fast-forward).
+   2. Create a new branch from local `main`: `feat/…`, `fix/…`, `perf/…`,
+      `chore/…`, `docs/…`, named for the batch of work.
+   3. Commit all the accumulated changes on that branch. Conventional
+      Commits (`feat(scope): …`), split into logical commits where the
+      changes are unrelated, no attribution trailers. Never commit secrets,
+      `.env*`, `.secrets/`, or credentials files.
+   4. Merge the branch into local `main` with a merge commit
+      (`git merge --no-ff <branch>`).
+   5. Push `main` to `origin`. This deploys QA automatically.
+
+   Do not open a pull request for this flow. CI (`ci.yml`) runs only on
+   pull requests, so the local checks in step 2 are the gate before
+   pushing `main`.
+4. **Verify on QA.** The deploy run is green, then spot-check the changed
+   pages on the QA URL. Fixes follow the same flow: local changes first,
+   then branch, commit, merge and push only when the user says so.
+5. **Promote.** Open a PR `main` → `production` and merge it only when the
    user asks. Never push directly to `production`, never merge a branch into
    `production` that has not been on `main`.
-7. **Verify production.** The `deploy-production` run is green, then check
+6. **Verify production.** The `deploy-production` run is green, then check
    https://scoutsts.com: the changed pages, `/api/health`, and one login.
 
 Rules that apply at every step:
@@ -118,10 +138,10 @@ Rules that apply at every step:
   the same flow. For an outage, re-run the previous successful deploy run.
   Hotfix: branch from `production`, PR into `production`, then merge
   `production` back into `main`.
-- Merge PRs one at a time and wait for the QA deploy to finish before the
-  next merge.
-- Commit and push when work is complete. Merge to `main` (QA) after each
-  push. Merge to `production` only on an explicit ask.
+- Push `main` once per batch and wait for the QA deploy to finish before
+  the next push.
+- Commit and push only when the user says "push" or "commit", never on
+  completion of a task. Merge to `production` only on an explicit ask.
 
 Recommended repository settings (admin): require the `api` and `web` checks
 and a pull request on `main` and `production`; block force-pushes and
@@ -131,7 +151,7 @@ branches on merge.
 <!-- REPOWISE_AGENTS:START — Do not edit below this line. Auto-generated by Repowise. -->
 ## Codebase Intelligence for sts_somalia_client (Repowise)
 
-Indexed by [Repowise](https://repowise.dev). Last indexed: 2026-10-30 (commit d619f5b). Confidence: 100%.
+Indexed by [Repowise](https://repowise.dev). Last indexed: 2026-11-06 (commit 39597d4). Confidence: 100%.
 ### How to work in this repo
 
 - **Trust the index.** `verified: true` means the bytes were checked against the live tree, so never re-read those lines. Re-read only on `bounds: "approximate"`, `_meta.stale_warning`, `search_method: "bm25"` or `confidence: "low"`; `index_behind: true` alone is informational.
@@ -154,54 +174,24 @@ Indexed by [Repowise](https://repowise.dev). Last indexed: 2026-10-30 (commit d6
 | `get_dead_code()` | Confidence-tiered unreachable files / unused exports / zombie packages. For cleanup sweeps, not targeted fixes. |
 | `get_overview()` | Architecture map. Call once, first, in an unfamiliar repo; skip it after that. |
 
-### Architecture
-**Files:** 607 | **Lines:** 84930 | **Import cycles:** 1
-sts_somalia_client is a typescript codebase of 607 files. Execution starts at src/lib/supabase/server.ts. Start here when reading the codebase. Ranked by PageRank over the import graph: the files most of the codebase ultimately depends on.
-
-### Key modules
-- `src/modules` — src/modules/admin · src/modules/admin/components · src/modules/admin/integrations · src/modules/affiliates · src/modules/agencies ·…
-- `src/app` — src/app · src/app/(auth) · src/app/(auth)/forgot-password · src/app/(auth)/login/verify-2fa · src/app/(auth)/reset-password ·…
-- `src/components/ui` — src/components/ui
-**Language:** typescript | **Files:** 34 | **Public symbols:** 186 / 206
-Covers the 34 source files in src/components/ui
-- `src/lib` — src/lib · src/lib/auth · src/lib/notifications · src/lib/provider-runtime · src/lib/supabase · src/lib/types
-**Language:** typescript |…
-- `src/lib/provider-runtime` — src/lib/provider-runtime · src/lib/supabase · src/lib/types
-**Language:** typescript | **Files:** 10 | **Public symbols:** 28 / 71
-Covers…
-- `src/components/marketing` — src/components/marketing
-**Language:** typescript | **Files:** 44 | **Public symbols:** 80 / 140
-Covers the 44 source files in…
-- `src/lib/auth` — src/lib/auth · src/lib/notifications
-**Language:** typescript | **Files:** 11 | **Public symbols:** 42 / 66
-Covers the 11 source files in 2…
-- `src/modules/admin` — src/modules/admin
-**Language:** typescript | **Files:** 15 | **Public symbols:** 135 / 226
-Covers the 15 source files in src/modules/admin
-- `src/components` — src/components · src/components/admin · src/components/auth · src/components/dashboard · src/components/marketing · src/components/portal ·…
-- `src/modules/visa` — src/modules/visa · src/modules/visa/components · src/modules/visa/partner · src/modules/visa/partner/adapters
-**Language:** typescript |…
-
 ### Entry points
 - `apps/api/src/main.ts`
 - `apps/web/src/lib/supabase/server.ts`
 - `apps/web/src/lib/trpc/server.ts`
 
 ### Files that need care (bug-fix history first, then churn — check `get_risk` before editing)
-- `apps/web/src/components/portal/portal-shell.tsx` — 3 bug fixes, last fix today; 13 commits/90d
-- `apps/web/src/modules/admin/queries.ts` — 2 bug fixes, last fix 7 days ago; 17 commits/90d
-- `apps/web/src/lib/auth/actions.ts` — 2 bug fixes, last fix 5 weeks ago; 9 commits/90d
-- `apps/web/src/modules/flights/components/flight-search-form.tsx` — 2 bug fixes, last fix 5 weeks ago; 10 commits/90d
-- `apps/web/src/components/marketing/flights-hero.tsx` — 2 bug fixes, last fix 5 weeks ago; 6 commits/90d
+- `apps/web/src/components/portal/portal-shell.tsx` — 3 bug fixes, last fix 6 days ago; 14 commits/90d
+- `apps/web/src/modules/payments/providers.ts` — 2 bug fixes, last fix today; 5 commits/90d
+- `apps/web/src/app/(marketing)/checkout/[orderId]/page.tsx` — 2 bug fixes, last fix today; 12 commits/90d
+- `apps/web/src/modules/admin/queries.ts` — 2 bug fixes, last fix 13 days ago; 17 commits/90d
+- `apps/web/src/lib/auth/actions.ts` — 2 bug fixes, last fix 6 weeks ago; 10 commits/90d
 
 ### Code health
-Three co-equal signals: defect risk 8.15/10 avg, hotspot health 6.52/10 (stable), worst `apps/web/src/modules/visa/actions.ts` at 1.64/10 · maintainability 9.18/10 · performance risk 33 open static I/O-in-loop / N+1 findings. Detail: `get_health()`.
+Three co-equal signals: defect risk 7.92/10 avg, hotspot health 7.48/10 (stable), worst `apps/web/src/app/admin/(portal)/admin-notification-bell.tsx` at 2.74/10 · maintainability 9.04/10 · performance risk 2 open static I/O-in-loop / N+1 findings. Detail: `get_health()`.
 
 Critical files:
-- `supabase/seed.sql` — change entropy — impact −3.0
-- `apps/web/src/modules/hotels/components/offline-booking-panel.tsx` — change entropy — impact −3.0
-- `apps/web/src/modules/hotels/components/new-booking-form.tsx` — change entropy — impact −3.0
-- `apps/web/src/modules/hotels/components/front-desk-grid.tsx` — change entropy — impact −3.0
-- `apps/web/src/modules/hotels/reservation-actions.ts` — change entropy — impact −3.0
+- `AGENTS.md` — untested hotspot — impact −2.0
+- `apps/web/src/modules/payments/components/checkout-form.tsx` — large method (CheckoutForm) — impact −1.1
+- `apps/web/src/modules/orders/format.ts` — brain method (describeOrderItem) — impact −0.6
 
 <!-- REPOWISE_AGENTS:END -->

@@ -12,7 +12,7 @@ import {
 import { formatMoney } from "@/modules/umrah/pricing";
 import { NewServiceForm, EditServiceForm, type AdminService } from "./service-forms";
 
-export const metadata = { title: "Private Umrah Services | Admin Console" };
+export const metadata = { title: "Private Umrah Services" };
 
 /**
  * The price list behind the private Umrah builder. Every row here is one

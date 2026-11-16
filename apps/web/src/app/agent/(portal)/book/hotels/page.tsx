@@ -1,3 +1,4 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
@@ -91,8 +92,8 @@ export default async function AgentHotelDeskPage({
                     <h3 className="truncate font-heading text-sm font-semibold"><Link href={href} className="rounded-sm hover:text-primary focus-visible:outline-2 focus-visible:outline-ring">{hotel.name}</Link></h3>
                     <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin className="size-3.5" aria-hidden="true" />{hotel.city}</div>
                     <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t border-border pt-4">
-                      <dl><dt className="text-[10px] text-muted-foreground">From / night</dt><dd className="mt-1 font-heading text-base font-semibold tabular-nums">{hotel.minPrice !== null && hotel.minPrice > 0 ? money(Number(hotel.minPrice), hotel.currency) : "On request"}</dd></dl>
-                      <Button size="sm" variant="outline" render={<Link href={href} />}>Rooms<ArrowRight className="size-3.5" aria-hidden="true" /></Button>
+                      <dl><dt className="text-[10px] text-muted-foreground">From / night</dt><dd className="mt-1 font-heading text-base font-semibold tabular-nums">{hotel.minPrice !== null && hotel.minPrice > 0 ? <AgentMoney value={money(Number(hotel.minPrice), hotel.currency)} /> : "On request"}</dd></dl>
+                      <Button size="sm" variant="outline" render={<Link href={href} />}>Rooms & rates<ArrowRight className="size-3.5" aria-hidden="true" /></Button>
                     </div>
                   </div>
                 </article>

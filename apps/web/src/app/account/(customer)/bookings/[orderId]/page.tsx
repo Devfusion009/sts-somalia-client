@@ -238,8 +238,10 @@ export default async function BookingDetailPage({
     !waitlisted &&
     (["pending", "confirmed"].includes(hotelStatus ?? "") ||
       ["pending", "confirmed"].includes(hallStatus ?? "") ||
-      umrahBookingStatus === "confirmed");
-  const nextStep = payNow
+      umrahBookingStatus === "confirmed" ||
+      // A flight is payable while its priced fare is held.
+      (order.order_items.some((item) => item.item_type === "flight") && Number(order.total) > 0));
+  const nextStep = umrahIsPrivate && umrahBookingStatus === "pending" ? null : payNow
     ? { label: "Amount due", amount: Number(order.total), action: "Pay now" }
     : balanceDue > 0
       ? { label: "Balance due", amount: balanceDue, action: "Pay balance" }
@@ -260,8 +262,8 @@ export default async function BookingDetailPage({
           <h2 className="min-w-0 flex-1 font-heading text-lg font-semibold">
             {justWaitlisted ? "You're on the waitlist" : "Booking request received"}
           </h2>
-          <Button variant="outline" render={<Link href="/hotels" />}>
-            Browse hotels <ArrowRight data-icon="inline-end" aria-hidden="true" />
+          <Button variant="outline" render={<Link href={umrahIsPrivate ? "/umrah/private" : "/hotels"} />}>
+            {umrahIsPrivate ? "Browse Umrah packages" : "Browse hotels"} <ArrowRight data-icon="inline-end" aria-hidden="true" />
           </Button>
         </div>
       ) : null}

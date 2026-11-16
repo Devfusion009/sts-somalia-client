@@ -35,9 +35,21 @@ export type Method = {
 
 export type BankTransfer = { bankName: string; accountName: string; accountNumber: string };
 
+/** Amount and method chosen outside the form (the Add money page's amount-first panel). */
+export type ControlledTopup = { amount: string; method: string; label: string };
+
+function ControlledFields({ controlled }: { controlled: ControlledTopup }) {
+  return (
+    <>
+      <input type="hidden" name="amount" value={controlled.amount} />
+      <input type="hidden" name="method" value={controlled.method} />
+    </>
+  );
+}
+
 const PROOF_ACCEPT = "image/jpeg,image/png,image/webp,application/pdf";
 
-const METHOD_ICONS: Record<string, ComponentType<{ className?: string }>> = {
+export const METHOD_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   bank_transfer: Landmark,
   cash_office: Banknote,
   card: CreditCard,
@@ -195,10 +207,12 @@ export function OfflineTopupForm({
   methods,
   defaultAmount,
   onSuccess,
+  controlled,
 }: {
   methods: Method[];
   defaultAmount?: number;
   onSuccess?: () => void;
+  controlled?: ControlledTopup;
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(requestOfflineTopup, null);
   const [method, setMethod] = useState(methods[0]?.id ?? "");
@@ -222,11 +236,15 @@ export function OfflineTopupForm({
           </Alert>
         ) : null}
 
-        <MethodPicker methods={methods} value={method} onChange={setMethod} name="method" />
+        {controlled ? (
+          <ControlledFields controlled={controlled} />
+        ) : (
+          <MethodPicker methods={methods} value={method} onChange={setMethod} name="method" />
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <AmountField id="offline-amount" defaultValue={defaultAmount} />
-          <Field>
+          {controlled ? null : <AmountField id="offline-amount" defaultValue={defaultAmount} />}
+          <Field className={controlled ? "sm:col-span-2" : undefined}>
             <FieldLabel htmlFor="offline-reference">Reference</FieldLabel>
             <Input id="offline-reference" name="reference" placeholder="Transfer ref, transaction id, receipt no." />
           </Field>
@@ -241,8 +259,8 @@ export function OfflineTopupForm({
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
           <FieldError className="sm:mr-auto">{state?.error}</FieldError>
-          <SubmitButton pendingText="Sending…" className="max-sm:w-full">
-            Send for confirmation
+          <SubmitButton size={controlled ? "lg" : undefined} disabled={controlled ? !(Number(controlled.amount) > 0) : undefined} pendingText="Sending…" className={controlled ? "w-full" : "max-sm:w-full"}>
+            {controlled && Number(controlled.amount) > 0 ? `Send ${controlled.label} for confirmation` : "Send for confirmation"}
           </SubmitButton>
         </div>
       </FieldGroup>
@@ -254,14 +272,25 @@ export function OnlineTopupForm({
   methods,
   defaultAmount,
   returnTo,
+  controlled,
 }: {
   methods: Method[];
   defaultAmount?: number;
   /** Portal path to land on once the wallet is credited (booking desk). */
   returnTo?: string;
+  controlled?: ControlledTopup;
 }) {
-  const [state, formAction] = useActionState<ActionState, FormData>(startOnlineTopup, null);
-  const [methodId, setMethodId] = useState(methods[0]?.id ?? "");
+  const attempt = useRef<{ fingerprint: string; key: string } | null>(null);
+  const [state, formAction] = useActionState<ActionState, FormData>(async (previous, data) => {
+    const fingerprint = JSON.stringify([data.get("amount"), data.get("method"), data.get("payerPhone")]);
+    if (!attempt.current || attempt.current.fingerprint !== fingerprint) attempt.current = { fingerprint, key: crypto.randomUUID() };
+    data.set("idempotencyKey", attempt.current.key);
+    const result = await startOnlineTopup(previous, data);
+    if (result?.paymentAttemptStatus === "failed") attempt.current = null;
+    return result;
+  }, null);
+  const [ownMethodId, setMethodId] = useState(methods[0]?.id ?? "");
+  const methodId = controlled?.method ?? ownMethodId;
   const selected = methods.find((m) => m.id === methodId);
   const router = useRouter();
 
@@ -275,10 +304,14 @@ export function OnlineTopupForm({
     <form action={formAction}>
       {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
       <FieldGroup className="gap-4">
-        <MethodPicker methods={methods} value={methodId} onChange={setMethodId} name="method" />
+        {controlled ? (
+          <ControlledFields controlled={controlled} />
+        ) : (
+          <MethodPicker methods={methods} value={methodId} onChange={setMethodId} name="method" />
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <AmountField id="online-amount" defaultValue={defaultAmount} />
+          {controlled ? null : <AmountField id="online-amount" defaultValue={defaultAmount} />}
           {selected?.requiresPhone ? (
             <Field>
               <FieldLabel htmlFor="online-phone">
@@ -291,8 +324,8 @@ export function OnlineTopupForm({
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
           <FieldError className="sm:mr-auto">{state?.error}</FieldError>
-          <SubmitButton pendingText="Starting…" className="max-sm:w-full">
-            Pay {selected ? `with ${selected.label}` : "now"}
+          <SubmitButton size={controlled ? "lg" : undefined} disabled={controlled ? !(Number(controlled.amount) > 0) : undefined} pendingText="Starting…" className={controlled ? "w-full" : "max-sm:w-full"}>
+            {controlled && Number(controlled.amount) > 0 ? `Pay ${controlled.label}` : <>Pay {selected ? `with ${selected.label}` : "now"}</>}
           </SubmitButton>
         </div>
       </FieldGroup>

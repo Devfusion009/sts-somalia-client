@@ -79,17 +79,18 @@ export async function getResolvedVisaPricing(visaTypeId: string, nationalityCode
   ).catch(() => null);
 }
 
-/** The signed-in user's applications (any status), newest first. */
+/** The signed-in user's applications (any status), most recently submitted (or created draft) first. */
 export async function getMyVisaApplications() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("visa_applications")
     .select(
       `*,
-       visa_type:visa_type_id (name, destination_country_code),
-       documents:visa_documents (id, document_type, is_current, review_status, rejection_reason),
+       visa_type:visa_type_id (name, destination_country_code, required_documents, application_sections),
+       members:visa_members (id, full_name, is_primary),
+       documents:visa_documents (id, document_type, member_id, is_current, review_status, rejection_reason),
        document_requests:visa_document_requests (id, title, status, requirement, due_date, description),
-       appointments:visa_appointments (id, status, appointment_type, scheduled_at, confirmation_number, biometrics_required,
+       appointments:visa_appointments (id, status, appointment_type, scheduled_at, confirmation_number, biometrics_required, member_id, biometrics_completed,
          centre:visa_application_centres (name, city, address, timezone, collection_hours)),
        passports:visa_passports (id, status, holder_name, tracking_reference),
        order_items (order:order_id (id, status, total, currency))`
@@ -97,7 +98,13 @@ export async function getMyVisaApplications() {
     .order("created_at", { ascending: false });
   // A failed read must not render as "No visa applications yet".
   if (error) throw error;
-  return data ?? [];
+  // Match the booking date shown in the list. Resuming an older draft must
+  // place its new submission ahead of applications created more recently.
+  return (data ?? []).sort((a, b) =>
+    (b.submitted_at ?? b.created_at).localeCompare(a.submitted_at ?? a.created_at)
+    || b.created_at.localeCompare(a.created_at)
+    || b.id.localeCompare(a.id)
+  );
 }
 
 /**
@@ -146,7 +153,9 @@ export async function getApplicationForWizard(applicationId: string) {
   data.members.sort(
     (a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order
   );
-  return data;
+  const { data: requirements, error } = await supabase.rpc("visa_traveller_requirements", { p_application_id: data.id });
+  if (error) throw error;
+  return { ...data, traveller_requirements: requirements };
 }
 
 /** Tracking/result view: adds status history and document requests. */
@@ -205,4 +214,27 @@ export async function getOrderForVisaApplication(applicationId: string) {
     remaining: Number(order.total) - paid,
     method: succeeded.at(-1)?.method_label ?? null,
   };
+}
+
+/** Available re-application credit for this application's applicant (refused visa, STS fee). */
+export async function getReapplyCredit(app: {
+  currency: string;
+  agency_customer_id: string | null;
+  applicant_profile_id: string | null;
+  submitted_by: string;
+}): Promise<{ amount: number; currency: string } | null> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("visa_reapply_credits")
+    .select("amount, currency")
+    .eq("status", "available")
+    .eq("currency", app.currency)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at")
+    .limit(1);
+  query = app.agency_customer_id
+    ? query.eq("agency_customer_id", app.agency_customer_id)
+    : query.is("agency_customer_id", null).eq("profile_id", app.applicant_profile_id ?? app.submitted_by);
+  const { data } = await query.maybeSingle();
+  return data ? { amount: Number(data.amount), currency: data.currency } : null;
 }

@@ -15,16 +15,16 @@ function toCardData(card: PackageCard): PackageCardData {
 export async function getFeaturedPackages(limit = 4): Promise<PackageCardData[]> {
   try {
     const trpc = await getServerTrpc();
-    return (await trpc.umrah.featured.query({ limit })).map(toCardData);
+    return (await trpc.umrah.featured.query({ limit })).filter((p) => p.package_type === "group").map(toCardData);
   } catch {
     return [];
   }
 }
 
-export async function getAllPackages(): Promise<PackageCardData[]> {
+export async function getAllPackages(kind: "group" | "private" = "group"): Promise<PackageCardData[]> {
   try {
     const trpc = await getServerTrpc();
-    return (await trpc.umrah.packages.query()).map(toCardData);
+    return (await trpc.umrah.packages.query()).filter((p) => p.package_type === kind).map(toCardData);
   } catch {
     return [];
   }

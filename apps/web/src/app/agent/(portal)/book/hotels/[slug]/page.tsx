@@ -1,9 +1,11 @@
+import { AgentMoney } from "@/components/portal/agent-money";
 import { notFound, redirect } from "next/navigation";
 import { BedDouble, Star } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { getBookingCustomers } from "@/modules/agencies/booking-context";
+import { travellerName } from "@/modules/agencies/traveller-profile";
 import { getAgencyMarkupRule } from "@/modules/agencies/markup";
 import { getHotelBySlug, getRoomAvailability } from "@/modules/hotels/queries";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +47,7 @@ export default async function AgentHotelRoomsPage({
 
   const supabase = await createClient();
   const customers = await getBookingCustomers(supabase, membership.agency.id);
-  if (customers.length === 0) redirect("/agent/book");
+  if (customers.length === 0) redirect("/agent/book?service=hotels");
 
   const hotel = await getHotelBySlug(slug);
   if (!hotel) notFound();
@@ -135,7 +137,7 @@ export default async function AgentHotelRoomsPage({
                     </TableCell>
                     <TableCell numeric className="text-sm font-medium">
                       {room.base_price > 0 ? (
-                        money(Number(room.base_price), room.currency)
+                        <AgentMoney value={money(Number(room.base_price), room.currency)} />
                       ) : (
                         <span className="font-normal text-muted-foreground">On request</span>
                       )}
@@ -162,6 +164,7 @@ export default async function AgentHotelRoomsPage({
                         bookingMode={bookingMode}
                         agencyCustomerId={customers[0].id}
                         customerCount={customers.length}
+                        guests={customers.map((customer) => ({ id: customer.id, name: travellerName(customer) }))}
                         markup={markup}
                         available={available}
                         roomsLeft={left}

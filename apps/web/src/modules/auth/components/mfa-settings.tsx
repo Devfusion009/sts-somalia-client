@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Copy, Download, KeyRound, Plus, ShieldCheck, ShieldPlus, Trash2 } from "lucide-react";
+import { AlertCircle, ChevronRight, Copy, Download, KeyRound, Plus, QrCode, ShieldCheck, ShieldPlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,10 +60,12 @@ function addedOn(iso?: string | null) {
 export function MfaSettings({
   factors,
   recoveryCodesLeft = 0,
+  dashboard = false,
 }: {
   factors: EnrolledFactor[];
   /** Unused recovery codes on the account. */
-  recoveryCodesLeft?: number;
+  recoveryCodesLeft?: number | null;
+  dashboard?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -71,15 +73,23 @@ export function MfaSettings({
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const hasFactor = factors.length > 0;
+  const hasFactor = factors.length > 0 || mode.kind === "codes";
+
+  function runTransition(task: () => Promise<void>) {
+    startTransition(async () => {
+      try { await task(); }
+      catch { setError("Security settings could not be updated."); }
+    });
+  }
 
   function beginEnroll() {
     setError(null);
-    startTransition(async () => {
+    runTransition(async () => {
       const mfa = await mfaApi();
       // A setup abandoned earlier leaves an unverified factor whose name would
       // block a new one with the same name.
-      const { data: listed } = await mfa.listFactors();
+      const { data: listed, error: listError } = await mfa.listFactors();
+      if (listError) { setError("Authenticators could not be loaded."); return; }
       for (const stale of listed?.all.filter((f) => f.status === "unverified") ?? []) {
         await mfa.unenroll({ factorId: stale.id });
       }
@@ -100,7 +110,7 @@ export function MfaSettings({
     setMode({ kind: "idle" });
     setCode("");
     setError(null);
-    startTransition(async () => {
+    runTransition(async () => {
       const mfa = await mfaApi();
       await mfa.unenroll({ factorId });
     });
@@ -110,7 +120,7 @@ export function MfaSettings({
     if (mode.kind !== "enrolling") return;
     const factorId = mode.factorId;
     setError(null);
-    startTransition(async () => {
+    runTransition(async () => {
       const mfa = await mfaApi();
       const { data: challenge, error: challengeError } = await mfa.challenge({ factorId });
       if (challengeError || !challenge) {
@@ -124,7 +134,12 @@ export function MfaSettings({
       }
       const result = await completeMfaEnrollmentAction();
       setCode("");
-      if (result?.error) setError(result.error);
+      if (result?.error) {
+        setError(result.error);
+        setMode({ kind: "idle" });
+        router.refresh();
+        return;
+      }
       if (result?.codes) {
         setMode({ kind: "codes", codes: result.codes });
       } else {
@@ -137,7 +152,7 @@ export function MfaSettings({
 
   function removeFactor(factorId: string) {
     setError(null);
-    startTransition(async () => {
+    runTransition(async () => {
       const mfa = await mfaApi();
       const { error: unenrollError } = await mfa.unenroll({ factorId });
       if (unenrollError) {
@@ -152,7 +167,7 @@ export function MfaSettings({
 
   function regenerateCodes() {
     setError(null);
-    startTransition(async () => {
+    runTransition(async () => {
       const result = await regenerateRecoveryCodesAction();
       if (result?.error) setError(result.error);
       else if (result?.codes) setMode({ kind: "codes", codes: result.codes });
@@ -177,11 +192,14 @@ export function MfaSettings({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Two-factor authentication</CardTitle>
+    <Card id={dashboard ? "two-factor" : undefined} className="scroll-mt-20">
+      <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+        <CardTitle className="flex items-center gap-3">
+          {dashboard ? <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary"><ShieldCheck className="size-5" aria-hidden /></span> : null}
+          Two-factor authentication
+        </CardTitle>
         <CardAction>
-          <Badge variant={hasFactor ? "success" : "neutral"}>{hasFactor ? "On" : "Off"}</Badge>
+          <Badge variant={hasFactor ? "success" : "neutral"}>{dashboard ? hasFactor ? "Enabled" : "Not enabled" : hasFactor ? "On" : "Off"}</Badge>
         </CardAction>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -288,9 +306,9 @@ export function MfaSettings({
           </FieldGroup>
         ) : hasFactor ? (
           <div className="space-y-4">
-            <ul className="-my-2 divide-y divide-border">
+            <ul className={dashboard ? "space-y-3" : "-my-2 divide-y divide-border"}>
               {factors.map((f) => (
-                <li key={f.id} className="flex items-center justify-between gap-3 py-2.5">
+                <li key={f.id} className={`flex flex-wrap items-center justify-between gap-3 ${dashboard ? "rounded-xl border p-4" : "py-2.5"}`}>
                   <span className="flex min-w-0 items-center gap-2.5">
                     <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden="true" />
                     <span className="min-w-0">
@@ -319,8 +337,8 @@ export function MfaSettings({
               <span className="flex items-center gap-2 text-sm">
                 <KeyRound className="size-4 text-muted-foreground" aria-hidden="true" />
                 Recovery codes
-                <Badge variant={recoveryCodesLeft > 2 ? "neutral" : "warning"} className="tabular-nums">
-                  {recoveryCodesLeft} left
+                <Badge variant={recoveryCodesLeft == null ? "neutral" : recoveryCodesLeft > 2 ? "neutral" : "warning"} className="tabular-nums">
+                  {recoveryCodesLeft == null ? "Unavailable" : `${recoveryCodesLeft} left`}
                 </Badge>
               </span>
               <ConfirmButton
@@ -341,7 +359,16 @@ export function MfaSettings({
             </Button>
           </div>
         ) : (
-          <Button onClick={beginEnroll} loading={pending}>
+          dashboard ? <div className="space-y-3">
+            <Button variant="outline" className="h-auto w-full justify-between gap-3 rounded-xl p-4 text-left" onClick={beginEnroll} loading={pending}>
+              <span className="flex items-center gap-3"><QrCode className="size-5 shrink-0 text-primary" aria-hidden /><span>Set up authenticator app</span></span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            </Button>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/20 p-4">
+              <span className="flex items-center gap-3 text-sm font-medium"><KeyRound className="size-5 text-muted-foreground" aria-hidden />Recovery codes</span>
+              <Badge variant="neutral">Not available</Badge>
+            </div>
+          </div> : <Button onClick={beginEnroll} loading={pending}>
             {pending ? null : <ShieldPlus aria-hidden="true" />} Add authenticator app
           </Button>
         )}

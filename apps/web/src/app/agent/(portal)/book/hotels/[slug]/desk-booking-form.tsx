@@ -1,5 +1,8 @@
 "use client";
 
+import { AgentMoney } from "@/components/portal/agent-money";
+
+
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -38,6 +41,7 @@ export function DeskBookingForm({
   available,
   roomsLeft,
   defaults,
+  guests = [],
 }: {
   hotelId: string;
   room: { id: string; name: string; base_price: number; currency: string; max_occupancy: number };
@@ -51,6 +55,8 @@ export function DeskBookingForm({
   /** Units left for the dates the page loaded with — bounds the Rooms picker. */
   roomsLeft?: number;
   defaults?: { checkIn?: string; checkOut?: string; guests?: string };
+  /** Lead guest per selected customer, as printed in their passport. */
+  guests?: { id: string; name: string }[];
 }) {
   const isGroup = customerCount > 1;
   // Seeded manual hotels carry base_price 0 meaning "price on request" — STS
@@ -179,15 +185,31 @@ export function DeskBookingForm({
               </Field>
             </div>
 
-            <Field>
-              <FieldLabel htmlFor={`guestNames-${room.id}`}>Guest names</FieldLabel>
-              <Textarea
-                id={`guestNames-${room.id}`}
-                name="guestNames"
-                rows={2}
-                placeholder="One name per line"
-              />
-            </Field>
+            {isGroup ? (
+              <Field>
+                <FieldLabel>Lead guests</FieldLabel>
+                {/* Each customer's booking carries their own name. */}
+                {guests.map((guest) => (
+                  <input key={guest.id} type="hidden" name={`c_${guest.id}__guestNames`} value={guest.name} />
+                ))}
+                <ul className="flex flex-wrap gap-1.5">
+                  {guests.map((guest) => (
+                    <li key={guest.id} className="rounded-full border border-border bg-secondary px-2.5 py-1 text-xs font-medium">{guest.name}</li>
+                  ))}
+                </ul>
+              </Field>
+            ) : (
+              <Field>
+                <FieldLabel htmlFor={`guestNames-${room.id}`}>Guest names</FieldLabel>
+                <Textarea
+                  id={`guestNames-${room.id}`}
+                  name="guestNames"
+                  rows={2}
+                  defaultValue={guests[0]?.name}
+                  placeholder="One name per line"
+                />
+              </Field>
+            )}
 
             <Field>
               <FieldLabel htmlFor={`specialRequests-${room.id}`}>Special requests</FieldLabel>
@@ -209,11 +231,11 @@ export function DeskBookingForm({
                 <>
                   <div className="flex items-baseline justify-between gap-3">
                     <dt className="text-muted-foreground tabular-nums">Net · {nightsLabel}</dt>
-                    <dd className="tabular-nums">{money(net, room.currency)}</dd>
+                    <dd className="tabular-nums">{<AgentMoney value={money(net, room.currency)} />}</dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
                     <dt className="text-muted-foreground">Your margin</dt>
-                    <dd className="tabular-nums">{money(margin, room.currency)}</dd>
+                    <dd className="tabular-nums">{<AgentMoney value={money(margin, room.currency)} />}</dd>
                   </div>
                   <div
                     className={cn(
@@ -223,19 +245,19 @@ export function DeskBookingForm({
                   >
                     <dt>{isGroup ? "Per customer" : "Customer pays"}</dt>
                     <dd className={cn("tabular-nums", !isGroup && "font-heading text-base")}>
-                      {money(customerPays, room.currency)}
+                      {<AgentMoney value={money(customerPays, room.currency)} />}
                     </dd>
                   </div>
                   {isGroup ? (
                     <div className="flex items-baseline justify-between gap-3 border-t border-border pt-1.5 font-semibold">
                       <dt className="tabular-nums">Total · {customerCount} customers</dt>
-                      <dd className="font-heading text-base tabular-nums">{money(grandTotal, room.currency)}</dd>
+                      <dd className="font-heading text-base tabular-nums">{<AgentMoney value={money(grandTotal, room.currency)} />}</dd>
                     </div>
                   ) : null}
                   {shortBy > 0 ? (
                     <div className="flex items-baseline justify-between gap-3 border-t border-border pt-1.5 text-destructive">
                       <dt className="font-medium">Short by</dt>
-                      <dd className="font-semibold tabular-nums">{money(shortBy, room.currency)}</dd>
+                      <dd className="font-semibold tabular-nums">{<AgentMoney value={money(shortBy, room.currency)} />}</dd>
                     </div>
                   ) : null}
                 </>

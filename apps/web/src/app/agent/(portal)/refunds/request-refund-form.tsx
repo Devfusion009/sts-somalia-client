@@ -21,10 +21,14 @@ import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 export function RequestRefundForm({
   orders,
+  initialOrderId,
 }: {
   orders: { id: string; order_number: string; total: number; currency: string }[];
+  /** Opened from a booking page: start with that order chosen. */
+  initialOrderId?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  const preselect = initialOrderId && orders.some((o) => o.id === initialOrderId) ? initialOrderId : "";
+  const [open, setOpen] = useState(Boolean(preselect));
   const [state, formAction] = useActionState(requestAgencyRefundAction, null);
   const submitted = useRef(false);
 
@@ -54,8 +58,10 @@ export function RequestRefundForm({
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="orderId">Order</FieldLabel>
-              <select id="orderId" name="orderId" defaultValue="" className={NATIVE_SELECT_CLASS}>
-                <option value="">Not tied to a specific order</option>
+              <select id="orderId" name="orderId" defaultValue={preselect} required className={NATIVE_SELECT_CLASS}>
+                <option value="" disabled>
+                  Choose an order
+                </option>
                 {orders.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.order_number} — {money(Number(o.total), o.currency)}

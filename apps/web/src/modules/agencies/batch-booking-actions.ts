@@ -9,10 +9,8 @@ import { getActiveAgencyId } from "@/modules/orders/helpers";
 import { createHotelBooking } from "@/modules/hotels/booking-actions";
 import { createUmrahBooking } from "@/modules/umrah/actions";
 import { getServerTrpc } from "@/lib/trpc/server";
-import { createHallBookingSchema, requestFlightQuoteSchema } from "@sts/shared-types";
+import { createHallBookingSchema } from "@sts/shared-types";
 import { getBookingCustomers } from "./booking-context";
-
-export type QuoteActionState = { error: string | null; success?: boolean } | null;
 
 function parseHallBookingForm(formData: FormData) {
   return createHallBookingSchema.safeParse({
@@ -48,36 +46,6 @@ async function createHallBookingRunner(
   }
 }
 
-function parseFlightQuoteForm(formData: FormData) {
-  return requestFlightQuoteSchema.safeParse({
-    origin: formData.get("origin")?.toString().toUpperCase(),
-    destination: formData.get("destination")?.toString().toUpperCase(),
-    departDate: formData.get("departDate"),
-    returnDate: formData.get("returnDate")?.toString() || undefined,
-    tripType: formData.get("tripType") ?? "one_way",
-    cabinClass: formData.get("cabinClass") ?? "economy",
-    adults: formData.get("adults") ?? 1,
-    contactPhone: formData.get("contactPhone"),
-    notes: formData.get("notes")?.toString().trim() || undefined,
-    agencyCustomerId: formData.get("agencyCustomerId")?.toString() || undefined,
-    newCustomerName: formData.get("newCustomerName")?.toString() || undefined,
-    newCustomerPhone: formData.get("newCustomerPhone")?.toString() || undefined,
-  });
-}
-
-async function requestFlightQuoteViaTrpc(formData: FormData): Promise<{ error: string | null }> {
-  const parsed = parseFlightQuoteForm(formData);
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
-  const trpc = await getServerTrpc();
-  try {
-    const result = await trpc.flights.requestQuote.mutate(parsed.data);
-    return result.error ? { error: result.error } : { error: null };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Could not send the quote request." };
-  }
-}
-
 /**
  * Places the same product for every customer on the counter.
  *
@@ -110,10 +78,16 @@ function isRedirectError(error: unknown): boolean {
   );
 }
 
+/** Fields prefixed `c_<customerId>__` belong to that customer's booking only. */
 function cloneFor(formData: FormData, customerId: string): FormData {
   const clone = new FormData();
+  const own = `c_${customerId}__`;
   for (const [key, value] of formData.entries()) {
     if (key === "agencyCustomerId" || key === "desk") continue;
+    if (key.startsWith("c_")) {
+      if (key.startsWith(own)) clone.append(key.slice(own.length), value);
+      continue;
+    }
     clone.append(key, value);
   }
   clone.set("agencyCustomerId", customerId);
@@ -247,41 +221,3 @@ export async function payBatchFromWallet(
   return { error: null };
 }
 
-/**
- * Flights are quote requests, not orders — there is nothing to batch an id
- * onto and nothing to pay, so this just raises one request per customer and
- * reports the outcome.
- */
-export async function createBatchFlightQuotes(
-  _prevState: QuoteActionState,
-  formData: FormData
-): Promise<QuoteActionState> {
-  const profile = await requireUser();
-  const supabase = await createClient();
-
-  const agencyId = await getActiveAgencyId(supabase, profile.id);
-  if (!agencyId) return { error: "You are not an active member of an agency." };
-
-  const customers = await getBookingCustomers(supabase, agencyId);
-  if (customers.length === 0) return { error: "Choose at least one customer." };
-
-  const failed: string[] = [];
-  let sent = 0;
-
-  for (const customer of customers) {
-    const result = await requestFlightQuoteViaTrpc(cloneFor(formData, customer.id));
-    if (result?.error) {
-      failed.push(customer.full_name);
-    } else {
-      sent += 1;
-    }
-  }
-
-  if (sent === 0) {
-    return { error: `Could not send a request for ${failed.join(", ")}.` };
-  }
-  if (failed.length > 0) {
-    return { error: `Sent ${sent}. Failed for ${failed.join(", ")}.` };
-  }
-  return { error: null, success: true };
-}

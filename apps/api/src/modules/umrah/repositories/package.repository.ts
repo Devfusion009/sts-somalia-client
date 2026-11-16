@@ -1,3 +1,4 @@
+import { RedisService } from "../../../infra/redis/redis.service";
 import { Injectable } from "@nestjs/common";
 import type { Database } from "@sts/shared-types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -8,10 +9,11 @@ import { dbException, throwIfDbError } from "../../../common/errors/db-error";
 export const IMAGES_BUCKET = "umrah-images";
 
 const CARD_SELECT =
-  "id, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats, offline_seats), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
+  "id, package_type, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats, offline_seats, sales_close_days, status), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
 
-const DETAIL_SELECT = `id, slug, name, description, tagline, tier, is_featured, origin_iata, destination_iata,
+const DETAIL_SELECT = `id, package_type, slug, name, description, tagline, tier, is_featured, origin_iata, destination_iata,
   duration_days, includes, images, base_price, original_price, currency, status,
+  agent_contacts, facilities, accommodation_details, flight_details, transport_details, nights_makkah, nights_madinah,
   meal_plan, meals_note, contact_person_name, contact_person_phone, contact_person_email, contact_whatsapp,
   umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, offline_seats, price_override, sales_close_days, status,
     outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at,
@@ -30,7 +32,7 @@ type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-exp
 /** umrah_packages and the tables that hang off a package (departures, hotels, days, rate card, agencies). */
 @Injectable()
 export class PackageRepository {
-  constructor(private readonly rls: RlsSupabaseService) {}
+  constructor(private readonly rls: RlsSupabaseService, private readonly cache: RedisService) {}
 
   /** Typed reads: row shapes flow from the generated schema to the API's callers. */
   private db(): SupabaseClient<Database> {
@@ -45,35 +47,48 @@ export class PackageRepository {
   // ---- public catalog (anon, published only) ----
 
   async findPublishedCards(opts: { featuredFirst: boolean; limit?: number }) {
-    let query = createAnonClient().from("umrah_packages").select(CARD_SELECT).eq("status", "published");
+    const client = createAnonClient();
+    const { error: releaseError } = await client.rpc("release_public_umrah_checkouts");
+    throwIfDbError(releaseError, "Seat availability could not be checked.");
+    let query = client.from("umrah_packages").select(CARD_SELECT).eq("status", "published").eq("pool_visibility", "public")
+      .or("package_type.eq.private,public_setup_complete.eq.true");
     query = opts.featuredFirst
       ? query.order("is_featured", { ascending: false }).order("base_price", { ascending: true })
       : query.order("base_price");
-    if (opts.limit) query = query.limit(opts.limit);
+    // Limit after availability filtering; sold-out rows must not crowd out seats on sale.
     const { data, error } = await query;
     throwIfDbError(error, "Packages could not be loaded.");
     return data ?? [];
   }
 
   async findIdBySlug(slug: string): Promise<string | null> {
-    const { data } = await createAnonClient().from("umrah_packages").select("id").eq("slug", slug).maybeSingle();
+    const { data } = await this.rls.getOrAnon().from("umrah_packages").select("id").eq("slug", slug).maybeSingle();
     return data?.id ?? null;
   }
 
   /** Lazy backstop for the unpaid-seat sweep before seat counts are read. */
   async releaseStaleSeats(packageId: string) {
-    await createAnonClient().rpc("release_stale_umrah_seats", { p_package_id: packageId });
+    const client = createAnonClient();
+    const { error } = await client.rpc("release_public_umrah_checkouts");
+    throwIfDbError(error, "Seat availability could not be checked.");
+    await client.rpc("release_stale_umrah_seats", { p_package_id: packageId });
   }
 
   async findPublishedDetail(slug: string) {
-    const { data, error } = await createAnonClient()
-      .from("umrah_packages")
-      .select(DETAIL_SELECT)
-      .eq("slug", slug)
-      .eq("status", "published")
-      .maybeSingle();
+    const { data, error } = await this.rls.getOrAnon().from("umrah_packages").select(DETAIL_SELECT)
+      .eq("slug", slug).eq("status", "published")
+      .or("package_type.eq.private,public_setup_complete.eq.true").maybeSingle();
     throwIfDbError(error, "The package could not be loaded.");
     return data;
+  }
+
+  async findAssignedCards() {
+    const { error: releaseError } = await this.rls.get().rpc("release_public_umrah_checkouts");
+    throwIfDbError(releaseError, "Seat availability could not be checked.");
+    const { data, error } = await this.rls.get().from("umrah_packages").select(CARD_SELECT)
+      .eq("status", "published").eq("pool_visibility", "private");
+    throwIfDbError(error, "Agency pools could not be loaded.");
+    return data ?? [];
   }
 
   // ---- admin ----
@@ -104,14 +119,26 @@ export class PackageRepository {
     return data;
   }
 
-  async insertPackage(row: Row) {
-    const { error } = await this.write().from("umrah_packages").insert(row);
+  async insertPublicPackage(row: Row, departureDate: string, totalSeats: number) {
+    const { data, error } = await this.write().rpc("create_public_umrah_package", {
+      p_package: row, p_departure_date: departureDate, p_total_seats: totalSeats,
+    });
     throwIfDbError(error, "The package could not be saved.");
+    await this.cache.invalidate("umrah-packages");
+    return data as string;
+  }
+
+  async insertPackage(row: Row) {
+    const { data, error } = await this.write().from("umrah_packages").insert(row).select("id").single();
+    throwIfDbError(error, "The package could not be saved.");
+    await this.cache.invalidate("umrah-packages");
+    return data!.id as string;
   }
 
   async updatePackage(id: string, row: Row) {
     const { error } = await this.write().from("umrah_packages").update(row).eq("id", id);
     throwIfDbError(error, "The package could not be saved.");
+    await this.cache.invalidate("umrah-packages");
   }
 
   async findImages(packageId: string): Promise<unknown | undefined> {
@@ -123,6 +150,7 @@ export class PackageRepository {
   async setImages(packageId: string, images: string[]) {
     const { error } = await this.write().from("umrah_packages").update({ images }).eq("id", packageId);
     throwIfDbError(error, "The gallery could not be saved.");
+    await this.cache.invalidate("umrah-packages");
   }
 
   async signImageUpload(path: string) {

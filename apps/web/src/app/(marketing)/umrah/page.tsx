@@ -5,7 +5,7 @@ import { ArrowRight, BadgeCheck, Building2, CalendarDays, Check, Headset, Lock, 
 import { SectionHeading } from "@/components/marketing/section-heading";
 import { PackageCard } from "@/modules/umrah/components/package-card";
 import { getFeaturedPackages } from "@/modules/umrah/queries";
-import { UmrahBookingJourney, UmrahServiceGallery, UmrahFlowComparison } from "@/components/marketing/umrah-visual-sections";
+import { UmrahBookingJourney, UmrahServiceGallery } from "@/components/marketing/umrah-visual-sections";
 import { UmrahCollectionHero } from "@/components/marketing/travel-collection-heroes";
 import styles from "@/components/marketing/travel-collection.module.css";
 
@@ -66,9 +66,8 @@ export default async function UmrahPage() {
           <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">{featured.map((pkg) => <PackageCard key={pkg.id} pkg={pkg} />)}</div>
         </div>
       </section> : null}
-      <UmrahBookingJourney />
       <UmrahServiceGallery />
-      <UmrahFlowComparison />
+      <UmrahBookingJourney />
     </div>
   );
 }

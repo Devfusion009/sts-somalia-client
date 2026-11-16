@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
-import { Ban, Trash2, X } from "lucide-react";
+import { BadgeCheck, Ban, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 type ButtonProps = Omit<ComponentProps<typeof Button>, "type" | "onClick" | "title">;
 
 /** Named (not a component) so server components can pass it across the client boundary. */
-const ICONS = { trash: Trash2, x: X, ban: Ban } as const;
+const ICONS = { trash: Trash2, x: X, ban: Ban, check: BadgeCheck } as const;
 type ConfirmIcon = keyof typeof ICONS;
 
 /**

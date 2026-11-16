@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CreditCard, Smartphone, Wallet, Landmark, Building2, Lock } from "lucide-react";
+import { AlertCircle, CreditCard, Smartphone, Wallet, Landmark, Building2, Lock, ShieldCheck, Check, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
-import { trpc } from "@/lib/trpc/react";
+import { initiateCheckoutPayment } from "../checkout-actions";
 
 /** Serializable subset of PaymentMethodDef safe to pass into a client component. */
 export type CheckoutMethod = {
@@ -25,13 +25,13 @@ export type CheckoutMethod = {
 };
 
 const GROUPS = [
-  { id: "local", title: "Local payments" },
-  { id: "international", title: "International cards" },
-  { id: "other", title: "Other ways to pay" },
+  { id: "local", title: "Mobile money", icon: Smartphone },
+  { id: "international", title: "Card", icon: CreditCard },
+  { id: "other", title: "Bank & cash", icon: Landmark },
 ] as const;
 
 const TILE =
-  "rounded-xl border bg-card text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
+  "rounded-lg border bg-card text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
 const KIND_ICONS = {
   card: CreditCard,
@@ -49,6 +49,7 @@ export function CheckoutForm({
   remaining,
   isFirstPayment,
   minDeposit,
+  allowPartial,
 }: {
   orderId: string;
   methods: CheckoutMethod[];
@@ -60,29 +61,17 @@ export function CheckoutForm({
   isFirstPayment: boolean;
   /** Minimum a first payment must cover to count as a deposit (order.total * MIN_DEPOSIT_FRACTION). */
   minDeposit: number;
+  /** Umrah packages take deposits; every other order is paid in full. */
+  allowPartial: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const initiate = trpc.payments.initiate.useMutation({
-    onSuccess: (data) => {
-      if (data.error) {
-        setError(data.error);
-        return;
-      }
-      if (data.result?.type === "redirect") {
-        window.location.href = data.result.url;
-        return;
-      }
-      // "success" and "instructions" both land back on the checkout page: a
-      // fully-settled order redirects itself to /success on reload, a still-
-      // open balance or a requires_action banner just re-renders here.
-      router.push(`/checkout/${data.orderId ?? orderId}`);
-      router.refresh();
-    },
-    onError: (err) => setError(err.message),
-  });
+  const [isPending, setPending] = useState(false);
+  const [signInRequired, setSignInRequired] = useState(false);
+  const submitting = useRef(false);
   const [selectedId, setSelectedId] = useState(methods[0]?.id ?? "");
   const selected = methods.find((m) => m.id === selectedId);
+  const onlineAvailable = methods.some(m => ["card", "mobile_money"].includes(m.kind));
 
   const canDeposit = isFirstPayment && minDeposit < remaining;
   const [payChoice, setPayChoice] = useState<"full" | "amount">("full");
@@ -92,7 +81,9 @@ export function CheckoutForm({
 
   // Radio-group keyboard model for the method tiles: one tab stop, arrows move
   // the selection (WAI-ARIA radio pattern). Order matches the rendered groups.
-  const orderedMethods = GROUPS.flatMap((g) => methods.filter((m) => m.group === g.id));
+  const groups = GROUPS.filter((g) => methods.some((m) => m.group === g.id));
+  const activeGroup = selected?.group ?? groups[0]?.id;
+  const orderedMethods = methods.filter((m) => m.group === activeGroup);
   const tileRefs = useRef(new Map<string, HTMLButtonElement>());
   function onMethodKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     const keys = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"];
@@ -113,21 +104,43 @@ export function CheckoutForm({
     tileRefs.current.get(id)?.focus();
   }
 
-  function handleSubmit(formData: FormData) {
+  async function handleSubmit(formData: FormData) {
+    if (submitting.current) return;
+    submitting.current = true;
+    setPending(true);
     setError(null);
-    initiate.mutate({
-      orderId,
-      methodId: selectedId,
-      payerPhone: (formData.get("payerPhone")?.toString().trim() || undefined) as string | undefined,
-      amount: payChoice === "full" ? undefined : amount,
-    });
+    setSignInRequired(false);
+    try {
+      const data = await initiateCheckoutPayment({
+        orderId,
+        methodId: selectedId,
+        payerPhone: formData.get("payerPhone")?.toString().trim() || undefined,
+        amount: payChoice === "full" ? undefined : amount,
+      });
+      if (data.error) {
+        setError(data.error);
+        setSignInRequired(Boolean(data.signInRequired));
+        return;
+      }
+      if (data.result?.type === "redirect") {
+        window.location.href = data.result.url;
+        return;
+      }
+      router.push(`/checkout/${data.orderId ?? orderId}`);
+      router.refresh();
+    } catch {
+      setError("Payment status could not be confirmed. Refresh checkout before trying again.");
+    } finally {
+      submitting.current = false;
+      setPending(false);
+    }
   }
 
   return (
-    <form action={handleSubmit} className="space-y-6">
-      {remaining < 1 - 0.005 ? null : (
+    <form action={handleSubmit} className="space-y-5">
+      {!allowPartial || remaining < 1 - 0.005 || (isFirstPayment && minDeposit >= remaining) ? null : (
         <fieldset>
-          <legend id="pay-amount-heading" className="font-heading text-base font-semibold">
+          <legend id="pay-amount-heading" className="font-heading text-lg font-semibold tracking-tight">
             Amount
           </legend>
           <div role="radiogroup" aria-labelledby="pay-amount-heading" className="mt-3 grid gap-2.5 sm:grid-cols-2">
@@ -194,23 +207,48 @@ export function CheckoutForm({
         </fieldset>
       )}
 
-      <div>
-        <h2 id="payment-method-heading" className="font-heading text-base font-semibold">
-          Payment method
-        </h2>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="payment-method-heading" className="font-heading text-lg font-semibold tracking-tight">Payment method</h2>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary"><Lock className="size-3" aria-hidden />Secure checkout</span>
+        </div>
+
+        {groups.length > 1 ? (
+          <div role="tablist" aria-label="Payment type" className="grid gap-1 rounded-xl bg-muted p-1" style={{ gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))` }}>
+            {groups.map((group) => {
+              const active = group.id === activeGroup;
+              const GroupIcon = group.icon;
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => {
+                    if (active) return;
+                    const first = methods.find((m) => m.group === group.id);
+                    if (first) setSelectedId(first.id);
+                  }}
+                  className={cn(
+                    "flex min-h-10 flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all sm:flex-row sm:gap-2 sm:text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <GroupIcon className="size-4 shrink-0" aria-hidden />
+                  <span className="truncate">{group.title}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
         <div
-          className="mt-3 space-y-5"
           role="radiogroup"
           aria-labelledby="payment-method-heading"
           onKeyDown={onMethodKeyDown}
+          className={cn("grid gap-3", orderedMethods.length > 1 && "sm:grid-cols-2")}
         >
-          {GROUPS.map((group) => {
-            const groupMethods = methods.filter((m) => m.group === group.id);
-            if (groupMethods.length === 0) return null;
-            return (
-              <div key={group.id} className="space-y-2.5">
-                <h3 className="text-sm font-medium text-muted-foreground">{group.title}</h3>
-                {groupMethods.map((method) => {
+          {orderedMethods.map((method) => {
             const Icon = KIND_ICONS[method.kind];
             const active = method.id === selectedId;
             return (
@@ -227,53 +265,47 @@ export function CheckoutForm({
                 onClick={() => setSelectedId(method.id)}
                 className={cn(
                   TILE,
-                  "flex min-h-14 w-full items-center gap-3 px-4 py-3",
+                  "relative flex min-h-32 w-full flex-col items-start gap-3 rounded-xl p-4",
                   active
-                    ? "border-primary bg-primary/[0.03] ring-2 ring-primary/20"
-                    : "border-border hover:border-primary/40"
+                    ? "border-primary bg-primary/[0.04] shadow-[0_0_0_1px_var(--primary)]"
+                    : "border-border hover:border-foreground/20 hover:shadow-sm"
                 )}
               >
                 <span
                   aria-hidden
                   className={cn(
-                    "flex size-4 shrink-0 items-center justify-center rounded-full border-2",
-                    active ? "border-primary" : "border-muted-foreground/40"
+                    "flex size-10 shrink-0 items-center justify-center rounded-lg border",
+                    active ? "border-primary/20 bg-primary text-primary-foreground" : "border-border bg-muted/50 text-muted-foreground"
                   )}
                 >
-                  {active ? <span className="size-2 rounded-full bg-primary" /> : null}
+                  <Icon className="size-[18px]" />
+                </span>
+                <span className="min-w-0 flex-1 pr-6">
+                  <span className="block text-sm font-semibold">{method.label}</span>
+                  <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                    {method.description}
+                    {method.simulated ? " · test mode" : ""}
+                  </span>
+
                 </span>
                 <span
                   aria-hidden
                   className={cn(
-                    "flex size-9 shrink-0 items-center justify-center rounded-lg",
-                    active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    "absolute top-4 right-4 flex size-5 items-center justify-center rounded-full border-2 transition-colors",
+                    active ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30"
                   )}
                 >
-                  <Icon className="size-4.5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">{method.label}</span>
-                  <span className="block text-xs text-muted-foreground sm:truncate">
-                    {method.description}
-                    {method.simulated ? " · test mode" : ""}
-                  </span>
-                </span>
-                <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
-                  {method.badges.map((badge) => (
-                    <span
-                      key={badge}
-                      className="rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground"
-                    >
-                      {badge}
-                    </span>
-                  ))}
+                  {active ? <Check className="size-3" strokeWidth={3} /> : null}
                 </span>
               </button>
             );
           })}
-              </div>
-            );
-          })}
+          {!onlineAvailable ? (
+            <button type="button" role="radio" aria-checked={false} disabled className={cn(TILE, "flex items-center gap-3 rounded-xl border-dashed border-border bg-muted/20 px-4 py-3 text-muted-foreground sm:col-span-2")}>
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted"><CreditCard className="size-[18px]" aria-hidden /></span>
+              <span className="min-w-0"><span className="block text-sm font-semibold">Online payment</span><span className="mt-1 block text-xs">Not yet available</span></span>
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -295,34 +327,41 @@ export function CheckoutForm({
       {error ? (
         <Alert variant="destructive">
           <AlertCircle />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{error}{signInRequired ? <Link className="ml-2 font-semibold underline underline-offset-4" href={`/login?redirect_to=${encodeURIComponent(`/checkout/${orderId}`)}`}>Sign in</Link> : null}</AlertDescription>
         </Alert>
       ) : null}
 
-      <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-muted-foreground">
-          By paying you agree to our{" "}
-          <Link
-            href="/terms"
-            className="rounded-sm underline underline-offset-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            terms and conditions
-          </Link>
-          .
-        </p>
+      <div className="-mx-5 -mb-5 space-y-4 rounded-b-xl border-t border-border bg-muted/25 p-5 sm:-mx-6 sm:-mb-6 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="shrink-0"><span className="block text-xs text-muted-foreground">{selected?.kind === "cash" ? "Amount at office" : "Amount to pay"}</span><span className="mt-1 block text-xl font-semibold tabular-nums">{payLabel}</span></div>
         <Button
           type="submit"
           size="lg"
-          loading={initiate.isPending}
+          loading={isPending}
           disabled={
-            !selected ||
+            isPending || signInRequired || !selected ||
             (payChoice === "amount" && (!Number.isFinite(amount) || amount < amountFloor || amount > remaining))
           }
-          className="w-full gap-2 tabular-nums sm:w-auto"
+          className="h-12 w-full gap-2 rounded-lg bg-brand-accent px-6 text-sm font-semibold text-brand-accent-foreground shadow-xs hover:bg-brand-accent/90 sm:w-auto"
         >
-          {initiate.isPending ? null : <Lock className="size-4" aria-hidden />}
-          {initiate.isPending ? "Processing…" : `Pay ${payLabel}`}
+          {isPending ? null : <Lock className="size-4" aria-hidden />}
+          {isPending ? "Processing…" : selected?.id === "cash_office" ? "Continue with office payment" : selected?.id === "bank_transfer" ? "Continue with bank transfer" : `Pay ${payLabel}`}
+          {!isPending ? <ArrowRight className="size-4" aria-hidden /> : null}
         </Button>
+        </div>
+        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+          <ShieldCheck className="size-3.5 shrink-0" aria-hidden />
+          <span>
+            By continuing you agree to our{" "}
+            <Link
+              href="/terms"
+              className="rounded-sm underline underline-offset-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              terms and conditions
+            </Link>
+            .
+          </span>
+        </p>
       </div>
     </form>
   );

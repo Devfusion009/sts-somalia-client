@@ -18,7 +18,7 @@ export function AdminWorkspace() {
       <WorkspaceCover
         compact
         headingLevel={2}
-        image="/marketing/airport.webp"
+        image="/admin/travel-operations.svg"
         title="Travel operations"
         actions={<Link href="/admin/queue" className={styles.queueLink}>Open order queue<ArrowRight className="size-3.5" aria-hidden="true" /></Link>}
       />
