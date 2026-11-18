@@ -1,3 +1,4 @@
+import { PoolRequestList } from "@/modules/umrah/components/pool-request-list";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2, ChevronRight, Layers, List, Luggage } from "lucide-react";
@@ -114,6 +115,7 @@ export default async function AccountBookingsPage({
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
+      <PoolRequestList />
       <PageHeader title="My bookings" actions={viewToggle} />
 
       {success && SUCCESS_MESSAGES[success] ? (

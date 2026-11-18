@@ -1,0 +1,8 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript');
+function load(deps){const file='apps/web/src/modules/umrah/pool-worker.ts';const m={exports:{}};new Function('require','module','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(id=>deps[id]||{},m,m.exports);return m.exports;}
+for(const agency of [null,'qa-agency'])test(`path-based ${agency?'agent':'customer'} email uses site URL and records delivery`,async()=>{
+ let origin,finished;const request={id:'r',agency_id:agency,customer_id:'c',status:'requested'};
+ const db={rpc:async(name,args)=>{if(name==='claim_umrah_pool_emails')return{data:[{id:'j',request_id:'r',kind:'received',claim_token:'lease'}]};if(name==='finish_umrah_pool_email')finished=args;return{data:{}}},from:table=>({select:()=>({eq:()=>({single:async()=>({data:table==='umrah_pool_requests'?request:agency?{contact_email:'agent@example.test'}:{email:'customer@example.test'}})})})})};
+ const worker=load({'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/integrations':{getIntegrations:()=>({email:{provider:'smtp'},siteUrl:'http://localhost:3000'})},'@/lib/subdomain':{portalOrigin:()=>'',rootOrigin:()=>''},'./pool-email':{poolMailIsCurrent:()=>true,renderPoolEmail:(kind,r,url)=>{origin=url;return{subject:'QA',text:'QA'}}},'@/lib/notifications/email':{sendEmail:async()=>({sent:true})}});
+ assert.equal((await worker.processUmrahPools()).sent,1);assert.equal(origin,'http://localhost:3000');assert.equal(finished.p_outcome,'sent');assert.equal(finished.p_token,'lease');
+});

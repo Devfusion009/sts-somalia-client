@@ -103,9 +103,12 @@ export class PackageAdminService {
       await this.packages.updatePackage(input.id, row);
       return { id: input.id };
     }
-    const record = { ...row, slug: slugify(input.name), package_type: input.packageType ?? "group" };
+    const record = { ...row, slug: slugify(input.name), package_type: input.packageType ?? "group",
+      request_first: input.requestFirst ?? false, formation_closes_at: input.formationClosesAt,
+      payment_cutoff_at: input.paymentCutoffAt, payment_window_hours: input.paymentWindowHours, request_terms: input.requestTerms,
+    };
     return { id: input.packageType === "private"
-      ? await this.packages.insertPackage(record)
+      ? await this.packages.insertPackage({ ...row, slug: record.slug, package_type: record.package_type })
       : await this.packages.insertPublicPackage(record, input.departureDate!, input.totalSeats!) };
 
   }

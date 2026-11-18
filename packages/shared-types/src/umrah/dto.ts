@@ -129,6 +129,11 @@ export const publicUmrahAgentContactSchema = z.object({
 });
 
 export const packageUpsertSchema = z.object({
+  requestFirst: z.boolean().optional(),
+  formationClosesAt: z.string().datetime({offset:true}).optional(),
+  paymentCutoffAt: z.string().datetime({offset:true}).optional(),
+  paymentWindowHours: z.number().int().min(1).max(168).optional(),
+  requestTerms: z.string().trim().min(10).max(5000).optional(),
   packageType: z.enum(["group", "private"]).optional(),
   poolVisibility: z.enum(["public", "private"]).optional(),
   organizerName: optionalText(160),
@@ -156,6 +161,9 @@ export const packageUpsertSchema = z.object({
   totalSeats: z.number().int().min(1).max(10000).optional(),
   departureDate: isoDay.optional(),
 }).superRefine((value, ctx) => {
+  if (value.requestFirst && (value.id || value.packageType === "private" || value.poolVisibility === "private" || !value.formationClosesAt || !value.paymentCutoffAt || !value.requestTerms || !value.paymentWindowHours || Date.parse(value.formationClosesAt) + value.paymentWindowHours * 3_600_000 > Date.parse(value.paymentCutoffAt))) {
+    ctx.addIssue({code:"custom",path:["formationClosesAt"],message:"Complete public pool deadlines and terms."});
+  }
   if (value.packageType === "private") return;
   if (!value.organizerName?.trim()) ctx.addIssue({ code: "custom", path: ["organizerName"], message: "Enter the organizer name." });
   if (!value.organizerEmail) ctx.addIssue({ code: "custom", path: ["organizerEmail"], message: "Enter the organizer contact email." });
@@ -434,6 +442,13 @@ export const packageCardSchema = z.object({
 export type PackageCard = z.infer<typeof packageCardSchema>;
 
 const departurePublic = z.object({
+  booking_mode: z.enum(["immediate_payment", "request_then_pay"]).optional(),
+  formation_status: z.string().optional(),
+  formation_closes_at: z.string().nullable().optional(),
+  payment_cutoff_at: z.string().nullable().optional(),
+  payment_window_hours: z.number().optional(),
+  replacement_sales_open: z.boolean().optional(),
+  request_terms: z.string().nullable().optional(),
   id: z.string(),
   departure_date: z.string(),
   return_date: z.string(),

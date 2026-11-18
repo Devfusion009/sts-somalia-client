@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
+import { submitPoolRequestForm } from "@/modules/umrah/pool-request-submit";
 import { createUmrahBooking } from "@/modules/umrah/actions";
 import { sharingLabel } from "@/modules/umrah/images";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,8 @@ type Departure = {
   booked_seats: number;
   offline_seats: number;
   price_override: number | null;
+  booking_mode?: string;
+  request_terms?: string | null;
 };
 
 type SharingRate = { sharing: number; price: number | string };
@@ -61,7 +64,7 @@ function formatDate(date: string) {
 }
 
 function money(amount: number, currency: string) {
-  return `${currency} ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  return `${currency} ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function SectionHeading({ index, title }: { index: number; title: string }) {
@@ -118,7 +121,14 @@ export function BookingForm({
   action?: typeof createUmrahBooking;
   desk?: DeskContext;
 }) {
-  const [state, formAction] = useActionState(action ?? createUmrahBooking, null);
+  const [requestKey] = useState(() => {
+    // getRandomValues also works on HTTP QA; randomUUID requires a secure context.
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+  });
   const [selectedId, setSelectedId] = useState<string | null>(
     departures.find((departure) => seatsLeftOn(departure) > 0)?.id ?? null
   );
@@ -135,6 +145,13 @@ export function BookingForm({
   );
   const router = useRouter();
 
+  const selected = useMemo(
+    () => departures.find((d) => d.id === selectedId) ?? null,
+    [departures, selectedId]
+  );
+  const requestFirst = selected?.booking_mode === "request_then_pay";
+  const [state, formAction] = useActionState(requestFirst ? submitPoolRequestForm : action ?? createUmrahBooking, null);
+  const seatsLeft = selected ? seatsLeftOn(selected) : 0;
   // Desk submissions get a path back instead of a redirect, because a Server
   // Action redirect into the agent portal lands on the wrong host.
   useEffect(() => {
@@ -143,11 +160,6 @@ export function BookingForm({
     }
   }, [state, router]);
 
-  const selected = useMemo(
-    () => departures.find((d) => d.id === selectedId) ?? null,
-    [departures, selectedId]
-  );
-  const seatsLeft = selected ? seatsLeftOn(selected) : 0;
   const selectedRate = rates.find((r) => r.sharing === sharing) ?? null;
   const priceFor = (d: Departure | null) =>
     rates.length > 0 ? (selectedRate?.price ?? 0) : Number(d?.price_override ?? basePrice);
@@ -179,6 +191,7 @@ export function BookingForm({
   return (
     <form action={formAction} className="space-y-8">
       {bookedForSlot}
+      <input type="hidden" name="requestKey" value={requestKey} />
       {requiresApproval && rates.length === 0 ? <input type="hidden" name="room_sharing" value="1" /> : null}
       <section className="space-y-4">
         <SectionHeading index={1} title="Choose a departure" />
@@ -316,6 +329,7 @@ export function BookingForm({
         />
       </section>
 
+      {requestFirst ? <fieldset className="space-y-3 rounded-xl border p-4"><legend className="px-2 font-semibold">Pool terms</legend><div className="whitespace-pre-wrap text-sm">{selected?.request_terms}</div><label className="flex items-start gap-3"><input type="checkbox" name="termsAccepted" required className="mt-1 size-4" /><span>I accept the formation, payment and cancellation terms.</span></label><Badge variant="info">Payment opens when the group is full</Badge></fieldset> : null}
       <FieldError>{state?.error}</FieldError>
 
       <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-card p-4 shadow-md ring-1 ring-foreground/10">
@@ -335,8 +349,8 @@ export function BookingForm({
           </p>
         </div>
         <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center">
-          <SubmitButton size="lg" disabled={cannotBook} pendingText="Creating booking…">
-            {requiresApproval ? "Send booking request" : "Continue to payment"} <ArrowRight data-icon="inline-end" aria-hidden="true" />
+          <SubmitButton size="lg" disabled={cannotBook} pendingText={requestFirst ? "Submitting request…" : "Creating booking…"}>
+            {requestFirst ? "Request places" : requiresApproval ? "Send booking request" : "Continue to payment"} <ArrowRight data-icon="inline-end" aria-hidden="true" />
           </SubmitButton>
         </div>
       </div>

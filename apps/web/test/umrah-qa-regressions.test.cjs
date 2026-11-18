@@ -33,6 +33,7 @@ function load(path, mocks = {}) {
   });
   runInNewContext(outputText, {
     module: compiled, exports: compiled.exports,
+    crypto: { getRandomValues: bytes => require("node:crypto").webcrypto.getRandomValues(bytes) },
     FormData: class {
       constructor(form) { this.form = form; }
       get(key) { return this.form[key] ?? null; }
@@ -219,3 +220,8 @@ for (const [component, modulePath, endpoint, props, fields] of [
     assert.match(text(Component(props)), /Validation failed\./);
   });
 }
+test('request keys remain valid and unique without secure-context randomUUID', () => {
+  const keys=Array.from({length:20},()=>nodes(BookingForm({...formProps,departures:[available]})).find(node=>node.props.name==='requestKey').props.value);
+  assert.equal(new Set(keys).size,20);
+  for(const key of keys) assert.match(key,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+});

@@ -295,7 +295,13 @@ function slugify(input: string) {
 // ---------------------------------------------------------------------------
 
 function umrahPackageInput(formData: FormData) {
+  const requestFirst = formData.get("requestFirst") === "on";
   return {
+    ...(requestFirst ? {requestFirst:true,
+      formationClosesAt:new Date(`${formData.get("formationClosesAt")}:00+03:00`).toISOString(),
+      paymentCutoffAt:new Date(`${formData.get("paymentCutoffAt")}:00+03:00`).toISOString(),
+      paymentWindowHours:Number(formData.get("paymentWindowHours")), requestTerms:String(formData.get("requestTerms") ?? ""),
+    } : {}),
     packageType: String(formData.get("packageType") ?? "group") as "group" | "private",
     originIata: String(formData.get("originIata") ?? "").trim() || undefined,
     destinationIata: String(formData.get("destinationIata") ?? "").trim() || undefined,
