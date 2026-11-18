@@ -195,7 +195,7 @@ export default async function BookingDetailPage({
     : null;
 
   // Pilgrims, history, documents (signed links), readiness and travel — one API read under the caller's access.
-  const umrahFile = umrahBooking ? await (await getServerTrpc()).umrah.bookingFile.query({ bookingId: umrahBooking.id }) : null;
+  const umrahFile = umrahBooking ? await (await getServerTrpc({ timeoutMs: 15000 })).umrah.bookingFile.query({ bookingId: umrahBooking.id }) : null;
   const umrahPilgrims = umrahFile?.pilgrims ?? [];
   const umrahHistory = umrahFile?.history ?? [];
   const umrahDocumentRows = umrahFile?.documents ?? [];

@@ -9,13 +9,13 @@ import { dbException, throwIfDbError } from "../../../common/errors/db-error";
 export const IMAGES_BUCKET = "umrah-images";
 
 const CARD_SELECT =
-  "id, package_type, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats, offline_seats, sales_close_days, status), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
+  "id, package_type, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats, offline_seats, sales_close_days, status, booking_mode, formation_status, formation_closes_at, payment_cutoff_at, payment_window_hours, replacement_sales_open), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
 
 const DETAIL_SELECT = `id, package_type, slug, name, description, tagline, tier, is_featured, origin_iata, destination_iata,
   duration_days, includes, images, base_price, original_price, currency, status,
   agent_contacts, facilities, accommodation_details, flight_details, transport_details, nights_makkah, nights_madinah,
   meal_plan, meals_note, contact_person_name, contact_person_phone, contact_person_email, contact_whatsapp,
-  umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, offline_seats, price_override, sales_close_days, status,
+  umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, offline_seats, price_override, sales_close_days, status, booking_mode, formation_status, formation_closes_at, payment_cutoff_at, payment_window_hours, replacement_sales_open, request_terms,
     outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at,
     return_airline, return_flight_number, return_departs_at, return_arrives_at, baggage_note),
   umrah_package_hotels(id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order),

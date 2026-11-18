@@ -58,7 +58,9 @@ export default async function CheckoutPage({
   const { orderId } = await params;
   const profile = await requireUser(`/checkout/${orderId}`);
 
-  const trpc = await getServerTrpc();
+  // Checkout joins order items, bookings and payments. Give that read the same
+  // budget as the Umrah request detail so a slow QA/API response stays payable.
+  const trpc = await getServerTrpc({ timeoutMs: 15000 });
   let order: CheckoutOrderRow | null;
   try {
     // Cast, not inferred: this procedure's output is a raw multi-branch join
@@ -108,6 +110,7 @@ export default async function CheckoutPage({
     order.status === "pending_payment" &&
     paidTotal === 0 &&
     umrahItem?.umrah_booking?.booking_kind === "group" &&
+    !umrahItem.umrah_booking.pool_request_id &&
     umrahItem.umrah_booking.status === "pending";
   const umrahSeatsHeldUntil = umrahGroupUnpaid ? await umrahSeatHoldEnd(order.created_at) : null;
 

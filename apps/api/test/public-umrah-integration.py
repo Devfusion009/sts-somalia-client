@@ -3,7 +3,7 @@ Usage: python3 apps/api/test/public-umrah-integration.py
 Requires local PostgreSQL 16+ binaries. No Docker, credentials or network listener.
 """
 from pathlib import Path
-import os, subprocess, tempfile, concurrent.futures
+import os, subprocess, tempfile, concurrent.futures, sys
 ROOT=Path(__file__).resolve().parents[3]
 BINS=Path(os.environ.get('PG_TEST_BIN','/usr/lib/postgresql/16/bin'))
 def run(args, **kwargs):
@@ -44,6 +44,24 @@ with tempfile.TemporaryDirectory(prefix='sts-public-umrah-') as folder:
         assert remaining=='0',remaining
         run(args+['-f',ROOT/'supabase/migrations/20261116000002_unified_umrah_pool.sql'])
         run(args+['-f',ROOT/'apps/api/test/unified-umrah-pool.sql'])
+        if '--request-pool' in sys.argv:
+            run(args+['-f',ROOT/'apps/api/test/pool-request-fixture.sql'])
+            for migration in sorted((ROOT/'supabase/migrations').glob('20261117*umrah_pool*.sql')):
+                run(args+['-f',migration])
+                if migration.name.startswith('20261117000001_'): run(args+['-f',ROOT/'apps/api/test/pool-request-schema.sql'])
+            checks=ROOT/'apps/api/test/pool-request-checks.sql'
+            if checks.exists(): run(args+['-f',checks])
+            query="""begin; set local role authenticated; select set_config('test.admin','no',true); select set_config('test.agent','no',true); select set_config('test.uid','00000000-0000-0000-0000-000000000002',true); select submit_umrah_pool_requests((select id from test_ids where name='request-departure'),gen_random_uuid(),'[{"pilgrims":[{"full_name":"Final QA Pilgrim","gender":"male"}]}]',true); commit;"""
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool: results=list(pool.map(compete,range(2)))
+            assert sorted(r.returncode for r in results)==[0,3],[(r.returncode,r.stderr) for r in results]
+            run(args,input="select test_assert((select booked_seats=40 from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'last seat oversold'); select test_assert((select count(*)=1 from umrah_pool_events where kind='activate'),'activation not exactly once');")
+            activation=ROOT/'apps/api/test/pool-request-activation.sql'
+            if activation.exists(): run(args+['-f',activation])
+            payment=ROOT/'apps/api/test/pool-request-payment.sql'
+            if payment.exists(): run(args+['-f',payment])
+            run(args+['-f',ROOT/'apps/api/test/pool-request-closure.sql'])
+            print('PASS: atomic package creation and exact formation closure without duplicate release/notice.')
+            print('PASS: request-first schema, ownership, atomic batch, idempotency, withdrawal and concurrent capacity gates.')
         print('PASS: package validation, publication, customer and agent inventory, payment gate, expiry, bank review, confirmation, pool totals, concurrent last-seat race.')
     except subprocess.CalledProcessError as error:
         print(error.stdout);print(error.stderr);

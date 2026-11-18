@@ -1,3 +1,4 @@
+import { PoolRequestList } from "@/modules/umrah/components/pool-request-list";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
@@ -44,6 +45,7 @@ export default async function AgentBookingsPage({ searchParams }: { searchParams
 
   return (
     <div className="space-y-6">
+      <PoolRequestList agent />
       <PageHeader title="Bookings" actions={<>
         <Button variant="outline" nativeButton={false} render={<a href={exportHref} />}><Download data-icon="inline-start" aria-hidden="true" />Export CSV</Button>
         {canBook ? <Button render={<Link href="/agent/book" />}><Plus data-icon="inline-start" aria-hidden="true" />New booking</Button> : null}

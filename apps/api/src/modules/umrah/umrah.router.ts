@@ -1,3 +1,5 @@
+import { PoolRequestService } from "./services/pool-request.service";
+import { submitPoolRequestSchema, configurePoolSchema } from "@sts/shared-types";
 import { z } from "zod";
 import {
   adminCancelBookingSchema,
@@ -89,6 +91,19 @@ export const umrahRouter = router({
 
   operations: publicProcedure.query(async ({ ctx }) => (await ctx.resolve(UmrahCatalogService)).operations()),
 
+  poolRequests: router({
+    enabled: protectedAdminProcedure.query(async ({ctx}) => (await ctx.resolve(PoolRequestService)).enabled()),
+    openReplacements: protectedAdminProcedure.input(departureRefSchema).mutation(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).openReplacements(input.departureId)),
+    delivery: protectedAdminProcedure.input(departureRefSchema).query(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).delivery(input.departureId)),
+    resend: protectedAdminProcedure.input(z.object({jobId:z.string().uuid()})).mutation(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).resend(input.jobId)),
+    submit: protectedProcedure.input(submitPoolRequestSchema).mutation(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).submit(input)),
+    list: protectedProcedure.query(async ({ctx}) => (await ctx.resolve(PoolRequestService)).list()),
+    get: protectedProcedure.input(requestRefSchema).query(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).get(input.requestId)),
+    withdraw: protectedProcedure.input(requestRefSchema).mutation(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).withdraw(input.requestId)),
+    configure: protectedAdminProcedure.input(configurePoolSchema).mutation(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).configure(input)),
+    departures: protectedAdminProcedure.input(packageRefSchema).query(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).departures(input.packageId)),
+    applicants: protectedAdminProcedure.input(departureRefSchema).query(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).list(input.departureId)),
+  }),
   // ---- customer / agent ----
   bookingTravel: protectedProcedure
     .input(bookingRefSchema)

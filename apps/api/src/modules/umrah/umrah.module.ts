@@ -1,3 +1,4 @@
+import { PoolRequestService } from "./services/pool-request.service";
 import { Module } from "@nestjs/common";
 import { OrdersModule } from "../orders/orders.module";
 import { UmrahController } from "./umrah.controller";
@@ -21,6 +22,7 @@ import { FulfillmentAdminService } from "./services/fulfillment-admin.service";
   imports: [OrdersModule],
   controllers: [UmrahController],
   providers: [
+    PoolRequestService,
     PackageRepository,
     ServiceCatalogRepository,
     CustomRequestRepository,

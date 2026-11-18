@@ -4,3 +4,4 @@ export * from "./pricing";
 export * from "./itinerary";
 export * from "./rules";
 export * from "./dto";
+export * from "./pool-request";

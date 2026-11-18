@@ -1,0 +1,44 @@
+create function test_assert(ok boolean,message text) returns void language plpgsql as $$ begin if ok is distinct from true then raise exception '%',message; end if; end $$;
+create function test_fails(statement text,expected text) returns void language plpgsql as $$ begin
+ begin execute statement; exception when others then if position(expected in sqlerrm)>0 then return; end if; raise; end;
+ raise exception 'Expected rejection: %',expected;
+end $$;
+select set_config('test.admin','yes',false),set_config('test.agent','no',false),set_config('test.uid','00000000-0000-0000-0000-000000000002',false);
+insert into test_ids values('request-package',create_public_umrah_package((select to_jsonb(p)||'{"slug":"request-pool","contact_person_email":"qa@example.test"}'::jsonb from umrah_packages p where id=(select id from test_ids where name='package')),current_date+90,40));
+insert into test_ids select 'request-departure',id from umrah_package_departures where package_id=(select id from test_ids where name='request-package');
+select test_fails(format('select configure_umrah_request_pool(%L,now()+interval ''30 days'',now()+interval ''60 days'',48,''QA terms for this pool'')',(select id from test_ids where name='request-departure')),'not enabled');
+update platform_settings set value='true' where key='umrah_request_pools_enabled';
+select test_fails(format('select configure_umrah_request_pool(%L,now()+interval ''30 days'',now()+interval ''60 days'',48,null)',(select id from test_ids where name='request-departure')),'umrah_request_deadlines');
+select configure_umrah_request_pool((select id from test_ids where name='request-departure'),now()+interval '30 days',now()+interval '60 days',48,'QA terms for this pool');
+select test_fails(format('update umrah_packages set status=''published'' where id=%L',(select id from test_ids where name='request-package')),'cover image');
+update umrah_packages set images='["qa-cover.webp"]',status='published' where id=(select id from test_ids where name='request-package');
+select test_assert((select formation_status='forming' from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'publish did not start formation');
+select set_config('test.admin','no',false);
+create table request_results(result jsonb);
+insert into request_results select submit_umrah_pool_requests((select id from test_ids where name='request-departure'),'00000000-0000-0000-0000-000000000800','[{"pilgrims":[{"full_name":"QA Customer","gender":"male"}]}]',true);
+insert into test_ids select 'request-one',(result->0->>'id')::uuid from request_results;
+select test_assert((select booked_seats=1 and total_seats-booked_seats=39 from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'40 minus one must equal 39');
+select test_assert((select order_id is null and status='requested' and total=100 from umrah_pool_requests where id=(select id from test_ids where name='request-one')),'initial request created payment/order or wrong price');
+select test_assert(submit_umrah_pool_requests((select id from test_ids where name='request-departure'),'00000000-0000-0000-0000-000000000800','[{"pilgrims":[{"full_name":"QA Customer","gender":"male"}]}]',true)=(select result from request_results),'retry changed result');
+select test_fails(format('select submit_umrah_pool_requests(%L,''00000000-0000-0000-0000-000000000800'',''[{"pilgrims":[{"full_name":"Changed","gender":"male"}]}]'',true)',(select id from test_ids where name='request-departure')),'different details');
+select test_fails(format('update umrah_package_departures set total_seats=41 where id=%L',(select id from test_ids where name='request-departure')),'locked');
+select test_fails(format('update umrah_packages set base_price=999 where id=%L',(select id from test_ids where name='request-package')),'locked');
+select set_config('test.uid','00000000-0000-0000-0000-000000000003',false);
+select test_fails(format('select withdraw_umrah_pool_request(%L)',(select id from test_ids where name='request-one')),'not found');
+select set_config('test.uid','00000000-0000-0000-0000-000000000002',false);
+select withdraw_umrah_pool_request((select id from test_ids where name='request-one'));
+select withdraw_umrah_pool_request((select id from test_ids where name='request-one'));
+select test_assert((select booked_seats=0 from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'withdrawal did not release once');
+-- One malformed customer in a batch must roll back every earlier customer.
+insert into agency_members values('00000000-0000-0000-0000-000000000099','00000000-0000-0000-0000-000000000004','active');
+select set_config('test.uid','00000000-0000-0000-0000-000000000004',false),set_config('test.agent','yes',false);
+select test_fails(format('select submit_umrah_pool_requests(%L,gen_random_uuid(),''[{"agencyCustomerId":"00000000-0000-0000-0000-000000000088","pilgrims":[{"full_name":"Valid","gender":"male"}]},{"agencyCustomerId":"00000000-0000-0000-0000-000000000077","pilgrims":[{"full_name":"Invalid customer","gender":"male"}]}]'',true)',(select id from test_ids where name='request-departure')),'belonging to your agency');
+select test_assert((select booked_seats=0 from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'failed batch allocated places');
+select set_config('test.viewer','yes',false);
+select test_fails(format('select submit_umrah_pool_requests(%L,gen_random_uuid(),''[{"agencyCustomerId":"00000000-0000-0000-0000-000000000088","pilgrims":[{"full_name":"Viewer customer","gender":"male"}]}]'',true)',(select id from test_ids where name='request-departure')),'Only agency booking staff');
+select set_config('test.viewer','no',false);
+-- Fill 39 places using one named agency party; leave one for a concurrent race.
+select submit_umrah_pool_requests((select id from test_ids where name='request-departure'),gen_random_uuid(),jsonb_build_array(jsonb_build_object('agencyCustomerId','00000000-0000-0000-0000-000000000088','pilgrims',(select jsonb_agg(jsonb_build_object('full_name','QA Pilgrim '||i,'gender','male')) from generate_series(1,39) i))),true);
+select test_assert((select booked_seats=39 from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'family count incorrect');
+select test_assert((select count(*)=1 and bool_and(status='requested' and order_id is null and agency_id='00000000-0000-0000-0000-000000000099'::uuid) from umrah_pool_requests where departure_id=(select id from test_ids where name='request-departure') and num_pilgrims=39),'agency request created an order or lost agency attribution');
+select test_assert(not exists(select 1 from umrah_pool_events where kind='activate'),'activated too early');

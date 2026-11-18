@@ -27,7 +27,8 @@ import { NATIVE_SELECT_CLASS } from "@/components/ui/native-select";
 
 type UmrahPackage = Database["public"]["Tables"]["umrah_packages"]["Row"];
 
-export function UmrahPackageForm({ pkg, airports = [] }: { pkg?: UmrahPackage; airports?: Airport[] }) {
+export function UmrahPackageForm({ pkg, airports = [], requestFirstEnabled = false }: { pkg?: UmrahPackage; airports?: Airport[]; requestFirstEnabled?: boolean }) {
+  const [requestFirst, setRequestFirst] = useState(requestFirstEnabled);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [packageType] = useState(pkg?.package_type ?? "group");
@@ -77,6 +78,12 @@ export function UmrahPackageForm({ pkg, airports = [] }: { pkg?: UmrahPackage; a
               </Alert>
             ) : null}
             <input type="hidden" name="packageType" value={packageType} />
+            {!pkg && isPublic && requestFirstEnabled ? <fieldset className="space-y-4 rounded-xl border p-4"><legend className="px-2 font-medium">Group formation</legend><label className="flex gap-2"><input type="checkbox" name="requestFirst" checked={requestFirst} onChange={e=>setRequestFirst(e.target.checked)} />Request places before payment</label>{requestFirst ? <>
+              <Field><FieldLabel htmlFor="formationClosesAt">Formation closes (Mogadishu)</FieldLabel><Input id="formationClosesAt" name="formationClosesAt" type="datetime-local" required /></Field>
+              <Field><FieldLabel htmlFor="paymentCutoffAt">Final payment cutoff (Mogadishu)</FieldLabel><Input id="paymentCutoffAt" name="paymentCutoffAt" type="datetime-local" required /></Field>
+              <Field><FieldLabel htmlFor="paymentWindowHours">Payment window (hours)</FieldLabel><Input id="paymentWindowHours" name="paymentWindowHours" type="number" min={1} max={168} defaultValue={48} required /></Field>
+              <Field><FieldLabel htmlFor="requestTerms">Formation and cancellation terms</FieldLabel><Textarea id="requestTerms" name="requestTerms" minLength={10} maxLength={5000} required /></Field>
+            </> : null}</fieldset> : null}
             <Field>
               <FieldLabel htmlFor="name">Name</FieldLabel>
               <Input id="name" name="name" defaultValue={pkg?.name} required />
