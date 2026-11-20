@@ -511,6 +511,7 @@ select:not([multiple]):not([size]) {
 .portal-shell[data-portal-accent="admin"] [data-collapsible="icon"] [data-slot="sidebar-menu-button"] {
   position: relative;
   width: 2.75rem !important;
+  min-width: 2.75rem;
   height: 2.75rem !important;
   min-height: 2.75rem;
   justify-content: center;
