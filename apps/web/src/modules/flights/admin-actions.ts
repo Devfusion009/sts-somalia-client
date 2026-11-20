@@ -16,6 +16,7 @@ export async function retryFlightTicketing(_prev: FlightAdminState, formData: Fo
   await requirePlatformAdmin();
   const parsed = z.object({ bookingId: z.uuid() }).safeParse({ bookingId: formData.get("bookingId") });
   if (!parsed.success) return { error: "Booking not found." };
+  if (formData.get("supplierChecked") !== "yes") return { error: "Confirm with the supplier that no booking exists before retrying." };
 
   const { data, error } = await createAdminClient()
     .from("flight_bookings")

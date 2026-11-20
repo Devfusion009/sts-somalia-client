@@ -35,12 +35,12 @@ test('catalog immediately hides a sold-out group and relists released seats with
  assert.equal((await catalog.allPackages()).length,0);
  rows=[pkg]; assert.equal((await catalog.allPackages()).length,1);assert.equal(reads,3);
 });
-test('featured limit applies after removing full groups and private packages retain their listing',async()=> {
+test('featured limit excludes full groups and retired private packages',async()=> {
  const {UmrahCatalogService}=load('apps/api/src/modules/umrah/services/umrah-catalog.service.ts',{'../mappers/package.mapper':mapper});
  const soldOut={...pkg,umrah_package_departures:[{...departure,booked_seats:5}]};
  const catalog=new UmrahCatalogService({findPublishedCards:async()=>[soldOut,pkg,{...soldOut,id:'private',package_type:'private'}]},{},{},{},{},{});
  assert.equal((await catalog.featuredPackages(1))[0].id,'id');
- assert.deepEqual((await catalog.allPackages()).map(p=>p.id),['id','private']);
+ assert.deepEqual((await catalog.allPackages()).map(p=>p.id),['id']);
 });
 test('customer and agent package details show authored facilities, stay nights and responsible contact',()=> {
  const {PublicPackageDetails}=load('apps/web/src/modules/umrah/components/public-package-details.tsx');

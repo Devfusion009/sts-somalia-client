@@ -13,8 +13,9 @@
  */
 export function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  if (process.env.STS_WORKER_SCHEDULER === "external") return;
   if (process.env.CRON_SECRET) startPoolScheduler();
-  if (!process.env.EMAIL_PROVIDER?.trim()) return;
+  if (!process.env.EMAIL_PROVIDER?.trim() || !process.env.CRON_SECRET) return;
 
   const globalFlag = globalThis as typeof globalThis & { __stsEmailOutbox?: boolean };
   if (globalFlag.__stsEmailOutbox) return;

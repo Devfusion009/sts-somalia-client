@@ -33,6 +33,21 @@ export type MyBookingsResult = {
   orderMeta: Record<string, { orderNumber: string | null; total: number; currency: string }>;
 };
 
+type BookingRef = { type: BookingType; id: string };
+type BookingPageIndex = { refs: BookingRef[]; total: number; counts: Record<"upcoming" | "past" | "cancelled", number> };
+
+/** Read every database page; PostgREST may cap a single response. */
+async function allPages<T>(load: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<{ data: T[] }> {
+  const size = 500;
+  const data: T[] = [];
+  for (let from = 0; ; from += size) {
+    const page = await load(from, from + size - 1);
+    if (page.error) throw new Error("Booking history could not be loaded.");
+    data.push(...(page.data ?? []));
+    if ((page.data?.length ?? 0) < size) return { data };
+  }
+}
+
 /**
  * Direct port of apps/web's modules/bookings/{queries,actions}.ts. Reads
  * hotel/flight/visa/umrah/hall booking tables directly (not through those
@@ -54,6 +69,20 @@ export class BookingsService {
     return this.rls.get() as SupabaseClient<Database>;
   }
 
+  async getMyBookingsPage(userId: string, input: { page: number; filter: "all" | "upcoming" | "past" | "cancelled"; type?: BookingType; personalOnly?: boolean; view?: "list" | "trips"; sort?: "created" | "travel" }) {
+    const { data, error } = await this.rls.get().rpc("my_booking_page", {
+      p_page: input.page, p_size: 20, p_filter: input.filter, p_type: input.type ?? null, p_personal_only: input.personalOnly ?? false, p_view: input.view ?? "list", p_sort: input.sort ?? "created",
+    });
+    if (error || !data) throw new Error("Booking history could not be loaded.");
+    const index = data as BookingPageIndex;
+    if (!Array.isArray(index.refs) || !index.counts) throw new Error("Booking history could not be loaded.");
+    const result = await this.getMyBookings(userId, { personalOnly: input.personalOnly, selected: index.refs });
+    const rank = new Map(index.refs.map((ref, position) => [`${ref.type}-${ref.id}`, position]));
+    result.bookings.sort((a, b) => (rank.get(`${a.type}-${a.id}`) ?? Infinity) - (rank.get(`${b.type}-${b.id}`) ?? Infinity));
+    if (result.bookings.length !== index.refs.length) throw new Error("Booking history could not be loaded.");
+    return { ...result, total: index.total, counts: index.counts, page: input.page, pageSize: 20 };
+  }
+
   /**
    * Every booking belonging to the caller across all five verticals,
    * normalised into one shape and annotated with its order. Returns
@@ -67,7 +96,7 @@ export class BookingsService {
    * for someone else." Used by the agent portal's own read-only history of
    * orders from before the account became an agent.
    */
-  async getMyBookings(userId: string, opts: { personalOnly?: boolean } = {}): Promise<MyBookingsResult> {
+  async getMyBookings(userId: string, opts: { personalOnly?: boolean; selected?: BookingRef[] } = {}): Promise<MyBookingsResult> {
     const supabase = this.db();
     const orFilter = opts.personalOnly
       ? `customer_id.eq.${userId}`
@@ -76,41 +105,61 @@ export class BookingsService {
       ? `applicant_profile_id.eq.${userId}`
       : `applicant_profile_id.eq.${userId},submitted_by.eq.${userId}`;
 
-    const [hotelRes, flightRes, visaRes, umrahRes, umrahDraftRes, hallRes, orderItemsRes] = await Promise.all([
-      supabase
-        .from("hotel_bookings")
-        .select("id, check_in, check_out, status, total_price, currency, created_at, hotels(name)")
-        .or(orFilter),
-      supabase
-        .from("flight_bookings")
-        .select("id, origin_iata, destination_iata, depart_at, status, total_price, currency, created_at")
-        .or(orFilter),
-      supabase
-        .from("visa_applications")
-        .select("id, status, price, currency, created_at, travel_details, visa_types(name)")
-        .or(visaOrFilter),
-      supabase
-        .from("umrah_bookings")
-        .select(
-          "id, status, total_price, currency, created_at, num_pilgrims, booking_kind, umrah_packages(name), umrah_package_departures(departure_date, return_date), umrah_custom_requests(reference, departure_date)"
-        )
-        .or(orFilter),
-      supabase
-        .from("umrah_custom_requests")
-        .select("id, reference, status, current_step, num_pilgrims, departure_date, subtotal, currency, created_at")
-        .eq("status", "draft")
-        .or(orFilter),
-      supabase
-        .from("hall_bookings")
-        .select("id, event_type, start_date, end_date, status, price, currency, created_at, event_venues(name)")
-        .or(orFilter),
-      supabase
-        .from("order_items")
-        .select(
-          "order_id, hotel_booking_id, flight_booking_id, visa_application_id, umrah_booking_id, hall_booking_id, orders!inner(order_number, status, total, currency, customer_id, booked_by)"
-        )
-        .or(orFilter, { referencedTable: "orders" }),
+    if (opts.selected?.length === 0) return { bookings: [], orderMeta: {} };
+    const selectedIds = (type: BookingType) => opts.selected?.filter((ref) => ref.type === type).map((ref) => ref.id) ?? [];
+    const dummyId = "00000000-0000-0000-0000-000000000000";
+    const bookingIds = (type: BookingType) => selectedIds(type).length ? selectedIds(type) : [dummyId];
+    const selectedFilter = opts.selected ? Object.entries(ORDER_ITEM_FK).flatMap(([type, fk]) =>
+      selectedIds(type as BookingType).length ? [`${fk}.in.(${selectedIds(type as BookingType).join(",")})`] : []
+    ).join(",") : null;
+
+    const [hotelRes, flightRes, visaRes, umrahRes, hallRes, orderItemsRes] = await Promise.all([
+      opts.selected
+        ? supabase.from("hotel_bookings")
+            .select("id, check_in, check_out, status, total_price, currency, created_at, hotels(name)")
+            .or(orFilter).in("id", bookingIds("hotel"))
+        : allPages((from,to) => supabase.from("hotel_bookings")
+            .select("id, check_in, check_out, status, total_price, currency, created_at, hotels(name)")
+            .or(orFilter).order("created_at", { ascending: false }).order("id").range(from,to)),
+      opts.selected
+        ? supabase.from("flight_bookings")
+            .select("id, origin_iata, destination_iata, depart_at, status, total_price, currency, created_at")
+            .or(orFilter).in("id", bookingIds("flight"))
+        : allPages((from,to) => supabase.from("flight_bookings")
+            .select("id, origin_iata, destination_iata, depart_at, status, total_price, currency, created_at")
+            .or(orFilter).order("created_at", { ascending: false }).order("id").range(from,to)),
+      opts.selected
+        ? supabase.from("visa_applications")
+            .select("id, status, price, currency, created_at, travel_details, visa_types(name)")
+            .or(visaOrFilter).in("id", bookingIds("visa"))
+        : allPages((from,to) => supabase.from("visa_applications")
+            .select("id, status, price, currency, created_at, travel_details, visa_types(name)")
+            .or(visaOrFilter).order("created_at", { ascending: false }).order("id").range(from,to)),
+      opts.selected
+        ? supabase.from("umrah_bookings")
+            .select("id, status, total_price, currency, created_at, num_pilgrims, booking_kind, umrah_packages(name), umrah_package_departures(departure_date, return_date), umrah_custom_requests(reference, departure_date)")
+            .or(orFilter).in("id", bookingIds("umrah"))
+        : allPages((from,to) => supabase.from("umrah_bookings")
+            .select("id, status, total_price, currency, created_at, num_pilgrims, booking_kind, umrah_packages(name), umrah_package_departures(departure_date, return_date), umrah_custom_requests(reference, departure_date)")
+            .or(orFilter).order("created_at", { ascending: false }).order("id").range(from,to)),
+      opts.selected
+        ? supabase.from("hall_bookings")
+            .select("id, event_type, start_date, end_date, status, price, currency, created_at, event_venues(name)")
+            .or(orFilter).in("id", bookingIds("hall"))
+        : allPages((from,to) => supabase.from("hall_bookings")
+            .select("id, event_type, start_date, end_date, status, price, currency, created_at, event_venues(name)")
+            .or(orFilter).order("created_at", { ascending: false }).order("id").range(from,to)),
+      opts.selected
+        ? supabase.from("order_items")
+            .select("order_id, hotel_booking_id, flight_booking_id, visa_application_id, umrah_booking_id, hall_booking_id, orders!inner(order_number, status, total, currency, customer_id, booked_by)")
+            .or(selectedFilter!).or(orFilter, { referencedTable: "orders" })
+        : allPages((from,to) => supabase.from("order_items")
+            .select("order_id, hotel_booking_id, flight_booking_id, visa_application_id, umrah_booking_id, hall_booking_id, orders!inner(order_number, status, total, currency, customer_id, booked_by)")
+            .or(orFilter, { referencedTable: "orders" }).order("id").range(from,to)),
     ]);
+    if ([hotelRes, flightRes, visaRes, umrahRes, hallRes, orderItemsRes].some((result) => "error" in result && result.error)) {
+      throw new Error("Booking history could not be loaded.");
+    }
 
     const orderByBooking = new Map<string, { orderId: string; status: string }>();
     const orderMeta: MyBookingsResult["orderMeta"] = {};
@@ -190,19 +239,6 @@ export class BookingsService {
         createdAt: u.created_at,
         travelDate: u.umrah_package_departures?.departure_date ?? u.umrah_custom_requests?.departure_date ?? null,
         ...link("umrah", u.id),
-      })),
-      ...(umrahDraftRes.data ?? []).map((r) => ({
-        id: r.id,
-        type: "umrah" as const,
-        title: "Private Umrah",
-        subtitle: `${r.reference} · ${r.num_pilgrims} traveller${r.num_pilgrims > 1 ? "s" : ""} · step ${r.current_step} of 4`,
-        status: "draft",
-        price: Number(r.subtotal),
-        currency: r.currency,
-        createdAt: r.created_at,
-        travelDate: r.departure_date,
-        orderId: null,
-        orderStatus: null,
       })),
       ...(hallRes.data ?? []).map((h) => ({
         id: h.id,

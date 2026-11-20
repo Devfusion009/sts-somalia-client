@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/auth/actions";
+import type { Database } from "@/lib/types/database.types";
 import { getMyAgency } from "./queries";
 
 const assignableRoles = z.enum(["admin", "booking_staff", "accountant", "viewer"]);
@@ -58,12 +59,13 @@ export async function addTeamMember(_prevState: ActionState, formData: FormData)
   }
 
   const supabase = await createClient();
+  // The before-insert trigger assigns the required username from the profile email.
   const { error } = await supabase.from("agency_members").insert({
     agency_id: membership.agency.id,
     profile_id: target.id,
     role_in_agency: parsed.data.role,
     status: "active",
-  });
+  } as Database["public"]["Tables"]["agency_members"]["Insert"]);
 
   if (error) {
     if (error.code === "23505") {

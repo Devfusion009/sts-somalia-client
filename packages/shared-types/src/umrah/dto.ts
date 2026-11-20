@@ -122,10 +122,15 @@ export type SubmitTripInput = z.infer<typeof submitTripSchema>;
 
 export const packageRefSchema = z.object({ packageId: uuid });
 
+const isInternationalPhone = (phone: string | undefined) => {
+  const value = phone?.trim() ?? "";
+  const digits = value.replace(/\D/g, "");
+  return /^\+[0-9 ()-]{7,30}$/.test(value) && digits.length >= 8 && digits.length <= 15;
+};
+
 export const publicUmrahAgentContactSchema = z.object({
   name: z.string().trim().min(2, "Enter the agent's name.").max(120),
-  phone: z.string().trim().regex(/^\+?[0-9 ()-]{7,40}$/, "Enter a valid agent phone number.")
-    .refine(value => value.replace(/\D/g, "").length >= 7, "Enter a valid agent phone number."),
+  phone: z.string().trim().refine(isInternationalPhone, "Enter an international agent number (+ and 8 to 15 digits)."),
 });
 
 export const packageUpsertSchema = z.object({
@@ -139,11 +144,11 @@ export const packageUpsertSchema = z.object({
   organizerName: optionalText(160),
   organizerEmail: z.string().trim().email("Enter the organizer contact email.").optional(),
   id: uuid.optional(),
-  name: z.string().trim().min(2, "Enter the package name.").max(160),
+  name: z.string().trim().min(2, "Enter the Umrah pool name (at least 2 characters).").max(160),
   description: optionalText(4000),
   originIata: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Select the departure airport.").optional(),
   destinationIata: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Select the arrival airport.").optional(),
-  durationDays: z.number().int().min(1, "Duration must be at least 1 day."),
+  durationDays: z.number().int("Enter a whole number of days.").min(2, "Duration must be at least 2 days.").max(120, "Duration cannot exceed 120 days."),
   includes: z.array(z.string()),
   basePrice: z.number().min(0, "The price can't be negative."),
   currency: z.string().trim().regex(/^[A-Za-z]{3}$/, "Enter a 3-letter currency code."),
@@ -158,7 +163,7 @@ export const packageUpsertSchema = z.object({
   mealsNote: optionalText(500),
   nightsMakkah: z.number().int().min(0).max(120).optional(),
   nightsMadinah: z.number().int().min(0).max(120).optional(),
-  totalSeats: z.number().int().min(1).max(10000).optional(),
+  totalSeats: z.number().int("Enter a whole number of seats.").min(1, "Total seats must be at least 1.").max(10000, "Total seats cannot exceed 10,000.").optional(),
   departureDate: isoDay.optional(),
 }).superRefine((value, ctx) => {
   if (value.requestFirst && (value.id || value.packageType === "private" || value.poolVisibility === "private" || !value.formationClosesAt || !value.paymentCutoffAt || !value.requestTerms || !value.paymentWindowHours || Date.parse(value.formationClosesAt) + value.paymentWindowHours * 3_600_000 > Date.parse(value.paymentCutoffAt))) {
@@ -172,8 +177,8 @@ export const packageUpsertSchema = z.object({
     if (!value[key]?.trim()) ctx.addIssue({ code: "custom", path: [key], message: `Enter the ${required[key]}.` });
   }
   if ((value.contactPersonName?.trim().length ?? 0) < 2) ctx.addIssue({ code: "custom", path: ["contactPersonName"], message: "Enter the responsible person's full name." });
-  if (!/^\+?[0-9 ()-]{7,40}$/.test(value.contactPersonPhone ?? "") || (value.contactPersonPhone?.replace(/\D/g, "").length ?? 0) < 7) {
-    ctx.addIssue({ code: "custom", path: ["contactPersonPhone"], message: "Enter a valid responsible person's phone number." });
+  if (!isInternationalPhone(value.contactPersonPhone)) {
+    ctx.addIssue({ code: "custom", path: ["contactPersonPhone"], message: "Enter the responsible person's international phone number (+ and 8 to 15 digits)." });
   }
   if (value.durationDays < 2 || value.durationDays > 120) ctx.addIssue({ code: "custom", path: ["durationDays"], message: "Duration must be 2 to 120 days." });
   if (value.basePrice <= 0) ctx.addIssue({ code: "custom", path: ["basePrice"], message: "Enter a price greater than zero." });
@@ -182,7 +187,8 @@ export const packageUpsertSchema = z.object({
   if (value.nightsMakkah === undefined || value.nightsMadinah === undefined || nights < 1 || nights >= value.durationDays) {
     ctx.addIssue({ code: "custom", path: ["nightsMakkah"], message: "Stay nights must total at least one and be fewer than the trip days." });
   }
-  if (!value.id && (!value.totalSeats || !value.departureDate)) ctx.addIssue({ code: "custom", path: ["totalSeats"], message: "Enter the departure date and total seats." });
+  if (!value.id && value.totalSeats === undefined) ctx.addIssue({ code: "custom", path: ["totalSeats"], message: "Enter the total number of seats." });
+  if (!value.id && !value.departureDate) ctx.addIssue({ code: "custom", path: ["departureDate"], message: "Enter the departure date." });
 });
 export type PackageUpsertInput = z.infer<typeof packageUpsertSchema>;
 

@@ -11,7 +11,7 @@ import styles from "@/components/marketing/travel-collection.module.css";
 
 export const metadata: Metadata = {
   title: "Umrah Packages",
-  description: "Join a fixed-price group Umrah package or build a private trip with your own dates, hotels and services. Umrah from Somalia with STS.",
+  description: "Join a group Umrah package or contact STS for a private trip. Umrah from Somalia with STS.",
 };
 
 const FLOWS = [
@@ -23,7 +23,7 @@ const FLOWS = [
   {
     href: "/umrah/private", title: "Private Umrah", label: "Travel your way", image: "/marketing/umrah-private-restored-v1.webp", icon: Plane,
     features: [{ icon: CalendarDays, label: "Your travel dates" }, { icon: Building2, label: "Your hotel choices" }, { icon: Plane, label: "Optional flights" }, { icon: UsersRound, label: "Your own party" }],
-    cta: "Build a private trip",
+    cta: "Contact STS",
   },
 ];
 

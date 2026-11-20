@@ -1,5 +1,6 @@
 import { AgentMoney } from "@/components/portal/agent-money";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Receipt } from "lucide-react";
 import { getServerTrpc } from "@/lib/trpc/server";
 import { TYPE_ICON, TYPE_LABEL, formatDate } from "@/modules/bookings/components/booking-shared";
@@ -8,6 +9,8 @@ import { Badge, statusBadgeVariant } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pager } from "@/components/dashboard/pager";
+import { parsePage } from "@/lib/pagination";
 import { UnavailableNotice } from "@/components/portal/unavailable-notice";
 import { money } from "@/lib/money";
 
@@ -20,11 +23,13 @@ export const metadata: Metadata = { title: "Personal Bookings" };
  * role). Booked-for-customer orders processed through the agency belong on
  * /agent/bookings instead; myPersonalBookings filters those out.
  */
-export default async function AgentPersonalBookingsPage() {
+export default async function AgentPersonalBookingsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const page = parsePage((await searchParams).page);
   const trpc = await getServerTrpc();
   let bookings: UnifiedBooking[];
+  let total = 0;
   try {
-    ({ bookings } = await trpc.bookings.myPersonalBookings.query());
+    ({ bookings, total } = await trpc.bookings.myPersonalBookingsPage.query({ page }));
   } catch {
     return (
       <div className="space-y-6">
@@ -33,12 +38,13 @@ export default async function AgentPersonalBookingsPage() {
       </div>
     );
   }
+  if (page > 1 && total > 0 && bookings.length === 0) redirect(`/agent/personal-bookings?page=${Math.ceil(total / 20)}`);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Personal bookings"
-        meta={bookings.length > 0 ? `${bookings.length} booking${bookings.length === 1 ? "" : "s"}` : undefined}
+        meta={total > 0 ? `${total} booking${total === 1 ? "" : "s"}` : undefined}
       />
 
       <Card className="overflow-hidden py-0">
@@ -86,6 +92,7 @@ export default async function AgentPersonalBookingsPage() {
           </ul>
         )}
       </Card>
+      <Pager page={page} total={total} pageSize={20} hrefFor={(next) => `/agent/personal-bookings?page=${next}`} />
     </div>
   );
 }

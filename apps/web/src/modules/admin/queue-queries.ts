@@ -4,11 +4,11 @@ import { eventTypeLabel } from "@sts/shared-types";
 /**
  * Bookings that need a human decision, newest first: hotel and hall
  * bookings the allocator could not seat (dates full, or displaced by an
- * agency), and private Umrah requests, which are priced by staff. Bookings
+ * agency). Bookings
  * with free capacity never land here; they are paid and confirmed directly.
  */
 export type QueueEntry = {
-  kind: "hotel" | "hall" | "umrah";
+  kind: "hotel" | "hall";
   id: string;
   channel: "b2b" | "b2c";
   agencyName: string | null;
@@ -37,13 +37,11 @@ export type QueueEntry = {
 async function getTravellerNames(ids: {
   hotel: string[];
   hall: string[];
-  umrah: string[];
 }): Promise<Map<string, string>> {
   const supabase = await createClient();
   const columns = [
     ["hotel_booking_id", ids.hotel],
     ["hall_booking_id", ids.hall],
-    ["umrah_booking_id", ids.umrah],
   ] as const;
 
   const results = await Promise.all(
@@ -74,7 +72,7 @@ async function getTravellerNames(ids: {
 export async function getBookingQueue(): Promise<QueueEntry[]> {
   const supabase = await createClient();
 
-  const [{ data: hotelRows, error: hotelError }, { data: hallRows, error: hallError }, { data: umrahRows, error: umrahError }] = await Promise.all([
+  const [{ data: hotelRows, error: hotelError }, { data: hallRows, error: hallError }] = await Promise.all([
     supabase
       .from("hotel_bookings")
       .select(
@@ -89,20 +87,9 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
       )
       .eq("status", "waitlisted")
       .order("created_at", { ascending: false }),
-    // booking_kind = 'private' only: a group booking is taken against a
-    // scheduled departure with real seat inventory, so it is already
-    // confirmed by construction and has nothing for staff to decide here.
-    supabase
-      .from("umrah_bookings")
-      .select(
-        "id, num_pilgrims, status, total_price, currency, created_at, agency:agencies(name), request:umrah_custom_requests!umrah_bookings_custom_request_id_fkey(reference, departure_date, nights_makkah, nights_madinah, tier), customer:profiles!umrah_bookings_customer_id_fkey(full_name, email)"
-      )
-      .eq("booking_kind", "private")
-      .eq("status", "pending")
-      .order("created_at", { ascending: false }),
   ]);
 
-  if (hotelError || hallError || umrahError) throw new Error("Booking queue could not be loaded. Refresh and try again.");
+  if (hotelError || hallError) throw new Error("Booking queue could not be loaded. Refresh and try again.");
 
   // Who the agency is actually booking for. It hangs off the order rather
   // than the booking row (only visa/flight carry agency_customer_id
@@ -110,7 +97,6 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
   const travellerByBooking = await getTravellerNames({
     hotel: (hotelRows ?? []).map((b) => b.id),
     hall: (hallRows ?? []).map((b) => b.id),
-    umrah: (umrahRows ?? []).map((b) => b.id),
   });
 
   const entries: QueueEntry[] = [
@@ -154,36 +140,6 @@ export async function getBookingQueue(): Promise<QueueEntry[]> {
         customerEmail: customer?.email ?? null,
         travellerName: travellerByBooking.get(b.id) ?? null,
         price: Number(b.price),
-        currency: b.currency,
-        status: b.status,
-        createdAt: b.created_at,
-      };
-    }),
-    ...(umrahRows ?? []).map((b): QueueEntry => {
-      const request = b.request as unknown as {
-        reference: string;
-        departure_date: string | null;
-        nights_makkah: number;
-        nights_madinah: number;
-        tier: string;
-      } | null;
-      const customer = b.customer as unknown as { full_name: string | null; email: string } | null;
-      const agency = b.agency as unknown as { name: string } | null;
-      return {
-        kind: "umrah",
-        id: b.id,
-        channel: agency ? "b2b" : "b2c",
-        agencyName: agency?.name ?? null,
-        displaced: false,
-        title: `Private Umrah · ${request?.reference ?? "request"}`,
-        dates: request?.departure_date ? { from: request.departure_date, to: null } : null,
-        subtitle: `${request?.tier ?? "custom"} · ${b.num_pilgrims} traveller${b.num_pilgrims > 1 ? "s" : ""} · ${
-          request ? `${request.nights_makkah}N Makkah / ${request.nights_madinah}N Madinah` : ""
-        }`,
-        customerName: customer?.full_name ?? null,
-        customerEmail: customer?.email ?? null,
-        travellerName: travellerByBooking.get(b.id) ?? null,
-        price: Number(b.total_price),
         currency: b.currency,
         status: b.status,
         createdAt: b.created_at,

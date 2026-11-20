@@ -209,6 +209,9 @@ export function PackageDetailsForm({
               name="contactPersonPhone"
               required={packageType === "group"}
               type="tel"
+              inputMode="tel"
+              pattern="\+[0-9 ()-]{7,30}"
+              title="Start with + and country code; enter 8 to 15 digits."
               defaultValue={contactPersonPhone ?? ""}
               placeholder="+252 61 144 4420"
             />

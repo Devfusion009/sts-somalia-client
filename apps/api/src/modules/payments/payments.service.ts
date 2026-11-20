@@ -55,15 +55,18 @@ export class PaymentsService {
 
     const { data: stayItems } = await supabase
       .from("order_items")
-      .select("hotel_booking:hotel_booking_id (status), hall_booking:hall_booking_id (status), umrah_booking:umrah_booking_id (status, booking_kind), flight_booking:flight_booking_id (ticketing_status, priced_at)")
+      .select("hotel_booking:hotel_booking_id (status), hall_booking:hall_booking_id (status), umrah_booking:umrah_booking_id (status, booking_kind), flight_booking:flight_booking_id (ticketing_status, priced_at, raw_payload)")
       .eq("order_id", order.id);
     if (!stayItems) return { error: "Booking confirmation could not be checked." };
     const flight = stayItems
-      .map((item) => item.flight_booking as unknown as { ticketing_status: string | null; priced_at: string | null } | null)
+      .map((item) => item.flight_booking as unknown as { ticketing_status: string | null; priced_at: string | null; raw_payload?: { offer_expires_at?: string } } | null)
       .find((f) => f?.ticketing_status);
     if (flight) {
       if (flight.ticketing_status !== "awaiting_payment") return { error: "This flight booking can no longer be paid." };
-      if (!flight.priced_at || Date.parse(flight.priced_at) < Date.now() - FLIGHT_FARE_HOLD_MINUTES * 60_000) {
+      const expiresAt = flight.raw_payload?.offer_expires_at
+        ? Date.parse(flight.raw_payload.offer_expires_at)
+        : Date.parse(flight.priced_at ?? "") + FLIGHT_FARE_HOLD_MINUTES * 60_000;
+      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
         return { error: "This fare has expired. Search again for the latest price." };
       }
     }

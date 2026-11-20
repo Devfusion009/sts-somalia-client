@@ -5,11 +5,14 @@ import { RlsSupabaseService } from "../../../infra/supabase/rls-supabase.service
 
 const requestSchema = z.object({
   id: z.string(), reference: z.string(), departure_id: z.string(), status: poolRequestStatusSchema,
-  num_pilgrims: z.number(), currency: z.string(), total: z.coerce.number(), unit_price: z.coerce.number(),
+  num_pilgrims: z.number(), room_sharing: z.number().nullable(), special_requests: z.string(),
+  currency: z.string(), total: z.coerce.number(), unit_price: z.coerce.number(),
   agency_id: z.string().nullable(), agency_customer_id: z.string().nullable(),
-  order_id: z.string().nullable(), payment_due_at: z.string().nullable(), created_at: z.string(),
+  booking_id: z.string().nullable(), order_id: z.string().nullable(), payment_due_at: z.string().nullable(), created_at: z.string(),
   quote_snapshot: z.object({ packageName: z.string(), departureDate: z.string(), returnDate: z.string(), terms: z.string() }),
   closed_reason: z.string().nullable(),
+  customer: z.object({ full_name: z.string().nullable(), email: z.string().nullable() }).nullable().optional(),
+  agency: z.object({ name: z.string() }).nullable().optional(),
 });
 const departureSchema = z.object({
   id: z.string(), departure_date: z.string(), return_date: z.string(), total_seats: z.number(), booked_seats: z.number(),
@@ -40,7 +43,7 @@ export class PoolRequestService {
     // Read every page: PostgREST's response limit must not hide applicants or alter capacity totals.
     const pageSize = 500;
     for (let offset = 0; ; offset += pageSize) {
-      let query = this.rls.get().from("umrah_pool_requests").select("*")
+      let query = this.rls.get().from("umrah_pool_requests").select("*, customer:profiles!umrah_pool_requests_customer_id_fkey(full_name,email), agency:agencies!umrah_pool_requests_agency_id_fkey(name)")
         .order("created_at", { ascending: false }).order("id").range(offset, offset + pageSize - 1);
       if (departureId) query = query.eq("departure_id", departureId);
       const { data, error } = await query;
@@ -52,7 +55,7 @@ export class PoolRequestService {
   }
 
   async get(requestId: string) {
-    const { data, error } = await this.rls.get().from("umrah_pool_requests").select("*").eq("id", requestId).maybeSingle();
+    const { data, error } = await this.rls.get().from("umrah_pool_requests").select("*, customer:profiles!umrah_pool_requests_customer_id_fkey(full_name,email), agency:agencies!umrah_pool_requests_agency_id_fkey(name)").eq("id", requestId).maybeSingle();
     if (error || !data) throw new NotFoundException("Request not found.");
     const request = requestSchema.parse(data);
     const travelers = await this.rls.get().from("umrah_pool_request_travelers").select("id,full_name,gender").eq("request_id", requestId);
@@ -82,6 +85,11 @@ export class PoolRequestService {
   async openReplacements(departureId: string) {
     const { error } = await this.rls.get().rpc("open_umrah_pool_replacements", { p_departure: departureId });
     if (error) throw new BadRequestException(error.message);
+  }
+  async confirm(departureId: string) {
+    const { data, error } = await this.rls.get().rpc("admin_confirm_umrah_pool", { p_departure: departureId });
+    if (error) throw new BadRequestException(error.message);
+    return { confirmed: Number(data) };
   }
   async resend(jobId: string) {
     const { error } = await this.rls.get().rpc("resend_umrah_pool_email", { p_id: jobId });

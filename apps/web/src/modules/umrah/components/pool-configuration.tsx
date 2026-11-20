@@ -19,7 +19,7 @@ export function PoolConfiguration({ departureId }: { departureId: string }) {
   </form>;
 }
 
-export function PoolAdminOperation({operation,target,label}:{operation:"retry_email"|"open_replacements";target:string;label:string}) {
+export function PoolAdminOperation({operation,target,label}:{operation:"retry_email"|"open_replacements"|"confirm";target:string;label:string}) {
   const [state,action]=useActionState(poolAdminOperation,null);
-  return <form action={action} className="space-y-2"><input type="hidden" name="operation" value={operation}/><input type="hidden" name="target" value={target}/><SubmitButton variant="outline" size="sm">{label}</SubmitButton>{state?.error?<div role="alert" className="text-destructive">{state.error}</div>:state?<div role="status">Updated.</div>:null}</form>;
+  return <form action={action} className="space-y-2"><input type="hidden" name="operation" value={operation}/><input type="hidden" name="target" value={target}/><SubmitButton variant="outline" size="sm">{label}</SubmitButton>{state?.error?<div role="alert" className="text-destructive">{state.error}</div>:state?<div role="status">{operation === "confirm" ? "Payment invitations queued." : "Updated."}</div>:null}</form>;
 }

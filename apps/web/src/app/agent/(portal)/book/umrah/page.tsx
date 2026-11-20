@@ -35,7 +35,7 @@ export default async function AgentUmrahDeskPage() {
   const customer = await getBookingCustomer(supabase, membership.agency.id);
   if (!customer) redirect("/agent/book?service=umrah");
 
-  const packages = (await Promise.all([getAllPackages(), getAllPackages("private"), (await getServerTrpc()).umrah.assignedPackages.query()])).flat();
+  const packages = (await Promise.all([getAllPackages(), (await getServerTrpc()).umrah.assignedPackages.query()])).flat();
 
   return (
     <div className="space-y-6">
@@ -43,8 +43,8 @@ export default async function AgentUmrahDeskPage() {
         title="Umrah"
         back={{ href: "/agent/book", label: "Services" }}
         actions={
-          <Button variant="outline" render={<Link href="/agent/book/umrah/private" />}>
-            Build private Umrah <ArrowRight data-icon="inline-end" aria-hidden="true" />
+          <Button variant="outline" render={<Link href="/umrah/private" />}>
+            Private Umrah contact <ArrowRight data-icon="inline-end" aria-hidden="true" />
           </Button>
         }
       />

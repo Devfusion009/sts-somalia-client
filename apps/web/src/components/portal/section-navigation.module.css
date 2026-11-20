@@ -1,0 +1,73 @@
+.navigation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: .25rem;
+  padding: .75rem;
+}
+.primary {
+  padding-bottom: .75rem;
+  margin-bottom: .25rem;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+.navigation .item {
+  min-height: 2.5rem;
+  height: auto;
+  padding: .5rem .625rem;
+  gap: .625rem;
+  border-radius: .75rem;
+  font-size: .875rem;
+  line-height: 1.25rem;
+  color: var(--sidebar-foreground);
+}
+.item > svg { color: color-mix(in oklch, var(--sidebar-foreground) 72%, transparent); }
+.item .label { flex: 1; min-width: 0; }
+.item[data-active="true"] {
+  color: var(--sidebar-accent-foreground);
+  font-weight: 600;
+  background: var(--sidebar-accent);
+  box-shadow: none;
+}
+.item[data-active="true"] > svg,
+.sectionButton[data-current-section="true"] > svg { color: var(--sidebar-primary); }
+.sectionButton[data-current-section="true"] { color: var(--sidebar-accent-foreground); font-weight: 600; }
+.item .chevron { width: .875rem; height: .875rem; transition: transform 150ms ease; }
+.sectionButton[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
+.children {
+  margin: .25rem 0 .5rem 1.125rem;
+  padding-left: .625rem;
+  border-left: 1px solid var(--sidebar-border);
+}
+.navigation .child { min-height: 2.25rem; }
+.badge {
+  flex-shrink: 0;
+  padding: 0 .375rem;
+  min-width: 1.25rem;
+  border-radius: .375rem;
+  background: var(--sidebar-primary);
+  color: var(--sidebar-primary-foreground);
+  font-size: .75rem;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.pending { width: .375rem; height: .375rem; flex-shrink: 0; border-radius: 50%; background: var(--sidebar-primary); }
+.section[data-administration="true"] { margin-top: .5rem; padding-top: .5rem; border-top: 1px solid var(--sidebar-border); }
+.empty { padding: 1rem .5rem; font-size: .875rem; }
+.navigation[data-icon-only="true"] { align-items: center; padding: .5rem; }
+.navigation[data-icon-only="true"] .label,
+.navigation[data-icon-only="true"] .chevron { display: none; }
+.navigation[data-icon-only="true"] .badge {
+  position: absolute;
+  top: .25rem;
+  right: .25rem;
+  min-width: 0;
+  width: .375rem;
+  height: .375rem;
+  padding: 0;
+  font-size: 0;
+  border-radius: 50%;
+}
+.navigation[data-icon-only="true"] .item { min-height: 2rem; }
+.navigation[data-icon-only="true"] .pending { position: absolute; top: .25rem; right: .25rem; }
+@media (prefers-reduced-motion: reduce) { .item .chevron { transition: none; } }

@@ -52,17 +52,17 @@ async function activeCredentials(): Promise<Record<string, Record<string, string
 }
 
 export const getPaymentGateways = cache(async (): Promise<PaymentGateways> => {
-  const [db, bankTransfer] = await Promise.all([activeCredentials().catch((): Record<string, Record<string, string> | null> => ({ waafi: null })), getBankTransfer()]);
+  const [db, bankTransfer] = await Promise.all([activeCredentials().catch((): Record<string, Record<string, string> | null> => ({ stripe: null, razorpay: null, sifalo: null, waafi: null, edahab: null })), getBankTransfer()]);
   const env = process.env;
 
   const stripeDb = db.stripe;
-  const stripeSecret = stripeDb?.secret_key ?? env.STRIPE_SECRET_KEY;
+  const stripeSecret = stripeDb === undefined ? env.STRIPE_SECRET_KEY : stripeDb?.secret_key;
   const razorDb = db.razorpay;
   const waafiDb = db.waafi;
   const edahabDb = db.edahab;
   const edahab = {
-    apiKey: edahabDb?.api_key ?? env.EDAHAB_API_KEY,
-    agentCode: edahabDb?.agent_code ?? env.EDAHAB_AGENT_CODE,
+    apiKey: edahabDb === undefined ? env.EDAHAB_API_KEY : edahabDb?.api_key,
+    agentCode: edahabDb === undefined ? env.EDAHAB_AGENT_CODE : edahabDb?.agent_code,
   };
 
   // An admin switching card payments to Razorpay overrides a leftover env Stripe key.
@@ -70,7 +70,7 @@ export const getPaymentGateways = cache(async (): Promise<PaymentGateways> => {
 
   const explicitTestMode = env.PAYMENTS_TEST_MODE;
   return {
-    stripe: stripeSecret && !stripeOverridden ? { secretKey: stripeSecret, webhookSecret: stripeDb?.webhook_secret ?? env.STRIPE_WEBHOOK_SECRET ?? null } : null,
+    stripe: stripeSecret && !stripeOverridden ? { secretKey: stripeSecret, webhookSecret: (stripeDb === undefined ? env.STRIPE_WEBHOOK_SECRET : stripeDb?.webhook_secret) ?? null } : null,
     razorpay: razorDb?.key_id && razorDb?.key_secret ? { keyId: razorDb.key_id, keySecret: razorDb.key_secret, webhookSecret: razorDb.webhook_secret ?? null } : null,
     waafi: resolveWaafiConfig(waafiDb, env, true),
     edahab:

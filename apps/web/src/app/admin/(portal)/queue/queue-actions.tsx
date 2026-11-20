@@ -3,17 +3,11 @@
 import { useActionState } from "react";
 import { trpc } from "@/lib/trpc/react";
 import { Check, X } from "lucide-react";
-import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { SubmitButton } from "@/components/submit-button";
 import { updateHotelBookingStatus, updateHallBookingStatus } from "@/modules/admin/actions";
-import {
-  updateUmrahBookingStatus,
-  updateUmrahRequestPrice,
-} from "@/modules/umrah/service-admin-actions";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { toast } from "sonner";
 import type { ActionState } from "@/lib/auth/actions";
-import { money } from "@/lib/money";
 
 /**
  * Wraps a server action so success raises a toast from the call itself — the
@@ -33,12 +27,11 @@ function withToast(
   };
 }
 
-export type QueueKind = "hotel" | "hall" | "umrah";
+export type QueueKind = "hotel" | "hall";
 
 const STATUS_ACTIONS = {
   hotel: updateHotelBookingStatus,
   hall: updateHallBookingStatus,
-  umrah: updateUmrahBookingStatus,
 } as const;
 
 
@@ -92,58 +85,5 @@ export function QueueEntryActions({ kind, bookingId }: { kind: QueueKind; bookin
         </p>
       ) : null}
     </div>
-  );
-}
-
-/**
- * A private Umrah trip has no list price: staff set it here, and it updates
- * the booking and the customer's unpaid order together.
- */
-export function PriceQuoteForm({
-  bookingId,
-  currentPrice,
-  currency,
-}: {
-  kind: "umrah";
-  bookingId: string;
-  currentPrice: number;
-  currency: string;
-}) {
-  const action = updateUmrahRequestPrice;
-  const [state, formAction] = useActionState(
-    withToast(action, (fd) => `Price set to ${money(Number(fd.get("price")), currency)}.`),
-    null
-  );
-
-  return (
-    <form action={formAction} className="flex flex-col items-start gap-1 sm:items-end">
-      <input type="hidden" name="bookingId" value={bookingId} />
-      <div className="flex items-center gap-2">
-        <InputGroup className="w-36 max-sm:h-10">
-          <InputGroupAddon>
-            <InputGroupText>{currency}</InputGroupText>
-          </InputGroupAddon>
-          <InputGroupInput
-            name="price"
-            type="number"
-            min={0}
-            step="0.01"
-            defaultValue={currentPrice > 0 ? currentPrice.toFixed(2) : ""}
-            placeholder="Final price"
-            aria-label={`Final price (${currency})`}
-            aria-invalid={state?.error ? true : undefined}
-            className="text-right tabular-nums"
-          />
-        </InputGroup>
-        <SubmitButton variant="outline" pendingText="Saving…">
-          Quote
-        </SubmitButton>
-      </div>
-      {state?.error ? (
-        <p role="alert" className="text-xs text-destructive">
-          {state.error}
-        </p>
-      ) : null}
-    </form>
   );
 }

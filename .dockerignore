@@ -27,5 +27,7 @@ ADMIN_CREDENTIALS.local.md
 .vercel
 image.png
 coverage
+output
+qa-evidence
 *.tsbuildinfo
 npm-debug.log*

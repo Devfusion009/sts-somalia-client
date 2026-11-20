@@ -1,15 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { addCalendarDays, buildDatedItinerary } from "@sts/shared-types";
-import type { PackageCard, PackageDetail, SharingPriceMap, UmrahOperations, UmrahService } from "@sts/shared-types";
+import type { PackageCard, PackageDetail, UmrahOperations } from "@sts/shared-types";
 import { PackageRepository } from "../repositories/package.repository";
-import { ServiceCatalogRepository } from "../repositories/service-catalog.repository";
 import { UmrahBookingRepository } from "../repositories/umrah-booking.repository";
 import { CustomRequestRepository } from "../repositories/custom-request.repository";
 import { UmrahSettingsRepository } from "../repositories/umrah-settings.repository";
 import { toPackageCard, toPackageDetail } from "../mappers/package.mapper";
-import { RedisService } from "../../../infra/redis/redis.service";
-
-const CATALOG_TTL_SECONDS = 300;
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -29,51 +25,31 @@ type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-exp
 export class UmrahCatalogService {
   constructor(
     private readonly packages: PackageRepository,
-    private readonly services: ServiceCatalogRepository,
     private readonly bookings: UmrahBookingRepository,
     private readonly requests: CustomRequestRepository,
-    private readonly settings: UmrahSettingsRepository,
-    private readonly cache: RedisService
+    private readonly settings: UmrahSettingsRepository
   ) {}
 
   /** Featured first, then cheapest — the landing band reads as a ladder from the entry package. */
   async featuredPackages(limit: number): Promise<PackageCard[]> {
     const rows = await this.packages.findPublishedCards({ featuredFirst: true });
     return rows.map((r) => toPackageCard(r, today()))
-      .filter((card) => card.package_type === "private" || card.nextDeparture !== null).slice(0, limit);
+      .filter((card) => card.package_type === "group" && card.nextDeparture !== null).slice(0, limit);
   }
 
   async assignedPackages(): Promise<PackageCard[]> {
-    return (await this.packages.findAssignedCards()).map(row => toPackageCard(row, today()));
+    return (await this.packages.findAssignedCards()).map(row => toPackageCard(row, today())).filter(card => card.package_type === "group");
   }
 
   async allPackages(): Promise<PackageCard[]> {
     const rows = await this.packages.findPublishedCards({ featuredFirst: false });
     return rows.map((r) => toPackageCard(r, today()))
-      .filter((card) => card.package_type === "private" || card.nextDeparture !== null);
+      .filter((card) => card.package_type === "group" && card.nextDeparture !== null);
   }
 
   async packageBySlug(slug: string): Promise<PackageDetail | null> {
-    const id = await this.packages.findIdBySlug(slug);
-    if (id) await this.packages.releaseStaleSeats(id);
     const row = await this.packages.findPublishedDetail(slug);
     return row ? toPackageDetail(row) : null;
-  }
-
-  /** Published add-on services are the same for every visitor: cached, tag "umrah-services". */
-  publishedServices(): Promise<UmrahService[]> {
-    return this.cache.cachedRead("umrah:services:published", CATALOG_TTL_SECONDS, () => this.services.findPublished(), {
-      tags: ["umrah-services"],
-    });
-  }
-
-  sharingPrices(): Promise<SharingPriceMap> {
-    return this.cache.cachedRead(
-      "umrah:services:sharing-prices",
-      CATALOG_TTL_SECONDS,
-      () => this.services.findPublishedSharingPrices(),
-      { tags: ["umrah-services"] }
-    );
   }
 
   operations(): Promise<UmrahOperations> {

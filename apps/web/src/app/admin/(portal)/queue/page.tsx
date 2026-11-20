@@ -6,17 +6,17 @@ import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
 import { getBookingQueue } from "@/modules/admin/queue-queries";
-import { QueueEntryActions, PriceQuoteForm } from "./queue-actions";
+import { QueueEntryActions } from "./queue-actions";
 import { expirePastHallRequests } from "@/modules/events/venue-manager-queries";
 import { money } from "@/lib/money";
 
 const formatQueueDate = (iso: string) => format(new Date(`${iso}T00:00:00`), "EEE d MMM yyyy");
 
-export const metadata = { title: "Order Queue" };
+export const metadata = { title: "Booking requests" };
 
 /**
  * Requests that need an admin decision: hotel and hall bookings made when
- * the dates were full, and private Umrah trips. Newest first.
+ * the dates were full. Newest first.
  */
 export default async function OrderQueuePage() {
   await expirePastHallRequests(null);
@@ -31,7 +31,7 @@ export default async function OrderQueuePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Order Queue"
+        title="Booking requests"
         status={
           <>
             <Badge variant="neutral" className="tabular-nums">
@@ -108,9 +108,7 @@ export default async function OrderQueuePage() {
                         <Badge variant="warning" className="max-w-full whitespace-normal">
                           {entry.displaced ? "Displaced by an agency booking" : "Dates full"}
                         </Badge>
-                      ) : (
-                        <Badge variant="neutral">Private trip request</Badge>
-                      )}
+                      ) : null}
                     </p>
                     {entry.dates ? (
                       <p className="flex items-center gap-1.5 text-sm font-semibold tabular-nums">
@@ -152,14 +150,7 @@ export default async function OrderQueuePage() {
                   </p>
                   <div className="flex flex-col items-start gap-2 sm:items-end">
                     <QueueEntryActions kind={entry.kind} bookingId={entry.id} />
-                    {entry.kind === "umrah" ? (
-                      <PriceQuoteForm
-                        kind={entry.kind}
-                        bookingId={entry.id}
-                        currentPrice={entry.price}
-                        currency={entry.currency}
-                      />
-                    ) : null}
+
                   </div>
                 </div>
               </CardContent>

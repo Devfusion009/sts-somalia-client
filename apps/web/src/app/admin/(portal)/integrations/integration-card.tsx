@@ -45,7 +45,7 @@ import { CustomPartnerConfigForm } from "./custom-partner-config-form";
 type Phase = "live" | "configured" | "absent";
 
 const PHASE_STYLE: Record<Phase, { label: string; variant: BadgeVariant }> = {
-  live: { label: "Live", variant: "success" },
+  live: { label: "Active", variant: "success" },
   configured: { label: "Inactive", variant: "warning" },
   absent: { label: "Not connected", variant: "neutral" },
 };
@@ -97,7 +97,7 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-heading text-base font-semibold">{provider.name}</h3>
-              <Badge variant={phaseStyle.variant}>{provider.key === "waafi" && phase === "live" && status.fieldValues.environment === "sandbox" ? "Sandbox" : phaseStyle.label}</Badge>
+              <Badge variant={phaseStyle.variant}>{phase === "live" && status.fieldValues.environment === "sandbox" ? "Sandbox" : phaseStyle.label}</Badge>
               <Badge variant="outline" className="text-muted-foreground">
                 {provider.selfServe ? "Self-serve" : "Requires approval"}
               </Badge>
@@ -147,6 +147,10 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
             ) : null}
           </div>
         ) : null}
+
+        {provider.capabilities && <div className="flex flex-wrap gap-2" aria-label="Supported capabilities">
+          {provider.capabilities.map((capability) => <Badge key={capability} variant="outline">{capability}</Badge>)}
+        </div>}
 
         <details className="group/credentials" open={!status.hasCredentials}>
           <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">

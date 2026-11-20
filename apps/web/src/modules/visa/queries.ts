@@ -28,7 +28,7 @@ export async function getVisaTypes(filters: { country?: string; category?: strin
       return data ?? [];
     },
     { tags: ["visa"] }
-  ).catch(() => []);
+  );
   if (!filters.country) return visaTypes;
 
   return visaTypes.filter((v) => matchesDestination(v.destination_country_code, filters.country!));
@@ -51,7 +51,7 @@ export async function getVisaTypeById(id: string) {
     },
     // An unknown or unpublished id is not stored: ids a visitor invents must not fill the cache.
     { tags: ["visa"], cacheIf: (value) => value !== null }
-  ).catch(() => null);
+  );
 }
 
 /**
@@ -76,7 +76,7 @@ export async function getResolvedVisaPricing(visaTypeId: string, nationalityCode
       return data?.[0] ?? null;
     },
     { tags: ["visa"], cacheIf: (value) => value !== null }
-  ).catch(() => null);
+  );
 }
 
 /** The signed-in user's applications (any status), most recently submitted (or created draft) first. */

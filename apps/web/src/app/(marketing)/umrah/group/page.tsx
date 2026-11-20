@@ -101,7 +101,7 @@ export default async function GroupUmrahPage() {
             </EmptyHeader>
             <EmptyContent>
               <Button render={<Link href="/umrah/private" />} size="lg" className="gap-2">
-                Build a private Umrah <ArrowRight className="size-4" aria-hidden />
+                Contact STS for private Umrah <ArrowRight className="size-4" aria-hidden />
               </Button>
             </EmptyContent>
           </Empty>
@@ -153,7 +153,7 @@ export default async function GroupUmrahPage() {
                 None of these dates work for you?
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Build a private Umrah on your own dates, with the hotels you choose.
+                Arrange a private Umrah around your dates and preferred hotels with our team.
               </p>
             </div>
             <Button
@@ -162,7 +162,7 @@ export default async function GroupUmrahPage() {
               size="lg"
               className="w-full gap-2 bg-card sm:w-auto"
             >
-              Build a private trip <ArrowRight className="size-4" aria-hidden />
+              Contact STS <ArrowRight className="size-4" aria-hidden />
             </Button>
           </div>
         ) : null}

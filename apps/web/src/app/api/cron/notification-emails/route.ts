@@ -8,14 +8,13 @@ import { processNotificationEmails } from "@/lib/notifications/email-outbox";
  * external cron as well: rows are claimed with SKIP LOCKED, so overlapping
  * calls never send the same email twice.
  *
- * Same auth as the other cron routes: `Authorization: Bearer $CRON_SECRET`
- * once that env var is set.
+ * Requires `Authorization: Bearer $CRON_SECRET`.
  */
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
   const run = await processNotificationEmails();

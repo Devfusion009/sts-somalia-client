@@ -7,5 +7,5 @@ function queue(failedTable) {
 }
 test('a genuine empty queue returns no pending requests',async()=>assert.deepEqual(await queue()(),[]));
 test('failure of any booking source cannot appear as Queue is clear',async()=>{
- for(const source of ['hotel_bookings','hall_bookings','umrah_bookings']) await assert.rejects(queue(source)(),/could not be loaded/);
+ for(const source of ['hotel_bookings','hall_bookings']) await assert.rejects(queue(source)(),/could not be loaded/);
 });
