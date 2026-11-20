@@ -348,7 +348,7 @@ export function PortalShell({
   menuInfo?: { workspace?: string | null; buildSha?: string | null; supportEmail?: string };
   /** Portal-specific visual treatment; shared navigation behavior stays in this shell. */
   className?: string;
-  /** Optional client-side page finder; enabled for the admin console. */
+  /** Optional client-side page finder; enabled for admin and agent workspaces. */
   searchableNavigation?: boolean;
   children: React.ReactNode;
 }) {
@@ -448,8 +448,8 @@ export function PortalShell({
           ) : null}
         </SidebarHeader>
         <SidebarContent>
-          {accent === "admin" ? (
-            <SectionNavigation navGroups={navGroups} activeHref={activeHref} pathname={pathname} query={navQuery} onNavigate={() => setNavQuery("")} icons={PORTAL_ICONS} />
+          {accent === "admin" || accent === "agent" ? (
+            <SectionNavigation ariaLabel={`${portalName} navigation`} navGroups={navGroups} activeHref={activeHref} pathname={pathname} query={navQuery} onNavigate={() => setNavQuery("")} icons={PORTAL_ICONS} />
           ) : (
             <NavGroups customerNavigation={portalName === "My Account"} navGroups={navGroups} activeHref={activeHref} query={navQuery} onNavigate={searchableNavigation ? () => setNavQuery("") : undefined} />
           )}

@@ -9,7 +9,8 @@ import { filterNavigationGroups } from "./navigation-search";
 import styles from "./section-navigation.module.css";
 
 /** A compact service menu: persistent daily links, with one section expanded. */
-export function SectionNavigation({ navGroups, activeHref, pathname, query, onNavigate, icons }: {
+export function SectionNavigation({ navGroups, activeHref, pathname, query, onNavigate, icons, ariaLabel = "Portal navigation" }: {
+  ariaLabel?: string;
   navGroups: PortalNavGroup[];
   activeHref?: string;
   pathname: string;
@@ -52,7 +53,7 @@ export function SectionNavigation({ navGroups, activeHref, pathname, query, onNa
     </SidebarMenuItem>;
   }
 
-  return <nav aria-label="Admin navigation" className={styles.navigation} data-icon-only={iconOnly}>
+  return <nav aria-label={ariaLabel} className={styles.navigation} data-icon-only={iconOnly}>
     {visibleGroups.length === 0 && <div role="status" className={styles.empty}>No pages found.</div>}
     {visibleGroups.map((group) => {
       if (group.alwaysOpen) return <div key={group.label} className={styles.primary}>
