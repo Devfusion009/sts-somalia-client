@@ -19,7 +19,6 @@ export function DeskSteps() {
   const step = currentStep(pathname, Boolean(service));
   const steps = [...AGENT_BOOKING_STEPS] as string[];
   if (service?.key === "flights" || /(?:^|\/)book\/flights(?:\/|$)/.test(pathname)) steps[3] = "Book & pay";
-  if (/(?:^|\/)book\/umrah\/private(?:\/|$)/.test(pathname)) steps[3] = "Review request";
   return (
     <nav aria-label="Booking steps">
       <div className={styles.progressHead}><span>Booking progress</span><span>Step {step + 1} of {steps.length}</span></div>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Download } from "lucide-react";
 import { BackLink } from "@/components/back-link";
@@ -7,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 import { getUmrahBookingAdmin } from "@/modules/umrah/fulfillment-admin-queries";
+import { getSelectedUmrahCapacityAdmin } from "@/modules/umrah/fulfillment-admin-queries";
+import { poolCapacity } from "@/modules/umrah/pool";
 import { formatMoney } from "@/modules/umrah/pricing";
 import { PriceAdjustment } from "@/modules/umrah/components/price-adjustment";
 import {
@@ -32,7 +35,7 @@ import { HotelStayList, ItineraryList, contactLine } from "@/modules/umrah/compo
 import { CITY_LABEL } from "@/modules/umrah/itinerary";
 import { HAND_IN_LABEL, REVIEW_STATUS_LABEL, type HandInType } from "@/modules/umrah/readiness";
 
-export const metadata: Metadata = { title: "Umrah Booking" };
+export const metadata: Metadata = { title: "Umrah Order" };
 
 const REVIEW_VARIANT = { accepted: "success", rejected: "destructive", pending: "warning" } as const;
 
@@ -78,6 +81,8 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
   const nextStages = UMRAH_STAGES.slice(currentIndex + 1);
   const closed = ["cancelled", "refunded", "failed"].includes(booking.status);
   const departure = booking.departure;
+  const pool = departure ? (await getSelectedUmrahCapacityAdmin([departure.id]))[0] ?? null : null;
+  const capacity = pool ? poolCapacity(pool) : null;
   const hasFlights =
     !!departure &&
     [
@@ -115,7 +120,7 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
   return (
     <div className="space-y-8">
       <div className="space-y-5">
-        <BackLink href="/admin/umrah/bookings" label="All Umrah bookings" />
+        <BackLink href="/admin/umrah/bookings" label="Umrah orders" />
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -152,6 +157,10 @@ export default async function AdminUmrahBookingDetailPage({ params }: { params: 
           <StatRailItem label="Payment" value={order ? (ORDER_STATUS_LABELS[order.status] ?? order.status) : "No order"} />
           <StatRailItem label="Room sharing" value={booking.room_sharing ? `${booking.room_sharing} per room` : "—"} />
         </StatRail>
+        {capacity && pool && departure ? <section className="space-y-3" aria-labelledby="pool-availability-title">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h2 id="pool-availability-title" className="font-heading text-base font-semibold">Pool availability</h2><Button size="sm" variant="outline" render={<Link href={`/admin/umrah/departures/${departure.id}`} />}>Manage departure</Button></div>
+          <StatRail><StatRailItem label="Total seats" value={capacity.total} /><StatRailItem label="Filled" value={capacity.filled} /><StatRailItem label="Held" value={capacity.held} /><StatRailItem label="Available" value={capacity.remaining} /></StatRail>
+        </section> : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

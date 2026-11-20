@@ -93,7 +93,7 @@ export function adminNotificationHref(n: NotificationLike): string | null {
   if (n.type === "bank_proof_submitted") return newOrderHref(n) ?? "/admin/orders";
   if (n.type === "new_order") return newOrderHref(n) ?? "/admin/orders";
   if (n.type === "flight_ticketing_failed") return "/admin/flights?view=attention";
-  if (n.type === "private_umrah_request") return "/admin/umrah/requests?status=pending";
+  if (n.type === "private_umrah_request") return "/admin/orders";
   if (n.type === "payout_request") return "/admin/finance/withdrawals?status=pending";
   if (n.type === "visa_application_submitted" || n.type === "visa_status_changed" || n.type === "visa_case_attention") {
     const applicationId = (n.data as { applicationId?: string } | null)?.applicationId;

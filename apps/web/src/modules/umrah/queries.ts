@@ -3,6 +3,7 @@ import type { PackageCard } from "@sts/shared-types";
 import { getServerTrpc } from "@/lib/trpc/server";
 import type { PackageCardData } from "@/modules/umrah/components/package-card";
 import { umrahImageUrls } from "@/modules/umrah/images";
+import { cache } from "react";
 
 export { bookableDepartures } from "@sts/shared-types";
 
@@ -11,27 +12,19 @@ function toCardData(card: PackageCard): PackageCardData {
   return { ...card, images: umrahImageUrls(card.images) };
 }
 
-/** Landing band: featured first, then cheapest. Empty when the API is unreachable. */
+/** Landing band: featured first, then cheapest. Failures remain distinct from an empty catalog. */
 export async function getFeaturedPackages(limit = 4): Promise<PackageCardData[]> {
-  try {
-    const trpc = await getServerTrpc();
-    return (await trpc.umrah.featured.query({ limit })).filter((p) => p.package_type === "group").map(toCardData);
-  } catch {
-    return [];
-  }
+  const trpc = await getServerTrpc();
+  return (await trpc.umrah.featured.query({ limit })).filter((p) => p.package_type === "group").map(toCardData);
 }
 
-export async function getAllPackages(kind: "group" | "private" = "group"): Promise<PackageCardData[]> {
-  try {
-    const trpc = await getServerTrpc();
-    return (await trpc.umrah.packages.query()).filter((p) => p.package_type === kind).map(toCardData);
-  } catch {
-    return [];
-  }
+export async function getAllPackages(): Promise<PackageCardData[]> {
+  const trpc = await getServerTrpc();
+  return (await trpc.umrah.packages.query()).filter((p) => p.package_type === "group").map(toCardData);
 }
 
-/** Published package detail; the API releases stale unpaid seats before counting. */
-export async function getPackageBySlug(slug: string) {
+/** One package lookup per request, shared by metadata and page rendering. */
+export const getPackageBySlug = cache(async (slug: string) => {
   const trpc = await getServerTrpc();
   return trpc.umrah.packageBySlug.query({ slug });
-}
+});

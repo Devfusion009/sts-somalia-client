@@ -932,7 +932,7 @@ export type Database = {
           profile_id: string
           role_in_agency?: Database["public"]["Enums"]["agency_role"]
           status?: Database["public"]["Enums"]["member_status"]
-          username?: string
+          username: string
         }
         Update: {
           agency_id?: string
@@ -3544,6 +3544,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      marketing_callback_requests: {
+        Row: {
+          created_at: string
+          id: string
+          message: string | null
+          name: string
+          phone: string
+          service: string
+          status: string
+          submitted_on: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          name: string
+          phone: string
+          service: string
+          status?: string
+          submitted_on?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          name?: string
+          phone?: string
+          service?: string
+          status?: string
+          submitted_on?: string
+        }
+        Relationships: []
       }
       mfa_recovery_codes: {
         Row: {
@@ -8027,6 +8060,12 @@ export type Database = {
       }
     }
     Functions: {
+      activate_platform_integration: {
+        Args: { p_provider_key: string; p_credentials_encrypted: string }
+        Returns: undefined
+      }
+      flight_supplier_ready: { Args: Record<PropertyKey, never>; Returns: boolean }
+
       _admin_collection_entries: {
         Args: never
         Returns: {
@@ -8310,6 +8349,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_agency_aging_report: {
+        Args: never
+        Returns: {
+          agency_id: string
+          agency_name: string
+          aging_since: string
+          contact_email: string
+          outstanding_amount: number
+        }[]
+      }
       admin_agent_leaderboard: {
         Args: { p_from: string; p_limit: number; p_to: string }
         Returns: Json
@@ -8325,6 +8374,10 @@ export type Database = {
           p_refund_amount?: number
         }
         Returns: string
+      }
+      admin_confirm_umrah_pool: {
+        Args: { p_departure: string }
+        Returns: number
       }
       admin_dashboard_totals: { Args: never; Returns: Json }
       admin_nav_counts: { Args: never; Returns: Json }
@@ -8372,6 +8425,18 @@ export type Database = {
         Returns: Json
       }
       admin_top_hotels: { Args: { p_limit: number }; Returns: Json }
+      admin_umrah_capacity_for_departures: {
+        Args: { p_departure_ids: string[] }
+        Returns: {
+          confirmed_seats: number
+          departure_id: string
+          formation_status: string
+          held_seats: number
+          offline_seats: number
+          package_id: string
+          total_seats: number
+        }[]
+      }
       admin_visa_appointment_handoffs: {
         Args: { p_limit?: number; p_offset?: number }
         Returns: Json
@@ -9059,6 +9124,18 @@ export type Database = {
           user_agent: string
         }[]
       }
+      my_booking_page: {
+        Args: {
+          p_filter?: string
+          p_page?: number
+          p_personal_only?: boolean
+          p_size?: number
+          p_sort?: string
+          p_type?: string
+          p_view?: string
+        }
+        Returns: Json
+      }
       my_hotel_partner_ids: { Args: never; Returns: string[] }
       my_hotel_partner_owner_ids: { Args: never; Returns: string[] }
       my_managed_hotel_ids: { Args: never; Returns: string[] }
@@ -9117,7 +9194,7 @@ export type Database = {
           p_children: number
           p_extra_ids?: string[]
           p_num_rooms: number
-          p_rate_plan_id?: string | null
+          p_rate_plan_id?: string
           p_room_id: string
         }
         Returns: Json

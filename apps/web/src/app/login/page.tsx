@@ -39,14 +39,14 @@ export default async function LoginPage({
   const notice = error === "confirmation_failed" ? "That link is invalid or has expired." : undefined;
 
   return (
-    <div className="min-h-dvh bg-[#fafbf8] p-4 text-[#123b32] lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.04fr)] lg:gap-4 lg:p-5">
-      <aside aria-label="STS travel" className="relative isolate hidden min-h-[calc(100dvh-2.5rem)] overflow-hidden rounded-[1.75rem] bg-[#063b33] lg:flex">
+    <div className="min-h-dvh bg-card p-0 text-foreground lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.04fr)] lg:gap-0 lg:p-0">
+      <aside aria-label="STS travel" className="relative isolate hidden min-h-dvh overflow-hidden bg-[#063b33] lg:flex">
         <Image src="/auth/sts-reception-v2.webp" alt="Artistic view of the STS travel reception" fill preload sizes="(min-width: 1024px) 50vw, 0px" className="object-cover" />
         <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-[#032d28]/65 via-transparent to-[#032d28]/50" aria-hidden="true" />
         <div className="relative z-10 flex w-full flex-col justify-between p-8 xl:p-10">
           <div>
             <span className="flex items-center gap-3 text-[10px] font-medium tracking-[0.22em] text-[#d6e5d9] uppercase"><span className="h-px w-7 bg-[#d3b27d]" aria-hidden="true" />Scout Travel Solution</span>
-            <h2 className="mt-6 max-w-md font-heading text-4xl leading-[1.12] font-medium tracking-[-0.04em] text-white xl:text-[2.9rem]">Your travel desk.<br /><span className="text-[#d9e4d2]">Wherever you go.</span></h2>
+            <h2 className="mt-6 max-w-md font-heading text-4xl leading-[1.12] font-bold tracking-[-0.04em] text-white xl:text-[2.9rem]">Your travel desk.<br /><span className="text-brand-accent">Wherever you go.</span></h2>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/20 bg-[#073c34]/85 px-5 py-4 text-white">
             <span className="flex items-center gap-2 text-xs"><ShieldCheck className="size-4 text-[#d9c18d]" strokeWidth={1.5} aria-hidden="true" />ISO-certified company</span>

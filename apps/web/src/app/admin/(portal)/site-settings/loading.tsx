@@ -44,12 +44,11 @@ export default function SiteSettingsLoading() {
         <Card>
           <CardContent className="space-y-6">
             <Fields
-              labels={["Unpaid seat hold", "Private trip deposit", "Private balance due", "Private trip lead time"]}
-              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+              labels={["Unpaid seat hold"]}
+              className="grid gap-4 sm:grid-cols-2"
             />
             <div className="space-y-2.5">
               <Skeleton className="h-4 w-80 max-w-full" />
-              <Skeleton className="h-4 w-72 max-w-full" />
             </div>
             <Footer />
           </CardContent>

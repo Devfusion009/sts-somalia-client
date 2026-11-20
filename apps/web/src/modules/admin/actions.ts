@@ -22,6 +22,7 @@ import { parseDocumentSlotsJson, parseRequirementSectionsJson } from "./visa-typ
 import { COUNTRY_NAMES } from "@/lib/countries";
 import { invalidateCache } from "@/lib/redis";
 import { departureInput } from "@/modules/umrah/departure-input";
+import { umrahFacilitiesFromForm } from "@/modules/umrah/facility-options";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type ListingStatus = Database["public"]["Enums"]["listing_status"];
@@ -313,7 +314,7 @@ function umrahPackageInput(formData: FormData) {
     contactPersonName: String(formData.get("contactPersonName") ?? ""),
     contactPersonPhone: String(formData.get("contactPersonPhone") ?? ""),
     agentContacts: formData.getAll("agentContactName").map((name, index) => ({ name: String(name).trim(), phone: String(formData.getAll("agentContactPhone")[index] ?? "").trim() })).filter(contact => contact.name || contact.phone),
-    facilities: String(formData.get("facilities") ?? ""),
+    facilities: umrahFacilitiesFromForm(formData),
     accommodationDetails: String(formData.get("accommodationDetails") ?? ""),
     flightDetails: String(formData.get("flightDetails") ?? ""),
     transportDetails: String(formData.get("transportDetails") ?? ""),

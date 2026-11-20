@@ -45,10 +45,15 @@ with tempfile.TemporaryDirectory(prefix='sts-public-umrah-') as folder:
         run(args+['-f',ROOT/'supabase/migrations/20261116000002_unified_umrah_pool.sql'])
         run(args+['-f',ROOT/'apps/api/test/unified-umrah-pool.sql'])
         if '--request-pool' in sys.argv:
+            # Use the real paid-order invoice trigger in this isolated fixture.
+            run(args,input='create table invoices(order_id uuid unique references orders,invoice_number text unique,status text,issued_at timestamptz,total numeric,currency text); create sequence invoice_number_seq;')
+            run(args,input=function('20260807000001_b2b_phase1.sql','generate_invoice_number')+'\n'+function('20260807000001_b2b_phase1.sql','create_invoice_for_paid_order'))
+            run(args,input='create trigger orders_create_invoice after insert or update of status on orders for each row execute function create_invoice_for_paid_order();')
             run(args+['-f',ROOT/'apps/api/test/pool-request-fixture.sql'])
             for migration in sorted((ROOT/'supabase/migrations').glob('20261117*umrah_pool*.sql')):
                 run(args+['-f',migration])
                 if migration.name.startswith('20261117000001_'): run(args+['-f',ROOT/'apps/api/test/pool-request-schema.sql'])
+            run(args+['-f',ROOT/'supabase/migrations/20261119000001_admin_confirm_umrah_pool.sql'])
             checks=ROOT/'apps/api/test/pool-request-checks.sql'
             if checks.exists(): run(args+['-f',checks])
             query="""begin; set local role authenticated; select set_config('test.admin','no',true); select set_config('test.agent','no',true); select set_config('test.uid','00000000-0000-0000-0000-000000000002',true); select submit_umrah_pool_requests((select id from test_ids where name='request-departure'),gen_random_uuid(),'[{"pilgrims":[{"full_name":"Final QA Pilgrim","gender":"male"}]}]',true); commit;"""

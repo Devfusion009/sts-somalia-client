@@ -49,8 +49,7 @@ export const envSchema = z.object({
   BANK_TRANSFER_ACCOUNT_NUMBER: optional,
 
   DUFFEL_API_KEY: optional,
-  // Amadeus Enterprise flight APIs (search, pricing, flight orders). Booking
-  // is live only when all three are set.
+  // Legacy Amadeus REST contract. Enterprise SOAP requires its contracted adapter.
   AMADEUS_BASE_URL: optional,
   AMADEUS_CLIENT_ID: optional,
   AMADEUS_CLIENT_SECRET: optional,

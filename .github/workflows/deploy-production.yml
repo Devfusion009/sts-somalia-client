@@ -19,7 +19,30 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  verify:
+    if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w api
+      - run: npm run lint -w api
+      - run: npm run lint -w web
+      - run: npx tsc --noEmit -p apps/web
+      - run: npm test -w @sts/shared-types
+      - run: node --test apps/web/test/agent-bookings.test.cjs apps/web/test/catalog-outage.test.cjs apps/web/test/cron-auth.test.cjs apps/web/test/external-worker.test.mjs apps/web/test/marketing-callback.test.cjs apps/web/test/my-bookings-pages.test.cjs apps/web/test/pool-email.test.cjs apps/web/test/pool-worker.test.cjs apps/web/test/public-umrah-catalog.test.cjs
+      - run: python3 apps/api/test/public-umrah-integration.py --request-pool
+      - run: python3 apps/api/test/marketing-aging-integration.py
+      - run: python3 apps/api/test/umrah-capacity-integration.py
+      - run: python3 apps/api/test/my-bookings-page-integration.py
+
   build:
+    needs: verify
     if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     environment: production
@@ -115,15 +138,20 @@ jobs:
           SMTP_SECURE: ${{ vars.SMTP_SECURE }}
           SMTP_USER: ${{ vars.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
           AMADEUS_BASE_URL: ${{ vars.AMADEUS_BASE_URL }}
           AMADEUS_CLIENT_ID: ${{ vars.AMADEUS_CLIENT_ID }}
           AMADEUS_CLIENT_SECRET: ${{ secrets.AMADEUS_CLIENT_SECRET }}
         run: |
+          if [ -z "$CRON_SECRET" ] && ! printf '%s\n' "${{ secrets.PROD_ENV_FILE }}" | grep -q '^CRON_SECRET='; then
+            echo 'Production CRON_SECRET is required for notification and Umrah workers.' >&2
+            exit 1
+          fi
           {
             printf '%s\n' "${{ secrets.PROD_ENV_FILE }}"
             echo "WEB_IMAGE=${{ needs.build.outputs.web_image }}"
             echo "API_IMAGE=${{ needs.build.outputs.api_image }}"
-            for key in EMAIL_PROVIDER EMAIL_FROM EMAIL_REPLY_TO SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS AMADEUS_BASE_URL AMADEUS_CLIENT_ID AMADEUS_CLIENT_SECRET; do
+            for key in EMAIL_PROVIDER EMAIL_FROM EMAIL_REPLY_TO SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS CRON_SECRET AMADEUS_BASE_URL AMADEUS_CLIENT_ID AMADEUS_CLIENT_SECRET; do
               if [ -n "${!key}" ]; then printf "%s='%s'\n" "$key" "${!key}"; fi
             done
           } | ssh prod "umask 077 && cat > ${APP_DIR}/.env.next"
@@ -139,14 +167,15 @@ jobs:
           cd /opt/sts
           [ -f .env ] && cp .env .env.previous || true
           mv .env.next .env
-          docker compose pull web api
+          docker compose pull web api worker
           docker compose up -d --remove-orphans
 
           healthy() {
             for _ in $(seq 1 30); do
               web=$(docker compose ps --format '{{.Health}}' web)
               api=$(docker compose ps --format '{{.Health}}' api)
-              [ "$web" = healthy ] && [ "$api" = healthy ] && return 0
+              worker=$(docker compose ps --status running --services worker)
+              [ "$web" = healthy ] && [ "$api" = healthy ] && [ "$worker" = worker ] && return 0
               sleep 5
             done
             return 1
@@ -157,7 +186,7 @@ jobs:
             echo "Release healthy."
           else
             echo "Release unhealthy. Rolling back."
-            docker compose logs --tail 60 web api || true
+            docker compose logs --tail 60 web api worker || true
             if [ -f .env.previous ]; then
               cp .env.previous .env
               docker compose up -d --remove-orphans

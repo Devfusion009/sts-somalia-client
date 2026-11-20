@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Banknote, CheckCheck, Percent, Receipt, Users, Wallet } from "lucide-react";
+import { AlertCircle, Banknote, Building2, CheckCheck, Percent, Receipt, Users, Wallet } from "lucide-react";
 import { format } from "date-fns";
 import { BackLink } from "@/components/back-link";
 import { requirePlatformAdmin } from "@/lib/auth/session";
@@ -135,6 +135,9 @@ export default async function AdminAgencyDetailPage({
   const meta = [agency.contact_email, agency.contact_phone, agency.website, agency.address].filter(Boolean).join(" · ");
 
   const totalEarned = earnings.totalEarned;
+  const pendingTopups = topupRequests.filter((request) => request.status === "pending" && request.rail === "offline");
+  const activePayouts = payoutRequests.filter((request) => ["pending", "approved", "processing"].includes(request.status));
+  const pendingCommissionCount = pending.total;
   const entriesHref = (target: number) => {
     const params = new URLSearchParams();
     for (const key of ["range", "from", "to"] as const) {
@@ -147,15 +150,16 @@ export default async function AdminAgencyDetailPage({
   };
   return (
     <div className="space-y-8">
-      <div className="space-y-5">
+      <div className="space-y-4">
         <BackLink href="/admin/agencies" label="All agencies" />
-        <header className="flex min-w-0 flex-wrap items-center gap-4">
+        <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-6">
+        <header className="flex min-w-0 flex-wrap items-center gap-4 border-b pb-5">
           {logoUrl ? (
-            <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background max-sm:size-12">
+            <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-background max-sm:size-12">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={logoUrl} alt={`${agency.name} logo`} className="size-full object-contain" />
             </span>
-          ) : null}
+          ) : <span className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary max-sm:size-12"><Building2 className="size-6" /></span>}
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{agency.name}</h1>
@@ -179,9 +183,9 @@ export default async function AdminAgencyDetailPage({
             </Button>
           ) : null}
         </header>
-        {agency.about ? <p className="max-w-3xl text-sm text-muted-foreground">{agency.about}</p> : null}
+        {agency.about ? <p className="mt-4 max-w-3xl text-sm text-muted-foreground">{agency.about}</p> : null}
 
-        <StatRail className="sm:grid-cols-3 lg:grid-cols-6">
+        <StatRail className="mt-5 sm:grid-cols-3 lg:grid-cols-6 [&>div]:bg-secondary/30 [&>div]:py-4">
           <StatRailItem
             label="Wallet balance"
             value={`${wallet.balance < 0 ? "−" : ""}${usd(Math.abs(wallet.balance))}`}
@@ -193,9 +197,25 @@ export default async function AdminAgencyDetailPage({
           <StatRailItem label="Total earned" value={usd(totalEarned)} />
           <StatRailItem label="Members" value={agency.agency_members.length} />
         </StatRail>
+        </div>
+        <nav aria-label="Agency sections" className="flex gap-2 overflow-x-auto pb-1">
+          {[["performance", "Performance"], ["controls", "Account controls"], ["members", "Members"], ["markups", "Markups"], ["wallet", "Wallet activity"], ["earnings", "Earnings"], ["topups", "Top-ups"], ["payouts", "Payouts"], ["commissions", "Commissions"]].map(([anchor, label]) => (
+            <a key={anchor} href={`#${anchor}`} className="shrink-0 rounded-full border bg-card px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{label}</a>
+          ))}
+        </nav>
+        {pendingTopups.length > 0 || activePayouts.length > 0 || pendingCommissionCount > 0 ? (
+          <section aria-label="Finance attention" className="rounded-xl border border-amber-300/70 bg-amber-50/70 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+            <div className="flex items-center gap-2 font-semibold text-amber-950 dark:text-amber-100"><AlertCircle className="size-4" />Finance attention</div>
+            <div className="mt-3 flex flex-wrap gap-2 text-sm">
+              {pendingTopups.length > 0 ? <a href="#topups" className="rounded-lg border border-amber-200 bg-background px-3 py-2 font-medium hover:border-amber-500 dark:border-amber-800">{pendingTopups.length} top-up {pendingTopups.length === 1 ? "needs" : "need"} review</a> : null}
+              {activePayouts.length > 0 ? <a href="#payouts" className="rounded-lg border border-amber-200 bg-background px-3 py-2 font-medium hover:border-amber-500 dark:border-amber-800">{activePayouts.length} {activePayouts.length === 1 ? "payout" : "payouts"} in progress</a> : null}
+              {pendingCommissionCount > 0 ? <a href="#commissions" className="rounded-lg border border-amber-200 bg-background px-3 py-2 font-medium hover:border-amber-500 dark:border-amber-800">{pendingCommissionCount} commission {pendingCommissionCount === 1 ? "entry" : "entries"} pending</a> : null}
+            </div>
+          </section>
+        ) : null}
       </div>
 
-      <section className="space-y-3">
+      <section id="performance" className="scroll-mt-20 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-heading text-base font-semibold">Performance</h2>
           <DateRangePicker currentKey={range.key} />
@@ -220,7 +240,7 @@ export default async function AdminAgencyDetailPage({
         />
       </section>
 
-      <section className="space-y-3">
+      <section id="controls" className="scroll-mt-20 space-y-3">
         <h2 className="font-heading text-base font-semibold">Account controls</h2>
         <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
           <ControlCard title="Commission rate">
@@ -260,7 +280,7 @@ export default async function AdminAgencyDetailPage({
       </section>
 
       <div className="grid items-start gap-6 lg:grid-cols-2">
-        <Section title="Members" count={agency.agency_members.length}>
+        <Section id="members" title="Members" count={agency.agency_members.length}>
           <Card className="overflow-hidden py-0">
             {agency.agency_members.length === 0 ? (
               <Empty>
@@ -401,7 +421,7 @@ export default async function AdminAgencyDetailPage({
         </Section>
       </div>
 
-      <Section title="Wallet transactions" count={wallet.transactions.length}>
+      <Section id="wallet" title="Wallet transactions" count={wallet.transactions.length}>
         <Card className="overflow-hidden py-0">
           {wallet.transactions.length === 0 ? (
             <Empty>
@@ -479,7 +499,7 @@ export default async function AdminAgencyDetailPage({
           </Card>
         </Section>
 
-        <Section title="Earnings balance">
+        <Section id="earnings" title="Earnings balance">
           <StatRail className="sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
             <StatRailItem label="Total earned" value={usd(earnings.totalEarned)} />
             <StatRailItem label="In review" value={usd(earnings.inReview)} tone="warn" />
@@ -490,7 +510,7 @@ export default async function AdminAgencyDetailPage({
         </Section>
       </div>
 
-      <Section title="Wallet top-ups" count={topupRequests.length}>
+      <Section id="topups" title="Wallet top-ups" count={topupRequests.length}>
         <Card className="overflow-hidden py-0">
           {topupRequests.length === 0 ? (
             <Empty>
@@ -500,7 +520,7 @@ export default async function AdminAgencyDetailPage({
               <EmptyTitle>No top-ups</EmptyTitle>
             </Empty>
           ) : (
-            <Table>
+            <Table className="min-w-[850px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Filed</TableHead>
@@ -515,7 +535,7 @@ export default async function AdminAgencyDetailPage({
               </TableHeader>
               <TableBody>
                 {topupRequests.map((request) => (
-                  <TableRow key={request.id}>
+                  <TableRow key={request.id} className={request.status === "pending" ? "bg-amber-50/70 hover:bg-amber-50 dark:bg-amber-950/20" : "hover:bg-primary/[0.035]"}>
                     <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                       {format(new Date(request.requested_at), "d MMM yyyy")}
                     </TableCell>
@@ -525,10 +545,10 @@ export default async function AdminAgencyDetailPage({
                         {request.rail}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
+                    <TableCell className="font-mono text-xs font-medium">
                       {request.reference ?? request.provider_ref ?? "—"}
                     </TableCell>
-                    <TableCell numeric className="font-medium tabular-nums">
+                    <TableCell numeric className="font-semibold tabular-nums">
                       {usd(Number(request.amount))}
                     </TableCell>
                     <TableCell>
@@ -564,7 +584,7 @@ export default async function AdminAgencyDetailPage({
         </Card>
       </Section>
 
-      <Section title="Payout requests" count={payoutRequests.length}>
+      <Section id="payouts" title="Payout requests" count={payoutRequests.length}>
         <Card className="overflow-hidden py-0">
           {payoutRequests.length === 0 ? (
             <Empty>
@@ -574,7 +594,7 @@ export default async function AdminAgencyDetailPage({
               <EmptyTitle>No payout requests</EmptyTitle>
             </Empty>
           ) : (
-            <Table>
+            <Table className="min-w-[900px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Requested</TableHead>
@@ -588,15 +608,15 @@ export default async function AdminAgencyDetailPage({
               </TableHeader>
               <TableBody>
                 {payoutRequests.map((request) => (
-                  <TableRow key={request.id}>
+                  <TableRow key={request.id} className={["pending", "approved", "processing"].includes(request.status) ? "bg-amber-50/70 hover:bg-amber-50 dark:bg-amber-950/20" : "hover:bg-primary/[0.035]"}>
                     <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                       {format(new Date(request.requested_at), "d MMM yyyy")}
                     </TableCell>
-                    <TableCell numeric className="font-medium tabular-nums">
+                    <TableCell numeric className="font-semibold tabular-nums">
                       {usd(Number(request.amount))}
                     </TableCell>
                     <TableCell>
-                      <p>
+                      <p className="font-medium">
                         {request.bank_name ?? "—"}
                         {request.bank_branch ? ` · ${request.bank_branch}` : ""}
                       </p>
@@ -621,7 +641,7 @@ export default async function AdminAgencyDetailPage({
         </Card>
       </Section>
 
-      <Section title="Commission entries" count={commissionEntryTotal}>
+      <Section id="commissions" title="Commission entries" count={commissionEntryTotal}>
         <Card className="overflow-hidden py-0">
           {commissionEntries.length === 0 ? (
             <Empty>
@@ -631,7 +651,7 @@ export default async function AdminAgencyDetailPage({
               <EmptyTitle>No commission entries</EmptyTitle>
             </Empty>
           ) : (
-            <Table>
+            <Table className="min-w-[850px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Order</TableHead>
@@ -644,7 +664,7 @@ export default async function AdminAgencyDetailPage({
               </TableHeader>
               <TableBody>
                 {commissionEntries.map((entry) => (
-                  <TableRow key={entry.id}>
+                  <TableRow key={entry.id} className={entry.status === "pending" ? "bg-amber-50/40 hover:bg-amber-50/70 dark:bg-amber-950/10" : "hover:bg-primary/[0.035]"}>
                     <TableCell>
                       <p className="font-mono text-xs font-medium">{entry.order?.order_number ?? "—"}</p>
                       <p className="text-xs text-muted-foreground tabular-nums">
@@ -660,7 +680,7 @@ export default async function AdminAgencyDetailPage({
                     <TableCell numeric className="tabular-nums">
                       {usd(Number(entry.markup_amount))}
                     </TableCell>
-                    <TableCell numeric className="font-medium tabular-nums">
+                    <TableCell numeric className="font-semibold tabular-nums">
                       {usd(Number(entry.amount))}
                     </TableCell>
                     <TableCell>

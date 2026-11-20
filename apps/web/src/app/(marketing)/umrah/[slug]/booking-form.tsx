@@ -329,7 +329,7 @@ export function BookingForm({
         />
       </section>
 
-      {requestFirst ? <fieldset className="space-y-3 rounded-xl border p-4"><legend className="px-2 font-semibold">Pool terms</legend><div className="whitespace-pre-wrap text-sm">{selected?.request_terms}</div><label className="flex items-start gap-3"><input type="checkbox" name="termsAccepted" required className="mt-1 size-4" /><span>I accept the formation, payment and cancellation terms.</span></label><Badge variant="info">Payment opens when the group is full</Badge></fieldset> : null}
+      {requestFirst ? <fieldset className="space-y-3 rounded-xl border p-4"><legend className="px-2 font-semibold">Pool terms</legend><div className="whitespace-pre-wrap text-sm">{selected?.request_terms}</div><label className="flex items-start gap-3"><input type="checkbox" name="termsAccepted" required className="mt-1 size-4" /><span>I accept the formation, payment and cancellation terms.</span></label><Badge variant="info">Payment opens after group confirmation</Badge></fieldset> : null}
       <FieldError>{state?.error}</FieldError>
 
       <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-card p-4 shadow-md ring-1 ring-foreground/10">

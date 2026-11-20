@@ -7,6 +7,7 @@ import { requirePlatformAdmin } from "@/lib/auth/session";
 import { invalidateSetting } from "@/lib/site-settings";
 import { SOCIAL_PLATFORM_ORDER, type SocialLink } from "@/lib/social-platforms";
 import type { ActionState } from "@/lib/auth/actions";
+import { getUmrahOperations } from "@/modules/umrah/settings";
 
 async function saveSetting(key: string, value: unknown) {
   const supabase = await createClient();
@@ -75,12 +76,13 @@ const umrahOperationsSchema = z.object({
 /** umrah_operations: read by SQL through umrah_setting() and by modules/umrah/settings.ts. */
 export async function saveUmrahOperations(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requirePlatformAdmin();
+  const existing = await getUmrahOperations();
   const parsed = umrahOperationsSchema.safeParse({
     unpaidHoldHours: formData.get("unpaidHoldHours"),
-    privateDepositPercent: formData.get("privateDepositPercent"),
-    privateBalanceDueDays: formData.get("privateBalanceDueDays"),
-    privateLeadDays: formData.get("privateLeadDays"),
-    privateFullPaymentBeforeDocuments: formData.get("privateFullPaymentBeforeDocuments") === "on",
+    privateDepositPercent: existing.privateDepositPercent,
+    privateBalanceDueDays: existing.privateBalanceDueDays,
+    privateLeadDays: existing.privateLeadDays,
+    privateFullPaymentBeforeDocuments: existing.privateFullPaymentBeforeDocuments,
     visaRequiresPassport: formData.get("visaRequiresPassport") === "on",
     requiredDocuments: formData.getAll("requiredDocuments").map(String),
   });

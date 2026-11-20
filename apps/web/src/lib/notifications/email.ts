@@ -61,6 +61,9 @@ function smtp(): Transporter {
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
       pool: true,
       maxConnections: 3,
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 20_000,
     });
   }
   return smtpTransport;
@@ -125,6 +128,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
+      signal: AbortSignal.timeout(20_000),
       headers: {
         Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         "Content-Type": "application/json",

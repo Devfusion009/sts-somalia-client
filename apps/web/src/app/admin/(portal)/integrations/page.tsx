@@ -41,7 +41,7 @@ function ProviderList({ integrations }: { integrations: IntegrationStatus[] }) {
       {integrations.map((status) => (
         // Keyed on the active flag so a switch flipped by another card (card
         // processors are mutually exclusive) remounts with the saved state.
-        <IntegrationCard key={`${status.provider.key}-${status.isActive}`} status={status} />
+        <IntegrationCard key={`${status.provider.key}-${status.isActive}-${status.lastTestedAt ?? "untested"}`} status={status} />
       ))}
     </div>
   );
@@ -143,6 +143,18 @@ export default async function AdminIntegrationsPage({ searchParams }: { searchPa
           );
         })}
       </nav>
+
+      {(tab === "flights" || tab === "hotels") && <Card>
+        <CardContent className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="font-heading text-base font-semibold">Amadeus Enterprise</h2>
+            <Badge variant="warning">Contract integration required</Badge>
+          </div>
+          <Button variant="outline" render={<a href="https://developers.amadeus.com/" target="_blank" rel="noreferrer" />}>
+            Enterprise API portal
+          </Button>
+        </CardContent>
+      </Card>}
 
       {tab === "payments" && bank ? (
         <PaymentsTab integrations={integrations.filter((i) => i.provider.category === "payments")} bank={bank} />

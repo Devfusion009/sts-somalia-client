@@ -10,7 +10,7 @@ export function waafiSetupError(credentials: Record<string, string>): string | n
   return null;
 }
 
-export async function registerWaafiWebhook(credentials: Record<string, string>): Promise<{ error: string | null; secret?: string }> {
+async function configureWaafiWebhook(credentials: Record<string, string>, register: boolean): Promise<{ error: string | null; secret?: string }> {
   const invalid = waafiSetupError(credentials);
   if (invalid) return { error: invalid };
   const config = resolveWaafiConfig(credentials, process.env)!;
@@ -29,9 +29,19 @@ export async function registerWaafiWebhook(credentials: Record<string, string>):
     if (list.responseCode !== "2001" || !Array.isArray(list.params?.data)) return { error: "WaafiPay could not verify the webhook configuration." };
     const existing = list.params.data.find((row) => row.url === url && !row.eventType);
     if (existing) return credentials.webhook_secret ? { error: null } : { error: "Save the signing secret for the existing webhook." };
+    if (!register) return { error: "Register a default WaafiPay webhook for this site before activation." };
     if (list.params.data.length > 0) return { error: "Review the existing WaafiPay webhooks before registering this site." };
     const registration = await call("WEBHOOK_REGISTER", { url, description: "STS payments" });
     if (registration.responseCode !== "2001" || !registration.params?.secret) return { error: "WaafiPay could not register the webhook." };
     return { error: null, secret: registration.params.secret };
   } catch { return { error: "Could not reach WaafiPay." }; }
+}
+
+export async function registerWaafiWebhook(credentials: Record<string, string>) {
+  return configureWaafiWebhook(credentials, true);
+}
+
+/** Activation is read-only: never replaces another site's merchant webhook. */
+export async function verifyWaafiWebhook(credentials: Record<string, string>) {
+  return configureWaafiWebhook(credentials, false);
 }

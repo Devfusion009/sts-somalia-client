@@ -44,6 +44,7 @@ import {
   Images,
   Star,
   Search,
+  Phone,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -71,7 +72,8 @@ import { AdminAccountMenu, type AdminMenuInfo } from "@/components/portal/admin-
 import { rootOrigin, stripPortalPrefix } from "@/lib/subdomain";
 import { cn } from "@/lib/utils";
 import type { PartnerContext } from "@/modules/identity/queries";
-import { filterNavigationGroups } from "./navigation-search";
+import { filterNavigationGroups, findActiveNavigationItem } from "./navigation-search";
+import { SectionNavigation } from "./section-navigation";
 import { UmrahIcon } from "./umrah-icon";
 
 // Icons are resolved from a string key (not passed as component references)
@@ -115,6 +117,7 @@ export const PORTAL_ICONS = {
   photos: Images,
   reviews: Star,
   "new-booking": CirclePlus,
+  phone: Phone,
 } satisfies Record<string, LucideIcon>;
 
 const SUPPORT_EMAIL = "info@scoutsts.com";
@@ -126,8 +129,8 @@ const MANAGER_TIPS = [
 ];
 
 export type PortalIconName = keyof typeof PORTAL_ICONS;
-export type PortalNavItem = { href: string; label: string; icon: PortalIconName; badge?: number; searchTerms?: string };
-export type PortalNavGroup = { label: string; items: PortalNavItem[]; alwaysOpen?: boolean };
+export type PortalNavItem = { href: string; label: string; icon: PortalIconName; badge?: number; searchTerms?: string; activePaths?: string[] };
+export type PortalNavGroup = { label: string; items: PortalNavItem[]; alwaysOpen?: boolean; icon?: PortalIconName };
 export type PortalAccent = "customer" | "agent" | "admin" | "manager";
 
 /**
@@ -218,18 +221,18 @@ function NavGroups({
 
   return (
     <>
-      {visibleGroups.length === 0 ? <div role="status" className="px-5 py-6 text-xs text-sidebar-foreground/60">No pages found.</div> : null}
+      {visibleGroups.length === 0 ? <div role="status" className="px-5 py-6 text-xs text-sidebar-foreground/80">No pages found.</div> : null}
       {visibleGroups.map((group) => {
         const isOpen = group.alwaysOpen || isSearching || iconOnly || openGroups.has(group.label);
         return (
-          <SidebarGroup key={group.label} className={customerNavigation ? "gap-2 px-3 py-4 [&+&]:border-t [&+&]:border-white/10" : undefined}>
-            {iconOnly ? null : group.alwaysOpen || isSearching ? <SidebarGroupLabel className={customerNavigation ? "h-7 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-100/75" : undefined}>{group.label}</SidebarGroupLabel> : <SidebarGroupLabel
+          <SidebarGroup key={group.label} className={customerNavigation ? "gap-2 px-3 py-4 [&+&]:border-t [&+&]:border-sidebar-border" : undefined}>
+            {iconOnly ? null : group.alwaysOpen || isSearching ? <SidebarGroupLabel className={customerNavigation ? "h-7 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-sidebar-foreground" : undefined}>{group.label}</SidebarGroupLabel> : <SidebarGroupLabel
               render={
                 <button
                   type="button"
                   onClick={(e) => toggleGroup(group.label, e.currentTarget.closest<HTMLElement>("[data-slot=sidebar-group]"))}
                   aria-expanded={isOpen}
-                  className="flex w-full items-center justify-between gap-2 rounded-md text-[11px] font-medium text-sidebar-foreground/50 transition-colors hover:text-sidebar-foreground"
+                  className="flex w-full items-center justify-between gap-2 rounded-md text-xs font-medium text-sidebar-foreground/80 transition-colors hover:text-sidebar-foreground"
                 />
               }
             >
@@ -251,12 +254,12 @@ function NavGroups({
                           isActive={active}
                           aria-current={active ? "page" : undefined}
                           tooltip={item.label}
-                          // Active = filled row, white label, brand-teal icon.
+                          // Active destinations use the shared sidebar accent.
                           className={cn(
-                            "text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 [&_svg]:text-sidebar-foreground/60",
+                            "text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 [&_svg]:text-sidebar-foreground/80",
                             active && "[&_svg]:text-sidebar-primary",
-                            customerNavigation && "relative h-11 gap-3 rounded-lg px-3 text-[14px] font-medium text-white/90 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-300 [&_svg]:size-5 [&_svg]:text-emerald-100/80",
-                            customerNavigation && active && "data-active:bg-emerald-400/15 data-active:font-semibold data-active:text-white ring-1 ring-inset ring-emerald-200/20 before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-full before:bg-emerald-300 [&_svg]:text-emerald-300"
+                            customerNavigation && "relative h-11 gap-3 rounded-lg px-3 text-[14px] font-medium text-sidebar-accent-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring [&_svg]:size-5 [&_svg]:text-sidebar-foreground",
+                            customerNavigation && active && "data-active:bg-sidebar-accent data-active:font-semibold data-active:text-sidebar-accent-foreground ring-1 ring-inset ring-sidebar-border before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-full before:bg-sidebar-primary [&_svg]:text-sidebar-primary"
                           )}
                           render={<Link href={item.href} onClick={onNavigate ? () => { onNavigate(); setOpenMobile(false); } : undefined} />}
                         >
@@ -374,15 +377,9 @@ export function PortalShell({
   // produced no match for any item on any admin or agent page: nothing was
   // ever highlighted, and NavGroups fell back to opening the first group
   // instead of the one you were actually in.
-  const currentPath = stripPortalPrefix(pathname) ?? pathname;
-  const activeHref = navGroups
-    .flatMap((group) => group.items)
-    .map((item) => item.href)
-    .filter((href) => {
-      const target = stripPortalPrefix(href) ?? href;
-      return currentPath === target || currentPath.startsWith(`${target}/`);
-    })
-    .sort((a, b) => b.length - a.length)[0];
+  const activeItem = findActiveNavigationItem(navGroups.flatMap((group) => group.items), pathname);
+  const activeHref = activeItem?.href;
+  const activeGroup = navGroups.find((group) => group.items.some((item) => item.href === activeHref));
 
   const accountTrigger = (
     <SidebarMenuButton
@@ -398,19 +395,19 @@ export function PortalShell({
         </AvatarFallback>
       </Avatar>
       <div className="flex min-w-0 flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">
-        <span className="truncate text-sm leading-none font-medium text-white">{profileName || "Account"}</span>
-        <span className="truncate text-[11px] leading-none text-sidebar-foreground/60">
+        <span className="truncate text-sm leading-none font-medium text-sidebar-accent-foreground">{profileName || "Account"}</span>
+        <span className="truncate text-xs leading-none text-sidebar-foreground/80">
           {roleLabel}
           {accountCode ? ` · ${accountCode}` : ""}
         </span>
       </div>
-      <ChevronsUpDown className="size-3.5 shrink-0 text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden" />
+      <ChevronsUpDown className="size-3.5 shrink-0 text-sidebar-foreground/80 group-data-[collapsible=icon]:hidden" />
     </>
   );
 
   return (
-    <SidebarProvider className={className}>
-      <Sidebar collapsible="icon" className={portalName === "My Account" ? "[&_[data-slot=sidebar-header]]:border-b [&_[data-slot=sidebar-header]]:border-white/10 [&_[data-slot=sidebar-header]]:p-4 [&_[data-slot=sidebar-footer]]:border-t [&_[data-slot=sidebar-footer]]:border-white/10 [&_[data-slot=sidebar-footer]]:p-3 [&_[data-slot=sidebar-menu]]:gap-1" : undefined}>
+    <SidebarProvider className={cn("portal-shell", className)}>
+      <Sidebar collapsible="icon" className={portalName === "My Account" ? "[&_[data-slot=sidebar-header]]:border-b [&_[data-slot=sidebar-header]]:border-sidebar-border [&_[data-slot=sidebar-header]]:p-4 [&_[data-slot=sidebar-footer]]:border-t [&_[data-slot=sidebar-footer]]:border-sidebar-border [&_[data-slot=sidebar-footer]]:p-3 [&_[data-slot=sidebar-menu]]:gap-1" : undefined}>
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -427,15 +424,15 @@ export function PortalShell({
                   )}
                 </span>
                 <div className="flex flex-col leading-tight">
-                  <span className="truncate font-heading font-semibold text-white">{brandName ?? "STS Somalia"}</span>
-                  <span className="text-xs text-sidebar-foreground/60">{portalName}</span>
+                  <span className="truncate font-heading font-semibold text-sidebar-accent-foreground">{brandName ?? "STS Somalia"}</span>
+                  <span className="text-xs text-sidebar-foreground/80">{portalName}</span>
                 </div>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
           {searchableNavigation ? (
             <div className="relative mt-2 group-data-[collapsible=icon]:hidden">
-              <Search className="pointer-events-none absolute top-2.5 left-3 z-10 size-4 text-sidebar-foreground/50" aria-hidden="true" />
+              <Search className="pointer-events-none absolute top-2.5 left-3 z-10 size-4 text-sidebar-foreground/80" aria-hidden="true" />
               <SidebarInput
                 type="search"
                 aria-label="Search navigation"
@@ -444,14 +441,18 @@ export function PortalShell({
                 onChange={(event) => setNavQuery(event.target.value)}
                 onKeyDown={(event) => { if (event.key === "Escape") setNavQuery(""); }}
                 autoComplete="off"
-                className="h-9 border-sidebar-border bg-sidebar-accent/70 pr-9 pl-9 text-xs text-sidebar-foreground shadow-none placeholder:text-sidebar-foreground/50 focus-visible:ring-sidebar-ring [&::-webkit-search-cancel-button]:hidden"
+                className="h-9 border-sidebar-border bg-sidebar-accent/70 pr-9 pl-9 text-xs text-sidebar-foreground shadow-none placeholder:text-sidebar-foreground/80 focus-visible:ring-sidebar-ring [&::-webkit-search-cancel-button]:hidden"
               />
-              {navQuery ? <button type="button" aria-label="Clear navigation search" onClick={() => setNavQuery("")} className="absolute top-0.5 right-1 flex size-8 items-center justify-center rounded-md text-sidebar-foreground/60 hover:text-white focus-visible:outline-2 focus-visible:outline-sidebar-ring"><X className="size-3.5" aria-hidden="true" /></button> : null}
+              {navQuery ? <button type="button" aria-label="Clear navigation search" onClick={() => setNavQuery("")} className="absolute top-0.5 right-1 flex size-8 items-center justify-center rounded-md text-sidebar-foreground/80 hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-sidebar-ring"><X className="size-3.5" aria-hidden="true" /></button> : null}
             </div>
           ) : null}
         </SidebarHeader>
         <SidebarContent>
-          <NavGroups customerNavigation={portalName === "My Account"} navGroups={navGroups} activeHref={activeHref} query={navQuery} onNavigate={searchableNavigation ? () => setNavQuery("") : undefined} />
+          {accent === "admin" ? (
+            <SectionNavigation navGroups={navGroups} activeHref={activeHref} pathname={pathname} query={navQuery} onNavigate={() => setNavQuery("")} icons={PORTAL_ICONS} />
+          ) : (
+            <NavGroups customerNavigation={portalName === "My Account"} navGroups={navGroups} activeHref={activeHref} query={navQuery} onNavigate={searchableNavigation ? () => setNavQuery("") : undefined} />
+          )}
           {/* An exit hatch, not a destination — separated from real nav items
               and deliberately muted so it doesn't compete with them. A hotel
               manager's portal isn't a reskinned view of the public site the
@@ -464,7 +465,7 @@ export function PortalShell({
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       tooltip="Back to website"
-                      className={portalName === "My Account" ? "h-11 gap-3 rounded-lg px-3 text-white/85 hover:bg-white/10 hover:text-white [&_svg]:size-5" : "text-sidebar-foreground/55 hover:text-sidebar-foreground [&_svg]:size-3.5"}
+                      className={portalName === "My Account" ? "h-11 gap-3 rounded-lg px-3 text-sidebar-accent-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground [&_svg]:size-5" : "text-sidebar-foreground/55 hover:text-sidebar-foreground [&_svg]:size-3.5"}
                       render={<Link href={websiteHref} />}
                     >
                       <ExternalLink />
@@ -518,7 +519,12 @@ export function PortalShell({
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur-md sm:px-5">
           <SidebarTrigger className="text-muted-foreground max-sm:size-10" />
           <Separator orientation="vertical" className="h-4" />
-          <span className="truncate text-sm font-medium">{portalName}</span>
+          {accent === "admin" && activeItem ? (
+            <nav aria-label="Current location" className="flex min-w-0 items-center gap-2 text-sm">
+              {activeGroup && !activeGroup.alwaysOpen && <><span className="hidden shrink-0 text-muted-foreground sm:inline">{activeGroup.label}</span><span aria-hidden="true" className="hidden text-muted-foreground/50 sm:inline">/</span></>}
+              <span aria-current="page" className="truncate font-medium">{activeItem.label}</span>
+            </nav>
+          ) : <span className="truncate text-sm font-medium">{portalName}</span>}
           <div className="ml-auto flex shrink-0 items-center gap-2">{headerExtra}</div>
         </header>
         <div className="mx-auto w-full max-w-[1480px] min-w-0 flex-1 space-y-6 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">{children}</div>

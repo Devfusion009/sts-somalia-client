@@ -26,7 +26,7 @@ export default async function AccountOverviewPage() {
     db.from("umrah_bookings").select("id",{count:"exact",head:true}).eq("customer_id",profile.id),
     trpc.travelers.myTravelers.query().catch(()=>null),
     trpc.travelers.myDocuments.query().catch(()=>null),
-    trpc.bookings.myBookings.query().catch(()=>null),
+    trpc.bookings.myBookingsPage.query({ page: 1, filter: "upcoming", view: "list", sort: "travel" }).catch(()=>null),
   ]);
   const self = travelers?.find(t=>t.is_self) ?? null;
   const completion=profileCompletion(profile);

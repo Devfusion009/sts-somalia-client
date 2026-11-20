@@ -726,42 +726,22 @@ function agingBucket(days: number): AgencyAgingBucket {
  */
 export async function getAgencyAgingReport(): Promise<AgencyAgingRow[]> {
   const supabase = await createClient();
-
-  const { data: agencies } = await supabase
-    .from("agencies")
-    .select("id, name, contact_email, credit_balance, created_at")
-    .lt("credit_balance", 0);
-
-  if (!agencies || agencies.length === 0) return [];
-
+  const { data, error } = await supabase.rpc("admin_agency_aging_report");
+  if (error) throw new Error("Agency aging report could not be loaded.");
   const now = Date.now();
-
-  const rows = await Promise.all(
-    agencies.map(async (agency) => {
-      const { data: lastClean } = await supabase
-        .from("agency_wallet_transactions")
-        .select("created_at")
-        .eq("agency_id", agency.id)
-        .gte("balance_after", 0)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const agingSince = lastClean?.created_at ?? agency.created_at;
+  const rows = ((data ?? []) as Array<{ agency_id: string; agency_name: string; contact_email: string; outstanding_amount: number; aging_since: string }>).map(agency => {
+      const agingSince = agency.aging_since;
       const agingDays = Math.max(0, Math.floor((now - new Date(agingSince).getTime()) / 86_400_000));
-
       return {
-        agencyId: agency.id,
-        agencyName: agency.name,
+        agencyId: agency.agency_id,
+        agencyName: agency.agency_name,
         contactEmail: agency.contact_email,
-        outstandingAmount: -Number(agency.credit_balance),
+        outstandingAmount: Number(agency.outstanding_amount),
         agingSince,
         agingDays,
         bucket: agingBucket(agingDays),
       } satisfies AgencyAgingRow;
-    })
-  );
-
+    });
   return rows.sort((a, b) => b.agingDays - a.agingDays);
 }
 

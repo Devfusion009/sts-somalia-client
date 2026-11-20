@@ -66,7 +66,7 @@ export async function getFeaturedHotels(limit = 4): Promise<HotelCardData[]> {
       return (data ?? []).map(toCardData);
     },
     { tags: ["hotels"] }
-  ).catch(() => []);
+  );
 }
 
 /** Published hotels matching a city (all when empty), best rated first. Same for every visitor. */
@@ -104,7 +104,7 @@ export async function searchHotels(filters: {
   // longer than the haystack). Match on the city segment alone.
   const cityName = filters.city?.split(",")[0]?.trim();
 
-  const internal = await listPublishedHotels(cityName).catch(() => []);
+  const internal = await listPublishedHotels(cityName);
 
   // Blend in live external-supplier availability — only meaningful with a
   // city and stay dates, same as any real hotel search. Failures here never
@@ -157,7 +157,7 @@ export async function getHotelBySlug(slug: string) {
       return data;
     },
     { tags: ["hotels"], cacheIf: (value) => value !== null }
-  ).catch(() => null);
+  );
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

@@ -2,9 +2,9 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 function load(relative){const mod={exports:{}};new Function('require','module','exports',ts.transpileModule(fs.readFileSync(path.resolve(__dirname,'../src',relative),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(()=>({}),mod,mod.exports);return mod.exports;}
 const {ADMIN_NAV_GROUPS}=load('app/admin/(portal)/navigation.ts');
 const {poolCapacity,poolStatus}=load('modules/umrah/pool.ts');
-test('inventory is first with exactly four destinations; workspace shortcuts are last',()=>{
- assert.equal(ADMIN_NAV_GROUPS[0].label,'Catalog & inventory');assert.deepEqual(ADMIN_NAV_GROUPS[0].items.map(x=>x.label),['Hotels','Events & halls','Visa products','Umrah pool']);
- assert.equal(ADMIN_NAV_GROUPS.at(-1).label,'Workspace');
+test('workspace comes first and Umrah inventory has one destination',()=>{
+ assert.equal(ADMIN_NAV_GROUPS[0].label,'Workspace');
+ assert.ok(ADMIN_NAV_GROUPS.find(g=>g.label==='Umrah').items.some(x=>x.href==='/admin/umrah/pool'));
  assert.equal(ADMIN_NAV_GROUPS.flatMap(g=>g.items).filter(x=>x.href==='/admin/umrah/pool').length,1);
  assert.equal(ADMIN_NAV_GROUPS.flatMap(g=>g.items).some(x=>x.href==='/admin/catalog/umrah'),false);
 });

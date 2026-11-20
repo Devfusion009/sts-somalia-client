@@ -21,7 +21,29 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w api
+      - run: npm run lint -w api
+      - run: npm run lint -w web
+      - run: npx tsc --noEmit -p apps/web
+      - run: npm test -w @sts/shared-types
+      - run: node --test apps/web/test/agent-bookings.test.cjs apps/web/test/catalog-outage.test.cjs apps/web/test/cron-auth.test.cjs apps/web/test/external-worker.test.mjs apps/web/test/marketing-callback.test.cjs apps/web/test/my-bookings-pages.test.cjs apps/web/test/pool-email.test.cjs apps/web/test/pool-worker.test.cjs apps/web/test/public-umrah-catalog.test.cjs
+      - run: python3 apps/api/test/public-umrah-integration.py --request-pool
+      - run: python3 apps/api/test/marketing-aging-integration.py
+      - run: python3 apps/api/test/umrah-capacity-integration.py
+      - run: python3 apps/api/test/my-bookings-page-integration.py
+
   deploy-api:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,6 +114,7 @@ jobs:
           '
 
   deploy-web:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -129,9 +152,13 @@ jobs:
             apps/web/.next/static/ ubuntu@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/app/apps/web/.next/static/
           rsync -az -e "ssh -i ~/.ssh/lightsail.pem" \
             apps/web/public/ ubuntu@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/app/apps/web/public/
+          rsync -az -e "ssh -i ~/.ssh/lightsail.pem" \
+            apps/web/worker.mjs ubuntu@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/app/apps/web/worker.mjs
 
       - name: Write env file
         run: |
+          cron_secret="${{ secrets.CRON_SECRET }}"
+          if [ -z "$cron_secret" ]; then cron_secret="$(openssl rand -hex 32)"; fi
           ssh -i ~/.ssh/lightsail.pem ubuntu@${{ secrets.LIGHTSAIL_HOST }} "cat > /home/ubuntu/app/apps/web/.env.local" <<EOF
           DEPLOYMENT_ENV=qa
           WAAFI_ENVIRONMENT=sandbox
@@ -151,6 +178,8 @@ jobs:
           EMAIL_REPLY_TO=${{ vars.EMAIL_REPLY_TO }}
           RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
           INTEGRATIONS_ENCRYPTION_KEY=${{ secrets.INTEGRATIONS_ENCRYPTION_KEY }}
+          CRON_SECRET=$cron_secret
+          STS_WORKER_SCHEDULER=external
           EOF
 
       - name: Restart
@@ -159,5 +188,10 @@ jobs:
             pm2 describe sts-somalia-web > /dev/null 2>&1 \
               && pm2 restart sts-somalia-web \
               || PORT=3000 HOSTNAME=0.0.0.0 pm2 start server.js --name sts-somalia-web --cwd /home/ubuntu/app/apps/web
+            pm2 describe sts-somalia-worker > /dev/null 2>&1 \
+              && pm2 restart sts-somalia-worker \
+              || pm2 start worker.mjs --name sts-somalia-worker --cwd /home/ubuntu/app/apps/web --node-args=--env-file=.env.local
+            sleep 2
+            pm2 jlist | node -e "const fs=require(\"fs\"); const worker=JSON.parse(fs.readFileSync(0,\"utf8\")).find(process=>process.name===\"sts-somalia-worker\"); if(worker?.pm2_env?.status!==\"online\") process.exit(1)"
             pm2 save
           '

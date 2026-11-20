@@ -64,43 +64,45 @@
    steppers, links); its orange is reserved for high-emphasis marketing CTAs
    and price highlights so it stays special. Neutrals are teal-tinted rather
    than gray so even empty screens feel on-brand. */
+/* Reference palette: quiet teal surfaces, ink text, orange emphasis. */
 :root {
-  --background: #f6f8f7;
-  --foreground: #0e2723;
+  --background: #ffffff;
+  --foreground: #202b2b;
   --card: #ffffff;
-  --card-foreground: #0e2723;
+  --card-foreground: #202b2b;
   --popover: #ffffff;
-  --popover-foreground: #0e2723;
-  --primary: #00947c;
+  --popover-foreground: #202b2b;
+  --primary: #187d73;
   --primary-foreground: #ffffff;
-  --secondary: #eef5f2;
-  --secondary-foreground: #0c4a40;
-  --muted: #f0f4f3;
-  --muted-foreground: #5a6f6b;
-  --accent: #e2f2ec;
-  --accent-foreground: #0c4a40;
-  --destructive: #dc2626;
+  --secondary: #edf7f5;
+  --secondary-foreground: #176b63;
+  --muted: #f4f8f7;
+  --muted-foreground: #627270;
+  --accent: #e8f4f2;
+  --accent-foreground: #176b63;
+  --destructive: #c52d35;
   --destructive-foreground: #ffffff;
-  --border: #e2e9e7;
-  --input: #d4dfdb;
-  --ring: #00947c;
-  --brand-accent: #f4711c;
-  --brand-accent-foreground: #ffffff;
-  --brand-gold: #f59e0b;
-  --chart-1: #00947c;
-  --chart-2: #f4711c;
-  --chart-3: #0284c7;
-  --chart-4: #7c3aed;
-  --chart-5: #f59e0b;
-  --radius: 0.625rem;
-  --sidebar: #0b1f1c;
-  --sidebar-foreground: #b9cbc6;
-  --sidebar-primary: #2cc9a8;
-  --sidebar-primary-foreground: #04211c;
-  --sidebar-accent: #16302b;
+  --border: #e3eae8;
+  --input: #cdd9d6;
+  --ring: #238c80;
+  --brand-accent: #f38b19;
+  --brand-accent-foreground: #272014;
+  --brand-gold: #d78015;
+  --brand-teal: #2c988c;
+  --chart-1: #238c80;
+  --chart-2: #f38b19;
+  --chart-3: #317c9a;
+  --chart-4: #7768aa;
+  --chart-5: #c28c39;
+  --radius: .75rem;
+  --sidebar: #103c37;
+  --sidebar-foreground: #edf7f5;
+  --sidebar-primary: #92ded0;
+  --sidebar-primary-foreground: #103c37;
+  --sidebar-accent: #20554e;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #2dd4b4;
+  --sidebar-border: rgba(255,255,255,.14);
+  --sidebar-ring: #92ded0;
 }
 
 .dark {
@@ -197,6 +199,8 @@
   html {
     @apply font-sans;
     text-rendering: optimizeLegibility;
+    scroll-padding-top: 6rem;
+    -webkit-font-smoothing: antialiased;
   }
   h1, h2, h3, h4 {
     @apply font-heading;
@@ -405,4 +409,43 @@ select:not([multiple]):not([size]) {
   background-position: right 0.6rem center;
   background-size: 0.9rem;
   padding-inline-end: 2rem;
+}
+
+/* Shared portal surface; the footer keeps its independent brand palette. */
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) {
+  --sidebar: #ffffff;
+  --sidebar-foreground: #475e5a;
+  --sidebar-primary: #187d73;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8f4f2;
+  --sidebar-accent-foreground: #176b63;
+  --sidebar-border: #e3eae8;
+  --sidebar-ring: #238c80;
+  background: #f4f8f7;
+}
+.dark :is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) {
+  --sidebar: #0a211d;
+  --sidebar-foreground: #c3dcd5;
+  --sidebar-primary: #2dd4b4;
+  --sidebar-primary-foreground: #04211c;
+  --sidebar-accent: #103630;
+  --sidebar-accent-foreground: #e2f3ee;
+  --sidebar-border: rgba(255,255,255,.1);
+  background: var(--background);
+}
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-inset"] { background: transparent; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-header"] { padding: 1.25rem 1rem; border-bottom: 1px solid var(--sidebar-border); }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-footer"] { padding: .875rem; border-top: 1px solid var(--sidebar-border); }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-group-label"] { font-size: .75rem; letter-spacing: .04em; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-menu-button"] { min-height: 2.75rem; font-size: .875rem; border-radius: .75rem; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-menu-button"][data-active="true"] { color: var(--sidebar-accent-foreground); background: var(--sidebar-accent); font-weight: 600; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-inset"] > header { min-height: 4.5rem; background: var(--card); }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="page-header"] { padding-bottom: 1.5rem; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="page-header"] h1 { font-size: clamp(1.5rem,2.2vw,2rem); letter-spacing: -.035em; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="card"] { box-shadow: 0 2px 6px rgb(20 60 50 / .025); }
+@media (max-width: 639px) {
+  :is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-inset"] > header { min-height: 4rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
 }

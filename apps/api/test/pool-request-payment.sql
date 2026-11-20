@@ -12,7 +12,9 @@ select test_fails(format('insert into payments(order_id,amount,status) values(%L
 update payments set status='succeeded' where order_id=(select id from test_ids where name='request-pay-order');
 select test_assert((select status='paid' from umrah_pool_requests where order_id=(select id from test_ids where name='request-pay-order')),'full payment did not confirm request');
 select test_assert((select status='confirmed' from umrah_bookings where id=(select booking_id from umrah_pool_requests where order_id=(select id from test_ids where name='request-pay-order'))),'full payment did not confirm fulfillment');
+select test_assert((select count(*)=1 from invoices where order_id=(select id from test_ids where name='request-pay-order') and status='issued' and invoice_number like 'INV-%'),'paid Umrah order did not generate an invoice');
 update payments set status='succeeded' where order_id=(select id from test_ids where name='request-pay-order');
+select test_assert((select count(*)=1 from invoices where order_id=(select id from test_ids where name='request-pay-order')),'payment retry generated a duplicate invoice');
 select test_assert((select booked_seats=40 from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'settlement duplicated seats');
 -- Protected manual review and subsequent failure/expiry.
 insert into test_ids select 'request-expire-order',order_id from umrah_pool_requests where status='payment_due' and num_pilgrims=39;

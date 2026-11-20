@@ -24,16 +24,12 @@ export type ProviderDefinition = {
   credentialFields: ProviderCredentialField[];
   /** Sub-heading inside a category tab, e.g. the card processors versus mobile money. */
   group?: string;
+  capabilities?: string[];
 };
 
 /**
- * Every provider an admin can activate. Deliberately scoped to providers
- * this codebase actually calls live (src/lib/provider-runtime/*) — no
- * catalog entries for providers we haven't wired, since a listed-but-dead
- * toggle would be a half-finished feature. Enterprise suppliers (Booking.com,
- * Amadeus, Skyscanner, Expedia) need weeks-long partner vetting before they
- * issue a key at all, so they're out of scope for a self-serve "add and
- * activate" flow — noted here for anyone tempted to add them later.
+ * Only implemented adapters have activation controls. Enterprise Amadeus
+ * requires the contracted service definitions; legacy REST is not SOAP/GDS.
  */
 export const PROVIDER_CATALOG: ProviderDefinition[] = [
   {
@@ -84,6 +80,7 @@ export const PROVIDER_CATALOG: ProviderDefinition[] = [
     category: "payments",
     group: "WaafiPay",
     name: "WaafiPay",
+    capabilities: ["EVC Plus", "ZAAD", "Sahal", "Hosted checkout"],
     description: "EVC Plus, ZAAD and Sahal mobile money, through WaafiPay's hosted payment page or a direct wallet push.",
     selfServe: false,
     docsUrl: "https://docs.waafipay.com/",
@@ -123,7 +120,8 @@ export const PROVIDER_CATALOG: ProviderDefinition[] = [
     key: "duffel",
     category: "flights",
     name: "Duffel",
-    description: "Live flight search and fares across hundreds of airlines. Already the platform's flight engine.",
+    description: "Flight search, pricing, booking and ticket retrieval through Duffel.",
+    capabilities: ["Search", "Booking", "Ticket retrieval"],
     selfServe: true,
     docsUrl: "https://duffel.com/docs",
     signupUrl: "https://app.duffel.com/join",
@@ -133,11 +131,13 @@ export const PROVIDER_CATALOG: ProviderDefinition[] = [
     key: "hotelbeds",
     category: "hotels",
     name: "Hotelbeds",
+    capabilities: ["Search only"],
     description: "Wholesale hotel inventory (bedbank) — blends external availability into hotel search alongside your own partner hotels.",
-    selfServe: true,
+    selfServe: false,
     docsUrl: "https://developer.hotelbeds.com/documentation/hotels/booking-api/",
     signupUrl: "https://developer.hotelbeds.com/",
     credentialFields: [
+      { key: "environment", label: "Environment", options: [{ value: "sandbox", label: "Sandbox" }, { value: "production", label: "Production" }] },
       { key: "api_key", label: "API Key" },
       { key: "api_secret", label: "API Secret" },
     ],

@@ -1,6 +1,7 @@
 import { PoolRequestList } from "@/modules/umrah/components/pool-request-list";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CheckCircle2, ChevronRight, Layers, List, Luggage } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
@@ -8,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { FilterChips } from "@/components/dashboard/filter-chips";
+import { Pager } from "@/components/dashboard/pager";
+import { parsePage } from "@/lib/pagination";
 import { getServerTrpc } from "@/lib/trpc/server";
 import {
-  bookingTimeframe,
   groupIntoTrips,
   type BookingTimeframe,
   type UnifiedBooking,
@@ -47,9 +49,9 @@ type View = "trips" | "list";
 export default async function AccountBookingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ success?: string; filter?: string; view?: string; type?: string }>;
+  searchParams: Promise<{ success?: string; filter?: string; view?: string; type?: string; page?: string }>;
 }) {
-  const { success, filter: filterParam, view: viewParam, type: typeParam } = await searchParams;
+  const { success, filter: filterParam, view: viewParam, type: typeParam, page: pageParam } = await searchParams;
 
   // Default to upcoming: the reason someone opens this page is almost always a
   // trip they are about to take, not one they took last year.
@@ -57,31 +59,36 @@ export default async function AccountBookingsPage({
     | BookingTimeframe
     | "all";
   const view: View = viewParam === "list" ? "list" : "trips";
+  const page = parsePage(pageParam);
+  const bookingType = (["hotel", "flight", "visa", "umrah", "hall"] as const).find((type) => type === typeParam);
 
   const trpc = await getServerTrpc();
   // apps/api is a separate deployment (not yet reachable from every
   // environment) — an empty list here would read as "you have no bookings",
   // which may be false, so this page blocks rather than degrades.
-  let bookings, orderMeta;
+  let bookings, orderMeta, counts, total;
   try {
-    ({ bookings, orderMeta } = await trpc.bookings.myBookings.query());
+    ({ bookings, orderMeta, counts, total } = await trpc.bookings.myBookingsPage.query({ page, filter, type: bookingType, view }));
   } catch {
     return <UnavailableNotice label="My Bookings" />;
   }
 
-  const relevant = typeParam ? bookings.filter(b => b.type === typeParam) : bookings;
-  const counts: Record<BookingTimeframe, number> = { upcoming: 0, past: 0, cancelled: 0 };
-  for (const booking of relevant) counts[bookingTimeframe(booking)] += 1;
-
-  const visible =
-    filter === "all" ? relevant : relevant.filter((b) => bookingTimeframe(b) === filter);
+  const visible = bookings;
+  const allCount = counts.upcoming + counts.past + counts.cancelled;
+  if (page > 1 && total > 0 && visible.length === 0) {
+    const destination = new URLSearchParams({ filter, view });
+    if (bookingType) destination.set("type", bookingType);
+    destination.set("page", String(Math.ceil(total / 20)));
+    redirect(`/account/bookings?${destination}`);
+  }
   const { trips, ungrouped } = groupIntoTrips(visible, orderMeta);
 
-  const href = (next: { filter?: string; view?: string; type?: string }) => {
+  const href = (next: { filter?: string; view?: string; type?: string; page?: number }) => {
     const params = new URLSearchParams();
     params.set("filter", next.filter ?? filter);
     params.set("view", next.view ?? view);
-    if (typeParam) params.set("type", typeParam);
+    if (bookingType) params.set("type", bookingType);
+    if (next.page && next.page > 1) params.set("page", String(next.page));
     return `/account/bookings?${params.toString()}`;
   };
 
@@ -132,7 +139,7 @@ export default async function AccountBookingsPage({
           key: f.key,
           label: f.label,
           href: href({ filter: f.key }),
-          count: f.key === "all" ? bookings.length : counts[f.key],
+          count: f.key === "all" ? allCount : counts[f.key],
         }))}
       />
 
@@ -144,12 +151,12 @@ export default async function AccountBookingsPage({
                 <Luggage />
               </EmptyMedia>
               <EmptyTitle>
-                {bookings.length === 0 || filter === "all"
+                {allCount === 0 || filter === "all"
                   ? "No bookings"
                   : `No ${filter} bookings`}
               </EmptyTitle>
             </EmptyHeader>
-            {bookings.length === 0 ? (
+            {allCount === 0 ? (
               <EmptyContent>
                 <Button render={<Link href="/hotels" />}>Browse hotels</Button>
               </EmptyContent>
@@ -227,6 +234,7 @@ export default async function AccountBookingsPage({
           </ul>
         </Card>
       )}
+      <Pager page={page} total={total} pageSize={20} hrefFor={(nextPage) => href({ page: nextPage })} />
     </div>
   );
 }
@@ -238,13 +246,6 @@ function bookingHref(booking: UnifiedBooking) {
     return booking.status === "draft"
       ? `/visa/apply/${booking.id}`
       : `/account/visa/${booking.id}`;
-  }
-  // The private-Umrah builder resumes to whatever step the draft is actually
-  // on (see startUmrahCustomRequest / the landing page's own draft lookup),
-  // so linking straight to the landing page — rather than guessing a step
-  // number here — is what stays correct if that resume logic ever changes.
-  if (booking.type === "umrah" && booking.status === "draft") {
-    return "/umrah/private";
   }
   return "/account/bookings";
 }

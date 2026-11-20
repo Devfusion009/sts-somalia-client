@@ -84,27 +84,27 @@ async function bankTransfer(): Promise<BankTransferDetails> {
 
 export async function getPaymentGateways(): Promise<PaymentGateways> {
   const [db, bank] = await Promise.all([
-    activeCredentials().catch((): Record<string, Record<string, string> | null> => ({ waafi: null })),
+    activeCredentials().catch((): Record<string, Record<string, string> | null> => ({ stripe: null, razorpay: null, sifalo: null, waafi: null, edahab: null })),
     bankTransfer(),
   ]);
   const config = env();
 
   const stripeDb = db.stripe;
-  const stripeSecret = stripeDb?.secret_key ?? config.STRIPE_SECRET_KEY;
+  const stripeSecret = stripeDb === undefined ? config.STRIPE_SECRET_KEY : stripeDb?.secret_key;
   const razorDb = db.razorpay;
   const sifaloDb = db.sifalo;
   const waafiDb = db.waafi;
   const edahabDb = db.edahab;
   const edahab = {
-    apiKey: edahabDb?.api_key ?? config.EDAHAB_API_KEY,
-    agentCode: edahabDb?.agent_code ?? config.EDAHAB_AGENT_CODE,
+    apiKey: edahabDb === undefined ? config.EDAHAB_API_KEY : edahabDb?.api_key,
+    agentCode: edahabDb === undefined ? config.EDAHAB_AGENT_CODE : edahabDb?.agent_code,
   };
 
   // An admin switching card payments to Razorpay overrides a leftover env Stripe key.
   const stripeOverridden = !!razorDb && !stripeDb;
 
-  const sifaloUser = sifaloDb?.api_user ?? config.SIFALO_API_USER;
-  const sifaloKey = sifaloDb?.api_key ?? config.SIFALO_API_KEY;
+  const sifaloUser = sifaloDb === undefined ? config.SIFALO_API_USER : sifaloDb?.api_user;
+  const sifaloKey = sifaloDb === undefined ? config.SIFALO_API_KEY : sifaloDb?.api_key;
   const sifaloGatewayUrl = (config.SIFALO_GATEWAY_URL ?? "https://api.sifalopay.com/gateway/").replace(/\/?$/, "/");
   const apiPublicUrl = config.API_PUBLIC_URL ?? config.NEXT_PUBLIC_API_URL ?? null;
 
@@ -112,7 +112,7 @@ export async function getPaymentGateways(): Promise<PaymentGateways> {
   return {
     stripe:
       stripeSecret && !stripeOverridden
-        ? { secretKey: stripeSecret, webhookSecret: stripeDb?.webhook_secret ?? config.STRIPE_WEBHOOK_SECRET ?? null }
+        ? { secretKey: stripeSecret, webhookSecret: (stripeDb === undefined ? config.STRIPE_WEBHOOK_SECRET : stripeDb?.webhook_secret) ?? null }
         : null,
     razorpay:
       razorDb?.key_id && razorDb?.key_secret

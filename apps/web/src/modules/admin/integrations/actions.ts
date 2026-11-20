@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { encryptCredentials, decryptCredentials } from "@/lib/integrations-crypto";
-import { EXCLUSIVE_PROVIDER_GROUPS, getProvider } from "@/lib/provider-catalog";
+import { getProvider } from "@/lib/provider-catalog";
 import { testRazorpayConnection, testSifaloConnection, testStripeConnection, testWaafiConnection } from "@/lib/provider-runtime/payments-test";
 import { testDuffelConnection } from "@/lib/provider-runtime/duffel";
 import { testHotelbedsConnection } from "@/lib/provider-runtime/hotelbeds";
@@ -16,7 +16,7 @@ import { testZylalabsVisaConnection } from "@/lib/provider-runtime/visa-check";
 import { testCustomPartnerConfig } from "@/modules/visa/partner/adapters/custom";
 import type { ActionState } from "@/lib/auth/actions";
 
-import { waafiSetupError, registerWaafiWebhook } from "./waafi-setup";
+import { waafiSetupError, registerWaafiWebhook, verifyWaafiWebhook } from "./waafi-setup";
 
 const PATH = "/admin/integrations";
 
@@ -42,6 +42,15 @@ async function waafiPendingError(): Promise<string | null> {
   return data?.length ? "Resolve pending WaafiPay payments before changing the merchant or removing credentials." : null;
 }
 
+
+async function flightCredentialsPendingError(providerKey: string): Promise<string | null> {
+  if (getProvider(providerKey)?.category !== "flights") return null;
+  const { data, error } = await createAdminClient().from("flight_bookings").select("id")
+    .eq("provider", providerKey).in("ticketing_status", ["awaiting_payment", "queued", "booking", "booked", "failed"]).limit(1);
+  if (error) return "Pending flight bookings could not be checked.";
+  return data?.length ? "Resolve pending flight bookings before replacing or removing supplier credentials." : null;
+}
+
 const saveCredentialsSchema = z.object({
   providerKey: z.string().min(1),
 });
@@ -53,6 +62,9 @@ export async function saveIntegrationCredentials(_prev: ActionState, formData: F
 
   const provider = getProvider(parsed.data.providerKey);
   if (!provider) return { error: "Unknown provider." };
+
+  const pendingFlights = await flightCredentialsPendingError(provider.key);
+  if (pendingFlights) return { error: pendingFlights };
 
   const credentials: Record<string, string> = {};
   for (const field of provider.credentialFields) {
@@ -98,7 +110,7 @@ export async function saveIntegrationCredentials(_prev: ActionState, formData: F
   }
   const error = await upsertRow(provider.key, {
     credentials_encrypted: encrypted,
-    ...(provider.key === "waafi" ? { is_active: false } : {}),
+    is_active: false,
     last_tested_at: null,
     last_test_ok: null,
     last_test_message: null,
@@ -191,12 +203,20 @@ export async function setIntegrationActive(providerKey: string, isActive: boolea
 
   if (isActive) {
     const supabase = await createClient();
-    const { data } = await supabase
+    const { data, error: readError } = await supabase
       .from("platform_api_integrations")
       .select("credentials_encrypted, last_test_ok")
       .eq("provider_key", providerKey)
       .maybeSingle();
+    if (readError) return { error: "Provider configuration could not be read." };
     if (!data?.credentials_encrypted) return { error: "Save credentials before enabling this provider." };
+    if (!data.last_test_ok) return { error: "Test the connection before enabling this provider." };
+    if (provider.category === "flights") {
+      try {
+        const readiness = await (await getServerTrpcForActions()).flights.providerReadiness.query({ providerKey });
+        if (!readiness.ready) return { error: readiness.message ?? "The booking API is not ready." };
+      } catch { return { error: "The booking API is unavailable." }; }
+    }
     if (providerKey === "waafi") {
       let credentials: Record<string, string>;
       try { credentials = decryptCredentials(data.credentials_encrypted); }
@@ -204,7 +224,8 @@ export async function setIntegrationActive(providerKey: string, isActive: boolea
       const invalid = waafiSetupError(credentials);
       if (invalid) return { error: invalid };
       if (!credentials.webhook_secret) return { error: "Register the WaafiPay webhook before enabling payments." };
-      if (!data.last_test_ok) return { error: "Test the WaafiPay connection before enabling payments." };
+      const webhook = await verifyWaafiWebhook(credentials);
+      if (webhook.error) return { error: webhook.error };
       const { error: schemaError } = await createAdminClient().from("waafi_payment_attempts").select("reference_id").limit(1);
       if (schemaError) return { error: "Apply the WaafiPay database migration before enabling payments." };
       try {
@@ -212,20 +233,14 @@ export async function setIntegrationActive(providerKey: string, isActive: boolea
         const readiness = await trpc.payments.admin.waafiReadiness.query();
         if (!readiness.ready) return { error: readiness.message ?? "The payment API is not configured." };
       } catch { return { error: "The payment API is unavailable." }; }
-      const { data: updated, error } = await supabase.from("platform_api_integrations").update({ is_active: true })
-        .eq("provider_key", providerKey).eq("credentials_encrypted", data.credentials_encrypted).eq("last_test_ok", true).select("id");
-      if (error || !updated?.length) return { error: "Credentials changed. Test the connection again." };
-      revalidatePath(PATH);
-      return { error: null };
     }
-  }
-
-  await upsertRow(providerKey, { is_active: isActive });
-
-  // Card payments run through a single processor: switching one on switches its rival off.
-  if (isActive) {
-    const rivals = EXCLUSIVE_PROVIDER_GROUPS.find((group) => group.includes(providerKey))?.filter((k) => k !== providerKey) ?? [];
-    for (const rival of rivals) await upsertRow(rival, { is_active: false });
+    const { error } = await supabase.rpc("activate_platform_integration", {
+      p_provider_key: providerKey, p_credentials_encrypted: data.credentials_encrypted,
+    });
+    if (error) return { error: "Provider activation failed. Check the integration migration and test the saved credentials again." };
+  } else {
+    const error = await upsertRow(providerKey, { is_active: false });
+    if (error) return { error: "Provider could not be disabled." };
   }
   revalidatePath(PATH);
   return { error: null };
@@ -233,17 +248,21 @@ export async function setIntegrationActive(providerKey: string, isActive: boolea
 
 export async function deleteIntegrationCredentials(providerKey: string): Promise<{ error: string | null }> {
   await requirePlatformAdmin();
+  if (!getProvider(providerKey)) return { error: "Unknown provider." };
+  const pendingFlights = await flightCredentialsPendingError(providerKey);
+  if (pendingFlights) return { error: pendingFlights };
   if (providerKey === "waafi") {
     const pending = await waafiPendingError();
     if (pending) return { error: pending };
   }
-  await upsertRow(providerKey, {
+  const error = await upsertRow(providerKey, {
     credentials_encrypted: null,
     is_active: false,
     last_tested_at: null,
     last_test_ok: null,
     last_test_message: null,
   });
+  if (error) return { error: "Credentials could not be removed." };
   revalidatePath(PATH);
   return { error: null };
 }
@@ -258,7 +277,7 @@ const TEST_FN: Record<
   waafi: (creds) => testWaafiConnection(creds),
   edahab: async () => ({ ok: true, message: "Credentials saved. eDahab has no read-only check." }),
   duffel: (creds) => testDuffelConnection(creds.api_key),
-  hotelbeds: (creds) => testHotelbedsConnection(creds.api_key, creds.api_secret),
+  hotelbeds: (creds) => testHotelbedsConnection(creds.api_key, creds.api_secret, creds.environment),
   zylalabs_visa: (creds) => testZylalabsVisaConnection(creds.api_key),
   // Nothing to reach over the network — the "test" is just confirming the
   // secret that will sign sandbox webhook calls is actually saved.

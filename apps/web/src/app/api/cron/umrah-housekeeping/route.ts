@@ -3,9 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyUmrahBooking } from "@/modules/umrah/notify";
 
 /**
- * Daily Umrah housekeeping (see vercel.json), same auth pattern as
- * admin-event-reminders: service-role client, `Authorization: Bearer
- * $CRON_SECRET` enforced once that env var is set.
+ * Daily Umrah housekeeping. Requires `Authorization: Bearer $CRON_SECRET`.
  *
  * 1. Releases seats held by unpaid group bookings past
  *    umrah_operations.unpaidHoldHours, and expired Umrah agent holds.
@@ -13,16 +11,11 @@ import { notifyUmrahBooking } from "@/modules/umrah/notify";
  * 3. Sends balance-due and departure reminders (in-app from SQL, then email
  *    and WhatsApp here).
  *
- * The seat release also runs lazily before an Umrah package page renders,
- * so a missed cron run never keeps seats blocked from a buyer.
  */
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+  if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+    return new NextResponse("Unauthorized", { status: 401 });
   }
 
   const supabase = createAdminClient();
@@ -33,6 +26,12 @@ export async function GET(request: Request) {
     // Unpaid direct hotel and hall bookings release their rooms after 24 hours.
     supabase.rpc("_expire_unpaid_stay_orders"),
   ]);
+
+  const errors = [expired.error, completed.error, reminders.error, staysExpired.error].filter(Boolean);
+  if (errors.length > 0) {
+    console.error("Umrah housekeeping failed", errors.map((error) => error?.code ?? "database_error"));
+    return NextResponse.json({ error: "Umrah housekeeping failed." }, { status: 500 });
+  }
 
   for (const reminder of reminders.data ?? []) {
     await notifyUmrahBooking(
@@ -47,6 +46,5 @@ export async function GET(request: Request) {
     completed: completed.data ?? 0,
     reminders: reminders.data?.length ?? 0,
     staysReleased: staysExpired.data ?? 0,
-    errors: [expired.error, completed.error, reminders.error, staysExpired.error].filter(Boolean).map((e) => e!.message),
   });
 }

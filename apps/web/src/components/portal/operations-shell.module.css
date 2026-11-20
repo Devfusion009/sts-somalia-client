@@ -1,17 +1,8 @@
-.shell { min-height:100svh; }
-.shell :global([data-slot="sidebar-header"]) { padding:1.25rem .875rem; border-bottom:1px solid var(--sidebar-border); }
-.shell :global([data-slot="sidebar-group"]) { padding:.625rem .875rem; }
-.shell :global([data-slot="sidebar-menu-button"]) { min-height:2.375rem; border-radius:.625rem; font-size:.8125rem; }
-.shell :global([data-slot="sidebar-menu-button"][data-active="true"]) { background:color-mix(in oklch,var(--sidebar-primary) 14%,var(--sidebar)); box-shadow:inset 3px 0 var(--sidebar-primary); }
-.shell :global([data-slot="sidebar-group-label"]) { margin-bottom:.25rem; font-size:.625rem; letter-spacing:.12em; text-transform:uppercase; }
-.shell :global([data-slot="sidebar-footer"]) { padding:.75rem; }
-.shell :global([data-slot="sidebar-inset"]) > header { height:4.25rem; background:var(--card); }
-.shell :global([data-slot="page-header"]) { padding-bottom:1.25rem; border-bottom:1px solid var(--border); }
-.shell :global([data-slot="page-header"]) h1 { font-size:clamp(1.5rem,2.2vw,1.875rem); letter-spacing:-.045em; }
-.shell :global([data-slot="card"]) { border-radius:1rem; box-shadow:0 2px 4px -3px color-mix(in oklch,var(--foreground) 20%,transparent); }
-.shell :global([data-slot="table-container"]) { scrollbar-width:thin; }
-.shell :global([data-slot="table-header"]) { background:var(--muted); }
-.shell :global([data-slot="table-head"]) { height:3rem; font-size:.6875rem; font-weight:600; letter-spacing:.035em; }
-.shell :global([data-slot="table-cell"]) { padding-block:1rem; }
-.shell :global([data-slot="table-body"]) :global([data-slot="table-row"]):hover { background:color-mix(in oklch,var(--primary) 4%,var(--card)); }
-.shell :global([data-slot="input"]),.shell :global([data-slot="input-group"]),.shell :global([data-slot="select-trigger"]) { min-height:2.625rem; }
+.shell { min-height: 100svh; }
+.shell :global([data-slot="sidebar-group"]) { padding: .75rem .875rem; }
+.shell :global([data-slot="sidebar-group-label"]) { margin-bottom: .375rem; font-size: .75rem; font-weight: 600; }
+.shell :global([data-slot="table-container"]) { scrollbar-width: thin; }
+.shell :global([data-slot="table-header"]) { background: var(--muted); }
+.shell :global([data-slot="table-head"]) { height: 3rem; font-size: .8125rem; font-weight: 600; letter-spacing: 0; }
+.shell :global([data-slot="table-cell"]) { padding-block: 1rem; }
+.shell :global([data-slot="table-body"]) :global([data-slot="table-row"]):hover { background: color-mix(in oklch, var(--primary) 3%, var(--card)); }

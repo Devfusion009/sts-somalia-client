@@ -17,7 +17,7 @@ export function poolCapacity(row: Pick<UmrahPoolRow, "total_seats" | "confirmed_
 
 export function poolStatus(row: Pick<UmrahPoolRow, "package_status" | "departure_status" | "departure_date" | "pool_visibility" | "total_seats" | "confirmed_seats" | "held_seats" | "offline_seats"> & { sales_close_days?: number; booking_mode?: string; formation_status?: string }, today = new Date().toISOString().slice(0,10)) {
   if (row.package_status !== "published") return row.package_status === "draft" ? "Draft" : row.package_status.replace(/_/g," ");
-  if (row.booking_mode === "request_then_pay") return ({ forming: "Forming", activation_pending: "Group full", payment_open: "Payment open", ready: "Paid group", completed: "Completed", cancelled: "Cancelled", draft: "Draft" } as Record<string,string>)[row.formation_status ?? "draft"];
+  if (row.booking_mode === "request_then_pay") return ({ forming: "Forming", activation_pending: "Awaiting confirmation", payment_open: "Payment open", ready: "Paid group", completed: "Completed", cancelled: "Cancelled", draft: "Draft" } as Record<string,string>)[row.formation_status ?? "draft"];
   if (!row.departure_date) return "No dates";
   const close = new Date(`${row.departure_date}T00:00:00Z`);
   close.setUTCDate(close.getUTCDate() - (row.sales_close_days ?? 0));

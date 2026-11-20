@@ -9,13 +9,13 @@ import { UMRAH_STAGES, UMRAH_STAGE_LABELS } from "./stages";
 
 export default function UmrahBookingsLoading() {
   return (
-    <LoadingShell label="Umrah bookings">
-      <Title title="Umrah Bookings" badge />
+    <LoadingShell label="Umrah bookings & requests">
+      <Title title="Umrah bookings & requests" badge />
       <Chips labels={["All", ...UMRAH_STAGES.map((s) => UMRAH_STAGE_LABELS[s])]} />
       <DataTable
-        headers={["Reference", "Booking", "Departure", "Customer", "Pilgrims", "Total", "Payment", "Stage", ""]}
+        headers={["Reference", "Booking", "Departure", "Customer", "Pilgrims", "Total", "Payment", "Action"]}
         rows={8}
-        cell={{ 6: PillCell, 7: PillCell }}
+        cell={{ 6: PillCell }}
       />
     </LoadingShell>
   );
