@@ -384,6 +384,7 @@ export function PortalShell({
   const accountTrigger = (
     <SidebarMenuButton
       size="lg"
+      aria-label={profileName ? `Account menu for ${profileName}` : "Account menu"}
       className="flex items-center gap-2.5 rounded-lg border border-sidebar-border px-2 py-2 hover:bg-sidebar-accent/60 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:px-0"
     />
   );
@@ -406,12 +407,12 @@ export function PortalShell({
   );
 
   return (
-    <SidebarProvider className={cn("portal-shell", className)}>
+    <SidebarProvider className={cn("portal-shell", className)} data-portal-accent={accent} style={accent === "admin" ? { "--sidebar-width-icon": "4.5rem" } as React.CSSProperties : undefined}>
       <Sidebar collapsible="icon" className={portalName === "My Account" ? "[&_[data-slot=sidebar-header]]:border-b [&_[data-slot=sidebar-header]]:border-sidebar-border [&_[data-slot=sidebar-header]]:p-4 [&_[data-slot=sidebar-footer]]:border-t [&_[data-slot=sidebar-footer]]:border-sidebar-border [&_[data-slot=sidebar-footer]]:p-3 [&_[data-slot=sidebar-menu]]:gap-1" : undefined}>
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" render={<PortalHomeLink href={dashboardHref} onActivate={() => setNavQuery("")} />}>
+              <SidebarMenuButton size="lg" aria-label={`${brandName ?? "STS Somalia"} · ${portalName}`} tooltip={portalName} render={<PortalHomeLink href={dashboardHref} onActivate={() => setNavQuery("")} />}>
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white p-1">
                   {brandLogoUrl ? (
                     // Agency's own uploaded logo — a Supabase Storage URL, not a
@@ -423,7 +424,7 @@ export function PortalShell({
                     <Image src="/logo-icon.png" alt="" width={790} height={790} className="size-full object-contain" />
                   )}
                 </span>
-                <div className="flex flex-col leading-tight">
+                <div className="flex min-w-0 flex-col leading-tight group-data-[collapsible=icon]:hidden">
                   <span className="truncate font-heading font-semibold text-sidebar-accent-foreground">{brandName ?? "STS Somalia"}</span>
                   <span className="text-xs text-sidebar-foreground/80">{portalName}</span>
                 </div>
