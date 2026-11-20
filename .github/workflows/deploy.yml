@@ -31,6 +31,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Locate PostgreSQL test tools
+        run: echo "PG_TEST_BIN=$(pg_config --bindir)" >> "$GITHUB_ENV"
       - run: npm run build -w api
       - run: npm run lint -w api
       - run: npm run lint -w web
