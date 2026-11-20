@@ -1,19 +1,29 @@
-import { BadgeCheck, Headset, MapPin, Wallet } from "lucide-react";
+"use client";
 
-const ITEMS = [
-  { Icon: BadgeCheck, title: "ISO 9001:2015", detail: "Certified quality system" },
-  { Icon: Headset, title: "Local support", detail: "Somali, English & Arabic" },
-  { Icon: Wallet, title: "Payment options", detail: "Mobile money, bank & card" },
-  { Icon: MapPin, title: "Two offices", detail: "Mogadishu & Nairobi" },
+import { InfiniteMovingRow } from "@/components/ui/aceternity/motion-primitives";
+
+import { VerifiedIcon } from "@/components/ui/mui-icons";
+const USPS = [
+  "Licensed Somali travel agency",
+  "ISO 9001:2015 certified",
+  "Fully customisable Umrah & holiday packages",
+  "Local payment methods — EVC Plus, bank, card",
+  "Support desk based in Mogadishu",
+  "Confirmed rates, no hidden fees",
 ];
 
+/** Dark scrolling USP band directly under the hero, as in the reference layout. */
 export function UspStrip() {
-  return <div className="border-b border-border bg-card">
-    <ul className="mx-auto grid max-w-7xl grid-cols-2 gap-5 px-4 py-7 sm:px-6 lg:grid-cols-4 lg:px-8">
-      {ITEMS.map(({ Icon, title, detail }) => <li key={title} className="flex items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-secondary text-primary"><Icon className="size-5" aria-hidden /></span>
-        <div><p className="text-sm font-semibold">{title}</p><p className="mt-0.5 text-xs leading-5 text-muted-foreground">{detail}</p></div>
-      </li>)}
-    </ul>
-  </div>;
+  return (
+    <div className="border-y border-white/10 bg-sidebar py-3 text-sidebar-foreground">
+      <InfiniteMovingRow speed={48}>
+        {USPS.map((usp) => (
+          <span key={usp} className="flex shrink-0 items-center gap-2 px-6 text-sm font-semibold whitespace-nowrap motion-reduce:shrink motion-reduce:whitespace-normal">
+            <VerifiedIcon sx={{ fontSize: 18 }} className="text-brand-accent" />
+            {usp}
+          </span>
+        ))}
+      </InfiniteMovingRow>
+    </div>
+  );
 }

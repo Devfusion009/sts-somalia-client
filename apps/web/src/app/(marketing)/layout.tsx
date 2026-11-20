@@ -11,7 +11,7 @@ import { NavLoader } from "@/components/marketing/nav-loader";
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
     <MuiProvider>
-      <div className="flex min-h-dvh flex-col">
+      <div className="marketing-site flex min-h-dvh flex-col bg-background text-foreground">
         <a
           href="#main-content"
           className="sr-only z-50 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
