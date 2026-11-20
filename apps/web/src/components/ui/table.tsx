@@ -96,7 +96,7 @@ function TableHead({
     <th
       data-slot="table-head"
       className={cn(
-        "h-9 px-3 text-left align-middle text-xs font-medium whitespace-nowrap text-muted-foreground first:pl-4 last:pr-4 [&:has([role=checkbox])]:pr-0",
+        "h-12 px-4 text-left align-middle text-sm font-semibold whitespace-nowrap text-muted-foreground first:pl-4 last:pr-4 [&:has([role=checkbox])]:pr-0",
         numeric && "text-right",
         className
       )}
@@ -118,7 +118,7 @@ function TableCell({
       data-slot="table-cell"
       className={cn(
         numeric && "text-right",
-        "px-3 py-2.5 align-middle whitespace-nowrap tabular-nums first:pl-4 last:pr-4 [&:has([role=checkbox])]:pr-0",
+        "px-4 py-4 align-middle whitespace-nowrap tabular-nums first:pl-4 last:pr-4 [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}

@@ -49,11 +49,11 @@ export function MuiProvider({ children }: { children: React.ReactNode }) {
         palette: {
           mode,
           primary: {
-            main: mode === "dark" ? "#2dd4b4" : "#00947c",
+            main: mode === "dark" ? "#2dd4b4" : "#187d73",
             contrastText: "var(--primary-foreground)",
           },
           secondary: {
-            main: mode === "dark" ? "#fb8b3c" : "#f4711c",
+            main: mode === "dark" ? "#fb8b3c" : "#f38b19",
             contrastText: "var(--brand-accent-foreground)",
           },
           warning: { main: mode === "dark" ? "#fbbf24" : "#f59e0b" },

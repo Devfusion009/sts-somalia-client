@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
 
-import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
 import { NAV_LINKS, PARTNER_LINKS } from "@/lib/nav-links";
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from "@/lib/marketing-nav";
 
@@ -20,31 +19,31 @@ const COMPANY_LINKS = [
   { href: "/partner-terms", label: "Partner Terms" },
 ];
 
-const LINK = "text-sm text-sidebar-foreground/70 transition-colors hover:text-sidebar-primary focus-visible:rounded focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none";
+const LINK = "text-sm text-sidebar-foreground/90 transition-colors hover:text-sidebar-primary focus-visible:rounded focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none";
 
 export async function SiteFooter() {
   const socials = await getSocialLinks();
   return (
-    <footer className="bg-sidebar text-sidebar-foreground">
-      {/* Contact + newsletter */}
+    <footer className="bg-[#237f75] text-white [--sidebar-foreground:#ffffff] [--sidebar-primary:#ffffff] [--sidebar-primary-foreground:#176b63] [--sidebar-ring:#ffffff] [--sidebar-border:rgb(255_255_255_/_18%)]">
+      {/* Contact */}
       <div className="border-b border-sidebar-border">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-3 lg:items-center lg:px-8">
           <Link href="/" className="inline-flex items-center rounded-lg focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none">
-            <Image src="/logo.png" alt="STS Somalia" width={714} height={312} className="h-10 w-auto" />
+            <Image src="/logo.png" alt="STS Somalia" width={714} height={312} className="h-10 w-auto brightness-0 invert" />
           </Link>
 
           <div>
-            <p className="text-sm text-sidebar-foreground/70">Contact our booking desk</p>
+            <p className="text-sm text-sidebar-foreground/90">Contact our booking desk</p>
             <a href={SUPPORT_PHONE_TEL} className="mt-1 flex w-fit items-center gap-2 rounded font-heading text-xl font-bold tabular-nums hover:text-sidebar-primary focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none">
               <PhoneInTalkIcon sx={{ fontSize: 20 }} aria-hidden />
               {SUPPORT_PHONE_DISPLAY}
             </a>
-            <p className="mt-0.5 text-xs text-sidebar-foreground/60">Sat–Thu 8:00–18:00 EAT · emergencies 24/7</p>
+            <p className="mt-0.5 text-xs text-sidebar-foreground/85">Sat–Thu 8:00–18:00 EAT · emergencies 24/7</p>
           </div>
 
           <div className="lg:justify-self-end">
-            <p className="mb-2 text-sm font-semibold">Fare deals, before they sell out</p>
-            <NewsletterSignup />
+            <p className="mb-2 text-sm font-semibold">Write to our booking desk</p>
+            <a href="mailto:info@scoutsts.com" className="inline-flex min-h-11 items-center rounded-lg border border-sidebar-border px-4 text-sm font-semibold hover:bg-white/10">info@scoutsts.com</a>
           </div>
         </div>
       </div>
@@ -52,11 +51,11 @@ export async function SiteFooter() {
       {/* Columns */}
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
         <div>
-          <p className="max-w-xs text-sm leading-relaxed text-sidebar-foreground/70">
+          <p className="max-w-xs text-sm leading-relaxed text-sidebar-foreground/90">
             Scout Travel Solution — flights, hotels, visas, Umrah and event halls, from our offices in
             Mogadishu and Nairobi.
           </p>
-          <div className="mt-5 flex flex-col gap-2.5 text-sm text-sidebar-foreground/70">
+          <div className="mt-5 flex flex-col gap-2.5 text-sm text-sidebar-foreground/90">
             <a href="mailto:info@scoutsts.com" className="flex w-fit items-center gap-2 rounded transition-colors hover:text-sidebar-primary focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none">
               <EmailIcon sx={{ fontSize: 17 }} aria-hidden /> info@scoutsts.com
             </a>
@@ -140,8 +139,8 @@ export async function SiteFooter() {
       ) : null}
 
       {/* Bottom bar */}
-      <div className="border-t border-sidebar-border bg-black/20">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-5 text-xs text-sidebar-foreground/60 sm:flex-row sm:px-6 lg:px-8">
+      <div className="border-t border-sidebar-border bg-black/5">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-5 text-xs text-sidebar-foreground/85 sm:flex-row sm:px-6 lg:px-8">
           <p>© {new Date().getFullYear()} Scout Travel Solution. All rights reserved.</p>
           <div role="list" className="flex flex-wrap items-center justify-center gap-2" aria-label="Accepted payment methods">
             {["EVC Plus", "Bank transfer", "Visa", "Mastercard"].map((method) => (

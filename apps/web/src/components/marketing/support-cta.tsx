@@ -10,13 +10,13 @@ const tileClass =
 
 export function SupportCta() {
   return (
-    <section id="plan" className="scroll-mt-32 bg-background px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+    <section id="plan" className="scroll-mt-24 bg-secondary/60 px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
       <div className="mx-auto grid max-w-7xl overflow-hidden rounded-[2rem] border border-border bg-card shadow-sm lg:grid-cols-2">
-        <div className="relative isolate flex flex-col overflow-hidden bg-sidebar p-6 text-white sm:p-10 lg:p-12">
+        <div className="relative isolate flex flex-col overflow-hidden bg-[#237f75] p-6 text-white sm:p-10 lg:p-12">
           <div aria-hidden className="pointer-events-none absolute -top-40 -right-40 -z-10 size-[28rem] rounded-full bg-teal-400/10 blur-3xl" />
           <Reveal className="flex flex-1 flex-col">
             <h2 className="max-w-lg font-heading text-3xl leading-tight font-bold tracking-tight text-balance sm:text-4xl lg:text-[2.75rem]">
-              Talk to a real person <span className="text-teal-300">before you book.</span>
+              Talk to a real person <span className="text-white">before you book.</span>
             </h2>
 
             {/* 3:2 source shown at its own ratio on phones and close to it on
@@ -35,28 +35,28 @@ export function SupportCta() {
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <a href={SUPPORT_PHONE_TEL} className={tileClass}>
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-300/15 text-teal-300">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-300/15 text-white">
                   <Phone className="size-[1.125rem]" aria-hidden />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-xs font-medium text-white/60">Call us</span>
+                  <span className="block text-xs font-medium text-white/85">Call us</span>
                   <span className="block truncate font-heading text-base font-semibold tabular-nums">{SUPPORT_PHONE_DISPLAY}</span>
                 </span>
               </a>
               <WhatsAppInlineLink message="Hello STS! I have a question before booking." className={tileClass}>
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#25D366]/15 text-[#25D366]">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#25D366]/15 text-white">
                   <WhatsAppIcon className="size-[1.125rem]" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-medium text-white/60">WhatsApp</span>
+                  <span className="block text-xs font-medium text-white/85">WhatsApp</span>
                   <span className="block font-heading text-base font-semibold">Message us</span>
                 </span>
-                <ArrowUpRight className="size-4 shrink-0 text-white/50 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white" aria-hidden />
+                <ArrowUpRight className="size-4 shrink-0 text-white/80 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white" aria-hidden />
               </WhatsAppInlineLink>
             </div>
 
-            <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 pt-5 text-sm text-white/70 max-lg:mt-6">
-              <Clock3 className="size-4 shrink-0 text-white/50" aria-hidden />
+            <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 pt-5 text-sm text-white/90 max-lg:mt-6">
+              <Clock3 className="size-4 shrink-0 text-white/80" aria-hidden />
               <span>Saturday–Thursday · 8:00–18:00 EAT</span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs font-medium text-white/80 ring-1 ring-white/10">
                 <span className="size-1.5 rounded-full bg-teal-300" aria-hidden />
