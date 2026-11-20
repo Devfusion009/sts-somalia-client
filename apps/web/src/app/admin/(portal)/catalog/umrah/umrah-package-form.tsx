@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil } from "lucide-react";
 import {
@@ -17,7 +17,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { SubmitButton } from "@/components/submit-button";
+
 import { createUmrahPackage, updateUmrahPackage } from "@/modules/admin/actions";
 import { UMRAH_INCLUDE_OPTIONS } from "@/modules/umrah/includes";
 import { UMRAH_FACILITY_OPTIONS, splitUmrahFacilities } from "@/modules/umrah/facility-options";
@@ -41,6 +41,7 @@ export function UmrahPackageForm({ pkg, airports = [], requestFirstEnabled = fal
   const facilities = splitUmrahFacilities(pkg?.facilities);
   const action = pkg ? updateUmrahPackage : createUmrahPackage;
   const [state, formAction] = useActionState(action, null);
+  const [pending, startTransition] = useTransition();
 
   // Adjusted during render (not in an effect) per React's guidance for
   // deriving state from a state change; router.refresh() is the actual
@@ -67,7 +68,11 @@ export function UmrahPackageForm({ pkg, airports = [], requestFirstEnabled = fal
         </DialogTrigger>
       )}
       <DialogContent className="flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
-        <form action={formAction} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <form onSubmit={(event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          startTransition(() => formAction(data));
+        }} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {pkg ? <input type="hidden" name="id" value={pkg.id} /> : null}
           <DialogHeader className="shrink-0 border-b border-border px-5 py-5 pr-12">
             <DialogTitle>{pkg ? "Edit Umrah package" : "Create Umrah package"}</DialogTitle>
@@ -144,8 +149,6 @@ export function UmrahPackageForm({ pkg, airports = [], requestFirstEnabled = fal
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field><FieldLabel htmlFor="contactPersonName">Responsible person</FieldLabel><Input id="contactPersonName" name="contactPersonName" required minLength={2} maxLength={120} defaultValue={pkg?.contact_person_name ?? ""} /></Field>
                 <Field><FieldLabel htmlFor="contactPersonPhone">Contact number</FieldLabel><Input id="contactPersonPhone" name="contactPersonPhone" type="tel" inputMode="tel" required minLength={8} maxLength={30} pattern="\+[0-9 ()-]{7,30}" title="Start with + and country code; enter 8 to 15 digits." placeholder="+252 61 444 420" defaultValue={pkg?.contact_person_phone ?? ""} /></Field>
-                <Field><FieldLabel htmlFor="nightsMakkah">Makkah nights</FieldLabel><Input id="nightsMakkah" name="nightsMakkah" type="number" required min={0} max={119} defaultValue={pkg?.nights_makkah ?? ""} /></Field>
-                <Field><FieldLabel htmlFor="nightsMadinah">Madinah nights</FieldLabel><Input id="nightsMadinah" name="nightsMadinah" type="number" required min={0} max={119} defaultValue={pkg?.nights_madinah ?? ""} /></Field>
                 {!pkg ? <>
                   <Field><FieldLabel htmlFor="departureDate">Departure date</FieldLabel><Input id="departureDate" name="departureDate" type="date" required /></Field>
                 </> : null}
@@ -221,7 +224,7 @@ export function UmrahPackageForm({ pkg, airports = [], requestFirstEnabled = fal
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <SubmitButton pendingText="Saving…">{pkg ? "Save changes" : "Create & configure"}</SubmitButton>
+            <Button type="submit" loading={pending} disabled={pending}>{pending ? "Saving…" : pkg ? "Save changes" : "Create & configure"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -2,12 +2,11 @@
 .hotelCanvas { position:relative; min-height:25rem; overflow:hidden; border-radius:1.75rem; background:var(--sidebar); }
 .hotelCanvas::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,rgb(5 31 26 / 90%),rgb(5 31 26 / 38%) 58%,rgb(5 31 26 / 4%)); pointer-events:none; }
 .heroCopy { position:relative; z-index:1; max-width:45rem; padding:3.5rem 3rem 7rem; color:white; }
-.kicker { display:inline-flex; align-items:center; gap:.65rem; font-size:.75rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+.kicker { display:inline-flex; align-items:center; gap:.65rem; font-size:.625rem; font-weight:600; letter-spacing:.2em; text-transform:uppercase; }
 .kicker::before { content:''; width:1.75rem; height:1px; background:currentColor; opacity:.65; }
-.hotelTitle .editorial { color:var(--brand-accent); }
 .hotelTitle { margin-top:1.25rem; font-family:var(--font-heading); font-size:clamp(2.5rem,4.5vw,4.25rem); font-weight:600; line-height:1.08; letter-spacing:-.055em; }
-.editorial { font-family:var(--font-heading); font-weight:700; font-style:normal; letter-spacing:-.04em; }
-.photoCaption { position:absolute; right:2rem; bottom:6.5rem; z-index:1; display:flex; align-items:center; gap:.5rem; color:white; font-size:.8125rem; }
+.editorial { font-family:Georgia,'Times New Roman',serif; font-weight:400; font-style:italic; letter-spacing:-.04em; }
+.photoCaption { position:absolute; right:2rem; bottom:6.5rem; z-index:1; display:flex; align-items:center; gap:.5rem; color:white; font-size:.6875rem; }
 .searchDock { position:relative; z-index:10; margin:-3.5rem 1.5rem 0; border:1px solid var(--border); border-radius:1rem; background:var(--card); box-shadow:0 16px 36px -22px rgb(5 31 26 / 35%); }
 .searchForm { display:grid; grid-template-columns:1.3fr 1fr 1fr 1.15fr auto; padding:.625rem; background:var(--card); border-radius:inherit; }
 .searchCell { position:relative; min-width:0; padding:.625rem 1.125rem; border-right:1px solid var(--border); }
@@ -15,7 +14,7 @@
 .searchSubmit { display:flex; align-items:center; justify-content:center; gap:.65rem; min-height:3.75rem; margin-left:.625rem; padding:.75rem 1.75rem; border-radius:.75rem; background:var(--brand-accent); color:var(--brand-accent-foreground); font-family:var(--font-heading); font-size:.875rem; font-weight:700; transition:background .15s; }
 .searchSubmit:hover { background:color-mix(in oklch,var(--brand-accent),black 8%); }
 .searchSubmit:focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
-.trustRow { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:1rem 2.5rem; padding:1.5rem 1rem; font-size:.8125rem; color:var(--muted-foreground); }
+.trustRow { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:1rem 2.5rem; padding:1.5rem 1rem; font-size:.6875rem; color:var(--muted-foreground); }
 .resultRow { display:grid; grid-template-columns:15rem minmax(0,1fr); overflow:hidden; border:1px solid var(--border); border-radius:1.25rem; background:var(--card); box-shadow:0 3px 5px -4px rgb(5 31 26 / 12%); transition:border-color .2s,box-shadow .2s; }
 .resultRow:hover { border-color:color-mix(in oklch,var(--primary) 35%,var(--border)); box-shadow:0 12px 28px -20px rgb(5 31 26 / 30%); }
 .resultPhoto { position:relative; display:block; min-height:14rem; overflow:hidden; background:var(--secondary); }

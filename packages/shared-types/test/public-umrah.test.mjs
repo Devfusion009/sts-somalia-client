@@ -10,7 +10,7 @@ const valid = {
  mealsNote:'Breakfast and dinner',nightsMakkah:5,nightsMadinah:4,totalSeats:20,departureDate:'2027-03-01',
 };
 test('complete public package is accepted',()=>assert.equal(packageUpsertSchema.parse(valid).totalSeats,20));
-for (const key of ['name','description','contactPersonName','contactPersonPhone','facilities','accommodationDetails','flightDetails','transportDetails','mealsNote','totalSeats','departureDate','nightsMakkah','nightsMadinah']) {
+for (const key of ['name','description','contactPersonName','contactPersonPhone','facilities','accommodationDetails','flightDetails','transportDetails','mealsNote','totalSeats','departureDate']) {
  test(`public package requires ${key}`,()=>{const input={...valid};delete input[key];assert.equal(packageUpsertSchema.safeParse(input).success,false);});
 }
 for (const patch of [{totalSeats:0},{totalSeats:1.5},{durationDays:1},{basePrice:0},{contactPersonPhone:'123'},{nightsMakkah:7,nightsMadinah:4},{includes:[]}]) {
@@ -27,3 +27,5 @@ test('responsible person requires an international phone with 8 to 15 digits',()
  }
  assert.equal(packageUpsertSchema.safeParse({...valid,contactPersonPhone:'+252 (61) 144-4420'}).success,true);
 });
+
+test('public packages can omit city night counts',()=>{const input={...valid};delete input.nightsMakkah;delete input.nightsMadinah;assert.equal(packageUpsertSchema.safeParse(input).success,true);});

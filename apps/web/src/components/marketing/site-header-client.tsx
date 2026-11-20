@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { createScrollFlagStore } from "@/lib/scroll-flag-store";
 import type { Database } from "@/lib/types/database.types";
 
-import { ArrowForwardIcon, ArticleIcon, CelebrationIcon, DashboardIcon, ExpandMoreIcon, FlightTakeoffIcon, HotelIcon, LogoutIcon, MenuIcon, MosqueIcon, PersonIcon, PlaceIcon, SearchIcon } from "@/components/ui/mui-icons";
+import { ArrowForwardIcon, ArticleIcon, CelebrationIcon, DashboardIcon, ExpandMoreIcon, FlightTakeoffIcon, HotelIcon, LogoutIcon, MenuIcon, MosqueIcon, NearMeIcon, PersonIcon, PlaceIcon, SearchIcon } from "@/components/ui/mui-icons";
 import type { SvgIconComponent } from "@/components/ui/mui-icons";
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -89,7 +89,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
   return (
     <>
       {/* ---------------- Desktop pill nav ---------------- */}
-      <nav aria-label="Primary" data-nav-loader className="hidden items-center gap-1 xl:flex" onMouseLeave={scheduleClose}>
+      <nav aria-label="Primary" data-nav-loader className="hidden items-center gap-2 lg:flex" onMouseLeave={scheduleClose}>
         {MEGA_SECTIONS.map((section) => {
           const Icon = ICONS[section.icon];
           const active = pathname.startsWith(section.href);
@@ -116,10 +116,11 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                   "flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-all duration-300 ease-out group-data-[condensed]/header:h-9 group-data-[condensed]/header:px-3.5 group-data-[condensed]/header:text-[13px]",
                   "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none",
                   active || isOpen
-                    ? "border-transparent bg-secondary text-primary"
-                    : "border-transparent bg-transparent text-foreground hover:bg-secondary hover:text-primary"
+                    ? "border-primary/30 bg-primary/10 text-primary"
+                    : "border-border bg-card text-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
                 )}
               >
+                <Icon sx={{ fontSize: 19 }} aria-hidden />
                 {section.label}
                 <ExpandMoreIcon
                   sx={{ fontSize: 16 }}
@@ -182,11 +183,10 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
             </div>
           );
         })}
-        <Link href="/about" aria-current={pathname.startsWith("/about") ? "page" : undefined} className="rounded-full px-4 py-3 text-sm font-semibold hover:bg-secondary hover:text-primary focus-visible:outline-2 focus-visible:outline-ring">About</Link>
       </nav>
 
       {/* ---------------- Desktop right cluster ---------------- */}
-      <div className="hidden items-center gap-2 xl:flex">
+      <div className="hidden items-center gap-2 lg:flex">
         {profile ? (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -270,7 +270,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
           <Button
             variant="outline"
             render={<Link href="/login" />}
-            className="h-11 rounded-full border-border px-5 font-semibold text-foreground transition-all duration-300 ease-out group-data-[condensed]/header:h-9 group-data-[condensed]/header:px-4 hover:bg-secondary dark:border-border dark:bg-transparent"
+            className="h-11 rounded-full border-brand-accent px-5 font-semibold text-brand-accent transition-all duration-300 ease-out group-data-[condensed]/header:h-9 group-data-[condensed]/header:px-4 hover:bg-brand-accent hover:text-brand-accent-foreground dark:border-brand-accent dark:bg-transparent"
           >
             Log in
           </Button>
@@ -280,7 +280,8 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
           render={<Link href="/#plan" />}
           className="h-11 gap-2 rounded-full bg-brand-accent px-5 font-semibold text-brand-accent-foreground transition-all duration-300 ease-out group-data-[condensed]/header:h-9 group-data-[condensed]/header:px-4 hover:bg-brand-accent/90"
         >
-          Plan my trip
+          <NearMeIcon sx={{ fontSize: 18 }} />
+          Plan My Trip
         </Button>
       </div>
 
@@ -288,7 +289,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
       <Sheet>
         <SheetTrigger
           render={
-            <Button variant="ghost" size="icon" aria-label="Open menu" className="size-11 rounded-full transition-[width,height] duration-300 ease-out group-data-[condensed]/header:size-9 xl:hidden" />
+            <Button variant="ghost" size="icon" aria-label="Open menu" className="size-11 rounded-full transition-[width,height] duration-300 ease-out group-data-[condensed]/header:size-9 lg:hidden" />
           }
         >
           <MenuIcon />

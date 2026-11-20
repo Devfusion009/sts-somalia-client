@@ -36,8 +36,8 @@ export function SectionHeading({
       <div className={cn("max-w-2xl", align === "center" && "mx-auto")}>
         <h2
           className={cn(
-            "font-heading text-2xl font-bold tracking-[-.035em] text-balance sm:text-3xl",
-            align === "center" && "lg:text-4xl",
+            "font-heading text-3xl font-bold tracking-tight text-balance sm:text-4xl",
+            align === "center" && "lg:text-5xl",
             dark ? "text-sidebar-foreground" : "text-foreground"
           )}
         >
@@ -46,7 +46,7 @@ export function SectionHeading({
         {lead ? (
           <p
             className={cn(
-              "mt-3 text-base leading-7",
+              "mt-4 text-lg leading-relaxed",
               dark ? "text-sidebar-foreground/70" : "text-muted-foreground"
             )}
           >

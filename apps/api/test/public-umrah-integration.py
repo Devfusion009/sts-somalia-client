@@ -34,6 +34,8 @@ with tempfile.TemporaryDirectory(prefix='sts-public-umrah-') as folder:
         run(args,input='create trigger order_items_apply_umrah_terms after insert on order_items for each row execute function order_items_apply_umrah_terms(); create trigger payments_settle_order before insert or update of status on payments for each row execute function handle_payment_succeeded();')
         run(args,input='create trigger orders_confirm_umrah_group_bookings after update of status on orders for each row execute function umrah_confirm_group_bookings_on_payment();')
         run(args+['-f',ROOT/'apps/api/test/public-umrah-checks.sql'])
+        run(args+['-f',ROOT/'supabase/migrations/20261120000007_optional_umrah_city_nights.sql'])
+        run(args+['-f',ROOT/'apps/api/test/public-umrah-no-nights.sql'])
         run(args,input='grant select on test_ids to authenticated;')
         query="""begin; set local role authenticated; select set_config('test.uid','00000000-0000-0000-0000-000000000002',true); select create_umrah_group_booking((select id from test_ids where name='departure'),1,0::smallint,'','[{"full_name":"Last Seat Traveller","gender":"male"}]',null); select pg_sleep(0.2); commit;"""
         def compete(_): return subprocess.run([str(x) for x in args],input=query,text=True,capture_output=True)
@@ -44,6 +46,7 @@ with tempfile.TemporaryDirectory(prefix='sts-public-umrah-') as folder:
         assert remaining=='0',remaining
         run(args+['-f',ROOT/'supabase/migrations/20261116000002_unified_umrah_pool.sql'])
         run(args+['-f',ROOT/'apps/api/test/unified-umrah-pool.sql'])
+        run(args+['-f',ROOT/'apps/api/test/public-umrah-no-nights.sql'])
         if '--request-pool' in sys.argv:
             # Use the real paid-order invoice trigger in this isolated fixture.
             run(args,input='create table invoices(order_id uuid unique references orders,invoice_number text unique,status text,issued_at timestamptz,total numeric,currency text); create sequence invoice_number_seq;')
@@ -54,6 +57,8 @@ with tempfile.TemporaryDirectory(prefix='sts-public-umrah-') as folder:
                 run(args+['-f',migration])
                 if migration.name.startswith('20261117000001_'): run(args+['-f',ROOT/'apps/api/test/pool-request-schema.sql'])
             run(args+['-f',ROOT/'supabase/migrations/20261119000001_admin_confirm_umrah_pool.sql'])
+            run(args+['-f',ROOT/'supabase/migrations/20261120000008_admin_umrah_departure_date.sql'])
+            run(args+['-f',ROOT/'apps/api/test/public-umrah-no-nights.sql'])
             checks=ROOT/'apps/api/test/pool-request-checks.sql'
             if checks.exists(): run(args+['-f',checks])
             query="""begin; set local role authenticated; select set_config('test.admin','no',true); select set_config('test.agent','no',true); select set_config('test.uid','00000000-0000-0000-0000-000000000002',true); select submit_umrah_pool_requests((select id from test_ids where name='request-departure'),gen_random_uuid(),'[{"pilgrims":[{"full_name":"Final QA Pilgrim","gender":"male"}]}]',true); commit;"""
