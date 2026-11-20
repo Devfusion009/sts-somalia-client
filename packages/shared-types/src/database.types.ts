@@ -8376,7 +8376,7 @@ export type Database = {
         Returns: string
       }
       admin_confirm_umrah_pool: {
-        Args: { p_departure: string }
+        Args: { p_departure: string; p_departure_date?: string }
         Returns: number
       }
       admin_dashboard_totals: { Args: never; Returns: Json }

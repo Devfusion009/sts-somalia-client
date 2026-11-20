@@ -184,7 +184,7 @@ export const packageUpsertSchema = z.object({
   if (value.basePrice <= 0) ctx.addIssue({ code: "custom", path: ["basePrice"], message: "Enter a price greater than zero." });
   if (!value.includes.length) ctx.addIssue({ code: "custom", path: ["includes"], message: "Select the included services." });
   const nights = (value.nightsMakkah ?? 0) + (value.nightsMadinah ?? 0);
-  if (value.nightsMakkah === undefined || value.nightsMadinah === undefined || nights < 1 || nights >= value.durationDays) {
+  if ((value.nightsMakkah !== undefined || value.nightsMadinah !== undefined) && (nights < 1 || nights >= value.durationDays)) {
     ctx.addIssue({ code: "custom", path: ["nightsMakkah"], message: "Stay nights must total at least one and be fewer than the trip days." });
   }
   if (!value.id && value.totalSeats === undefined) ctx.addIssue({ code: "custom", path: ["totalSeats"], message: "Enter the total number of seats." });
@@ -288,6 +288,7 @@ export const departureUpsertSchema = z.object({
 export type DepartureUpsertInput = z.infer<typeof departureUpsertSchema>;
 
 export const departureRefSchema = z.object({ departureId: uuid });
+export const confirmPoolSchema = departureRefSchema.extend({ departureDate: isoDay.optional() });
 export const departuresOverviewSchema = z.object({ from: isoDay });
 
 export const cancelDepartureSchema = z.object({

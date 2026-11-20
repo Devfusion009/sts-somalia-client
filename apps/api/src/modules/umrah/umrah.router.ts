@@ -1,5 +1,5 @@
 import { PoolRequestService } from "./services/pool-request.service";
-import { submitPoolRequestSchema, configurePoolSchema } from "@sts/shared-types";
+import { submitPoolRequestSchema, configurePoolSchema, confirmPoolSchema } from "@sts/shared-types";
 import { z } from "zod";
 import {
   adminCancelBookingSchema,
@@ -69,7 +69,7 @@ export const umrahRouter = router({
   poolRequests: router({
     enabled: protectedAdminProcedure.query(async ({ctx}) => (await ctx.resolve(PoolRequestService)).enabled()),
     openReplacements: protectedAdminProcedure.input(departureRefSchema).mutation(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).openReplacements(input.departureId)),
-    confirm: protectedAdminProcedure.input(departureRefSchema).mutation(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).confirm(input.departureId)),
+    confirm: protectedAdminProcedure.input(confirmPoolSchema).mutation(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).confirm(input.departureId, input.departureDate)),
     delivery: protectedAdminProcedure.input(departureRefSchema).query(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).delivery(input.departureId)),
     resend: protectedAdminProcedure.input(z.object({jobId:z.string().uuid()})).mutation(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).resend(input.jobId)),
     submit: protectedProcedure.input(submitPoolRequestSchema).mutation(async ({ctx,input}) => (await ctx.resolve(PoolRequestService)).submit(input)),

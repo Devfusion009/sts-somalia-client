@@ -299,8 +299,8 @@ function umrahPackageInput(formData: FormData) {
   const requestFirst = formData.get("requestFirst") === "on";
   return {
     ...(requestFirst ? {requestFirst:true,
-      formationClosesAt:new Date(`${formData.get("formationClosesAt")}:00+03:00`).toISOString(),
-      paymentCutoffAt:new Date(`${formData.get("paymentCutoffAt")}:00+03:00`).toISOString(),
+      formationClosesAt:`${formData.get("formationClosesAt") || ""}:00+03:00`,
+      paymentCutoffAt:`${formData.get("paymentCutoffAt") || ""}:00+03:00`,
       paymentWindowHours:Number(formData.get("paymentWindowHours")), requestTerms:String(formData.get("requestTerms") ?? ""),
     } : {}),
     packageType: String(formData.get("packageType") ?? "group") as "group" | "private",
@@ -319,8 +319,6 @@ function umrahPackageInput(formData: FormData) {
     flightDetails: String(formData.get("flightDetails") ?? ""),
     transportDetails: String(formData.get("transportDetails") ?? ""),
     mealsNote: String(formData.get("mealsNote") ?? ""),
-    nightsMakkah: formData.has("nightsMakkah") ? Number(formData.get("nightsMakkah")) : undefined,
-    nightsMadinah: formData.has("nightsMadinah") ? Number(formData.get("nightsMadinah")) : undefined,
     totalSeats: formData.has("totalSeats") ? Number(formData.get("totalSeats")) : undefined,
     departureDate: String(formData.get("departureDate") ?? "") || undefined,
     durationDays: Number(formData.get("durationDays")),

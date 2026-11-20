@@ -86,8 +86,8 @@ export class PoolRequestService {
     const { error } = await this.rls.get().rpc("open_umrah_pool_replacements", { p_departure: departureId });
     if (error) throw new BadRequestException(error.message);
   }
-  async confirm(departureId: string) {
-    const { data, error } = await this.rls.get().rpc("admin_confirm_umrah_pool", { p_departure: departureId });
+  async confirm(departureId: string, departureDate?: string) {
+    const { data, error } = await this.rls.get().rpc("admin_confirm_umrah_pool", { p_departure: departureId, ...(departureDate ? { p_departure_date: departureDate } : {}) });
     if (error) throw new BadRequestException(error.message);
     return { confirmed: Number(data) };
   }

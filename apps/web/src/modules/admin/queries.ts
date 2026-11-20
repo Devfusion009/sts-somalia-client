@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { getServerTrpc } from "@/lib/trpc/server";
+import { getServerTrpc, TRPCClientError } from "@/lib/trpc/server";
 import type { UmrahPackageAdmin, UmrahPackageAdminListItem } from "api/dist/modules/umrah/services/package-admin.service";
 import { bucketLabel, enumerateBuckets, hourlyBucketKey, roundMoney } from "@/lib/date-range";
 import { ADMIN_PAGE_SIZE, pageRange, searchTerm } from "@/lib/pagination";
@@ -385,13 +385,14 @@ export async function getUmrahPackagesAdmin(): Promise<UmrahPackageAdminListItem
 
 /** Full package config for the admin detail page; null when it doesn't exist. */
 export async function getUmrahPackageById(id: string): Promise<UmrahPackageAdmin | null> {
-  const trpc = await getServerTrpc();
+  const trpc = await getServerTrpc({ timeoutMs: 15000 });
   // Typed through the API's exported row: the procedure's inferred output is too deep for tRPC's client (TS2589).
   const query = trpc.umrah.admin.packages.get.query as unknown as (input: { packageId: string }) => Promise<UmrahPackageAdmin>;
   try {
     return await query({ packageId: id });
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof TRPCClientError && error.data?.code === "NOT_FOUND") return null;
+    throw error;
   }
 }
 

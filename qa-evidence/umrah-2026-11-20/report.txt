@@ -1,0 +1,35 @@
+Umrah QA — 20 November 2026
+Environment: localhost Supabase, web and API; synthetic admin/customer identities approved by user. No live charges or production writes.
+
+Browser journey passed:
+- Created QA Full Journey 20 Nov, 10 days, USD 100, one seat, MGQ–JED, all includes/facility options, additional facilities, responsible person, agent contact, formation/payment deadlines and terms, no city night fields.
+- Uploaded cover and published. Package appeared on signed-in customer homepage and package detail with authored services and contacts.
+- Customer submitted full synthetic pilgrim details. Request appeared in account as Awaiting group completion.
+- Full pool waited for admin. Admin selected 8 December instead of 20 December. Return recalculated to 17 December.
+- Customer saw Group confirmed — payment due, new dates and Pay now.
+- Simulated card payment succeeded for USD 100. My Bookings showed Confirmed/Paid, starts 8 December. Detail showed confirmed timeline, full-payment update, itinerary dates and issued invoice INV-2026-000092.
+- Order STS-2026-000150; request UMR-A99D8EE42B1A46B5.
+
+Fixes:
+- Added admin departure-date selection at full-pool confirmation with atomic scheduling and payment invitations, synchronized customer snapshots, preserved duration, admin/full-capacity checks and payment window validation.
+- Genuine API failures are no longer swallowed as package-not-found responses.
+- Updated stale service-test fixtures and added schedule-forwarding and email-date coverage.
+
+Checks passed:
+- Shared-types tests, API type check/build, web type check, lint on changed web/API paths, git diff --check.
+- Full isolated PostgreSQL request-pool lifecycle suite: validation/publication, customer/agent inventory, ownership, idempotency, concurrent last seat, activation rollback, settlement, issued invoice, expiry, replacement capacity, mail leases/retries/resend.
+- Customer status/form/catalog regression tests and mail template/worker/service tests.
+
+Email transport captured locally (actual application SMTP path):
+Scout Travel Solution <no-reply@scoutsts.com> | Payment received
+Scout Travel Solution <no-reply@scoutsts.com> | Umrah group confirmed — payment due — UMR-A99D8EE42B1A46B5
+Scout Travel Solution <no-reply@scoutsts.com> | Umrah request received — UMR-A99D8EE42B1A46B5
+
+Limits:
+- This proves application transport and local SMTP acceptance, not external mailbox delivery, DNS authentication or production-provider credentials.
+- Payment was explicitly in test mode. Live acquiring/provider settlement was not exercised.
+- Publication, request, confirmation and payment were tested in browser; remaining configuration permutations were covered selectively by automated regressions, not an exhaustive cross-product of every setting.
+- Development cache caused temporary 404s after restart; moving the cache aside restored the route. Upload completed; no persistent upload defect reproduced.
+- Changes are uncommitted and not deployed. New migrations must be applied to QA before production through the repository release flow.
+
+Cleanup: QA web/API/SMTP processes and Supabase containers stopped; test ports verified closed. Docker service and socket verified inactive. Database volumes and test evidence preserved.
