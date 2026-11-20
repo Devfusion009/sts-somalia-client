@@ -2,10 +2,10 @@ import Link from "next/link";
 
 import { FOOTER_GROUPS } from "@/lib/marketing-nav";
 
-import { ArrowUpRight, Building2, Globe2, MapPin, Plane, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, Building2, Globe2, MapPin, Plane } from "lucide-react";
 
 const GROUP_ICONS = [Globe2, Building2, MapPin, Plane];
-/** Homepage destination directory and payment notice. */
+/** Homepage destination directory. */
 export function LinkFarm() {
   return (
     <section className="border-t border-border bg-muted/30 py-12 sm:py-16">
@@ -33,22 +33,6 @@ export function LinkFarm() {
           })}
         </div>
 
-        <div className="flex flex-col gap-4 rounded-2xl border border-brand-accent/20 bg-card p-5 sm:flex-row sm:gap-5 sm:p-7">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-accent/10 text-brand-accent"><ShieldCheck className="size-6" strokeWidth={1.5} aria-hidden /></span>
-          <div>
-            <h2 className="font-heading text-base font-semibold">Payment safety notice</h2>
-            <p className="mt-2 max-w-5xl text-sm leading-6 text-muted-foreground">
-              Scout Travel Solution only collects payment through this website and at our Mogadishu office.
-              We never ask for payment via any other website, personal account or payment link, and STS
-              accepts no responsibility for losses from payments made outside these channels. If in doubt,
-              call{" "}
-              <a href="tel:+252611444420" className="font-semibold whitespace-nowrap text-brand-accent hover:underline">
-                +252 611 444 420
-              </a>{" "}
-              before you pay.
-            </p>
-          </div>
-        </div>
       </div>
     </section>
   );
