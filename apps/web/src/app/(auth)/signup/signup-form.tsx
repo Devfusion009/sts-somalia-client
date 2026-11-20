@@ -9,14 +9,16 @@ import { SubmitButton } from "@/components/submit-button";
 import { AUTH_CONTROL, AuthCard } from "@/components/auth/auth-frame";
 import { signUpAction } from "@/lib/auth/actions";
 import { useRestoreOnError } from "@/lib/use-restore-on-error";
+import { GoogleSignIn } from "@/components/auth/google-sign-in";
 
-export function SignupForm() {
+export function SignupForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const [state, formAction] = useActionState(signUpAction, null);
   const formRef = useRef<HTMLFormElement>(null);
   useRestoreOnError(formRef, state);
 
   return (
     <AuthCard title="Create your account">
+      {googleEnabled ? <GoogleSignIn /> : null}
       <form ref={formRef} action={formAction}>
         <FieldGroup>
           <Field>

@@ -37,7 +37,7 @@ jobs:
       - run: npm run lint -w web
       - run: npx tsc --noEmit -p apps/web
       - run: npm test -w @sts/shared-types
-      - run: node --test apps/web/test/agent-bookings.test.cjs apps/web/test/catalog-outage.test.cjs apps/web/test/cron-auth.test.cjs apps/web/test/external-worker.test.mjs apps/web/test/marketing-callback.test.cjs apps/web/test/my-bookings-pages.test.cjs apps/web/test/pool-email.test.cjs apps/web/test/pool-worker.test.cjs apps/web/test/public-umrah-catalog.test.cjs
+      - run: node --test apps/web/test/agent-bookings.test.cjs apps/web/test/catalog-outage.test.cjs apps/web/test/cron-auth.test.cjs apps/web/test/google-customer-auth.test.cjs apps/web/test/external-worker.test.mjs apps/web/test/marketing-callback.test.cjs apps/web/test/my-bookings-pages.test.cjs apps/web/test/pool-email.test.cjs apps/web/test/pool-worker.test.cjs apps/web/test/public-umrah-catalog.test.cjs
       - run: python3 apps/api/test/public-umrah-integration.py --request-pool
       - run: python3 apps/api/test/marketing-aging-integration.py
       - run: python3 apps/api/test/umrah-capacity-integration.py
