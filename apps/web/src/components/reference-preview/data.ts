@@ -110,7 +110,7 @@ export const destinations = [
   {
     name: "Egypt",
     city: "Cairo",
-    image: "/marketing/dest-cairo.webp",
+    image: "/marketing/dest-visa-eg.png",
     price: 90,
   },
   {
@@ -119,11 +119,16 @@ export const destinations = [
     image: "/marketing/dubai.webp",
     price: 120,
   },
-  { name: "Kenya", city: "Nairobi", image: "/marketing/kenya.webp", price: 80 },
+  {
+    name: "Kenya",
+    city: "Nairobi",
+    image: "/marketing/dest-visa-ke.png",
+    price: 80,
+  },
   {
     name: "Malaysia",
     city: "Kuala Lumpur",
-    image: "/marketing/dest-kuala-lumpur.webp",
+    image: "/marketing/dest-visa-my.png",
     price: 130,
   },
   {
@@ -135,7 +140,7 @@ export const destinations = [
   {
     name: "Türkiye",
     city: "Istanbul",
-    image: "/marketing/istanbul.webp",
+    image: "/marketing/dest-visa-tr.jpg",
     price: 110,
   },
   {

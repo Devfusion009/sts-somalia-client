@@ -127,29 +127,49 @@ function Heading({
     </div>
   );
 }
+function fieldOptions(label: string) {
+  if (/service|need/i.test(label))
+    return ["Flights", "Hotels", "Visa", "Umrah", "Events & Halls"];
+  if (/room/i.test(label))
+    return ["Standard room", "Deluxe room", "Family room", "Suite"];
+  if (/country/i.test(label))
+    return [
+      "United Arab Emirates",
+      "Saudi Arabia",
+      "Kenya",
+      "Türkiye",
+      "Egypt",
+      "Malaysia",
+    ];
+  if (/guest|people/i.test(label))
+    return [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "10",
+      "20",
+      "50",
+      "100",
+      "250",
+      "500",
+    ];
+  return ["Mogadishu", "Hargeisa", "Nairobi", "Dubai", "Jeddah", "Istanbul"];
+}
 function Fields({ items }: { items: string[] }) {
   return (
     <div className="rp-fields">
       {items.map((label) => (
         <label key={label}>
           <span>{label}</span>
-          {/service|room|city|people|country|guest/i.test(label) ? (
+          {/service|need|room|city|people|country|guest/i.test(label) ? (
             <select defaultValue="">
               <option value="" disabled>
                 Choose {label.toLowerCase()}
               </option>
-              {[
-                "Mogadishu",
-                "Hargeisa",
-                "Nairobi",
-                "Dubai",
-                "2 adults",
-                "4 guests",
-                "Flights",
-                "Hotels",
-                "Visa",
-                "Umrah",
-              ].map((v) => (
+              {fieldOptions(label).map((v) => (
                 <option key={v}>{v}</option>
               ))}
             </select>
@@ -178,6 +198,34 @@ function Fields({ items }: { items: string[] }) {
 function SearchForm({ mode = "Flights" }: { mode?: string }) {
   const [tab, setTab] = useState(mode);
   const router = useRouter();
+  if (mode === "Visa")
+    return (
+      <form
+        className="rp-search rp-visa-search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          router.push(href("visa/uae"));
+        }}
+      >
+        <label>
+          <span>Passport</span>
+          <select defaultValue="Somalia">
+            <option>Somalia</option>
+            <option>Kenya</option>
+            <option>Ethiopia</option>
+          </select>
+        </label>
+        <label>
+          <span>Destination</span>
+          <select defaultValue="United Arab Emirates">
+            {fieldOptions("country").map((country) => (
+              <option key={country}>{country}</option>
+            ))}
+          </select>
+        </label>
+        <Button>Find my visa</Button>
+      </form>
+    );
   return (
     <form
       className="rp-search"
@@ -912,15 +960,16 @@ export function ReferencePreview({ screen }: { screen: string }) {
   else if (screen === "visa")
     content = (
       <>
+        {crumb}
         <Intro
-          tag="Visa assistance"
+          tag="STS visa services"
           title={
             <>
               Your destination. <em>Our visa expertise.</em>
             </>
           }
-          text="Tourist, business and family visas — with your documents checked by our team before they reach the embassy."
-          image="/marketing/dubai.webp"
+          text="Tourist, business and family visas. We check every document before it reaches the embassy, so you are not rejected for a small mistake."
+          image="/marketing/dest-visa-ae.jpg"
         >
           <SearchForm mode="Visa" />
         </Intro>
@@ -929,7 +978,7 @@ export function ReferencePreview({ screen }: { screen: string }) {
             eyebrow="Visa destinations"
             title="Places worth the paperwork"
           />
-          <div className="rp-grid rp-three">
+          <div className="rp-grid">
             {destinations.map((d) => (
               <Link
                 className="rp-destination"
@@ -1754,7 +1803,7 @@ export function ReferencePreview({ screen }: { screen: string }) {
               </h1>
               <p>Tourist visa · Document review by our desk</p>
             </div>
-            <Picture src="/marketing/dubai.webp" alt="Dubai skyline" />
+            <Picture src="/marketing/dest-visa-ae.jpg" alt="Dubai skyline" />
           </div>
           <div className="rp-detail-layout">
             <article>

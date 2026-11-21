@@ -12,5 +12,6 @@ export default async function DesignPreviewPage({
   params: Promise<{ screen?: string[] }>;
 }) {
   const { screen } = await params;
-  return <ReferencePreview screen={screen?.join("/") || "home"} />;
+  const page = screen?.join("/") || "home";
+  return <ReferencePreview key={page} screen={page} />;
 }

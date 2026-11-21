@@ -31,7 +31,7 @@
   font-weight: 750;
 }
 .reference-preview h1 {
-  font-size: clamp(34px, 3.5vw, 50px);
+  font-size: clamp(34px, 4vw, 58px);
   margin: 20px 0;
 }
 .reference-preview h2 {
@@ -85,7 +85,7 @@
   flex-shrink: 0;
 }
 .reference-preview .rp-container {
-  width: calc(100% - 80px);
+  width: 80%;
   max-width: 1160px;
   margin: auto;
 }
@@ -2190,4 +2190,40 @@
 .rp-not-found h1 {
   font-size: 28px;
   margin: 15px 0;
+}
+
+.rp-visa-search {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  align-items: end;
+  margin-top: 20px;
+  padding: 15px;
+  box-shadow: 0 12px 30px #173b3010;
+}
+.rp-visa-search .rp-button {
+  width: 100%;
+  margin: 0;
+  min-height: 42px;
+}
+.rp-intro:has(.rp-visa-search) {
+  padding-top: 30px;
+}
+.rp-intro:has(.rp-visa-search) .rp-photo {
+  height: 360px;
+}
+.reference-preview main > .rp-breadcrumb:has(+ .rp-intro) {
+  background: var(--rp-tint);
+  padding-bottom: 0;
+}
+@media (max-width: 500px) {
+  .rp-visa-search {
+    grid-template-columns: 1fr 1fr;
+  }
+  .rp-visa-search .rp-button {
+    grid-column: 1/-1;
+  }
+  .rp-intro:has(.rp-visa-search) .rp-photo {
+    height: 260px;
+  }
 }
