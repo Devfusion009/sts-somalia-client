@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { customerGoogleOrigin } from "@/lib/auth/google-policy";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, ArrowUpRight, ShieldCheck } from "lucide-react";
@@ -36,7 +38,9 @@ export default async function LoginPage({
   searchParams: Promise<{ redirect_to?: string; error?: string }>;
 }) {
   const { redirect_to, error } = await searchParams;
-  const notice = error === "confirmation_failed" ? "That link is invalid or has expired." : undefined;
+  const notice = error === "confirmation_failed" ? "That link is invalid or has expired."
+    : error === "google_sign_in_failed" ? "Google sign-in could not be completed." : undefined;
+  const googleEnabled = Boolean(customerGoogleOrigin((await headers()).get("host")));
 
   return (
     <div className="min-h-dvh bg-[#fafbf8] p-4 text-[#123b32] lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.04fr)] lg:gap-4 lg:p-5">
@@ -64,6 +68,7 @@ export default async function LoginPage({
           <LoginForm
             redirectTo={redirect_to}
             notice={notice}
+            googleEnabled={googleEnabled}
             demoAccounts={DEMO_LOGIN_ENABLED ? DEMO_ACCOUNT_ENTRIES : undefined}
           />
         </main>
