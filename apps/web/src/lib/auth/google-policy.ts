@@ -4,7 +4,13 @@ export const GOOGLE_RETURN_COOKIE = "__Host-sts-google-return";
 export const GOOGLE_CALLBACK_PATH = "/auth/google/callback";
 
 /** NODE_ENV is production on QA too; require the explicit deployment and switch. */
-export function customerGoogleOrigin(host: string | null, env: Environment): string | null {
+export function customerGoogleOrigin(host: string | null, env: Environment = {
+  DEPLOYMENT_ENV: process.env.DEPLOYMENT_ENV,
+  CUSTOMER_GOOGLE_LOGIN_ENABLED: process.env.CUSTOMER_GOOGLE_LOGIN_ENABLED,
+  // Next.js inlines these direct references when building the production image.
+  NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+}): string | null {
   if (env.DEPLOYMENT_ENV !== "production" || env.CUSTOMER_GOOGLE_LOGIN_ENABLED !== "true") return null;
   try {
     const site = new URL(env.NEXT_PUBLIC_SITE_URL ?? "");

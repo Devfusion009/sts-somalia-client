@@ -37,6 +37,13 @@ test('Google is opt-in and restricted to the production public host and backend'
   assert.equal(policy.customerGoogleOrigin('scoutsts.com', { ...production, NEXT_PUBLIC_SUPABASE_URL: 'https://auth.scoutsts.com' }), 'https://scoutsts.com');
 });
 
+test('default configuration reads the deployment switch and public build settings explicitly', () => {
+  const configured = load('apps/web/src/lib/auth/google-policy.ts', {}, production);
+  assert.equal(configured.customerGoogleOrigin('scoutsts.com'), 'https://scoutsts.com');
+  const qa = load('apps/web/src/lib/auth/google-policy.ts', {}, { ...production, DEPLOYMENT_ENV: 'qa' });
+  assert.equal(qa.customerGoogleOrigin('scoutsts.com'), null);
+});
+
 test('return URLs preserve booking context but cannot escape into other origins or portals', () => {
   for (const target of ['/account/bookings', '/checkout/order-123?step=payment', '/umrah/group', '/']) {
     assert.equal(policy.customerGoogleReturnPath(target), target);
@@ -63,6 +70,7 @@ function harness({ env = production, profile = { role: 'customer', is_platform_a
       return chain;
     },
   };
+  const configuredPolicy = { ...policy, customerGoogleOrigin: host => policy.customerGoogleOrigin(host, env) };
   const mocks = {
     'next/headers': { cookies: async () => store, headers: async () => new Headers({ host: 'scoutsts.com' }) },
     'next/navigation': { redirect: url => { throw Object.assign(new Error('REDIRECT'), { url }); } },
@@ -71,7 +79,7 @@ function harness({ env = production, profile = { role: 'customer', is_platform_a
       static redirect(url) { return { status: 307, url }; }
     } },
     '@/lib/supabase/server': { createClient: async () => client },
-    '@/lib/auth/google-policy': policy, './google-policy': policy,
+    '@/lib/auth/google-policy': configuredPolicy, './google-policy': configuredPolicy,
     '@/lib/auth/login-history': { recordLoginEvent: async (...args) => calls.logged.push(args) },
     '@/lib/auth/device': { sessionIdFromAccessToken: () => 'session-id' },
   };
