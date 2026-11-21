@@ -119,9 +119,9 @@ Follow the repository release flow: verify the code on QA with Google disabled,
 then promote through `main` → `production` when authorized. Do not enable
 Google on QA to test a production account.
 
-Once Google branding and the production provider are ready, add this server
-variable to the production web environment through the normal configuration
-release path:
+Once Google branding and the production provider are ready, set this repository
+variable in GitHub's **production** environment. The production deploy workflow
+writes it to the server environment, defaulting to `false` when unset:
 
 ```text
 CUSTOMER_GOOGLE_LOGIN_ENABLED=true

@@ -40,7 +40,7 @@ export default async function LoginPage({
   const { redirect_to, error } = await searchParams;
   const notice = error === "confirmation_failed" ? "That link is invalid or has expired."
     : error === "google_sign_in_failed" ? "Google sign-in could not be completed." : undefined;
-  const googleEnabled = Boolean(customerGoogleOrigin((await headers()).get("host"), process.env));
+  const googleEnabled = Boolean(customerGoogleOrigin((await headers()).get("host")));
 
   return (
     <div className="min-h-dvh bg-card p-0 text-foreground lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.04fr)] lg:gap-0 lg:p-0">

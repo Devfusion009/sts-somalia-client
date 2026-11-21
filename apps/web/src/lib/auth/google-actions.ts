@@ -7,7 +7,7 @@ import { customerGoogleOrigin, customerGoogleReturnPath, GOOGLE_CALLBACK_PATH, G
 import type { ActionState } from "./actions";
 
 export async function signInCustomerWithGoogle(_previous: ActionState, form: FormData): Promise<ActionState> {
-  const origin = customerGoogleOrigin((await headers()).get("host"), process.env);
+  const origin = customerGoogleOrigin((await headers()).get("host"));
   if (!origin) return { error: "Google sign-in is unavailable." };
 
   const supabase = await createClient();

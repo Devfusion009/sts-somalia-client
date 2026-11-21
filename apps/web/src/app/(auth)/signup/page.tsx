@@ -6,6 +6,6 @@ import { SignupForm } from "./signup-form";
 export const metadata: Metadata = { title: "Sign up" };
 
 export default async function SignupPage() {
-  const googleEnabled = Boolean(customerGoogleOrigin((await headers()).get("host"), process.env));
+  const googleEnabled = Boolean(customerGoogleOrigin((await headers()).get("host")));
   return <SignupForm googleEnabled={googleEnabled} />;
 }

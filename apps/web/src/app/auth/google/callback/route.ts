@@ -6,7 +6,7 @@ import { sessionIdFromAccessToken } from "@/lib/auth/device";
 import { customerGoogleOrigin, customerGoogleReturnPath, GOOGLE_RETURN_COOKIE, isGoogleCustomer } from "@/lib/auth/google-policy";
 
 export async function GET(request: NextRequest) {
-  const origin = customerGoogleOrigin(request.headers.get("host"), process.env);
+  const origin = customerGoogleOrigin(request.headers.get("host"));
   if (!origin) return new NextResponse("Not Found", { status: 404 });
   const store = await cookies();
   const next = customerGoogleReturnPath(store.get(GOOGLE_RETURN_COOKIE)?.value);
