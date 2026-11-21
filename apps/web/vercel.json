@@ -1,8 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
-      "*": false,
-      "feat/reference-ui-vercel": true
+      "*": false
     }
   },
   "buildCommand": "npm run vercel-build",
