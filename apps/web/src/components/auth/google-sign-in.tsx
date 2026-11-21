@@ -9,7 +9,7 @@ export function GoogleSignIn({ redirectTo }: { redirectTo?: string }) {
   return <div className="mb-6">
     <form action={action}>
       {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
-      <SubmitButton variant="outline" className="h-12 w-full gap-3 rounded-xl bg-white text-sm font-medium text-[#314e40]" pendingText="Connecting to Google…">
+      <SubmitButton variant="outline" className="h-12 w-full gap-3 rounded-xl border-[#d6e0d7] bg-white text-sm font-semibold text-[#314e40] shadow-sm transition-colors hover:border-[#237f75]/50 hover:bg-[#f3f8f6] focus-visible:ring-2 focus-visible:ring-[#237f75]/30 focus-visible:ring-offset-2" pendingText="Connecting to Google…">
         <svg viewBox="0 0 48 48" className="size-5" aria-hidden="true">
           <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z" />
           <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6C44.4 38.04 46.98 31.87 46.98 24.55Z" />

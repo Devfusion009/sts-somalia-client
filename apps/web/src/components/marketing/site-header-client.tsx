@@ -89,7 +89,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
   return (
     <>
       {/* ---------------- Desktop pill nav ---------------- */}
-      <nav aria-label="Primary" data-nav-loader className="hidden items-center gap-1 xl:gap-2 lg:flex" onMouseLeave={scheduleClose}>
+      <nav aria-label="Primary" data-nav-loader className="hidden items-center gap-1 xl:gap-2 xl:flex" onMouseLeave={scheduleClose}>
         {MEGA_SECTIONS.map((section) => {
           const Icon = ICONS[section.icon];
           const active = pathname.startsWith(section.href);
@@ -113,11 +113,11 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                 onFocus={() => open(section.key)}
                 onClick={closeNow}
                 className={cn(
-                  "flex h-11 items-center gap-1 rounded-md px-3 text-sm font-medium transition-colors duration-200 group-data-[condensed]/header:h-10",
+                  "flex h-11 items-center gap-1.5 rounded-xl border px-3 text-sm font-semibold transition-colors duration-200 group-data-[condensed]/header:h-10",
                   "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none",
                   active || isOpen
-                    ? "bg-primary/5 text-primary"
-                    : "text-foreground/80 hover:bg-primary/5 hover:text-primary"
+                    ? "border-primary/15 bg-primary/10 text-primary"
+                    : "border-transparent text-foreground/80 hover:border-primary/10 hover:bg-primary/5 hover:text-primary"
                 )}
               >
                 {section.label}
@@ -182,11 +182,11 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
             </div>
           );
         })}
-        <Link href="/about" aria-current={pathname === "/about" ? "page" : undefined} className={cn("flex h-11 items-center rounded-md px-3 text-sm font-medium transition-colors hover:bg-primary/5 hover:text-primary", pathname === "/about" ? "text-primary" : "text-foreground/80")}>About</Link>
+        <Link href="/about" aria-current={pathname === "/about" ? "page" : undefined} className={cn("flex h-11 items-center rounded-xl border px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary", pathname === "/about" ? "border-primary/15 bg-primary/10 text-primary" : "border-transparent text-foreground/80 hover:border-primary/10 hover:bg-primary/5 hover:text-primary")}>About</Link>
       </nav>
 
       {/* ---------------- Desktop right cluster ---------------- */}
-      <div className="hidden items-center gap-2 lg:flex">
+      <div className="hidden items-center gap-2 xl:flex">
         {profile ? (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -270,7 +270,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
           <Button
             variant="outline"
             render={<Link href="/login" />}
-            className="h-10 rounded-full border-border bg-card px-5 text-sm font-semibold text-foreground shadow-none transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+            className="h-11 rounded-xl border-primary/20 bg-card px-5 text-sm font-semibold text-primary shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
           >
             Log in
           </Button>
@@ -278,7 +278,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
 
         <Button
           render={<Link href="/#plan" />}
-          className="h-10 rounded-full bg-brand-accent px-5 text-sm font-semibold text-brand-accent-foreground shadow-none hover:bg-brand-accent/90"
+          className="h-11 rounded-xl border border-white/20 bg-brand-accent px-5 text-sm font-semibold text-white shadow-[0_3px_8px_-3px_rgb(249_115_22_/_0.5)] transition-colors hover:bg-[#e85e0b] focus-visible:ring-2 focus-visible:ring-brand-accent/40 focus-visible:ring-offset-2"
         >
           Plan my trip
         </Button>
@@ -288,7 +288,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
       <Sheet>
         <SheetTrigger
           render={
-            <Button variant="ghost" size="icon" aria-label="Open menu" className="size-11 rounded-full transition-[width,height] duration-300 ease-out group-data-[condensed]/header:size-9 lg:hidden" />
+            <Button variant="ghost" size="icon" aria-label="Open menu" className="size-11 rounded-full transition-[width,height] duration-300 ease-out group-data-[condensed]/header:size-9 xl:hidden" />
           }
         >
           <MenuIcon />

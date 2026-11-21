@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import { StsBrandLogo } from "./sts-brand-logo";
 
 import { getCurrentProfile } from "@/lib/auth/session";
 import { getMyPartnerContexts, isPortalOnlyIdentity } from "@/modules/identity/queries";
@@ -37,8 +37,7 @@ export async function SiteHeader() {
             href="/"
             className="flex shrink-0 flex-col items-start gap-0.5 rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
-            <Image src="/logo.png" alt="STS Somalia" width={714} height={312} priority className="h-9 w-auto transition-[height] duration-300 ease-out group-data-[condensed]/header:h-8" />
-            <span className="text-[8px] font-semibold tracking-[0.035em] text-brand-accent">Scout Travel Solution LTD</span>
+            <StsBrandLogo className="h-auto w-28 transition-[width] duration-200 sm:w-32 group-data-[condensed]/header:w-28 motion-reduce:transition-none" />
           </Link>
           <SiteHeaderClient profile={profile} contexts={contexts} />
         </div>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import { StsBrandLogo } from "./sts-brand-logo";
 import { ShieldCheck } from "lucide-react";
 
 import { NAV_LINKS, PARTNER_LINKS } from "@/lib/nav-links";
@@ -41,9 +41,8 @@ export async function SiteFooter() {
 
         <div className="grid gap-x-10 gap-y-10 py-10 sm:grid-cols-2 sm:py-12 lg:grid-cols-[1.3fr_0.85fr_1fr_1fr] lg:gap-x-14">
           <div className="sm:row-span-2 lg:row-span-1">
-            <Link href="/" className="inline-flex flex-col items-start gap-0.5 rounded-lg bg-white px-3 py-2.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
-              <Image src="/logo.png" alt="STS Somalia" width={714} height={312} className="h-9 w-auto" />
-              <span className="text-[8px] font-semibold tracking-[0.035em] text-brand-accent">Scout Travel Solution LTD</span>
+            <Link href="/" className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
+              <StsBrandLogo white className="h-auto w-40" />
             </Link>
             <p className="mt-5 max-w-64 text-sm leading-6 text-white/90">Flights, hotels, visas, Umrah and event halls — from our offices in Mogadishu and Nairobi.</p>
             <Link href="/about#credentials" className="mt-4 inline-flex min-h-8 items-center gap-2 rounded-full border border-white/25 px-3 text-[11px] font-semibold transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
