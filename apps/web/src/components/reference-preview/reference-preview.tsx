@@ -177,7 +177,7 @@ function Fields({ items }: { items: string[] }) {
             <input
               required={!/optional/i.test(label)}
               type={
-                /date|arrival|departure|check-in|check-out/i.test(label)
+                /date|when|arrival|departure|check-in|check-out/i.test(label)
                   ? "date"
                   : /email/i.test(label)
                     ? "email"
@@ -657,7 +657,7 @@ export function ReferencePreview({ screen }: { screen: string }) {
             </>
           }
           text="Flights, hotels, visas, Umrah and event halls — booked online with our team in Mogadishu and Nairobi."
-          image="/about/umrah-group.webp"
+          image="/about/umrah-group-wide.webp"
         >
           <SearchForm />
           <small className="rp-under-search">

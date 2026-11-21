@@ -2227,3 +2227,9 @@
     height: 260px;
   }
 }
+
+@media (max-width: 500px) {
+  .rp-header-actions .rp-button-secondary {
+    display: inline-flex;
+  }
+}
