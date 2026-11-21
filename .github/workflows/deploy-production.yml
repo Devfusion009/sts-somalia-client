@@ -19,7 +19,23 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  verify-google:
+    if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w api
+      - run: node apps/web/test/google-customer-auth.test.cjs
+      - run: npx tsc --noEmit -p apps/web
+
   build:
+    needs: verify-google
     if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     environment: production
@@ -118,12 +134,13 @@ jobs:
           AMADEUS_BASE_URL: ${{ vars.AMADEUS_BASE_URL }}
           AMADEUS_CLIENT_ID: ${{ vars.AMADEUS_CLIENT_ID }}
           AMADEUS_CLIENT_SECRET: ${{ secrets.AMADEUS_CLIENT_SECRET }}
+          CUSTOMER_GOOGLE_LOGIN_ENABLED: ${{ vars.CUSTOMER_GOOGLE_LOGIN_ENABLED || 'false' }}
         run: |
           {
             printf '%s\n' "${{ secrets.PROD_ENV_FILE }}"
             echo "WEB_IMAGE=${{ needs.build.outputs.web_image }}"
             echo "API_IMAGE=${{ needs.build.outputs.api_image }}"
-            for key in EMAIL_PROVIDER EMAIL_FROM EMAIL_REPLY_TO SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS AMADEUS_BASE_URL AMADEUS_CLIENT_ID AMADEUS_CLIENT_SECRET; do
+            for key in EMAIL_PROVIDER EMAIL_FROM EMAIL_REPLY_TO SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS AMADEUS_BASE_URL AMADEUS_CLIENT_ID AMADEUS_CLIENT_SECRET CUSTOMER_GOOGLE_LOGIN_ENABLED; do
               if [ -n "${!key}" ]; then printf "%s='%s'\n" "$key" "${!key}"; fi
             done
           } | ssh prod "umask 077 && cat > ${APP_DIR}/.env.next"

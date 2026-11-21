@@ -60,3 +60,6 @@ jobs:
 
       - name: Type check
         run: npx tsc --noEmit -p apps/web
+
+      - name: Customer Google sign-in tests
+        run: node apps/web/test/google-customer-auth.test.cjs

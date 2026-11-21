@@ -13,6 +13,7 @@ import { signInAction } from "@/lib/auth/actions";
 import { portalLoginHref } from "@/lib/subdomain";
 import { useRestoreOnError } from "@/lib/use-restore-on-error";
 import { DemoAccountsList, type DemoAccountEntry } from "@/modules/demo/demo-accounts-list";
+import { GoogleSignIn } from "@/components/auth/google-sign-in";
 
 const AGENT_LOGIN_HREF = portalLoginHref("agent");
 const MANAGER_LOGIN_HREF = portalLoginHref("manager");
@@ -42,11 +43,13 @@ export function LoginForm({
   redirectTo,
   notice,
   demoAccounts,
+  googleEnabled = false,
 }: {
   redirectTo?: string;
   notice?: string;
   /** Set only when DEMO_LOGIN_ENABLED is true server-side — see /login/page.tsx. */
   demoAccounts?: DemoAccountEntry[];
+  googleEnabled?: boolean;
 }) {
   const [personalState, personalAction, pending] = useActionState(signInAction, null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -65,6 +68,7 @@ export function LoginForm({
           </Alert>
         ) : null}
 
+        {googleEnabled ? <div className="mt-7"><GoogleSignIn redirectTo={redirectTo} /></div> : null}
         <form ref={formRef} action={personalAction} aria-busy={pending} className="mt-7">
           {redirectTo ? <input type="hidden" name="redirect_to" value={redirectTo} /> : null}
           <FieldGroup className="gap-5">
