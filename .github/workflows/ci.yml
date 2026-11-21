@@ -36,6 +36,9 @@ jobs:
       - name: Build
         run: npm run build -w api
 
+      - name: Locate PostgreSQL test tools
+        run: echo "PG_TEST_BIN=$(pg_config --bindir)" >> "$GITHUB_ENV"
+
       - name: Shared types and Umrah integration tests
         run: |
           npm test -w @sts/shared-types
