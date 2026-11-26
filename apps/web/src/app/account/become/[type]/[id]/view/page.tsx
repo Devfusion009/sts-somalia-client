@@ -24,7 +24,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatRail, StatRailItem } from "@/components/dashboard/stat-rail";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ResubmitDocumentForm } from "@/modules/partner-applications/components/resubmit-document-form";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { portalHref, type PortalSubdomain } from "@/lib/subdomain";
 
@@ -312,7 +311,6 @@ export default async function ApplicationViewPage({ params }: { params: Promise<
                     {review?.status === "rejected" ? (
                       <div className="space-y-2 sm:pl-11">
                         {review.note ? <p className="text-sm text-destructive">{review.note}</p> : null}
-                        <ResubmitDocumentForm kind={type} applicationId={id} docKey={doc.key} />
                       </div>
                     ) : null}
                   </li>

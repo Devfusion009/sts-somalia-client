@@ -32,13 +32,7 @@ export type ApplicationRow = {
   created_at: string;
 };
 
-/**
- * RLS-scoped fetch that also proves "mine + still editable". The editability
- * rule (status, plus the post-submission window) is evaluated in TS rather
- * than as a query filter because it spans two columns conditionally —
- * canApplicantEdit is the single definition, mirroring the
- * applicant_can_edit() SQL function that the UPDATE policies enforce.
- */
+/** Applicant-owned, never-submitted drafts only; mirrored by database policies. */
 export async function getEditableApplication(kind: ApplicationKind, id: string, userId: string) {
   const supabase = await createClient();
   const cfg = APP_CONFIG[kind];
@@ -113,7 +107,7 @@ export async function getLatestApplication(kind: ApplicationKind, userId: string
   const cfg = APP_CONFIG[kind];
   const { data } = await supabase
     .from(cfg.table)
-    .select("id, status, reference_number, review_notes, reviewed_at, submitted_at, created_at")
+    .select("id, status, reference_number, review_notes, reviewed_at, submitted_at, created_at, business_details")
     .eq("applicant_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)

@@ -1,65 +1,95 @@
 name: client_impression
+run-name: Client preview · ${{ github.ref_name }} · run ${{ github.run_number }}
 
-# Vercel's existing Git integration builds this branch. This workflow tracks
-# that deployment without a second build, a Vercel token, or a QA/prod release.
 on:
   push:
-    branches: [feat/reference-ui-vercel]
+    branches: [client_impression]
   workflow_dispatch:
 
 permissions:
   contents: read
-  deployments: read
 
+# Serialize releases so an older build cannot overwrite a newer client preview.
 concurrency:
-  group: client-impression-${{ github.ref }}
-  cancel-in-progress: true
+  group: deploy-client-impression
+  cancel-in-progress: false
 
 jobs:
-  vercel_preview:
-    name: Vercel client preview
-    if: github.ref == 'refs/heads/feat/reference-ui-vercel'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Verify Vercel preview and publish link
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const deadline = Date.now() + 15 * 60 * 1000;
+  verify:
+    if: github.ref == 'refs/heads/client_impression'
+    uses: ./.github/workflows/ci.yml
 
-            while (Date.now() < deadline) {
-              const { data: deployments } = await github.rest.repos.listDeployments({
-                owner, repo, sha: context.sha, environment: 'Preview', per_page: 20,
-              });
-              const deployment = deployments[0];
-              if (deployment) {
-                const { data: statuses } = await github.rest.repos.listDeploymentStatuses({
-                  owner, repo, deployment_id: deployment.id, per_page: 1,
-                });
-                const status = statuses[0];
-                if (status?.state === 'success') {
-                  const url = new URL(status.environment_url);
-                  if (url.protocol !== 'https:' || !url.hostname.endsWith('.vercel.app')) {
-                    throw new Error('Vercel did not return a valid preview URL.');
-                  }
-                  url.pathname = '/design-preview';
-                  url.search = '';
-                  url.hash = '';
-                  core.setOutput('preview_url', url.href);
-                  await core.summary
-                    .addHeading('Client impression')
-                    .addLink('Open the Vercel UI preview', url.href)
-                    .addRaw('\n\nQA and production are unchanged.\n')
-                    .write();
-                  return;
-                }
-                if (['failure', 'error', 'inactive'].includes(status?.state)) {
-                  throw new Error(`Vercel preview deployment ended with ${status.state}.`);
-                }
-              }
-              core.info('Waiting for the existing Vercel preview deployment...');
-              await new Promise(resolve => setTimeout(resolve, 10000));
-            }
-            throw new Error('No successful Vercel preview deployment found within 15 minutes.');
+  deploy:
+    name: Vercel client preview
+    needs: verify
+    if: github.ref == 'refs/heads/client_impression'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: client_impression
+      url: https://sts-client-impression.vercel.app/design-preview
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT: prj_Vjep37WcMqFOAtgnZhjaTAYpe740
+      VERCEL_SCOPE: sasmalsubhadip80-6309s-projects
+      PREVIEW_ALIAS: sts-client-impression.vercel.app
+      VERCEL_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate deployment credentials
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo '::error::Add the VERCEL_TOKEN Actions secret before deploying the client preview.'
+            exit 1
+          fi
+
+      - name: Install pinned Vercel CLI
+        run: npm install --global vercel@59.1.3
+
+      # Build once on Vercel using the existing apps/web monorepo project.
+      - name: Build and deploy preview
+        id: deployment
+        run: |
+          set -euo pipefail
+          vercel deploy --yes --target=preview \
+            --project "$VERCEL_PROJECT" --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN" \
+            --meta "githubCommitSha=$GITHUB_SHA" \
+            --meta "githubCommitRef=client_impression" > deployment-url.txt
+          node scripts/validate-preview-url.cjs deployment-url.txt >> "$GITHUB_OUTPUT"
+
+      - name: Update the existing client preview link
+        env:
+          DEPLOYMENT_URL: ${{ steps.deployment.outputs.url }}
+        run: |
+          set -euo pipefail
+          vercel alias set "$DEPLOYMENT_URL" "$PREVIEW_ALIAS" \
+            --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN"
+          printf '### Client impression\n\n[Open preview](https://%s/design-preview)\n\nCommit: `%s`\n' \
+            "$PREVIEW_ALIAS" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify public client link
+        run: |
+          python3 - <<'PY'
+          import os
+          import time
+          import urllib.request
+
+          url = f"https://{os.environ['PREVIEW_ALIAS']}/design-preview"
+          for attempt in range(6):
+              try:
+                  # No auth headers or cookies: test the link as a client.
+                  with urllib.request.urlopen(url, timeout=30) as response:
+                      html = response.read().decode('utf-8')
+                      if response.status == 200 and response.url == url and 'Travel from Somalia' in html:
+                          print(f'Public preview verified: {url}')
+                          break
+              except Exception as error:
+                  print(f'Preview check {attempt + 1}: {error}')
+              if attempt == 5:
+                  raise SystemExit('The shared preview link is not publicly accessible.')
+              time.sleep(10)
+          PY

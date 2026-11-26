@@ -14,6 +14,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { APP_CONFIG, REJECT_COOLDOWN_DAYS, canApplicantEdit, docSlotsFor, type ApplicationKind } from "@/modules/partner-applications/config";
 import { getLatestApplication, getRecentApplications, getRejectedDocumentKeys, type RecentApplication } from "@/modules/partner-applications/queries";
 import { startApplication } from "@/modules/partner-applications/actions";
+import { DraftProgressCard } from "@/modules/partner-applications/components/draft-progress-card";
+import { unconfirmedDraftStep } from "@/modules/partner-applications/draft-fields";
+import { getApplicationDrafts } from "@/modules/partner-applications/drafts";
+import { wizardStep } from "@/modules/partner-applications/queries";
 import { portalHref } from "@/lib/subdomain";
 
 const APPLICATION_KIND_PORTAL: Record<ApplicationKind, Parameters<typeof portalHref>[0]> = {
@@ -38,7 +42,7 @@ type Status = "none" | "draft" | "pending" | "under_review" | "more_info_request
 type LatestApp = Awaited<ReturnType<typeof getLatestApplication>>;
 
 const STATUS_LABEL: Record<string, string> = {
-  draft: "Draft",
+  draft: "In progress",
   pending: "Submitted",
   under_review: "Under review",
   more_info_requested: "Action needed",
@@ -83,22 +87,13 @@ function RecentApplicationsSection({
             {applications.map((app) => {
               const cfg = APP_CONFIG[app.kind];
               const editable = canApplicantEdit(app.status, app.submitted_at);
-              const editLabel =
-                app.status === "draft" ? "Resume" : app.status === "more_info_requested" ? "Continue" : "Edit";
+              const editLabel = "Continue application";
               const adminMessage = app.status === "more_info_requested" ? app.review_notes : null;
-              // A rejected document reopens its own upload even on an
-              // application that is otherwise past the edit window — the
-              // read-only view page carries the replacement form — so this
-              // row stays actionable regardless of `editable`.
               const rejectedKeys = rejectedDocKeys[app.id] ?? [];
               const slotLabels = new Map(docSlotsFor(app.kind).map((slot) => [slot.key, slot.label]));
               const needsAction = app.status === "more_info_requested" || rejectedKeys.length > 0;
-              const href = editable
-                ? rejectedKeys.length > 0
-                  ? `/account/become/${app.kind}/${app.id}?step=5`
-                  : `/account/become/${app.kind}/${app.id}`
-                : `/account/become/${app.kind}/${app.id}/view`;
-              const label = rejectedKeys.length > 0 ? "Re-upload" : editable ? editLabel : "View";
+              const href = editable ? `/account/become/${app.kind}/${app.id}` : `/account/become/${app.kind}/${app.id}/view`;
+              const label = editable ? editLabel : "View";
 
               return (
                 <li key={app.id} className="flex flex-col gap-4 px-5 py-5 transition-colors hover:bg-muted/30 sm:flex-row sm:items-center sm:gap-5">
@@ -125,7 +120,7 @@ function RecentApplicationsSection({
                     {rejectedKeys.length > 0 ? (
                       <p className="flex items-start gap-1.5 text-sm text-destructive">
                         <XCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                        Re-upload: {rejectedKeys.map((key) => slotLabels.get(key) ?? key).join(", ")}
+                        Documents requiring review: {rejectedKeys.map((key) => slotLabels.get(key) ?? key).join(", ")}
                       </p>
                     ) : null}
                   </div>
@@ -233,8 +228,8 @@ function ProgramPanel({
           status={<StatusPill status={status} />}
           meta={reference}
           action={
-            <Button render={<Link href={`/account/become/${kind}/${app!.id}`} />}>
-              {status === "more_info_requested" ? "Continue application" : "Resume application"}
+            <Button render={<Link href={canApplicantEdit(status, app?.submitted_at ?? null) ? `/account/become/${kind}/${app!.id}` : `/account/become/${kind}/${app!.id}/view`} />}>
+              {canApplicantEdit(status, app?.submitted_at ?? null) ? "Continue application" : "View application"}
             </Button>
           }
         />
@@ -341,6 +336,16 @@ export default async function BecomePartnerPage({
     { tab: "affiliate", label: "Affiliate", app: affiliateApp, isMember: !!affiliate.data },
   ] as const;
 
+  const inProgress = await Promise.all(programs.filter(p=>p.app && canApplicantEdit(p.app.status,p.app.submitted_at)).map(async p=>{
+    const kind=TAB_TO_KIND[p.tab];
+    const app=p.app!;
+    const drafts=await getApplicationDrafts(kind,app.id);
+    const latest=[...drafts].sort((a,b)=>Date.parse(b.saved_at)-Date.parse(a.saved_at))[0];
+    const maxStep=wizardStep(app.business_details);
+    const unfinished=unconfirmedDraftStep(drafts);
+    return {kind,id:app.id,maxStep,serverStep:unfinished && unfinished<=maxStep?unfinished:maxStep,savedAt:latest?Date.parse(latest.saved_at):null};
+  }));
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
       <PageHeader title="Partner applications" />
@@ -372,6 +377,7 @@ export default async function BecomePartnerPage({
         </Alert>
       ) : null}
 
+      {inProgress.length>0 && <section aria-labelledby="drafts-title" className="space-y-4"><div className="flex items-center gap-3"><h2 id="drafts-title" className="text-lg font-semibold">In progress</h2><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">{inProgress.length}</span></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{inProgress.map(d=><DraftProgressCard key={d.id} {...d} owner={profile.id}/>)}</div></section>}
       <Tabs defaultValue={defaultTab}>
         <div className="-mx-4 overflow-x-auto overflow-y-hidden px-4 pb-1 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0">
           <TabsList className="grid h-auto w-full grid-cols-2 gap-3 bg-transparent p-0 lg:grid-cols-4">

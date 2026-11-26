@@ -1,5 +1,7 @@
 "use client";
 
+import agentUi from "@/components/portal/agent-typography.module.css";
+
 import { AgentMoney } from "@/components/portal/agent-money";
 
 
@@ -30,7 +32,7 @@ export function TransferEarningsForm({ amount, transferId, disabled }: { amount:
       <DialogTrigger render={<Button variant="outline" size="sm" disabled={disabled} />}>
         Transfer earnings to wallet
       </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className={`${agentUi.dialog} sm:max-w-sm`}>
         <DialogHeader><DialogTitle>Transfer earnings to wallet</DialogTitle></DialogHeader>
         <dl className="flex items-center justify-between text-sm">
           <dt>Approved earnings</dt><dd className="font-semibold tabular-nums">{<AgentMoney value={money(amount, "USD")} />}</dd>

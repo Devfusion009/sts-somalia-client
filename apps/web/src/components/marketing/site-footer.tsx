@@ -1,12 +1,16 @@
 import Link from "next/link";
-import { StsBrandLogo } from "./sts-brand-logo";
-import { ShieldCheck } from "lucide-react";
+import Image from "next/image";
+import { Headphones, Mail, MapPin, Phone, ShieldCheck } from "lucide-react";
 
 import { NAV_LINKS, PARTNER_LINKS } from "@/lib/nav-links";
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from "@/lib/marketing-nav";
 import { SocialIcon } from "@/components/ui/social-icons";
 import { SOCIAL_PLATFORMS } from "@/lib/social-platforms";
 import { getSocialLinks } from "@/lib/site-settings";
+import { OFFICES } from "./about-data";
+import { FooterTrustBadges } from "./footer-trust-badges";
+import { StsBrandLogo } from "./sts-brand-logo";
+import styles from "./site-footer.module.css";
 
 const COMPANY_LINKS = [
   { href: "/about", label: "About us" },
@@ -23,59 +27,118 @@ const HELP_LINKS = [
   { href: "/privacy", label: "Privacy policy" },
   { href: "/partner-terms", label: "Partner terms" },
 ];
-const LINK = "inline-flex min-h-9 items-center rounded-sm py-1 text-sm leading-5 text-white/90 transition-colors hover:text-white hover:underline hover:underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white";
+const PAYMENT_MARKS = [
+  { name: "EVC Plus", src: "evc-plus.png", width: 230, height: 128, className: styles.evc },
+  { name: "Bank transfer", src: "bank-transfer.png", width: 800, height: 500, className: styles.bank },
+  { name: "Visa", src: "visa.png", width: 270, height: 210, className: styles.visa },
+  { name: "Mastercard", src: "mastercard.png", width: 999, height: 776, className: styles.mastercard },
+];
 
 export async function SiteFooter() {
   const socials = await getSocialLinks();
-  return (
-    <footer className="bg-[#207f76] text-white">
-      <div className="mx-auto max-w-7xl px-5 pt-10 sm:px-6 sm:pt-12 lg:px-8">
-        <div className="flex items-start gap-3 rounded-xl border border-white/15 bg-white/[0.07] px-4 py-4 sm:px-5">
-          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-white/90" aria-hidden />
-          <p className="max-w-5xl text-xs leading-6 text-white/95 sm:text-sm">
-            <strong className="font-semibold text-white">Payment safety.</strong>{" "}
-            STS only takes payment on this website and at our Mogadishu office. We never ask you to pay through another website, a personal account or a payment link. If in doubt, call{" "}
-            <a href={SUPPORT_PHONE_TEL} className="rounded-sm font-semibold whitespace-nowrap underline decoration-white/50 underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">{SUPPORT_PHONE_DISPLAY}</a>{" "}before you pay.
-          </p>
-        </div>
 
-        <div className="grid gap-x-10 gap-y-10 py-10 sm:grid-cols-2 sm:py-12 lg:grid-cols-[1.3fr_0.85fr_1fr_1fr] lg:gap-x-14">
-          <div className="sm:row-span-2 lg:row-span-1">
-            <Link href="/" className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
-              <StsBrandLogo white className="h-auto w-40" />
-            </Link>
-            <p className="mt-5 max-w-64 text-sm leading-6 text-white/90">Flights, hotels, visas, Umrah and event halls — from our offices in Mogadishu and Nairobi.</p>
-            <Link href="/about#credentials" className="mt-4 inline-flex min-h-8 items-center gap-2 rounded-full border border-white/25 px-3 text-[11px] font-semibold transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
-              <ShieldCheck className="size-3.5" aria-hidden /> ISO 9001:2015 certified
-            </Link>
-            <address className="mt-7 space-y-4 border-t border-white/20 pt-6 text-sm leading-6 not-italic text-white/90">
-              <div className="flex flex-col items-start">
-                <h2 className="mb-2 font-semibold text-white">Contact</h2>
-                <a href={SUPPORT_PHONE_TEL} className={`${LINK} block w-fit py-0 font-semibold text-white`}>{SUPPORT_PHONE_DISPLAY}</a>
-                <a href="mailto:info@scoutsts.com" className={LINK}>info@scoutsts.com</a>
-              </div>
-              <div><h3 className="font-semibold text-white">Mogadishu · head office</h3><p>First Floor 111, Sultan Business Park,<br />Waaberi District</p></div>
-              <div><h3 className="font-semibold text-white">Nairobi · Kenya office</h3><p>Yare Plaza, 3rd Floor, Office 308,<br />Eastleigh</p></div>
-            </address>
+  return (
+    <footer className={styles.footer}>
+      <div className={styles.container}>
+        <section className={styles.invitation} aria-labelledby="footer-invitation">
+          <div>
+            <span className={styles.eyebrow}>Your next journey, with STS</span>
+            <h2 id="footer-invitation">We plan. You explore. <span>We care.</span></h2>
+            <p>Flights, stays, visas and Umrah. Speak with our travel team.</p>
           </div>
-          {([{ title: "Services", links: NAV_LINKS }, { title: "Company", links: COMPANY_LINKS }, { title: "Help", links: HELP_LINKS }]).map(group => (
-            <nav key={group.title} aria-label={group.title}>
-              <h2 className="mb-3 text-sm font-semibold tracking-wide">{group.title}</h2>
-              <ul className="space-y-1">{group.links.map(link => <li key={link.href}><Link href={link.href} className={LINK}>{link.label}</Link></li>)}</ul>
+          <div className={styles.actions}>
+            <Link href="/#plan" className={styles.primaryButton}>Plan my trip</Link>
+            <a href={SUPPORT_PHONE_TEL} className={styles.secondaryButton}>
+              <Phone size={17} aria-hidden /> Call STS
+            </a>
+          </div>
+        </section>
+
+        <div className={styles.navigation}>
+          <div className={styles.brand}>
+            <Link href="/" className={styles.logoLink}>
+              <StsBrandLogo white className={styles.logo} />
+            </Link>
+            <p>Travel and event services, from our offices in Mogadishu and Nairobi.</p>
+            <div className={styles.brandTag}><MapPin size={14} aria-hidden /> Somalia &amp; Kenya</div>
+            {socials.length > 0 && (
+              <ul aria-label="Follow STS" className={styles.socials}>
+                {socials.map(social => (
+                  <li key={social.platform}>
+                    <a href={social.url} target="_blank" rel="noopener noreferrer" aria-label={SOCIAL_PLATFORMS[social.platform].label}>
+                      <SocialIcon platform={social.platform} size={19} />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {[
+            { title: "Explore STS", links: NAV_LINKS },
+            { title: "Company & partners", links: COMPANY_LINKS },
+            { title: "Help & information", links: HELP_LINKS },
+          ].map(group => (
+            <nav key={group.title} aria-label={group.title} className={styles.footerNav}>
+              <h2 className={styles.navHeading}>{group.title}</h2>
+              <ul className={styles.linkList}>
+                {group.links.map(link => <li key={link.href}><Link href={link.href}>{link.label}</Link></li>)}
+              </ul>
             </nav>
           ))}
         </div>
-      </div>
-      <div className="border-t border-white/20">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-6 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <div className="space-y-1 text-xs leading-5 text-white/85">
-            <p>© {new Date().getFullYear()} Scout Travel Solution. All rights reserved.</p>
-            <p>Sat–Thu 8:00–18:00 EAT · emergency support 24/7</p>
+
+        <section className={styles.offices} aria-label="Contact STS and our offices">
+          <div className={styles.travelDesk}>
+            <div className={styles.contactHeading}><Headphones size={20} aria-hidden /><h2>Speak with our team</h2></div>
+            <a href={SUPPORT_PHONE_TEL} className={styles.deskPhone}>{SUPPORT_PHONE_DISPLAY}</a>
+            <a href="mailto:info@scoutsts.com" className={styles.email}><Mail size={15} aria-hidden /> info@scoutsts.com</a>
           </div>
-          <div className="flex flex-wrap items-center gap-2" role="list" aria-label="Accepted payment methods">
-            {["EVC Plus", "Bank transfer", "Visa", "Mastercard"].map(method => <span key={method} role="listitem" className="rounded border border-white/25 px-2 py-1 text-[11px] font-medium text-white/90">{method}</span>)}
+          {OFFICES.map(office => (
+            <address key={office.key} className={styles.office}>
+              <div className={styles.officeHeading}>
+                <MapPin size={18} aria-hidden />
+                <h3>{office.city} <span>{office.role}</span></h3>
+              </div>
+              <p>{office.lines.map(line => <span key={line}>{line}</span>)}</p>
+              <div className={styles.officeLinks}>
+                <a href={office.phoneTel}>{office.phoneDisplay}</a>
+                <a href={office.mapsUrl} target="_blank" rel="noopener noreferrer">View on map</a>
+              </div>
+            </address>
+          ))}
+        </section>
+
+        <section className={styles.credentials} aria-labelledby="footer-credentials">
+          <div className={styles.sectionIntro}>
+            <span className={styles.eyebrow}>Credentials &amp; memberships</span>
+            <h2 id="footer-credentials">Our professional<br className={styles.desktopBreak} /> commitments.</h2>
+            <Link href="/about#credentials" className={styles.textLink}>View our credentials</Link>
           </div>
-          {socials.length ? <ul aria-label="Follow STS" className="flex items-center gap-2">{socials.map(social => <li key={social.platform}><a href={social.url} target="_blank" rel="noopener noreferrer" aria-label={SOCIAL_PLATFORMS[social.platform].label} className="grid size-10 place-items-center rounded-full border border-white/15 bg-white/10 text-white transition-colors hover:bg-white hover:text-[#207f76] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"><SocialIcon platform={social.platform} size={18} /></a></li>)}</ul> : null}
+          <FooterTrustBadges />
+        </section>
+
+        <section className={styles.payments} aria-labelledby="footer-payment-methods">
+          <div className={styles.paymentHeading}>
+            <span className={styles.iconTile}><ShieldCheck size={23} aria-hidden /></span>
+            <h2 id="footer-payment-methods">Accepted<br className={styles.desktopBreak} /> payment methods</h2>
+          </div>
+          <ul className={styles.paymentMarks}>
+            {PAYMENT_MARKS.map(mark => (
+              <li key={mark.name}>
+                <Image src={`/marketing/payments/${mark.src}`} alt={mark.name} width={mark.width} height={mark.height} unoptimized className={mark.className} />
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <div className={styles.paymentSafety}>
+          <ShieldCheck size={20} aria-hidden />
+          <p><strong>Payment safety.</strong> Pay only on this website or at our Mogadishu office. STS never requests payment to a personal account or through another website. To confirm a payment request, call <a href={SUPPORT_PHONE_TEL}>{SUPPORT_PHONE_DISPLAY}</a>.</p>
+        </div>
+
+        <div className={styles.bottom}>
+          <p>© {new Date().getFullYear()} Scout Travel Solution. All rights reserved.</p>
+          <p>Sat–Thu 8:00–18:00 EAT <span aria-hidden>·</span> Emergency support 24/7</p>
         </div>
       </div>
     </footer>

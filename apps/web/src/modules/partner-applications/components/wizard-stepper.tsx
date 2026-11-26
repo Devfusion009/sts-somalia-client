@@ -18,6 +18,8 @@ export function WizardStepper({
   return (
     <aside className="rounded-2xl border border-border bg-card p-5 shadow-xs">
       <p className="text-sm font-semibold">Application progress</p>
+      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>Step {steps.indexOf(currentStep)+1} of {steps.length}</span><span className="font-medium text-primary">In progress</span></div>
+      <div role="progressbar" aria-label="Completed application steps" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={Math.max(0,steps.indexOf(currentStep))} className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{width:`${Math.max(0,steps.indexOf(currentStep))/steps.length*100}%`}} /></div>
       <ol className="mt-4">
         {steps.map((step, i) => {
           const isCurrent = step === currentStep;

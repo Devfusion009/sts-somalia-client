@@ -23,7 +23,7 @@ function sectionFor(pathname: string): SectionKey | null {
 }
 
 /** The loader never covers the page for longer than this, whatever the router does. */
-const FAILSAFE_MS = 12_000;
+const FAILSAFE_MS = 8_000;
 /** Shortest time the popup stays up, so a fast route change does not flash it. */
 const MIN_VISIBLE_MS = 650;
 
@@ -88,11 +88,10 @@ export function NavLoader() {
     };
   }, []);
 
-  return (
-    <AnimatePresence onExitComplete={() => setPending(null)}>
-      {visible && pending ? <Popup key="nav-loader" section={pending.section} reduced={reduced} /> : null}
-    </AnimatePresence>
-  );
+  // Unmount the entire overlay immediately when finished. An exit presence
+  // boundary can retain the backdrop while nested animations are still running,
+  // defeating the timeout even though `visible` is already false.
+  return visible && pending ? <Popup section={pending.section} reduced={reduced} /> : null;
 }
 
 function Popup({ section, reduced }: { section: SectionKey; reduced: boolean }) {

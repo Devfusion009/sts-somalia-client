@@ -56,18 +56,19 @@ export function PhoneField({
   }
 
   return (
-    <div className="flex gap-2">
+    <div className="flex min-w-0 items-stretch gap-2">
       <input type="hidden" name={name} value={number ? `${dial}${number}` : ""} />
       <CountryCodeSelect value={dial} onChange={setDial} />
       <Input
         id={id}
+        type="tel"
         inputMode="numeric"
         autoComplete="tel-national"
         value={number}
         onChange={(e) => handleNumberChange(e.target.value)}
         required={required}
         aria-invalid={invalid}
-        className="flex-1"
+        className="min-w-0 flex-1"
       />
     </div>
   );

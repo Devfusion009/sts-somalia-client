@@ -212,29 +212,9 @@ export const REJECT_COOLDOWN_DAYS = 30;
 export const EARLIEST_BUSINESS_YEAR = 1900;
 export const CURRENT_YEAR = new Date().getFullYear();
 
-/**
- * How long after submitting an applicant may still change their own
- * application. Long enough to fix something spotted right after hitting
- * submit, short enough that a reviewer isn't verifying a moving target.
- * 'draft' and 'more_info_requested' ignore the window entirely — both mean
- * the application is explicitly back in the applicant's hands.
- *
- * Enforced for real by the applicant_can_edit() SQL function behind each
- * application table's UPDATE policy; this copy drives the UI and the server
- * actions' pre-checks. Keep the two in step.
- */
-export const EDIT_WINDOW_HOURS = 2;
-
+/** Submitted applications remain read-only for applicants in every review state. */
 export function canApplicantEdit(status: string, submittedAt: string | null): boolean {
-  if (status === "draft" || status === "more_info_requested") return true;
-  if (status !== "pending" && status !== "under_review") return false;
-  if (!submittedAt) return false;
-  return Date.now() - new Date(submittedAt).getTime() < EDIT_WINDOW_HOURS * 3_600_000;
-}
-
-export function editWindowEndsAt(submittedAt: string | null): Date | null {
-  if (!submittedAt) return null;
-  return new Date(new Date(submittedAt).getTime() + EDIT_WINDOW_HOURS * 3_600_000);
+  return status === "draft" && submittedAt === null;
 }
 
 export type DocSlot = { key: string; label: string; optional?: boolean; expiryField?: boolean };

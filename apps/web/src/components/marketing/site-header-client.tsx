@@ -31,6 +31,7 @@ import { MEGA_SECTIONS, SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL, type MegaSecti
 import { cn } from "@/lib/utils";
 import { createScrollFlagStore } from "@/lib/scroll-flag-store";
 import type { Database } from "@/lib/types/database.types";
+import styles from "./site-navigation.module.css";
 
 import { ArrowForwardIcon, ArticleIcon, CelebrationIcon, DashboardIcon, ExpandMoreIcon, FlightTakeoffIcon, HotelIcon, LogoutIcon, MenuIcon, MosqueIcon, PersonIcon, PlaceIcon, SearchIcon } from "@/components/ui/mui-icons";
 import type { SvgIconComponent } from "@/components/ui/mui-icons";
@@ -89,16 +90,15 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
   return (
     <>
       {/* ---------------- Desktop pill nav ---------------- */}
-      <nav aria-label="Primary" data-nav-loader className="hidden items-center gap-1 xl:gap-2 xl:flex" onMouseLeave={scheduleClose}>
+      <nav aria-label="Primary" data-nav-loader className={cn(styles.navigation, "hidden items-center gap-0.5 xl:flex")} onMouseLeave={scheduleClose}>
         {MEGA_SECTIONS.map((section) => {
           const Icon = ICONS[section.icon];
-          const active = pathname.startsWith(section.href);
+          const active = pathname === section.href || pathname.startsWith(`${section.href}/`);
           const isOpen = openKey === section.key;
 
           return (
             <div
               key={section.key}
-              className="relative"
               onMouseEnter={() => open(section.key)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") closeNow();
@@ -109,17 +109,15 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
             >
               <Link
                 href={section.href}
+                aria-current={active ? (pathname === section.href ? "page" : "location") : undefined}
                 aria-expanded={isOpen}
+                aria-controls={isOpen ? `nav-panel-${section.key}` : undefined}
+                data-open={isOpen}
                 onFocus={() => open(section.key)}
                 onClick={closeNow}
-                className={cn(
-                  "flex h-11 items-center gap-1.5 rounded-xl border px-3 text-sm font-semibold transition-colors duration-200 group-data-[condensed]/header:h-10",
-                  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none",
-                  active || isOpen
-                    ? "border-primary/15 bg-primary/10 text-primary"
-                    : "border-transparent text-foreground/80 hover:border-primary/10 hover:bg-primary/5 hover:text-primary"
-                )}
+                className={styles.item}
               >
+                <Icon aria-hidden="true" sx={{ fontSize: 17 }} className="hidden 2xl:block" />
                 {section.label}
                 <ExpandMoreIcon
                   sx={{ fontSize: 16 }}
@@ -130,33 +128,33 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
               <AnimatePresence>
                 {isOpen ? (
                   <motion.div
+                    id={`nav-panel-${section.key}`}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 4 }}
                     transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                     className="absolute top-full left-1/2 z-50 w-max -translate-x-1/2 pt-3"
                   >
-                    <div className="overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl">
-                      <div className="flex items-start gap-3 border-b border-border bg-secondary/50 p-4">
-                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+                    <div className={cn(styles.panel, "overflow-hidden")}>
+                      <div className="flex items-start gap-3 border-b border-border bg-primary/5 p-5">
+                        <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-primary/10 bg-card text-primary">
                           <Icon sx={{ fontSize: 20 }} />
                         </span>
                         <div className="max-w-xs">
                           <Link
                             href={section.href}
                             onClick={closeNow}
-                            className="flex items-center gap-1.5 font-heading text-sm font-bold hover:text-primary"
+                            className="flex min-h-6 items-center gap-1.5 rounded-sm font-heading text-sm font-bold hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
                           >
                             All {section.label}
-                            <ArrowForwardIcon sx={{ fontSize: 14 }} className="text-primary" />
                           </Link>
                           <p className="mt-0.5 text-xs text-muted-foreground">{section.blurb}</p>
                         </div>
                       </div>
-                      <div className="flex gap-8 p-4">
+                      <div className="flex gap-6 p-5">
                         {section.columns.map((column) => (
                           <div key={column.heading} className="min-w-44">
-                            <p className="mb-2 text-xs font-bold text-muted-foreground">
+                            <p className="mb-2 px-3 text-xs font-semibold tracking-wide text-muted-foreground">
                               {column.heading}
                             </p>
                             <ul className="space-y-0.5">
@@ -165,7 +163,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                                   <Link
                                     href={link.href}
                                     onClick={closeNow}
-                                    className="block rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-primary focus-visible:bg-accent focus-visible:text-primary"
+                                    className="flex min-h-10 items-center rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 transition-colors outline-none hover:bg-primary/5 hover:text-primary focus-visible:bg-primary/5 focus-visible:text-primary"
                                   >
                                     {link.label}
                                   </Link>
@@ -182,7 +180,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
             </div>
           );
         })}
-        <Link href="/about" aria-current={pathname === "/about" ? "page" : undefined} className={cn("flex h-11 items-center rounded-xl border px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary", pathname === "/about" ? "border-primary/15 bg-primary/10 text-primary" : "border-transparent text-foreground/80 hover:border-primary/10 hover:bg-primary/5 hover:text-primary")}>About</Link>
+        <Link href="/about" aria-current={pathname === "/about" ? "page" : undefined} className={styles.item}>About</Link>
       </nav>
 
       {/* ---------------- Desktop right cluster ---------------- */}
@@ -293,7 +291,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
         >
           <MenuIcon />
         </SheetTrigger>
-        <SheetContent side="right" className="flex w-80 flex-col">
+        <SheetContent side="right" className="flex w-[min(24rem,100vw)] flex-col">
           <SheetHeader>
             <SheetTitle>Menu</SheetTitle>
           </SheetHeader>
@@ -308,7 +306,8 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                       render={
                         <Link
                           href={section.href}
-                          className="flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-2 font-heading text-base font-semibold hover:bg-accent"
+                          aria-current={pathname === section.href ? "page" : pathname.startsWith(`${section.href}/`) ? "location" : undefined}
+                          className="flex min-h-11 items-center gap-2.5 rounded-xl border border-transparent px-3 py-2 font-heading text-base font-semibold hover:bg-primary/5 aria-[current]:border-primary/10 aria-[current]:bg-primary/5 aria-[current]:text-primary"
                         />
                       }
                     >
@@ -335,7 +334,7 @@ export function SiteHeaderClient({ profile, contexts }: { profile: Profile | nul
                   </div>
                 );
               })}
-              <SheetClose render={<Link href="/about" className="flex min-h-11 items-center rounded-lg px-2 font-heading text-base font-semibold hover:bg-accent" />}>About STS</SheetClose>
+              <SheetClose render={<Link href="/about" aria-current={pathname === "/about" ? "page" : undefined} className="flex min-h-11 items-center rounded-xl border border-transparent px-3 font-heading text-base font-semibold hover:bg-primary/5 aria-[current]:border-primary/10 aria-[current]:bg-primary/5 aria-[current]:text-primary" />}>About STS</SheetClose>
             </nav>
 
             <div className="mt-6 border-t border-border pt-4">
@@ -457,7 +456,8 @@ export function HeaderSearch() {
   // Flights has its own route search; this bar submits hotel destinations.
   const onFlights = pathname === "/flights";
   const hasCollectionSearch = pathname === "/hotels" || pathname === "/umrah" || pathname.startsWith("/umrah/");
-  const visible = !onHotelDetail && !onVisa && !onCheckout && !onFlights && !hasCollectionSearch && (!isHome || scrolledPast);
+  const onEventsOrAbout = pathname === "/events" || pathname.startsWith("/events/") || pathname === "/about" || pathname.startsWith("/about/");
+  const visible = !onHotelDetail && !onVisa && !onCheckout && !onFlights && !hasCollectionSearch && !onEventsOrAbout && (!isHome || scrolledPast);
 
   return (
     <AnimatePresence initial={false}>

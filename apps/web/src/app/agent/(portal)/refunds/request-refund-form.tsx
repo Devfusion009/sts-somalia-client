@@ -1,5 +1,7 @@
 "use client";
 
+import agentUi from "@/components/portal/agent-typography.module.css";
+
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import {
@@ -44,7 +46,7 @@ export function RequestRefundForm({
       <DialogTrigger render={<Button />}>
         <Plus data-icon="inline-start" aria-hidden="true" /> Request a refund
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={`${agentUi.dialog} sm:max-w-md`}>
         <DialogHeader>
           <DialogTitle>Request a refund</DialogTitle>
         </DialogHeader>

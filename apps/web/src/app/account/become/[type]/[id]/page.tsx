@@ -19,6 +19,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { requireUser } from "@/lib/auth/session";
 import { APP_CONFIG, stepsFor, stepLabel, docSlotsFor, type ApplicationKind } from "@/modules/partner-applications/config";
 import { getDocumentReviews, getEditableApplication, wizardStep } from "@/modules/partner-applications/queries";
+import { unconfirmedDraftStep } from "@/modules/partner-applications/draft-fields";
+import { getApplicationDrafts } from "@/modules/partner-applications/drafts";
 import { WizardStepper } from "@/modules/partner-applications/components/wizard-stepper";
 import { Button } from "@/components/ui/button";
 import {
@@ -69,16 +71,24 @@ export default async function PartnerApplicationWizardPage({
   const { application } = await getEditableApplication(type, id, user.id);
   if (!application) redirect(`/account/become/${type}/${id}/view`);
 
+  const drafts = await getApplicationDrafts(type, id);
+  const draftApplication = { ...application, drafts, draftOwner: user.id };
   const validSteps = stepsFor(type);
   const maxStep = Math.min(Math.max(wizardStep(application.business_details), 1), 6);
 
   if (!stepParam) {
-    const resumeStep = validSteps.includes(maxStep) ? maxStep : validSteps[validSteps.length - 1];
+    const unfinished = unconfirmedDraftStep(drafts);
+    const resumeStep = unfinished && unfinished <= maxStep ? unfinished : validSteps.includes(maxStep) ? maxStep : validSteps[validSteps.length - 1];
     redirect(`/account/become/${type}/${id}?step=${resumeStep}`);
   }
 
   const requested = Number.parseInt(stepParam, 10) || validSteps[0];
   const step = validSteps.includes(requested) && requested <= maxStep ? requested : Math.min(maxStep, validSteps[validSteps.length - 1]);
+
+  // Partial edits must be validated before review; never silently submit an
+  // older confirmed version while the latest draft contains different data.
+  const unconfirmed=unconfirmedDraftStep(drafts);
+  if (step >= 5 && unconfirmed) redirect(`/account/become/${type}/${id}?step=${unconfirmed}`);
 
   const cfg = APP_CONFIG[type];
 
@@ -184,14 +194,14 @@ export default async function PartnerApplicationWizardPage({
                   <Separator className="mt-4" />
                 </div>
               ) : null}
-              <StepBusiness kind={type} application={application} backHref="/account/become" />
+              <StepBusiness kind={type} application={draftApplication} backHref="/account/become" />
             </>
           ) : step === 2 ? (
-            <StepContact kind={type} application={application} />
+            <StepContact kind={type} application={draftApplication} />
           ) : step === 3 ? (
-            <StepOperations kind={type} application={application} />
+            <StepOperations kind={type} application={draftApplication} />
           ) : step === 4 ? (
-            <StepSettlement kind={type} application={application} />
+            <StepSettlement kind={type} application={draftApplication} />
           ) : step === 5 ? (
             <StepDocuments kind={type} application={application} reviews={documentReviews} />
           ) : (

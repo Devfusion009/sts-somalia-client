@@ -33,7 +33,7 @@ export default async function AgentMarkupsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Markups" />
+      <PageHeader title="Pricing & markups" />
 
       <div className={cn("grid items-start gap-6", isOwner && "lg:grid-cols-[minmax(0,1fr)_340px]")}>
         {isOwner ? (

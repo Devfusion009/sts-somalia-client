@@ -1,4 +1,4 @@
-name: Deploy to AWS
+name: QA deployment
 
 # Neither app builds on its box. apps/api used to build in place on EC2,
 # which only stayed cheap because the box kept tsc's incremental state; a
@@ -20,29 +20,13 @@ concurrency:
   group: deploy-qa
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   verify:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Locate PostgreSQL test tools
-        run: echo "PG_TEST_BIN=$(pg_config --bindir)" >> "$GITHUB_ENV"
-      - run: npm run build -w api
-      - run: npm run lint -w api
-      - run: npm run lint -w web
-      - run: npx tsc --noEmit -p apps/web
-      - run: npm test -w @sts/shared-types
-      - run: node --test apps/web/test/agent-bookings.test.cjs apps/web/test/catalog-outage.test.cjs apps/web/test/cron-auth.test.cjs apps/web/test/google-customer-auth.test.cjs apps/web/test/external-worker.test.mjs apps/web/test/marketing-callback.test.cjs apps/web/test/my-bookings-pages.test.cjs apps/web/test/pool-email.test.cjs apps/web/test/pool-worker.test.cjs apps/web/test/public-umrah-catalog.test.cjs
-      - run: python3 apps/api/test/public-umrah-integration.py --request-pool
-      - run: python3 apps/api/test/marketing-aging-integration.py
-      - run: python3 apps/api/test/umrah-capacity-integration.py
-      - run: python3 apps/api/test/my-bookings-page-integration.py
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
 
   deploy-api:
     needs: verify
@@ -55,7 +39,7 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build
         run: npm run build -w api
@@ -76,7 +60,20 @@ jobs:
             ./ ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/app/
 
       - name: Write env file
+        env:
+          INTEGRATIONS_ENCRYPTION_KEY: ${{ secrets.QA_INTEGRATIONS_ENCRYPTION_KEY }}
+          WAAFI_MERCHANT_UID: ${{ secrets.QA_WAAFI_MERCHANT_UID }}
+          WAAFI_API_USER_ID: ${{ secrets.QA_WAAFI_API_USER_ID }}
+          WAAFI_API_KEY: ${{ secrets.QA_WAAFI_API_KEY }}
+          WAAFI_STORE_ID: ${{ secrets.QA_WAAFI_STORE_ID }}
+          WAAFI_HPP_KEY: ${{ secrets.QA_WAAFI_HPP_KEY }}
         run: |
+          for key in INTEGRATIONS_ENCRYPTION_KEY WAAFI_MERCHANT_UID WAAFI_API_USER_ID WAAFI_API_KEY WAAFI_STORE_ID WAAFI_HPP_KEY; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing QA deployment configuration: $key"
+              exit 1
+            fi
+          done
           ssh -i ~/.ssh/ec2.pem ubuntu@${{ secrets.EC2_HOST }} "cat > /home/ubuntu/app/apps/api/.env.local" <<EOF
           NODE_ENV=production
           DEPLOYMENT_ENV=qa
@@ -93,7 +90,12 @@ jobs:
           EMAIL_FROM=${{ vars.EMAIL_FROM }}
           EMAIL_REPLY_TO=${{ vars.EMAIL_REPLY_TO }}
           RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
-          INTEGRATIONS_ENCRYPTION_KEY=${{ secrets.INTEGRATIONS_ENCRYPTION_KEY }}
+          INTEGRATIONS_ENCRYPTION_KEY=$INTEGRATIONS_ENCRYPTION_KEY
+          WAAFI_MERCHANT_UID=$WAAFI_MERCHANT_UID
+          WAAFI_API_USER_ID=$WAAFI_API_USER_ID
+          WAAFI_API_KEY=$WAAFI_API_KEY
+          WAAFI_STORE_ID=$WAAFI_STORE_ID
+          WAAFI_HPP_KEY=$WAAFI_HPP_KEY
           EOF
 
       - name: Ship build artifacts
@@ -126,7 +128,7 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build
         env:
@@ -158,7 +160,20 @@ jobs:
             apps/web/worker.mjs ubuntu@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/app/apps/web/worker.mjs
 
       - name: Write env file
+        env:
+          INTEGRATIONS_ENCRYPTION_KEY: ${{ secrets.QA_INTEGRATIONS_ENCRYPTION_KEY }}
+          WAAFI_MERCHANT_UID: ${{ secrets.QA_WAAFI_MERCHANT_UID }}
+          WAAFI_API_USER_ID: ${{ secrets.QA_WAAFI_API_USER_ID }}
+          WAAFI_API_KEY: ${{ secrets.QA_WAAFI_API_KEY }}
+          WAAFI_STORE_ID: ${{ secrets.QA_WAAFI_STORE_ID }}
+          WAAFI_HPP_KEY: ${{ secrets.QA_WAAFI_HPP_KEY }}
         run: |
+          for key in INTEGRATIONS_ENCRYPTION_KEY WAAFI_MERCHANT_UID WAAFI_API_USER_ID WAAFI_API_KEY WAAFI_STORE_ID WAAFI_HPP_KEY; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing QA deployment configuration: $key"
+              exit 1
+            fi
+          done
           cron_secret="${{ secrets.CRON_SECRET }}"
           if [ -z "$cron_secret" ]; then cron_secret="$(openssl rand -hex 32)"; fi
           ssh -i ~/.ssh/lightsail.pem ubuntu@${{ secrets.LIGHTSAIL_HOST }} "cat > /home/ubuntu/app/apps/web/.env.local" <<EOF
@@ -179,7 +194,12 @@ jobs:
           EMAIL_FROM=${{ vars.EMAIL_FROM }}
           EMAIL_REPLY_TO=${{ vars.EMAIL_REPLY_TO }}
           RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
-          INTEGRATIONS_ENCRYPTION_KEY=${{ secrets.INTEGRATIONS_ENCRYPTION_KEY }}
+          INTEGRATIONS_ENCRYPTION_KEY=$INTEGRATIONS_ENCRYPTION_KEY
+          WAAFI_MERCHANT_UID=$WAAFI_MERCHANT_UID
+          WAAFI_API_USER_ID=$WAAFI_API_USER_ID
+          WAAFI_API_KEY=$WAAFI_API_KEY
+          WAAFI_STORE_ID=$WAAFI_STORE_ID
+          WAAFI_HPP_KEY=$WAAFI_HPP_KEY
           CRON_SECRET=$cron_secret
           STS_WORKER_SCHEDULER=external
           EOF

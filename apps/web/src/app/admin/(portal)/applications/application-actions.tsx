@@ -36,11 +36,13 @@ export function ApplicationActions({
   applicationId,
   type,
   layout = "stack",
+  approvalUnavailable = false,
 }: {
   applicationId: string;
   type: ApplicationType;
   /** `inline`: icon-only row for table cells; `stack`: full-width buttons for a side panel. */
   layout?: "stack" | "inline";
+  approvalUnavailable?: boolean;
 }) {
   const router = useRouter();
   const answerReview = useAnswerReview();
@@ -81,7 +83,7 @@ export function ApplicationActions({
       <div className={cn("flex gap-2", inline ? "items-center justify-end gap-1" : "w-full flex-col")}>
         {inline ? (
           <>
-            <Button size="icon-sm" disabled={revisionPending} aria-label="Approve" title="Approve" onClick={() => setApproveOpen(true)}>
+            <Button size="icon-sm" disabled={revisionPending || approvalUnavailable} aria-label="Approve" title="Approve" onClick={() => setApproveOpen(true)}>
               <Check />
             </Button>
             <Button
@@ -105,14 +107,14 @@ export function ApplicationActions({
           </>
         ) : (
           <>
-            <Button disabled={revisionPending} onClick={() => setApproveOpen(true)}>
-              <Check data-icon="inline-start" /> Approve
+            <Button disabled={revisionPending || approvalUnavailable} onClick={() => setApproveOpen(true)}>
+              <Check data-icon="inline-start" /> Approve application
             </Button>
             <Button variant="outline" onClick={() => { if (revisionPending) document.getElementById("answer-review")?.scrollIntoView({ behavior: "smooth", block: "center" }); else setInfoOpen(true); }}>
               <MessageCircleQuestion data-icon="inline-start" /> {revisionPending ? "Review corrections" : "Request more info"}
             </Button>
             <Button variant="destructive" onClick={() => setRejectOpen(true)}>
-              <X data-icon="inline-start" /> Reject
+              <X data-icon="inline-start" /> Reject application
             </Button>
           </>
         )}
@@ -198,6 +200,7 @@ export function ApplicationActions({
           </AlertDialogContent>
         </AlertDialog>
       </div>
+      {approvalUnavailable && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-900">Approval unavailable · configuration required</div>}
       {approveState?.error || rejectState?.error || infoState?.error ? (
         <p role="alert" className={cn("text-sm text-destructive", inline && "text-right text-xs")}>
           {approveState?.error ?? rejectState?.error ?? infoState?.error}

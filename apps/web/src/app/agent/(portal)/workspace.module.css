@@ -159,3 +159,18 @@
 .addFunds:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
 @media(max-width:1279px) { .serviceRow { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:767px) { .banner { min-height:9rem; } .bannerImage { width:100% !important; opacity:.35; } .bannerContent { padding:1.25rem; } .bannerContent h2 { font-size:1.375rem; } .serviceRow { grid-template-columns:repeat(2,minmax(0,1fr)); } .serviceRow .service { padding:.875rem; } .serviceRow .serviceIcon { width:2.5rem; height:2.5rem; } }
+
+/* Keep operational figures legible before the service shortcuts. */
+.metric { background: var(--card); border-color: var(--border); padding: 1.25rem; gap: .875rem; }
+.metricIcon { background: color-mix(in oklch, var(--tone) 12%, var(--card)); color: var(--tone); box-shadow: none; }
+.metricValue { overflow: visible; overflow-wrap: anywhere; font-size: clamp(1.25rem, 1.7vw, 1.75rem); }
+.metricValue :global(span) { white-space: normal; }
+.metricPeriod { display: block; margin-top: .375rem; line-height: 1.5; }
+.up, .down, .neutral { margin-top: .5rem; font-size: .75rem; }
+.serviceRow .service { min-height: 5.5rem; }
+@media (max-width: 639px) {
+  .metrics { gap: .75rem; }
+  .metric { padding: 1rem; }
+  .metricValue { font-size: 1.25rem; }
+  .serviceRow .service { min-height: 6rem; }
+}
