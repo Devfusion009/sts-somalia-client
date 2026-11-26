@@ -11,7 +11,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 
 function getKey(): Buffer {
   const secret = process.env.INTEGRATIONS_ENCRYPTION_KEY;
-  if (!secret) throw new Error("INTEGRATIONS_ENCRYPTION_KEY is not set.");
+  if (!secret?.trim()) throw new Error("Secure credential storage is not configured. Contact the system administrator.");
   return createHash("sha256").update(secret).digest();
 }
 

@@ -1,5 +1,8 @@
 "use server";
 
+import { getApplicationDrafts } from "./drafts";
+import { unconfirmedDraftStep } from "./draft-fields";
+import { confirmDraft } from "./draft-confirmation";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -13,7 +16,7 @@ import {
   missingRequiredDocSlots,
   type ApplicationKind,
 } from "./config";
-import { getEditableApplication, getLatestApplication, getOwnedApplication, type DocumentRef } from "./queries";
+import { getEditableApplication, getLatestApplication, type DocumentRef } from "./queries";
 import {
   step1BusinessSchema,
   step1AffiliateSchema,
@@ -80,8 +83,8 @@ export async function startApplication(formData: FormData): Promise<void> {
 
   const latest = await getLatestApplication(kind, user.id);
 
-  if (latest && (latest.status === "draft" || latest.status === "more_info_requested")) {
-    redirect(wizardPath(kind, latest.id, 1));
+  if (latest && (latest.status === "draft" && latest.submitted_at === null)) {
+    redirect(`/account/become/${kind}/${latest.id}`);
   }
 
   if (latest && latest.status === "rejected" && latest.reviewed_at) {
@@ -163,6 +166,8 @@ export async function saveStep1(_prev: ActionState, formData: FormData): Promise
   const { error } = await supabase.from(cfg.table).update(update as never).eq("id", id);
   if (error) return { error: error.message };
 
+  if (formData.get("intent") === "continue" && !await confirmDraft(user.id,kind,id,1,formData)) return {error:"Draft confirmation is unavailable. Try Continue again."};
+
   if (formData.get("intent") === "continue") redirect(wizardPath(kind, id, 2));
   return { error: null };
 }
@@ -200,6 +205,8 @@ export async function saveStep2(_prev: ActionState, formData: FormData): Promise
 
   const { error } = await supabase.from(APP_CONFIG[kind].table).update({ business_details: details } as never).eq("id", id);
   if (error) return { error: error.message };
+
+  if (formData.get("intent") === "continue" && !await confirmDraft(user.id,kind,id,2,formData)) return {error:"Draft confirmation is unavailable. Try Continue again."};
 
   if (formData.get("intent") === "continue") redirect(wizardPath(kind, id, 3));
   return { error: null };
@@ -293,6 +300,8 @@ export async function saveStep3(_prev: ActionState, formData: FormData): Promise
   const { error } = await supabase.from(APP_CONFIG[kind].table).update({ business_details: details } as never).eq("id", id);
   if (error) return { error: error.message };
 
+  if (formData.get("intent") === "continue" && !await confirmDraft(user.id,kind,id,3,formData)) return {error:"Draft confirmation is unavailable. Try Continue again."};
+
   if (formData.get("intent") === "continue") redirect(wizardPath(kind, id, nextStep));
   return { error: null };
 }
@@ -370,6 +379,8 @@ export async function saveStep4(_prev: ActionState, formData: FormData): Promise
 
   const { error } = await supabase.from(APP_CONFIG[kind].table).update({ business_details: details } as never).eq("id", id);
   if (error) return { error: error.message };
+
+  if (formData.get("intent") === "continue" && !await confirmDraft(user.id,kind,id,4,formData)) return {error:"Draft confirmation is unavailable. Try Continue again."};
 
   if (formData.get("intent") === "continue") redirect(wizardPath(kind, id, 5));
   return { error: null };
@@ -556,15 +567,7 @@ export async function getDocumentViewUrl(kind: ApplicationKind, id: string, docK
   return { url: data.signedUrl };
 }
 
-/**
- * Replaces one document an admin marked 'rejected' — the only edit an
- * applicant can make once an application is already decided. Everything
- * else on a decided application is locked (see
- * applicant_edit_pending_applications.sql); the DB write here goes through
- * resubmit_kyc_document(), a security-definer function that itself
- * re-checks the doc is currently rejected before touching anything, so this
- * can't be used to swap out an already-verified document.
- */
+/** Retained for older clients; submitted applications are rejected before upload. */
 export async function resubmitRejectedDocument(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const kind = kindOf(formData);
   const id = String(formData.get("applicationId"));
@@ -577,8 +580,8 @@ export async function resubmitRejectedDocument(_prev: ActionState, formData: For
   if (file.size > MAX_UPLOAD_BYTES) return { error: UPLOAD_SIZE_ERROR };
 
   const user = await requireUser();
-  const application = await getOwnedApplication(kind, id, user.id);
-  if (!application) return { error: "Application not found." };
+  const {application} = await getEditableApplication(kind, id, user.id);
+  if (!application) return { error: "Submitted applications are read-only." };
 
   const supabase = await createClient();
   const { data: review } = await supabase
@@ -678,6 +681,9 @@ export async function submitApplication(_prev: ActionState, formData: FormData):
   const { supabase, application } = await getEditableApplication(kind, id, user.id);
   if (!application) return { error: "This application can no longer be edited." };
 
+  const unfinished=unconfirmedDraftStep(await getApplicationDrafts(kind,id));
+  if(unfinished) return {error:`Continue step ${unfinished} to confirm your saved draft before submitting.`};
+
   const details = (application.business_details ?? {}) as Record<string, unknown>;
   // The agency application is a single scrolling page (no per-step "Continue"
   // gate to force each section's required fields before the next one is
@@ -729,7 +735,6 @@ export async function submitApplication(_prev: ActionState, formData: FormData):
   // reference number or overwrite its original submission timestamp —
   // both are things admins and applicants already cite when talking about
   // this specific application.
-  const wasAlreadySubmitted = application.status === "pending" || application.status === "under_review";
   let refData = application.reference_number;
   if (!refData) {
     const { data: newRef, error: refError } = await supabase.rpc(cfg.refRpc);
@@ -746,16 +751,6 @@ export async function submitApplication(_prev: ActionState, formData: FormData):
     })
     .eq("id", id);
   if (error) return { error: error.message };
-
-  // A fresh draft/more_info_requested -> pending transition is already
-  // covered by the notify_on_application_submitted DB trigger. This is the
-  // other case: the applicant edited an application that was already
-  // pending/under_review and explicitly resubmitted it — status never
-  // transitions, so that trigger stays silent by design, and admins would
-  // otherwise never learn the edit happened at all.
-  if (wasAlreadySubmitted) {
-    await supabase.rpc("notify_admins_application_updated", { p_kind: kind, p_application_id: id });
-  }
 
   revalidatePath("/account/become");
   redirect(

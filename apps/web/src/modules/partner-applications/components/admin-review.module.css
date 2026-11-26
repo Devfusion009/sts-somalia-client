@@ -1,0 +1,39 @@
+.screen { --primary: #007c73; --ring: #007c73; color: var(--foreground); }
+.tabs { display:flex; gap:1rem; overflow-x:auto; border-bottom:1px solid var(--border); }
+.tabs button { display:flex; flex-shrink:0; align-items:center; gap:.6rem; min-height:3.5rem; padding:.75rem 1rem; border-bottom:4px solid transparent; color:var(--muted-foreground); font-size:.875rem; font-weight:500; }
+.tabs button[aria-current] { border-color:var(--primary); color:var(--primary); font-weight:650; }
+.tabs button:focus-visible { outline:2px solid var(--primary); outline-offset:-4px; border-radius:6px; }
+.screen [data-detail-section] { display:none; border:1px solid var(--border); border-radius:12px; box-shadow:none; }
+.screen[data-active="business"] :global(#business), .screen[data-active="contact"] :global(#contact), .screen[data-active="operations"] :global(#operations), .screen[data-active="settlement"] :global(#settlement), .screen[data-active="documents"] :global(#documents), .screen[data-active="audit"] :global(#audit), .screen[data-active="about"] :global(#about), .screen[data-active="audience"] :global(#audience), .screen[data-active="notes"] :global(#notes) { display:block; margin-top:0; }
+.screen [data-detail-section] > div:first-child { background:transparent; border:0; padding:1.25rem 1.25rem 0; gap:.75rem; }
+.screen [data-detail-section] > div:first-child > span:first-child { display:none; }
+.screen [data-detail-section] h2 { color:var(--foreground); font-size:1.125rem; }
+.screen [data-detail-section] > [data-detail-content] { padding:1.25rem; }
+.screen [data-detail-group] > h3 { padding:.65rem .875rem; background:var(--muted); border-radius:8px 8px 0 0; color:var(--foreground); font-size:.875rem; letter-spacing:0; text-transform:none; margin-bottom:0; }
+.screen [data-detail-group] > h3 > span { display:none; }
+.screen [data-review-grid] { display:block; margin-top:0; }
+.screen [data-review-grid-head] { display:grid; grid-template-columns:minmax(140px,1fr) minmax(160px,1.5fr) 112px; gap:1rem; padding:.5rem .875rem; background:color-mix(in srgb,var(--muted) 55%,var(--card)); font-size:.75rem; border-bottom:1px solid var(--border); }
+.screen [data-review-grid] [data-review-answer] { display:grid; grid-template-columns:minmax(140px,1fr) minmax(160px,1.5fr) 112px; align-items:center; gap:.35rem 1rem; padding:.55rem .875rem; border:0; border-bottom:1px solid var(--border); border-radius:0; min-height:42px; }
+.screen [data-review-answer] dt { font-size:.8125rem; font-weight:600; text-transform:none; letter-spacing:0; }
+.screen [data-review-answer] dd { margin:0; line-height:1.5; font-family:inherit; font-size:.875rem; font-weight:400; overflow-wrap:anywhere; }
+.screen [data-answer-controls] { margin:0; flex-wrap:nowrap; justify-content:flex-end; gap:.4rem; }
+.screen [data-answer-controls] button { width:32px; height:28px; min-height:28px; padding:0; border-radius:6px; color:var(--foreground); }
+.screen [data-action-label] { display:none; }
+.screen [data-review-answer] > span[aria-hidden] { display:none; }
+.screen [data-correction] { grid-column:1/-1; }
+.screen aside [data-slot="card"] { border-radius:12px; box-shadow:none; }
+.screen aside button { border-radius:8px; }
+.progress { width:clamp(60px,10vw,160px); height:7px; appearance:none; border:0; border-radius:20px; overflow:hidden; }
+.progress::-webkit-progress-bar { background:var(--muted); }
+.progress::-webkit-progress-value { background:var(--primary); border-radius:20px; }
+.progress::-moz-progress-bar { background:var(--primary); }
+@media(max-width:767px) {
+ .screen [data-review-grid-head] { display:none; }
+ .screen [data-review-grid] [data-review-answer] { grid-template-columns:minmax(0,1fr) 80px; padding:.875rem .5rem; }
+ .screen [data-review-answer] dt { grid-column:1; }
+ .screen [data-review-answer] dd { grid-column:1; }
+ .screen [data-answer-controls] { grid-column:2; grid-row:1/3; }
+ .screen [data-correction] { grid-column:1/-1; }
+}
+
+.screen [data-answer-controls] button[aria-pressed="true"] { border-color:var(--primary); background:color-mix(in srgb,var(--primary) 12%,var(--card)); color:var(--primary); }

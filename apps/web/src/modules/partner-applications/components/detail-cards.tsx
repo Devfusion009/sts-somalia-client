@@ -1,3 +1,5 @@
+import { applicantAnswer, NOT_PROVIDED_BY_APPLICANT } from "../answer-display";
+import { AnswerSectionProgress, ReviewSectionTools } from "./admin-review-workspace";
 import { ReviewableAnswer } from "./answer-review";
 import { FileText, FileImage, File as FileIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -126,6 +128,7 @@ export function DetailSection({
   return (
     <Card
       id={id}
+      data-detail-section
       style={{ "--tone": SECTION_TONES[tone] } as React.CSSProperties}
       className={cn(
         "scroll-mt-32 gap-0 overflow-hidden border-t-[3px] border-t-[var(--tone)] py-0",
@@ -139,9 +142,11 @@ export function DetailSection({
           </span>
         ) : null}
         <h2 className="min-w-0 truncate font-heading text-[17px] font-bold tracking-tight text-[var(--tone)]">{title}</h2>
+        <AnswerSectionProgress section={id} />
         {meta ? <div className="ml-auto flex shrink-0 items-center gap-2">{meta}</div> : null}
       </div>
-      <div className="space-y-6 px-5 py-5 sm:px-6">{children}</div>
+      <ReviewSectionTools />
+      <div data-detail-content className="space-y-6 px-5 py-5 sm:px-6">{children}</div>
     </Card>
   );
 }
@@ -149,7 +154,7 @@ export function DetailSection({
 /** A labelled group inside a section, e.g. "Office" within Business details. */
 export function DetailGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-3">
+    <div data-detail-group className="space-y-3">
       <h3 className="flex items-center gap-2 font-heading text-[11px] font-bold tracking-[0.1em] text-[var(--tone,var(--primary))] uppercase">
         <span aria-hidden className="h-3 w-1 rounded-full bg-[var(--tone,var(--primary))]" />
         {title}
@@ -183,11 +188,11 @@ export function DetailGrid({ rows, compact }: { rows: Array<[string, string]>; c
   const visible = rows.filter(([, v]) => v !== "");
   if (visible.length === 0) return <span className="text-sm text-muted-foreground">No details</span>;
   return (
-    <dl className={cn("grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2", !compact && "lg:grid-cols-3")}>
+    <dl data-review-grid className={cn("grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2", !compact && "lg:grid-cols-3")}><div data-review-grid-head aria-hidden="true" className="hidden"><span>Field</span><span>Applicant response</span><span>Review</span></div>
       {visible.map(([label, value]) => (
-        <ReviewableAnswer key={label} label={label} value={value} className="min-w-0">
+        <ReviewableAnswer key={label} label={label} value={value === NOT_PROVIDED_BY_APPLICANT || value === "—" ? undefined : value} className="min-w-0">
           <dt className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</dt>
-          <dd className={cn("mt-1 leading-snug break-words", valueClass(label, value))}>{value}</dd>
+          <dd className={cn("mt-1 leading-snug break-words", value === NOT_PROVIDED_BY_APPLICANT ? "text-sm font-normal text-muted-foreground" : valueClass(label, value))}>{value === "—" ? "Not provided" : value}</dd>
         </ReviewableAnswer>
       ))}
     </dl>
@@ -254,7 +259,7 @@ export function FullWidthField({ label, children }: { label: string; children: R
 function BusinessIdentityFields(d: Details): Array<[string, string]> {
   return [
     ["Legal business name", s(d.legalBusinessName)],
-    ["Trading name", s(d.tradingName)],
+    ["Trading name", applicantAnswer(d.tradingName)],
     ["Business type", d.businessType ? titleCase(d.businessType) : "—"],
     ["Year established", s(d.yearEstablished)],
     ["Registration number", s(d.registrationNumber)],

@@ -22,6 +22,9 @@ export async function prepareAgentCredentials(applicationId: string, contactEmai
   if (!["pending", "under_review"].includes(application.status)) throw new Error("Application is not awaiting approval.");
 
   if (!existing) {
+    if (!process.env.INTEGRATIONS_ENCRYPTION_KEY?.trim()) {
+      throw new Error("Agent credential storage is not configured. Contact the system administrator.");
+    }
     const password = `Sts!${randomBytes(24).toString("base64url")}9a`;
     const passwordEncrypted = encryptCredentials({ password });
     const { error } = await admin.from("agent_login_credentials").upsert({

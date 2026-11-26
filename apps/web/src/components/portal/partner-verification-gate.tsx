@@ -3,7 +3,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Progress } from "@/components/ui/progress";
-import { ResubmitDocumentForm } from "@/modules/partner-applications/components/resubmit-document-form";
 import { docSlotsFor, type ApplicationKind } from "@/modules/partner-applications/config";
 import type { DocumentRef } from "@/modules/admin/partner-accounts";
 import { cn } from "@/lib/utils";
@@ -20,7 +19,6 @@ type Review = { status: string; note: string | null };
 export function PartnerVerificationGate({
   kind,
   portalLabel,
-  applicationId,
   referenceNumber,
   documentRefs,
   docReviews,
@@ -108,7 +106,6 @@ export function PartnerVerificationGate({
                   {status === "rejected" ? (
                     <div className="space-y-2">
                       {review?.note ? <p className="text-sm text-destructive">{review.note}</p> : null}
-                      <ResubmitDocumentForm kind={kind} applicationId={applicationId} docKey={slot.key} />
                     </div>
                   ) : null}
                 </li>

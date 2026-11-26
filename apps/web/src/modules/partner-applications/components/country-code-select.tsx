@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { COUNTRY_DIAL_CODES } from "./country-codes";
@@ -21,6 +21,8 @@ export function CountryCodeSelect({ value, onChange }: { value: string; onChange
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownId = useId();
 
   const selected = COUNTRY_DIAL_CODES.find((c) => c.dial === value) ?? COUNTRY_DIAL_CODES[0];
 
@@ -36,12 +38,21 @@ export function CountryCodeSelect({ value, onChange }: { value: string; onChange
     onChange(dial);
     setOpen(false);
     setQuery("");
+    triggerRef.current?.focus();
   }
 
   return (
     <div
       ref={containerRef}
-      className="relative"
+      className="relative shrink-0 self-stretch"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && open) {
+          event.preventDefault();
+          setOpen(false);
+          setQuery("");
+          triggerRef.current?.focus();
+        }
+      }}
       onBlur={(e) => {
         if (!containerRef.current?.contains(e.relatedTarget as Node)) {
           setOpen(false);
@@ -50,10 +61,13 @@ export function CountryCodeSelect({ value, onChange }: { value: string; onChange
       }}
     >
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Country code"
+        aria-expanded={open}
+        aria-controls={open ? dropdownId : undefined}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="flex h-full min-h-11 min-w-24 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-input bg-card px-3 text-sm shadow-none outline-none transition-colors hover:bg-accent focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 dark:bg-input/30"
       >
         <FlagIcon iso2={selected.iconIso2} />
         <span>{selected.dial}</span>
@@ -61,11 +75,12 @@ export function CountryCodeSelect({ value, onChange }: { value: string; onChange
       </button>
 
       {open ? (
-        <div className="absolute z-20 mt-1 w-64 overflow-hidden rounded-lg border border-border bg-popover shadow-md ring-1 ring-foreground/10">
+        <div id={dropdownId} className="absolute top-full left-0 z-20 mt-2 w-64 max-w-[calc(100vw-3rem)] overflow-hidden rounded-xl border border-border bg-popover shadow-lg ring-1 ring-foreground/5">
           <div className="border-b border-border p-1.5">
             <Input
               autoFocus
               placeholder="Search country or code…"
+              aria-label="Search country or code"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="h-8"
@@ -81,8 +96,8 @@ export function CountryCodeSelect({ value, onChange }: { value: string; onChange
                   type="button"
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    select(c.dial);
                   }}
+                  onClick={() => select(c.dial)}
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                 >
                   <FlagIcon iso2={c.iconIso2} />
