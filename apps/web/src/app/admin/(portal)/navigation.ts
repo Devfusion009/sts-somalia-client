@@ -55,6 +55,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
     icon: "bank",
     items: [
       { href: "/admin/finance/top-ups", label: "Wallet top-ups", icon: "credit-note", searchTerms: "deposits credit review" },
+      { href: "/admin/finance/payments", label: "Payments", icon: "payments", searchTerms: "payment in out transfer cashbook" },
       { href: "/admin/finance/withdrawals", label: "Withdrawals", icon: "payouts", searchTerms: "payout earnings commission" },
       { href: "/admin/refunds", label: "Refund requests", icon: "refund" },
       { href: "/admin/reports/aging", label: "Aging report", icon: "aging", searchTerms: "receivables overdue outstanding balances" },

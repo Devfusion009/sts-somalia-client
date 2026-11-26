@@ -26,6 +26,7 @@ export const AGENT_NAV_GROUPS: PortalNavGroup[] = [
     icon: "payouts",
     items: [
       { href: "/agent/finance", label: "Wallet", icon: "payouts", searchTerms: "balance credit funds" },
+      { href: "/agent/finance/payments", label: "Payments & gateways", icon: "payments", searchTerms: "payment in out transfers refunds waafi" },
       { href: "/agent/finance/top-up", label: "Top up wallet", icon: "bank", searchTerms: "deposit add money funds credit" },
       { href: "/agent/finance/transactions", label: "Transactions", icon: "payments", searchTerms: "wallet ledger payment history debits credits" },
       { href: "/agent/finance/billing", label: "Billing & invoices", icon: "invoice", searchTerms: "receipts statements downloads" },
