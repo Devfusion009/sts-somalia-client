@@ -51,6 +51,32 @@ configuration is missing. Production does not reference these QA secrets.
 Apply pending migrations to the linked QA database before releasing code that
 depends on them. The deployment workflows do not apply database migrations.
 
+For the STS SMTP mailbox on QA, configure Actions variables `QA_EMAIL_PROVIDER`
+(`smtp`), `QA_EMAIL_FROM`, `QA_EMAIL_REPLY_TO`, `QA_SMTP_HOST`, `QA_SMTP_PORT`, `QA_SMTP_SECURE` and
+`QA_SMTP_USER`, plus the encrypted Actions secret `QA_SMTP_PASS`. Both QA
+services receive these settings. Ports 465 and 587 use `SMTP_SECURE=true` and
+`SMTP_SECURE=false`, respectively; port 587 negotiates STARTTLS. Agent approval
+requires a configured outgoing email provider. Failed deliveries retain the
+encrypted credential copy for retry without issuing a new password.
+
+### SMTP storage and rotation
+
+- Local runtime settings live in ignored `apps/web/.env.local` and
+  `apps/api/.env.local` files with mode `0600`. The API also supports the
+  older `apps/api/.env` fallback; keep any retained mailbox settings consistent.
+- Commit only the blank-password `.env.example` templates. Nested environment
+  files are excluded from Docker build contexts; SMTP credentials are injected
+  at runtime and never use a `NEXT_PUBLIC_` variable or image build argument.
+- QA uses the `QA_` Actions settings above. Production uses its existing
+  `production` GitHub Environment variables and `SMTP_PASS` secret, independently
+  of QA. Preparing QA mail does not configure or deploy production.
+- QA deployments write an owner-only temporary env file and replace the runtime
+  file atomically. Production already writes its env file under `umask 077`.
+- To rotate the mailbox password, update the Hostinger mailbox password, the
+  appropriate deployment secret and local env files, then redeploy that
+  environment. Restarting services loads the new configuration. Never put the
+  password in documentation, logs, screenshots or commits.
+
 ## Recovery
 
 Revert the faulty change through a PR into the affected release branch, or rerun
