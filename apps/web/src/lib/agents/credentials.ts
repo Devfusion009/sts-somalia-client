@@ -75,6 +75,14 @@ export async function prepareAgentCredentials(applicationId: string, contactEmai
   return { ...credential, profile_id: profile.id };
 }
 
+/** A saved delivery record overrides status parameters from an old approval URL. */
+export function agentCredentialEmailStatus(
+  delivery: { approved_at: string | null; email_sent_at: string | null } | null,
+  reportedStatus?: string,
+) {
+  return delivery?.approved_at ? delivery.email_sent_at ? "sent" : "pending" : reportedStatus;
+}
+
 /** Safe delivery metadata for the admin console. Never returns a password or alias. */
 export async function getAgentCredentialDelivery(applicationId: string) {
   const { data, error } = await createAdminClient().from("agent_login_credentials")

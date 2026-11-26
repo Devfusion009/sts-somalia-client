@@ -1285,6 +1285,7 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
             <SummaryRow label="Name" value={d.contactFullName} />
             <SummaryRow label="Role" value={d.contactRole} />
             <SummaryRow label="Mobile" value={d.contactMobile} />
+            <SummaryRow label={kind === "agency" ? "Credential email" : "Email"} value={d.contactEmail} />
           </>
         )}
       </div>

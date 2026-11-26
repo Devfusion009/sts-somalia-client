@@ -1,6 +1,6 @@
 // Loopback-only SMTP fixture. Never forwards mail; accepts disposable QA credentials.
 const net = require('node:net');
-function createSmtpCapture(onMessage) {
+function createSmtpCapture(onMessage, { rejectMessages = 0 } = {}) {
   const sockets = new Set();
   const server = net.createServer(socket => {
     sockets.add(socket);
@@ -16,9 +16,11 @@ function createSmtpCapture(onMessage) {
         buffer = buffer.slice(boundary + 2);
         if (receiving) {
           if (line !== '.') { lines.push(line.replace(/^\.\./, '.')); continue; }
-          onMessage({ recipients, message: lines.join('\r\n') });
+          const accepted = rejectMessages === 0;
+          if (!accepted) rejectMessages--;
+          onMessage({ recipients, message: lines.join('\r\n'), accepted });
           receiving = false; lines = []; recipients = [];
-          socket.write('250 Captured\r\n');
+          socket.write(accepted ? '250 Captured\r\n' : '451 Temporary SMTP failure\r\n');
           continue;
         }
         const command = line.split(' ')[0].toUpperCase();

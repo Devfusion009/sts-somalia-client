@@ -3,6 +3,7 @@
 import { prepareAgentCredentials, getAgentCredentialDelivery } from "@/lib/agents/credentials";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptCredentials } from "@/lib/integrations-crypto";
+import { getIntegrations } from "@/lib/integrations";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -285,6 +286,9 @@ export async function approveApplication(
   let agentId: string | null = null;
 
   if (type === "agency") {
+    if (!getIntegrations().email.provider) {
+      return { error: "Configure outgoing email before approving agent applications." };
+    }
     const { data: appRow } = await supabase
       .from("agency_applications")
       .select("business_details")
@@ -383,7 +387,7 @@ export async function retryAgentCredentialEmail(applicationId: string): Promise<
   if (!info) return { error: "Application not found." };
   const status = await deliverAgentCredentials(applicationId, info);
   revalidatePath(`/admin/partners/agency/${info.referenceNumber}`);
-  return { error: status === "sent" ? null : "Credential email was not sent." };
+  return { error: status === "sent" ? null : status === "not_configured" ? "Outgoing email is not configured." : "Credential email was not sent. Retry delivery." };
 }
 
 const rejectSchema = z.object({

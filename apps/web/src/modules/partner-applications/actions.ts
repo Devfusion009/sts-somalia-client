@@ -19,6 +19,7 @@ import {
 import { getEditableApplication, getLatestApplication, type DocumentRef } from "./queries";
 import {
   step1BusinessSchema,
+  emailSchema,
   step1AffiliateSchema,
   step2ContactSchema,
   step2AffiliateSchema,
@@ -685,6 +686,14 @@ export async function submitApplication(_prev: ActionState, formData: FormData):
   if(unfinished) return {error:`Continue step ${unfinished} to confirm your saved draft before submitting.`};
 
   const details = (application.business_details ?? {}) as Record<string, unknown>;
+  if (kind === "agency") {
+    if (!emailSchema.safeParse(details.contactEmail).success) {
+      return { error: "Enter a valid authorized contact email before submitting." };
+    }
+    if (!emailSchema.safeParse(details.businessEmail).success) {
+      return { error: "Enter a valid business email before submitting." };
+    }
+  }
   // The agency application is a single scrolling page (no per-step "Continue"
   // gate to force each section's required fields before the next one is
   // reachable), so its submit check enumerates every field the page marks

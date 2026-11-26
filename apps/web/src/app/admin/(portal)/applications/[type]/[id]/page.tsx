@@ -3,7 +3,9 @@ import { AnswerReviewProvider } from "@/modules/partner-applications/components/
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { Building2, Home, Check, FileStack, History, X } from "lucide-react";
+import { Building2, Home, Check, FileStack, History, X, Clock3, MessageSquare } from "lucide-react";
+import reviewStyles from "@/modules/partner-applications/components/admin-review.module.css";
+import { getIntegrations } from "@/lib/integrations";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -160,13 +162,10 @@ export default async function ApplicationDetailPage({
   // from the business's authorized contact; both sit side by side in the rail.
   const verifiedDocs = signedDocs.filter((d) => documentReviews.get(d.key)?.status === "verified").length;
   const submitted = application.submitted_at ?? application.created_at;
-  const meta = [
-    application.reference_number ?? id,
-    TYPE_LABEL[type],
-    ...headerFacts(type, details),
-    format(new Date(submitted), "d MMM yyyy, HH:mm"),
-  ].join(" · ");
+  const identityFacts = headerFacts(type, details);
+  const StatusIcon = application.status === "approved" ? Check : application.status === "rejected" ? X : application.status === "more_info_requested" ? MessageSquare : Clock3;
   const decided = application.status === "approved" || application.status === "rejected";
+  const approvalUnavailable = type === "agency" && (!process.env.INTEGRATIONS_ENCRYPTION_KEY?.trim() || !getIntegrations().email.provider);
   const sections = detailSectionLinks(type);
   const jumpLinks: Array<{ id: string; label: string; tone: SectionTone }> = [
     ...sections,
@@ -183,29 +182,36 @@ export default async function ApplicationDetailPage({
     <div className="space-y-6">
       <div className="space-y-5">
         <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground"><Link href="/admin" aria-label="Admin dashboard"><Home size={18}/></Link><span aria-hidden>/</span><span>Partners &amp; agencies</span><span aria-hidden>/</span><Link href="/admin/applications" className="hover:text-primary">Partner applications</Link><span aria-hidden>/</span><span className="font-semibold text-foreground">Application review</span></nav>
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-          <div className="flex min-w-0 items-center gap-4">
+        <header className={reviewStyles.reviewHeader}>
+          <div className={reviewStyles.headerIdentity}>
             {logoUrl ? (
-              <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-card max-sm:size-12">
+              <span className={reviewStyles.applicationLogo}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={logoUrl} alt="" className="size-full object-contain" />
               </span>
-            ) : <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground"><Building2 size={28}/></span>}
-            <div className="min-w-0 space-y-1">
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{name}</h1>
-                <Badge variant={APPLICATION_STATUS_VARIANT[application.status] ?? "neutral"}>
+            ) : <span className={reviewStyles.applicationLogo}><Building2 size={32} aria-hidden/></span>}
+            <div className={reviewStyles.headerMain}>
+              <div className={reviewStyles.headerKicker}>Partner application</div>
+              <div className={reviewStyles.headerTitle}>
+                <h1>{name}</h1>
+                <Badge className={reviewStyles.headerStatus} variant={APPLICATION_STATUS_VARIANT[application.status] ?? "neutral"}>
+                  <StatusIcon size={16} aria-hidden/>
                   {applicationStatusLabel(application.status)}
                 </Badge>
               </div>
-              <p className="text-sm break-words text-muted-foreground tabular-nums">{meta}</p>
+              {identityFacts.length > 0 && <ul className={reviewStyles.identityFacts}>{identityFacts.map(fact=><li key={fact}>{fact}</li>)}</ul>}
             </div>
+            {application.status === "approved" && partnerAccountId ? (
+              <Button className="shrink-0" render={<Link href={`/admin/partners/${slug}/${partnerAccountId}`} />}>
+                Partner account
+              </Button>
+            ) : null}
           </div>
-          {application.status === "approved" && partnerAccountId ? (
-            <Button className="shrink-0" render={<Link href={`/admin/partners/${slug}/${partnerAccountId}`} />}>
-              Partner account
-            </Button>
-          ) : null}
+          <dl className={reviewStyles.headerMetadata}>
+            <div><dt>Application reference</dt><dd className={reviewStyles.reference}>{application.reference_number ?? id}</dd></div>
+            <div><dt>Partner type</dt><dd>{TYPE_LABEL[type]}</dd></div>
+            <div><dt>Submitted</dt><dd><time dateTime={new Date(submitted).toISOString()}>{format(new Date(submitted), "d MMM yyyy, HH:mm")}</time></dd></div>
+          </dl>
         </header>
 
 
@@ -351,10 +357,10 @@ export default async function ApplicationDetailPage({
                       Start review
                     </Button>
                   </form>
-                  <ApplicationActions applicationId={application.id} type={type} approvalUnavailable={type === "agency" && !process.env.INTEGRATIONS_ENCRYPTION_KEY?.trim()} />
+                  <ApplicationActions applicationId={application.id} type={type} approvalUnavailable={approvalUnavailable} />
                 </div>
               ) : application.status === "under_review" ? (
-                <ApplicationActions applicationId={application.id} type={type} approvalUnavailable={type === "agency" && !process.env.INTEGRATIONS_ENCRYPTION_KEY?.trim()} />
+                <ApplicationActions applicationId={application.id} type={type} approvalUnavailable={approvalUnavailable} />
               ) : decided ? (
                 <div className="border-t border-border pt-4 text-sm">
                   <p className="font-medium">
