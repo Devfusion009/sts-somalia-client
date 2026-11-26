@@ -1,4 +1,5 @@
 name: client_impression
+run-name: Client preview · ${{ github.ref_name }} · run ${{ github.run_number }}
 
 on:
   push:
@@ -26,12 +27,12 @@ jobs:
     timeout-minutes: 30
     environment:
       name: client_impression
-      url: https://stssomaliaclient-git-fea-d257c9-sasmalsubhadip80-6309s-projects.vercel.app/design-preview
+      url: https://sts-client-impression.vercel.app/design-preview
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_PROJECT: prj_Vjep37WcMqFOAtgnZhjaTAYpe740
       VERCEL_SCOPE: sasmalsubhadip80-6309s-projects
-      PREVIEW_ALIAS: stssomaliaclient-git-fea-d257c9-sasmalsubhadip80-6309s-projects.vercel.app
+      PREVIEW_ALIAS: sts-client-impression.vercel.app
       VERCEL_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
@@ -69,3 +70,26 @@ jobs:
             --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN"
           printf '### Client impression\n\n[Open preview](https://%s/design-preview)\n\nCommit: `%s`\n' \
             "$PREVIEW_ALIAS" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify public client link
+        run: |
+          python3 - <<'PY'
+          import os
+          import time
+          import urllib.request
+
+          url = f"https://{os.environ['PREVIEW_ALIAS']}/design-preview"
+          for attempt in range(6):
+              try:
+                  # No auth headers or cookies: test the link as a client.
+                  with urllib.request.urlopen(url, timeout=30) as response:
+                      html = response.read().decode('utf-8')
+                      if response.status == 200 and response.url == url and 'Travel from Somalia' in html:
+                          print(f'Public preview verified: {url}')
+                          break
+              except Exception as error:
+                  print(f'Preview check {attempt + 1}: {error}')
+              if attempt == 5:
+                  raise SystemExit('The shared preview link is not publicly accessible.')
+              time.sleep(10)
+          PY

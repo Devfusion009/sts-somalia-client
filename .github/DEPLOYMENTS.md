@@ -37,7 +37,19 @@ serialized. Vercel authentication protection remains enabled.
    branch is no longer a deployment source once this configuration is applied.
 
 Shared client URL:
-https://stssomaliaclient-git-fea-d257c9-sasmalsubhadip80-6309s-projects.vercel.app/design-preview
+https://sts-client-impression.vercel.app/design-preview
+
+## QA payment configuration
+
+QA uses the repository secrets `QA_INTEGRATIONS_ENCRYPTION_KEY`,
+`QA_WAAFI_MERCHANT_UID`, `QA_WAAFI_API_USER_ID`, `QA_WAAFI_API_KEY`,
+`QA_WAAFI_STORE_ID` and `QA_WAAFI_HPP_KEY`. Both QA services receive the same
+encryption key and sandbox gateway configuration. The key must remain stable
+while encrypted credentials exist in the QA database. QA releases stop if this
+configuration is missing. Production does not reference these QA secrets.
+
+Apply pending migrations to the linked QA database before releasing code that
+depends on them. The deployment workflows do not apply database migrations.
 
 ## Recovery
 

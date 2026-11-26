@@ -44,7 +44,7 @@ test('Vercel auto-deploy is disabled; only Actions may deploy after quality chec
   assert.match(commands, /deploy --yes --target=preview/);
   assert.doesNotMatch(commands, /--prod\b|--target[= ]production|vercel promote/);
   assert.match(commands, /vercel alias set/);
-  assert.equal(job.env.PREVIEW_ALIAS, 'stssomaliaclient-git-fea-d257c9-sasmalsubhadip80-6309s-projects.vercel.app');
+  assert.equal(job.env.PREVIEW_ALIAS, 'sts-client-impression.vercel.app');
 });
 
 test('shared quality checks cover all three PR targets and regression suites', () => {
@@ -60,6 +60,22 @@ test('shared quality checks cover all three PR targets and regression suites', (
   assert.match(web, /google-customer-auth/);
   assert.match(web, /pool-email/);
   assert.match(web, /npm run lint/);
+});
+
+test('QA payment credentials are isolated from production and shared by its two services', () => {
+  const qa = workflow('deploy.yml');
+  const names = ['INTEGRATIONS_ENCRYPTION_KEY', 'WAAFI_MERCHANT_UID', 'WAAFI_API_USER_ID', 'WAAFI_API_KEY', 'WAAFI_STORE_ID', 'WAAFI_HPP_KEY'];
+  for (const name of ['deploy-api', 'deploy-web']) {
+    const step = qa.jobs[name].steps.find(s => s.name === 'Write env file');
+    for (const key of names) {
+      assert.equal(step.env[key], '${{ secrets.QA_' + key + ' }}');
+      assert.ok(step.run.includes(key + '=$' + key));
+    }
+    assert.match(step.run, /Missing QA deployment configuration/);
+    assert.match(step.run, /WAAFI_ENVIRONMENT=sandbox/);
+  }
+  const production = readFileSync(resolve(root, '.github/workflows/deploy-production.yml'), 'utf8');
+  assert.doesNotMatch(production, /secrets\.QA_(INTEGRATIONS|WAAFI)/);
 });
 
 test('all workflow documents parse and embedded GitHub scripts compile', () => {
