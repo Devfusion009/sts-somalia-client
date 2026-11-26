@@ -108,7 +108,7 @@ export function LoginForm({
 
         <p className="mt-6 text-sm text-[#718477]">
           New to STS?{" "}
-          <Link href="/signup" className="rounded-sm font-semibold text-[#0b7159] underline decoration-[#c7d7ca] underline-offset-4 hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+          <Link href={redirectTo ? `/signup?redirect_to=${encodeURIComponent(redirectTo)}` : "/signup"} className="rounded-sm font-semibold text-[#0b7159] underline decoration-[#c7d7ca] underline-offset-4 hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
             Create an account
           </Link>
         </p>
