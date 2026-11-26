@@ -12,6 +12,7 @@ import { DestinationCard } from "@/components/marketing/destination-rail";
 const PACKAGES = [
   {
     title: "Dubai City Break",
+    offer: "Mega Offer",
     image: "/marketing/dubai.webp",
     price: "$620",
     meta: "5 days · flights + hotel",
@@ -26,6 +27,7 @@ const PACKAGES = [
   },
   {
     title: "Umrah — Standard",
+    offer: "Mega Offer",
     image: "/marketing/madinah.webp",
     price: "$1,850",
     meta: "14 days · full package",
@@ -40,6 +42,7 @@ const PACKAGES = [
   },
   {
     title: "Jeddah & Red Sea",
+    offer: "Mega Offer",
     image: "/marketing/dest-jeddah.webp",
     price: "$720",
     meta: "5 days · flights + hotel",
