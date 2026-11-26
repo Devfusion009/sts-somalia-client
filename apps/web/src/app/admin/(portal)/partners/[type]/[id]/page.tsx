@@ -1,4 +1,4 @@
-import { getAgentCredentialDelivery } from "@/lib/agents/credentials";
+import { getAgentCredentialDelivery, agentCredentialEmailStatus } from "@/lib/agents/credentials";
 import { AgentCredentialDelivery } from "./agent-credential-delivery";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -120,12 +120,15 @@ export default async function PartnerAccountConsolePage({
   const reviewerRow = application.reviewer as { full_name?: string | null; email?: string } | null;
   const meta = [entity.contactEmail, entity.contactPhone].filter(Boolean).join(" · ");
 
-  // Set by approveApplication's redirect: whether the approval email went out.
+  // Saved credential delivery takes precedence over an old approval URL after retry.
+  const currentEmailStatus = agentCredentialEmailStatus(agentDelivery, approvalEmail);
   const approvalNotice =
     justApproved === "1"
-      ? approvalEmail === "sent"
+      ? currentEmailStatus === "sent"
         ? { variant: "default" as const, text: "Approved. Approval email sent to the applicant." }
-        : approvalEmail === "not_configured"
+        : currentEmailStatus === "pending"
+          ? { variant: "warning" as const, text: "Approved. Agent credential email is awaiting delivery." }
+        : currentEmailStatus === "not_configured"
           ? { variant: "warning" as const, text: "Approved. Approval email not sent: no email provider is configured." }
           : { variant: "destructive" as const, text: "Approved. Approval email could not be sent." }
       : null;

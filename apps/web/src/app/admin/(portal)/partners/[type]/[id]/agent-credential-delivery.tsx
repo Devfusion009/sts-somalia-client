@@ -9,7 +9,7 @@ export function AgentCredentialDelivery({ applicationId, agentId, email, sent }:
     <dl className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
       <div><dt className="text-xs text-muted-foreground">Agent ID</dt><dd className="mt-1 font-mono font-semibold">{agentId}</dd></div>
       <div><dt className="text-xs text-muted-foreground">Credential email</dt><dd className="mt-1 break-all">{email}</dd></div>
-      <div><dt className="text-xs text-muted-foreground">Delivery</dt><dd className="mt-1 font-medium">{sent || state?.error === null ? "Sent" : "Not sent"}</dd></div>
+      <div><dt className="text-xs text-muted-foreground">Delivery</dt><dd role="status" aria-live="polite" className="mt-1 font-medium">{sent || state?.error === null ? "Sent" : "Not sent"}</dd></div>
     </dl>
     {!sent && state?.error !== null ? <form action={action} className="space-y-2"><SubmitButton variant="outline" pendingText="Sending…">Retry credential email</SubmitButton><FieldError>{state?.error}</FieldError></form> : null}
   </section>;
