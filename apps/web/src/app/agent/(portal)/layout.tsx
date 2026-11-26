@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import styles from "@/components/portal/operations-shell.module.css";
+import { AgentSectionNavigation } from "./section-navigation";
 import { AGENT_NAV_GROUPS } from "./navigation";
 import typography from "@/components/portal/agent-typography.module.css";
 
@@ -67,7 +68,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
 
   return (
     <PortalShell
-      className={styles.shell}
+      className={`${styles.shell} ${typography.shell}`}
       portalName="Agent Portal"
       roleLabel={
         {
@@ -96,7 +97,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
       <Suspense fallback={null}>
         <AgencyOnboarding agency={membership.agency} />
       </Suspense>
-      <div className={typography.portal}>{children}</div>
+      <div className={typography.portal}><AgentSectionNavigation />{children}</div>
     </PortalShell>
   );
 }

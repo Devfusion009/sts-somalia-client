@@ -1,5 +1,7 @@
 "use client";
 
+import agentUi from "@/components/portal/agent-typography.module.css";
+
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import {
@@ -35,7 +37,7 @@ export function AddCustomerForm() {
       <DialogTrigger render={<Button />}>
         <Plus data-icon="inline-start" aria-hidden="true" /> Add customer
       </DialogTrigger>
-      <DialogContent className={styles.dialog}>
+      <DialogContent className={`${styles.dialog} ${agentUi.dialog}`}>
         <DialogHeader className={styles.dialogHeader}>
           <DialogTitle>New customer</DialogTitle>
         </DialogHeader>

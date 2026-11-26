@@ -6,3 +6,6 @@
 .shell :global([data-slot="table-head"]) { height: 3rem; font-size: .8125rem; font-weight: 600; letter-spacing: 0; }
 .shell :global([data-slot="table-cell"]) { padding-block: 1rem; }
 .shell :global([data-slot="table-body"]) :global([data-slot="table-row"]):hover { background: color-mix(in oklch, var(--primary) 3%, var(--card)); }
+
+/* Reference treatment is confined to the application-review screen. */
+.shell:has([data-application-review]) { --sidebar:#004c49; --sidebar-background:#004c49; --sidebar-accent:#12635e; --sidebar-border:#ffffff26; --sidebar-foreground:#ffffff; --sidebar-accent-foreground:#ffffff; --sidebar-primary:#d5f4eb; --sidebar-primary-foreground:#004c49; }

@@ -26,6 +26,7 @@ const VERTICALS = [
 export function MarkupForm({ pendingScopes }: { pendingScopes: string[] }) {
   const [state, formAction] = useActionState<MarkupActionState, FormData>(upsertAgencyMarkup, null);
   const [itemType, setItemType] = useState("all");
+  const [markupType, setMarkupType] = useState("percent");
   const replacesPending = pendingScopes.includes(itemType);
 
   return (
@@ -58,13 +59,13 @@ export function MarkupForm({ pendingScopes }: { pendingScopes: string[] }) {
         <div className="grid grid-cols-2 gap-3">
           <Field>
             <FieldLabel htmlFor="markupType">Type</FieldLabel>
-            <select id="markupType" name="markupType" defaultValue="percent" className={NATIVE_SELECT_CLASS}>
+            <select id="markupType" name="markupType" value={markupType} onChange={(event) => setMarkupType(event.target.value)} className={NATIVE_SELECT_CLASS}>
               <option value="percent">Percent (%)</option>
               <option value="fixed">Fixed (USD)</option>
             </select>
           </Field>
           <Field data-invalid={state?.error ? true : undefined}>
-            <FieldLabel htmlFor="value">Value</FieldLabel>
+            <FieldLabel htmlFor="value">{markupType === "percent" ? "Markup (%)" : "Markup (USD)"}</FieldLabel>
             <Input
               id="value"
               name="value"

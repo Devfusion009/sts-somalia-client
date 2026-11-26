@@ -15,57 +15,119 @@
   letter-spacing: .045em;
 }
 .portal { min-width: 0; }
-.portal :global([data-slot="table-head"]) {
+:is(.portal, .dialog) :global([data-slot="table-head"]) {
   font-size: .6875rem;
   font-weight: 600;
   letter-spacing: .035em;
 }
-.portal :global([data-slot="table-cell"]) {
+:is(.portal, .dialog) :global([data-slot="table-cell"]) {
   padding-block: .875rem;
 }
-.portal :global([data-slot="table-cell"]:first-child:not(:has([role="checkbox"]))) {
+:is(.portal, .dialog) :global([data-slot="table-cell"]:first-child:not(:has([role="checkbox"]))) {
   font-weight: 600;
 }
-.portal :global([data-slot="table-row"][data-state="selected"]) {
+:is(.portal, .dialog) :global([data-slot="table-row"][data-state="selected"]) {
   background: var(--accent);
   box-shadow: inset 3px 0 var(--primary);
 }
-.portal :global([data-slot="label"]),
-.portal :global([data-slot="field-label"]) {
+:is(.portal, .dialog) :global([data-slot="label"]),
+:is(.portal, .dialog) :global([data-slot="field-label"]) {
   font-size: .75rem;
   font-weight: 600;
   letter-spacing: .01em;
   color: var(--muted-foreground);
 }
-.portal :global([data-slot="input"]),
-.portal :global([data-slot="input-group-control"]),
-.portal :global([data-slot="textarea"]),
-.portal :global([data-slot="select-trigger"]) {
+:is(.portal, .dialog) :global([data-slot="input"]),
+:is(.portal, .dialog) :global([data-slot="input-group-control"]),
+:is(.portal, .dialog) :global([data-slot="textarea"]),
+:is(.portal, .dialog) :global([data-slot="select-trigger"]) {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
-.portal :global([data-slot="input"]),
-.portal :global([data-slot="textarea"]),
-.portal :global([data-slot="select-trigger"]) {
+:is(.portal, .dialog) :global([data-slot="input"]),
+:is(.portal, .dialog) :global([data-slot="textarea"]),
+:is(.portal, .dialog) :global([data-slot="select-trigger"]) {
   background-color: color-mix(in oklch, var(--secondary) 35%, var(--card));
 }
-.portal :global([data-slot="input"]:focus-visible),
-.portal :global([data-slot="textarea"]:focus-visible),
-.portal :global([data-slot="select-trigger"]:focus-visible) {
+:is(.portal, .dialog) :global([data-slot="input"]:focus-visible),
+:is(.portal, .dialog) :global([data-slot="textarea"]:focus-visible),
+:is(.portal, .dialog) :global([data-slot="select-trigger"]:focus-visible) {
   background-color: var(--card);
 }
-.portal :global([data-slot="field"]:focus-within > [data-slot="field-label"]) {
+:is(.portal, .dialog) :global([data-slot="field"]:focus-within > [data-slot="field-label"]) {
   color: var(--primary);
 }
-.portal :global(input[autocomplete="organization"]),
-.portal :global(input[autocomplete="country"]) {
+:is(.portal, .dialog) :global(input[autocomplete="organization"]),
+:is(.portal, .dialog) :global(input[autocomplete="country"]) {
   font-weight: 600;
 }
-.portal :global(input::placeholder), .portal :global(textarea::placeholder) {
+:is(.portal, .dialog) :global(input::placeholder), :is(.portal, .dialog) :global(textarea::placeholder) {
   font-weight: 400;
 }
-.portal :global(dt) { font-weight: 500; }
-.portal :global([data-slot="badge"]) { font-weight: 600; }
+:is(.portal, .dialog) :global(dt) { font-weight: 500; }
+:is(.portal, .dialog) :global([data-slot="badge"]) { font-weight: 600; }
 @media (max-width: 639px) {
-  .portal :global([data-slot="table-cell"]) { padding-block: .75rem; }
+  :is(.portal, .dialog) :global([data-slot="table-cell"]) { padding-block: .75rem; }
 }
+
+/* Agent workspace: shared by every booking, finance and agency section. */
+.shell {
+  --agent-surface: color-mix(in oklch, var(--card) 96%, var(--primary));
+}
+.portal {
+  width: 100%;
+  max-width: 96rem;
+  margin-inline: auto;
+  line-height: 1.55;
+}
+:is(.portal, .dialog) :global([data-slot="page-header"]) {
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.portal h1 { font-size: clamp(1.5rem, 2.2vw, 2rem); line-height: 1.2; letter-spacing: -.035em; }
+:is(.portal, .dialog) :global([data-slot="card"]) { box-shadow: 0 2px 8px -6px color-mix(in oklch, var(--foreground) 20%, transparent); }
+:is(.portal, .dialog) :global([data-slot="label"]),
+:is(.portal, .dialog) :global([data-slot="field-label"]) { font-size: .8125rem; color: var(--foreground); line-height: 1.5; }
+:is(.portal, .dialog) :global([data-slot="input"]),
+:is(.portal, .dialog) :global([data-slot="select-trigger"]),
+:is(.portal, .dialog) :global([data-slot="input-group"]),
+:is(.portal, .dialog) :global(select:not([size])) {
+  min-height: 2.75rem;
+  border-radius: .625rem;
+  border-color: var(--input);
+  background-color: var(--card);
+}
+:is(.portal, .dialog) :global([data-slot="input-group"] input) { min-width: 0; }
+:is(.portal, .dialog) :global([data-slot="textarea"]) { min-height: 7rem; border-radius: .625rem; border-color: var(--input); background: var(--card); }
+:is(.portal, .dialog) :global(input[aria-invalid="true"]),
+:is(.portal, .dialog) :global(textarea[aria-invalid="true"]),
+:is(.portal, .dialog) :global(select[aria-invalid="true"]) { border-color: var(--destructive); }
+:is(.portal, .dialog) :global([data-slot="field-group"]) { gap: 1.25rem; }
+:is(.portal, .dialog) :global([data-slot="field-error"]) { font-size: .8125rem; line-height: 1.5; }
+:is(.portal, .dialog) :global([data-slot="button"]:not([data-size="icon"]):not([data-size="icon-sm"]):not([data-size="icon-xs"])) { min-height: 2.5rem; }
+:is(.portal, .dialog) :global([data-slot="button"]:focus-visible),
+:is(.portal, .dialog) :global(a:focus-visible),
+:is(.portal, .dialog) :global(input:focus-visible),
+:is(.portal, .dialog) :global(select:focus-visible),
+:is(.portal, .dialog) :global(textarea:focus-visible) { outline: 2px solid var(--ring); outline-offset: 3px; }
+:is(.portal, .dialog) :global([data-slot="table-head"]) { font-size: .75rem; white-space: nowrap; background: var(--agent-surface, var(--muted)); }
+:is(.portal, .dialog) :global([data-slot="table-cell"]) { font-size: .875rem; vertical-align: middle; }
+:is(.portal, .dialog) :global([data-slot="table-row"]:focus-within) { background: var(--accent); }
+:is(.portal, .dialog) :global([data-slot="table-container"]) { max-width: 100%; overscroll-behavior-inline: contain; }
+@media (max-width: 639px) {
+  :is(.portal, .dialog) :global([data-slot="input"]),
+  :is(.portal, .dialog) :global([data-slot="textarea"]),
+  :is(.portal, .dialog) :global([data-slot="select-trigger"]),
+  :is(.portal, .dialog) :global(select) { font-size: 1rem; }
+  :is(.portal, .dialog) :global([data-slot="page-header"]) { padding-bottom: 1rem; }
+  :is(.portal, .dialog) :global([data-slot="button"]:not([data-size^="icon"])) { min-height: 2.75rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .portal *, .portal *::before, .portal *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+.sectionNavigation { display: flex; gap: .375rem; max-width: 100%; overflow-x: auto; padding: .375rem; margin-bottom: 1.5rem; border: 1px solid var(--border); border-radius: .875rem; background: var(--card); scrollbar-width: thin; }
+.sectionNavigation a { display: inline-flex; flex-shrink: 0; align-items: center; min-height: 2.75rem; padding: .5rem .875rem; border-radius: .625rem; font-size: .8125rem; font-weight: 500; color: var(--muted-foreground); white-space: nowrap; }
+.sectionNavigation a:hover { background: var(--muted); color: var(--foreground); }
+.sectionNavigation a[aria-current="page"] { background: var(--accent); color: var(--accent-foreground); font-weight: 650; box-shadow: inset 0 -2px var(--primary); }
+
+.dialog { max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain; }

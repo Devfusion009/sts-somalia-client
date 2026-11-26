@@ -234,3 +234,33 @@ test('installed summary uses one RPC; authorization errors never fall back to ro
   await assert.rejects(denied.queries.getAgencyPendingPayments('other'), /could not be loaded/);
   assert.equal(denied.requests.length, 1);
 });
+
+function renderSectionNavigation(pathname) {
+  const { AGENT_NAV_GROUPS } = load('apps/web/src/app/agent/(portal)/navigation.ts');
+  const { AgentSectionNavigation } = load('apps/web/src/app/agent/(portal)/section-navigation.tsx', {
+    'next/link': { __esModule: true, default: ({ href, children, ...props }) => h('a', { href, 'aria-current': props['aria-current'] }, children) },
+    'next/navigation': { usePathname: () => pathname },
+    './navigation': { AGENT_NAV_GROUPS },
+    '@/components/portal/agent-typography.module.css': { __esModule: true, default: { sectionNavigation: 'section-navigation' } },
+  });
+  return renderToStaticMarkup(h(AgentSectionNavigation));
+}
+
+test('finance navigation selects the specific child instead of its wallet prefix', () => {
+  const html = renderSectionNavigation('/agent/finance/withdrawals');
+  assert.match(html, /href="\/agent\/finance\/withdrawals" aria-current="page"/);
+  assert.doesNotMatch(html, /href="\/agent\/finance" aria-current="page"/);
+  assert.equal((html.match(/aria-current="page"/g) ?? []).length, 1);
+  assert.match(html, /Finance pages/);
+});
+
+test('nested agency and booking-tool routes retain their section context', () => {
+  assert.match(renderSectionNavigation('/agent/team/member-1'), /href="\/agent\/team" aria-current="page"/);
+  assert.match(renderSectionNavigation('/agent/refunds/request-1'), /Booking tools pages/);
+  assert.match(renderSectionNavigation('/agent/security'), /Agency settings pages/);
+});
+
+test('dashboard and booking desk do not get unrelated section tabs', () => {
+  assert.equal(renderSectionNavigation('/agent'), '');
+  assert.equal(renderSectionNavigation('/agent/book/flights'), '');
+});

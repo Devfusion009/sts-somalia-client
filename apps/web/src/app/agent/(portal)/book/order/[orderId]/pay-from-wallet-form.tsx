@@ -1,5 +1,7 @@
 "use client";
 
+import agentUi from "@/components/portal/agent-typography.module.css";
+
 import { AgentMoney } from "@/components/portal/agent-money";
 
 
@@ -69,7 +71,7 @@ export function PayFromWalletForm({
       <DialogTrigger render={<Button size="lg" className="w-full tabular-nums" />}>
         Pay {<AgentMoney value={money(amount, currency)} />}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className={`${agentUi.dialog} sm:max-w-sm`}>
         <DialogHeader>
           <DialogTitle>Confirm payment</DialogTitle>
         </DialogHeader>

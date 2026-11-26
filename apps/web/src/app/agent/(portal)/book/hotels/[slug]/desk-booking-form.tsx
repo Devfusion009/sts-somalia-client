@@ -1,5 +1,7 @@
 "use client";
 
+import agentUi from "@/components/portal/agent-typography.module.css";
+
 import { AgentMoney } from "@/components/portal/agent-money";
 
 
@@ -98,7 +100,7 @@ export function DeskBookingForm({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size="sm" />}>Book</DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className={`${agentUi.dialog} sm:max-w-lg`}>
         <DialogHeader>
           <DialogTitle>{room.name}</DialogTitle>
         </DialogHeader>
