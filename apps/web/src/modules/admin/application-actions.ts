@@ -386,8 +386,10 @@ export async function retryAgentCredentialEmail(applicationId: string): Promise<
   const info = await loadApplicantInfo(supabase, "agency", applicationId);
   if (!info) return { error: "Application not found." };
   const status = await deliverAgentCredentials(applicationId, info);
-  revalidatePath(`/admin/partners/agency/${info.referenceNumber}`);
-  return { error: status === "sent" ? null : status === "not_configured" ? "Outgoing email is not configured." : "Credential email was not sent. Retry delivery." };
+  if (status !== "sent") return { error: status === "not_configured" ? "Outgoing email is not configured." : "Credential email was not sent. Retry delivery." };
+  // Return before rendering the full console. The client opens a fresh page
+  // after success, avoiding a long server-action revalidation response.
+  return { error: null, destination: `/admin/partners/agency/${encodeURIComponent(info.referenceNumber)}?approved=1&email=sent` };
 }
 
 const rejectSchema = z.object({

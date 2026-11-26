@@ -63,7 +63,7 @@ function fixture({ sendNotice } = {}) {
   const actions=load('apps/web/src/modules/admin/application-actions.ts', {
     '@/lib/integrations':{getIntegrations:()=>({email:{provider:emailProvider}})},
     '@/lib/agents/credentials':credentials,'@/lib/supabase/admin':adminModule,'@/lib/integrations-crypto':crypto,
-    'next/cache':{revalidatePath(){}},'next/navigation':{redirect(url){throw Object.assign(new Error(url),{redirect:true});}},
+    'next/cache':{revalidatePath(){if(emailStatus==='assert-no-revalidation')throw Error('Retry must not wait for console revalidation');}},'next/navigation':{redirect(url){throw Object.assign(new Error(url),{redirect:true});}},
     '@/lib/supabase/server':{createClient:async()=>client},'@/lib/auth/session':{requirePlatformAdmin:async()=>{if(!adminAllowed)throw Error('Denied');}},
     '@/lib/notifications/application-notify':notices,'@/modules/partner-applications/config':{docSlotsFor:()=>[]},
   });
@@ -104,6 +104,12 @@ test('saved credential delivery overrides stale approval URL success and failure
   for(const stale of ['failed','not_configured','pending'])assert.equal(agentCredentialEmailStatus({...approved,email_sent_at:'2026-11-26'},stale),'sent');
   assert.equal(agentCredentialEmailStatus(null,'not_configured'),'not_configured');
 });
+test('successful retry returns a fresh console URL without waiting for page revalidation',async()=>{
+  const f=fixture();await f.approve();f.setEmailStatus('assert-no-revalidation');
+  const sent=f.mail.length;
+  assert.deepEqual(await f.actions.retryAgentCredentialEmail(applicationId),{error:null,destination:'/admin/partners/agency/STS-TA-TEST?approved=1&email=sent'});
+  assert.equal(f.mail.length,sent);
+});
 test('real SMTP rejection followed by retry delivers the same usable credentials once', {timeout:15000}, async()=>{
   const { createSmtpCapture } = require('./helpers/smtp-capture.cjs');
   const nodemailer = require('nodemailer');
@@ -130,13 +136,13 @@ test('real SMTP rejection followed by retry delivers the same usable credentials
     const issued=f.mail[0].agentLogin;
     assert.ok(credential.password_encrypted);assert.equal(credential.email_sent_at,null);
     assert.equal(messages.length,1);assert.equal(messages[0].accepted,false);
-    assert.deepEqual(await f.actions.retryAgentCredentialEmail(applicationId),{error:null});
+    assert.deepEqual(await f.actions.retryAgentCredentialEmail(applicationId),{error:null,destination:'/admin/partners/agency/STS-TA-TEST?approved=1&email=sent'});
     assert.equal(messages.length,2);assert.equal(messages[1].accepted,true);
     assert.equal(messages[1].recipients.length,1);assert.match(messages[1].recipients[0],/contact@example\.test/);
     assert.ok(messages[1].message.includes(issued.agentId));assert.ok(messages[1].message.includes(issued.password));
     assert.ok(credential.email_sent_at);assert.equal(credential.password_encrypted,null);assert.equal(f.created,1);
     assert.deepEqual(await f.auth.signInWithAgentIdAction(null,loginForm(issued.agentId,issued.password)),{error:null,destination:'/agent'});
-    assert.deepEqual(await f.actions.retryAgentCredentialEmail(applicationId),{error:null});
+    assert.deepEqual(await f.actions.retryAgentCredentialEmail(applicationId),{error:null,destination:'/admin/partners/agency/STS-TA-TEST?approved=1&email=sent'});
     assert.equal(messages.length,2);assert.equal(f.created,1);
   } finally {
     for(const transport of transports)transport.close();
