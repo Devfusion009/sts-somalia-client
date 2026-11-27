@@ -22,6 +22,7 @@ import { parseDocumentSlotsJson, parseRequirementSectionsJson } from "./visa-typ
 import { COUNTRY_NAMES } from "@/lib/countries";
 import { invalidateCache } from "@/lib/redis";
 import { departureInput } from "@/modules/umrah/departure-input";
+import { umrahFacilitiesFromForm } from "@/modules/umrah/facility-options";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type ListingStatus = Database["public"]["Enums"]["listing_status"];
@@ -295,7 +296,13 @@ function slugify(input: string) {
 // ---------------------------------------------------------------------------
 
 function umrahPackageInput(formData: FormData) {
+  const requestFirst = formData.get("requestFirst") === "on";
   return {
+    ...(requestFirst ? {requestFirst:true,
+      formationClosesAt:`${formData.get("formationClosesAt") || ""}:00+03:00`,
+      paymentCutoffAt:`${formData.get("paymentCutoffAt") || ""}:00+03:00`,
+      paymentWindowHours:Number(formData.get("paymentWindowHours")), requestTerms:String(formData.get("requestTerms") ?? ""),
+    } : {}),
     packageType: String(formData.get("packageType") ?? "group") as "group" | "private",
     originIata: String(formData.get("originIata") ?? "").trim() || undefined,
     destinationIata: String(formData.get("destinationIata") ?? "").trim() || undefined,
@@ -307,13 +314,11 @@ function umrahPackageInput(formData: FormData) {
     contactPersonName: String(formData.get("contactPersonName") ?? ""),
     contactPersonPhone: String(formData.get("contactPersonPhone") ?? ""),
     agentContacts: formData.getAll("agentContactName").map((name, index) => ({ name: String(name).trim(), phone: String(formData.getAll("agentContactPhone")[index] ?? "").trim() })).filter(contact => contact.name || contact.phone),
-    facilities: String(formData.get("facilities") ?? ""),
+    facilities: umrahFacilitiesFromForm(formData),
     accommodationDetails: String(formData.get("accommodationDetails") ?? ""),
     flightDetails: String(formData.get("flightDetails") ?? ""),
     transportDetails: String(formData.get("transportDetails") ?? ""),
     mealsNote: String(formData.get("mealsNote") ?? ""),
-    nightsMakkah: formData.has("nightsMakkah") ? Number(formData.get("nightsMakkah")) : undefined,
-    nightsMadinah: formData.has("nightsMadinah") ? Number(formData.get("nightsMadinah")) : undefined,
     totalSeats: formData.has("totalSeats") ? Number(formData.get("totalSeats")) : undefined,
     departureDate: String(formData.get("departureDate") ?? "") || undefined,
     durationDays: Number(formData.get("durationDays")),

@@ -1,10 +1,12 @@
+import { AdminReviewWorkspace, AdminReviewTabs, AnswerReviewSummary } from "@/modules/partner-applications/components/admin-review-workspace";
 import { AnswerReviewProvider } from "@/modules/partner-applications/components/answer-review";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { Check, FileStack, History, X } from "lucide-react";
+import { Building2, Home, Check, FileStack, History, X, Clock3, MessageSquare } from "lucide-react";
+import reviewStyles from "@/modules/partner-applications/components/admin-review.module.css";
+import { getIntegrations } from "@/lib/integrations";
 import { cn } from "@/lib/utils";
-import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import {
   getApplicationDetail,
@@ -20,7 +22,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { StatRail } from "@/components/dashboard/stat-rail";
 import { APPLICATION_STATUS_VARIANT, applicationStatusLabel } from "../../status";
 import { ApplicationActions } from "../../application-actions";
 import { InternalNotesForm } from "../internal-notes-form";
@@ -33,7 +34,6 @@ import {
   DocFileIcon,
   detailSectionLinks,
   headerFacts,
-  SECTION_TONES,
   type SectionTone,
   type Details,
 } from "@/modules/partner-applications/components/detail-cards";
@@ -82,12 +82,11 @@ const DOC_ROW_STATUS: Record<string, string> = {
 
 /** Compact 3-node pipeline (Submitted -> Under Review -> Decision) so the admin sees where an application sits at a glance, not just its current label. */
 function ReviewPipeline({ status }: { status: string }) {
-  const inReview = status !== "pending";
   const decided = status === "approved" || status === "rejected";
   const rejected = status === "rejected";
   const nodes = [
     { label: "Submitted", done: true, active: false },
-    { label: "Review", done: inReview, active: status === "under_review" || status === "more_info_requested" },
+    { label: "Review", done: decided, active: status === "under_review" || status === "more_info_requested" },
     { label: "Decision", done: decided, active: false, rejected },
   ];
   return (
@@ -103,11 +102,11 @@ function ReviewPipeline({ status }: { status: string }) {
                   : node.done
                     ? "bg-primary text-primary-foreground"
                     : node.active
-                      ? "bg-primary/15 text-primary ring-2 ring-primary/40"
+                      ? "border-2 border-primary bg-card text-primary"
                       : "bg-muted text-muted-foreground"
               )}
             >
-              {node.done ? (node.rejected ? <X className="size-3.5" /> : <Check className="size-3.5" />) : i + 1}
+              {node.done ? (node.rejected ? <X className="size-3.5" /> : <Check className="size-3.5" />) : node.active ? <span className="size-2 rounded-full bg-primary"/> : i + 1}
             </span>
             <span className="text-center text-xs leading-tight whitespace-nowrap text-muted-foreground">{node.label}</span>
           </div>
@@ -139,7 +138,7 @@ export default async function ApplicationDetailPage({
   const name =
     type === "agency"
       ? (application as { agency_name: string }).agency_name
-      : type === "hotel_partner"
+      : (type === "hotel_partner" || type === "venue_partner")
         ? (application as { business_name: string }).business_name
         : `${TYPE_LABEL[type]} application`;
 
@@ -155,7 +154,6 @@ export default async function ApplicationDetailPage({
     })
   );
 
-  const applicant = application.applicant as unknown as { full_name: string | null; email: string; phone: string | null } | null;
   const decider = application.decider as unknown as { full_name: string | null; email: string } | null;
   const details = ((application as { business_details?: unknown }).business_details ?? {}) as Details;
   const logoUrl = partnerLogoUrl(typeof details.logoPath === "string" ? details.logoPath : null);
@@ -163,33 +161,11 @@ export default async function ApplicationDetailPage({
   // The account that signed in and submitted is routinely a different person
   // from the business's authorized contact; both sit side by side in the rail.
   const verifiedDocs = signedDocs.filter((d) => documentReviews.get(d.key)?.status === "verified").length;
-  const railItems: Array<{ label: string; value: string }> = [
-    { label: "Submitted by", value: applicant?.full_name ?? applicant?.email ?? "—" },
-    { label: "Account email", value: applicant?.email ?? "—" },
-    ...(type === "affiliate"
-      ? []
-      : [{ label: "Authorized contact", value: String(details.contactFullName ?? "—") || "—" }]),
-    { label: "Documents", value: signedDocs.length === 0 ? "None" : `${verifiedDocs} of ${signedDocs.length} verified` },
-    ...(type === "agency"
-      ? [
-          {
-            label: "Requested markup",
-            value:
-              details.requestedMarkupPercent == null || details.requestedMarkupPercent === ""
-                ? "—"
-                : `${details.requestedMarkupPercent}%`,
-          },
-        ]
-      : []),
-  ];
   const submitted = application.submitted_at ?? application.created_at;
-  const meta = [
-    application.reference_number ?? id,
-    TYPE_LABEL[type],
-    ...headerFacts(type, details),
-    format(new Date(submitted), "d MMM yyyy, HH:mm"),
-  ].join(" · ");
+  const identityFacts = headerFacts(type, details);
+  const StatusIcon = application.status === "approved" ? Check : application.status === "rejected" ? X : application.status === "more_info_requested" ? MessageSquare : Clock3;
   const decided = application.status === "approved" || application.status === "rejected";
+  const approvalUnavailable = type === "agency" && (!process.env.INTEGRATIONS_ENCRYPTION_KEY?.trim() || !getIntegrations().email.provider);
   const sections = detailSectionLinks(type);
   const jumpLinks: Array<{ id: string; label: string; tone: SectionTone }> = [
     ...sections,
@@ -201,44 +177,44 @@ export default async function ApplicationDetailPage({
   ];
 
   return (
+    <AnswerReviewProvider key={`${id}:${application.status}`} applicationId={id} type={type} enabled={application.status === "pending" || application.status === "under_review"}>
+    <AdminReviewWorkspace>
     <div className="space-y-6">
       <div className="space-y-5">
-        <BackLink href="/admin/applications" label="All applications" />
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-          <div className="flex min-w-0 items-center gap-4">
+        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground"><Link href="/admin" aria-label="Admin dashboard"><Home size={18}/></Link><span aria-hidden>/</span><span>Partners &amp; agencies</span><span aria-hidden>/</span><Link href="/admin/applications" className="hover:text-primary">Partner applications</Link><span aria-hidden>/</span><span className="font-semibold text-foreground">Application review</span></nav>
+        <header className={reviewStyles.reviewHeader}>
+          <div className={reviewStyles.headerIdentity}>
             {logoUrl ? (
-              <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-card max-sm:size-12">
+              <span className={reviewStyles.applicationLogo}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={logoUrl} alt="" className="size-full object-contain" />
               </span>
-            ) : null}
-            <div className="min-w-0 space-y-1">
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <h1 className="min-w-0 font-heading text-2xl font-semibold tracking-tight break-words">{name}</h1>
-                <Badge variant={APPLICATION_STATUS_VARIANT[application.status] ?? "neutral"}>
+            ) : <span className={reviewStyles.applicationLogo}><Building2 size={32} aria-hidden/></span>}
+            <div className={reviewStyles.headerMain}>
+              <div className={reviewStyles.headerKicker}>Partner application</div>
+              <div className={reviewStyles.headerTitle}>
+                <h1>{name}</h1>
+                <Badge className={reviewStyles.headerStatus} variant={APPLICATION_STATUS_VARIANT[application.status] ?? "neutral"}>
+                  <StatusIcon size={16} aria-hidden/>
                   {applicationStatusLabel(application.status)}
                 </Badge>
               </div>
-              <p className="text-sm break-words text-muted-foreground tabular-nums">{meta}</p>
+              {identityFacts.length > 0 && <ul className={reviewStyles.identityFacts}>{identityFacts.map(fact=><li key={fact}>{fact}</li>)}</ul>}
             </div>
+            {application.status === "approved" && partnerAccountId ? (
+              <Button className="shrink-0" render={<Link href={`/admin/partners/${slug}/${partnerAccountId}`} />}>
+                Partner account
+              </Button>
+            ) : null}
           </div>
-          {application.status === "approved" && partnerAccountId ? (
-            <Button className="shrink-0" render={<Link href={`/admin/partners/${slug}/${partnerAccountId}`} />}>
-              Partner account
-            </Button>
-          ) : null}
+          <dl className={reviewStyles.headerMetadata}>
+            <div><dt>Application reference</dt><dd className={reviewStyles.reference}>{application.reference_number ?? id}</dd></div>
+            <div><dt>Partner type</dt><dd>{TYPE_LABEL[type]}</dd></div>
+            <div><dt>Submitted</dt><dd><time dateTime={new Date(submitted).toISOString()}>{format(new Date(submitted), "d MMM yyyy, HH:mm")}</time></dd></div>
+          </dl>
         </header>
 
-        <StatRail className={cn(railItems.length === 5 ? "lg:grid-cols-5" : "lg:grid-cols-4")}>
-          {railItems.map(({ label, value }) => (
-            <div key={label} className="min-w-0 bg-secondary/40 px-4 py-3">
-              <dt className="truncate text-xs text-muted-foreground">{label}</dt>
-              <dd className="mt-0.5 truncate text-sm font-semibold" title={value}>
-                {value}
-              </dd>
-            </div>
-          ))}
-        </StatRail>
+
       </div>
 
       {application.status === "rejected" && application.review_notes ? (
@@ -252,30 +228,9 @@ export default async function ApplicationDetailPage({
         </Alert>
       ) : null}
 
-      <nav
-        aria-label="Application sections"
-        className="sticky top-14 z-10 -mx-4 overflow-x-auto border-y border-border bg-background/90 px-4 py-2 backdrop-blur-md sm:mx-0 sm:rounded-xl sm:border sm:px-2"
-      >
-        <ol className="flex min-w-max items-center gap-1">
-          {jumpLinks.map((link, i) => (
-            <li key={link.id}>
-              <a
-                href={`#${link.id}`}
-                style={{ "--tone": SECTION_TONES[link.tone] } as React.CSSProperties}
-                className="flex items-center gap-2 rounded-lg px-3 py-1.5 font-heading text-sm font-semibold text-foreground/75 transition-colors hover:bg-[color-mix(in_oklab,var(--tone)_10%,transparent)] hover:text-[var(--tone)]"
-              >
-                <span className="flex size-5 items-center justify-center rounded-md bg-[var(--tone)] font-mono text-[10px] font-bold text-white tabular-nums">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                {link.label}
-              </a>
-            </li>
-          ))}
-        </ol>
-      </nav>
+      <AdminReviewTabs items={jumpLinks} />
 
-      <AnswerReviewProvider key={`${id}:${application.status}`} applicationId={id} type={type} enabled={application.status === "pending" || application.status === "under_review"}>
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-6">
           {Object.keys(details).length === 0 ? null : type === "affiliate" ? (
             <AffiliateDetailCards details={details} />
@@ -385,10 +340,16 @@ export default async function ApplicationDetailPage({
         <aside className="space-y-4 xl:sticky xl:top-32">
           <Card>
             <CardHeader>
-              <SectionTitle>Review</SectionTitle>
+              <SectionTitle>Review summary</SectionTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <ReviewPipeline status={application.status} />
+              <AnswerReviewSummary />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><SectionTitle>Decision</SectionTitle></CardHeader>
+            <CardContent className="space-y-4">
               {application.status === "pending" ? (
                 <div className="space-y-2">
                   <form action={startReview.bind(null, type, id)}>
@@ -396,10 +357,10 @@ export default async function ApplicationDetailPage({
                       Start review
                     </Button>
                   </form>
-                  <ApplicationActions applicationId={application.id} type={type} />
+                  <ApplicationActions applicationId={application.id} type={type} approvalUnavailable={approvalUnavailable} />
                 </div>
               ) : application.status === "under_review" ? (
-                <ApplicationActions applicationId={application.id} type={type} />
+                <ApplicationActions applicationId={application.id} type={type} approvalUnavailable={approvalUnavailable} />
               ) : decided ? (
                 <div className="border-t border-border pt-4 text-sm">
                   <p className="font-medium">
@@ -431,7 +392,8 @@ export default async function ApplicationDetailPage({
           </Card>
         </aside>
       </div>
-      </AnswerReviewProvider>
     </div>
+    </AdminReviewWorkspace>
+    </AnswerReviewProvider>
   );
 }

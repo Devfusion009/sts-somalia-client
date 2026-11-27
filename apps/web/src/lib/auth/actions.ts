@@ -11,6 +11,7 @@ import { pathPrefixFor, portalHref, rootOrigin, type PortalSubdomain } from "@/l
 import { recordLoginEvent, recordSecurityEvent } from "@/lib/auth/login-history";
 import { sessionIdFromAccessToken } from "@/lib/auth/device";
 import { consumeRecoveryCode } from "@/lib/auth/recovery-codes";
+import { customerGoogleReturnPath } from "@/lib/auth/google-policy";
 
 /** `orderId` is set by desk bookings so a group submission can collect the orders it created. */
 export type ActionState = {
@@ -445,7 +446,7 @@ export async function signUpAction(
     return { error: error.message };
   }
 
-  redirect("/account");
+  redirect(customerGoogleReturnPath(formData.get("redirect_to") || "/"));
 }
 
 const mfaVerifySchema = z.object({

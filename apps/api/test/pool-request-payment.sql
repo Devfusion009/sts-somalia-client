@@ -1,0 +1,57 @@
+-- Aged legacy cleanup never cancels an active request-first invitation.
+update orders set created_at=now()-interval '3 days' where id in(select order_id from umrah_pool_requests);
+select release_public_umrah_checkouts();
+select _expire_unpaid_umrah_orders();
+select test_assert((select count(*)=2 from umrah_pool_requests where status='payment_due'),'legacy cleanup cancelled invitations');
+insert into test_ids select 'request-pay-order',order_id from umrah_pool_requests where status='payment_due' and num_pilgrims=1;
+select test_fails(format('insert into payments(order_id,amount,status) values(%L,50,''requires_action'')',(select id from test_ids where name='request-pay-order')),'full outstanding');
+select test_fails(format('insert into payments(order_id,amount,status,currency) values(%L,100,''requires_action'',''EUR'')',(select id from test_ids where name='request-pay-order')),'currency');
+insert into payments(order_id,amount,status) select id,100,'requires_action' from test_ids where name='request-pay-order';
+select test_assert((select status='payment_due' from umrah_pool_requests where order_id=(select id from test_ids where name='request-pay-order')),'bank evidence confirmed request');
+select test_fails(format('insert into payments(order_id,amount,status) values(%L,100,''processing'')',(select id from test_ids where name='request-pay-order')),'already processing');
+update payments set status='succeeded' where order_id=(select id from test_ids where name='request-pay-order');
+select test_assert((select status='paid' from umrah_pool_requests where order_id=(select id from test_ids where name='request-pay-order')),'full payment did not confirm request');
+select test_assert((select status='confirmed' from umrah_bookings where id=(select booking_id from umrah_pool_requests where order_id=(select id from test_ids where name='request-pay-order'))),'full payment did not confirm fulfillment');
+select test_assert((select count(*)=1 from invoices where order_id=(select id from test_ids where name='request-pay-order') and status='issued' and invoice_number like 'INV-%'),'paid Umrah order did not generate an invoice');
+update payments set status='succeeded' where order_id=(select id from test_ids where name='request-pay-order');
+select test_assert((select count(*)=1 from invoices where order_id=(select id from test_ids where name='request-pay-order')),'payment retry generated a duplicate invoice');
+select test_assert((select booked_seats=40 from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'settlement duplicated seats');
+-- Protected manual review and subsequent failure/expiry.
+insert into test_ids select 'request-expire-order',order_id from umrah_pool_requests where status='payment_due' and num_pilgrims=39;
+insert into payments(order_id,amount,status) select id,3900,'requires_action' from test_ids where name='request-expire-order';
+update umrah_pool_requests set payment_due_at=now()-interval '1 minute' where order_id=(select id from test_ids where name='request-expire-order');
+select expire_umrah_pool_requests();
+select test_assert((select status='payment_due' from umrah_pool_requests where order_id=(select id from test_ids where name='request-expire-order')),'review lost seats');
+update payments set status='failed' where order_id=(select id from test_ids where name='request-expire-order');
+select expire_umrah_pool_requests();
+select expire_umrah_pool_requests();
+select test_assert((select booked_seats=1 from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'expiry released incorrect seats');
+select test_assert((select status='expired' from umrah_pool_requests where order_id=(select id from test_ids where name='request-expire-order')),'expiry state incorrect');
+-- Late provider success is retained for reconciliation without resurrecting inventory.
+update payments set status='succeeded' where order_id=(select id from test_ids where name='request-expire-order');
+select test_assert((select status='cancelled' from orders where id=(select id from test_ids where name='request-expire-order')),'late success resurrected order');
+select test_assert((select count(*)=1 from umrah_pool_events where kind='payment_reconciliation'),'late funds not flagged');
+select test_assert((select booked_seats=1 from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'late success took seats');
+select set_config('test.admin','yes',false);
+select open_umrah_pool_replacements((select id from test_ids where name='request-departure'));
+select test_assert((select replacement_sales_open from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'replacements did not open');
+select set_config('test.uid','00000000-0000-0000-0000-000000000003',false),set_config('test.agent','no',false),set_config('test.admin','no',false);
+select submit_umrah_pool_requests((select id from test_ids where name='request-departure'),gen_random_uuid(),'[{"pilgrims":[{"full_name":"Replacement QA","gender":"female"}]}]',true);
+select process_umrah_request_pools();
+select test_assert((select count(*)=3 from umrah_pool_email_jobs where kind='payment_due'),'replacement reissued old invitations');
+select test_assert((select booked_seats=2 from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'replacement count incorrect');
+-- Queue lease retry, no second claim and no stale worker acknowledgment.
+create table qa_mail_claim as select * from claim_umrah_pool_emails(1);
+select test_assert((select count(*)=1 from qa_mail_claim),'mail not claimed');
+select finish_umrah_pool_email((select id from qa_mail_claim),gen_random_uuid(),'sent',null);
+select test_assert((select status='sending' from umrah_pool_email_jobs where id=(select id from qa_mail_claim)),'stale lease acknowledged');
+select finish_umrah_pool_email((select id from qa_mail_claim),(select claim_token from qa_mail_claim),'failed','SMTP unavailable');
+select test_assert((select status='pending' and available_at>now() from umrah_pool_email_jobs where id=(select id from qa_mail_claim)),'retry/backoff missing');
+update umrah_pool_email_jobs set attempts=9,available_at=now()-interval '1 minute' where id=(select id from qa_mail_claim);
+truncate qa_mail_claim;
+insert into qa_mail_claim select * from claim_umrah_pool_emails(1);
+select finish_umrah_pool_email((select id from qa_mail_claim),(select claim_token from qa_mail_claim),'failed','SMTP unavailable');
+select test_assert((select status='failed' from umrah_pool_email_jobs where id=(select id from qa_mail_claim)),'exhausted notification disappeared');
+select set_config('test.admin','yes',false);
+select resend_umrah_pool_email((select id from qa_mail_claim));
+select test_assert((select status='pending' and attempts=0 from umrah_pool_email_jobs where id=(select id from qa_mail_claim)),'admin resend failed');

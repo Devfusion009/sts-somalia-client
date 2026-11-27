@@ -1,0 +1,95 @@
+name: client_impression
+run-name: Client preview · ${{ github.ref_name }} · run ${{ github.run_number }}
+
+on:
+  push:
+    branches: [client_impression]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize releases so an older build cannot overwrite a newer client preview.
+concurrency:
+  group: deploy-client-impression
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/client_impression'
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Vercel client preview
+    needs: verify
+    if: github.ref == 'refs/heads/client_impression'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: client_impression
+      url: https://sts-client-impression.vercel.app/design-preview
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT: prj_Vjep37WcMqFOAtgnZhjaTAYpe740
+      VERCEL_SCOPE: sasmalsubhadip80-6309s-projects
+      PREVIEW_ALIAS: sts-client-impression.vercel.app
+      VERCEL_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate deployment credentials
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo '::error::Add the VERCEL_TOKEN Actions secret before deploying the client preview.'
+            exit 1
+          fi
+
+      - name: Install pinned Vercel CLI
+        run: npm install --global vercel@59.1.3
+
+      # Build once on Vercel using the existing apps/web monorepo project.
+      - name: Build and deploy preview
+        id: deployment
+        run: |
+          set -euo pipefail
+          vercel deploy --yes --target=preview \
+            --project "$VERCEL_PROJECT" --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN" \
+            --meta "githubCommitSha=$GITHUB_SHA" \
+            --meta "githubCommitRef=client_impression" > deployment-url.txt
+          node scripts/validate-preview-url.cjs deployment-url.txt >> "$GITHUB_OUTPUT"
+
+      - name: Update the existing client preview link
+        env:
+          DEPLOYMENT_URL: ${{ steps.deployment.outputs.url }}
+        run: |
+          set -euo pipefail
+          vercel alias set "$DEPLOYMENT_URL" "$PREVIEW_ALIAS" \
+            --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN"
+          printf '### Client impression\n\n[Open preview](https://%s/design-preview)\n\nCommit: `%s`\n' \
+            "$PREVIEW_ALIAS" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify public client link
+        run: |
+          python3 - <<'PY'
+          import os
+          import time
+          import urllib.request
+
+          url = f"https://{os.environ['PREVIEW_ALIAS']}/design-preview"
+          for attempt in range(6):
+              try:
+                  # No auth headers or cookies: test the link as a client.
+                  with urllib.request.urlopen(url, timeout=30) as response:
+                      html = response.read().decode('utf-8')
+                      if response.status == 200 and response.url == url and 'Travel from Somalia' in html:
+                          print(f'Public preview verified: {url}')
+                          break
+              except Exception as error:
+                  print(f'Preview check {attempt + 1}: {error}')
+              if attempt == 5:
+                  raise SystemExit('The shared preview link is not publicly accessible.')
+              time.sleep(10)
+          PY

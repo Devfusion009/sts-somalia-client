@@ -1,5 +1,7 @@
 "use client";
 
+import agentUi from "@/components/portal/agent-typography.module.css";
+
 import { AgentMoney } from "@/components/portal/agent-money";
 
 
@@ -245,7 +247,7 @@ export function EventCalendar({
       </div>
 
       <Dialog open={selectedDay !== null} onOpenChange={(open) => !open && setSelectedDay(null)}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className={`${agentUi.dialog} max-h-[85vh] overflow-y-auto sm:max-w-lg`}>
           <DialogHeader>
             <DialogTitle>{selectedDay ? format(selectedDay, "EEEE, d MMMM yyyy") : ""}</DialogTitle>
           </DialogHeader>

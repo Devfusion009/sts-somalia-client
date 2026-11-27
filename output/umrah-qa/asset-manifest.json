@@ -1,0 +1,37 @@
+{
+  "qa_package_id": "430b5640-77c8-4897-ac2c-3102df8be7d8",
+  "assets": [
+    {
+      "file": "coach.webp",
+      "bytes": 246820,
+      "sha256": "fb07abe5d7ada1a230f8a901149cfb316ed145c7578591447eac8d8a235f3a06",
+      "purpose": "Fictional QA illustration; not contracted accommodation or transport",
+      "bucket": "umrah-images",
+      "storage_path": "430b5640-77c8-4897-ac2c-3102df8be7d8/1794925205119-4egyj0w7-coach.webp"
+    },
+    {
+      "file": "madinah.webp",
+      "bytes": 195968,
+      "sha256": "28feb9d8078b41608c388e2ce04f94044af5ff873577e358e9e1ee812713777d",
+      "purpose": "Fictional QA illustration; not contracted accommodation or transport",
+      "bucket": "umrah-images",
+      "storage_path": "430b5640-77c8-4897-ac2c-3102df8be7d8/1794925192161-nt90fyex-madinah.webp"
+    },
+    {
+      "file": "makkah.webp",
+      "bytes": 159430,
+      "sha256": "cdd3d5280368e021625b5846e81218adc73e9c89f2e44a71922cb4a98b865be7",
+      "purpose": "Fictional QA illustration; not contracted accommodation or transport",
+      "bucket": "umrah-images",
+      "storage_path": "430b5640-77c8-4897-ac2c-3102df8be7d8/1794925189406-934105a6-makkah.webp"
+    },
+    {
+      "file": "room.webp",
+      "bytes": 110632,
+      "sha256": "b41ec11286999bec9c5e236c171cb8fca2983dd727b10277c112a8fbb8ace148",
+      "purpose": "Fictional QA illustration; not contracted accommodation or transport",
+      "bucket": "umrah-images",
+      "storage_path": "430b5640-77c8-4897-ac2c-3102df8be7d8/1794925194373-6juebies-room.webp"
+    }
+  ]
+}

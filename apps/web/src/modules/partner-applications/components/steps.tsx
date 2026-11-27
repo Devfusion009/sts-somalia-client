@@ -1,7 +1,9 @@
 "use client";
 
-import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { applicantAnswer, NOT_PROVIDED_BY_APPLICANT } from "../answer-display";
+import { DraftStep, useDraftCapture, type DraftApplication } from "./draft-step";
 import {
   AlertCircle,
   ArrowRight,
@@ -105,11 +107,11 @@ import {
   type ApplicationKind,
   type DocSlot,
 } from "../config";
-import type { ApplicationRow, DocumentRef, DocumentReview } from "../queries";
+import type { DocumentRef, DocumentReview } from "../queries";
 import { partnerLogoUrl } from "../logo-url";
 import { FileField } from "@/components/ui/upload";
 
-type AppRow = ApplicationRow;
+type AppRow = DraftApplication;
 
 function s(v: unknown): string {
   return typeof v === "string" ? v : "";
@@ -131,44 +133,6 @@ function IconInput({ icon: Icon, className, ...props }: { icon: LucideIcon } & R
       <Input className={cn("pl-9", className)} {...props} />
     </div>
   );
-}
-
-/**
- * Debounced autosave: any change or click inside the form (typing, a native
- * select, or a click-based custom picker like BucketPicker/CountryCodeSelect
- * that don't fire native "change" events) schedules a save a moment later.
- *
- * Calls the useActionState dispatch DIRECTLY with a snapshotted FormData
- * rather than `form.requestSubmit()`. This is deliberate, not stylistic:
- * React 19 resets a <form>'s uncontrolled fields after an action bound via
- * its `action` prop finishes a real submit-event-driven submission — fine
- * for "Continue" (the page navigates away immediately after, so the reset
- * is invisible), but for autosave it was wiping out whatever the user had
- * just typed in an *earlier* field (e.g. business phone) the moment a
- * *later* field's autosave round-trip completed, since defaultValue-based
- * inputs snap back to their stale initial value on reset. Invoking the
- * dispatch as a plain function call bypasses the native submit-event path
- * entirely, so that auto-reset never triggers.
- */
-function useAutosave(formRef: React.RefObject<HTMLFormElement | null>, formAction: (payload: FormData) => void) {
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  return useCallback(() => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      if (!formRef.current) return;
-      const payload = new FormData(formRef.current);
-      startTransition(() => formAction(payload));
-    }, 900);
-  }, [formRef, formAction]);
-}
-
-/**
- * A non-redirecting successful action result only ever comes from an
- * autosave submit — "Continue" always redirects on success instead — so
- * this is a plain derived value, no effect/state needed to track it.
- */
-function isSaved(state: ActionState, pending: boolean): boolean {
-  return !pending && state !== null && state.error === null;
 }
 
 /**
@@ -296,12 +260,15 @@ function ErrorAlert({ state }: { state: ActionState }) {
 /* -------------------------------------------------------------------------- */
 /* Step 1 — business details (agency / hotel_partner) or "about you" (affiliate) */
 /* -------------------------------------------------------------------------- */
-export function StepBusiness({ kind, application, backHref }: { kind: ApplicationKind; application: AppRow; backHref: string }) {
-  const [state, formAction, pending] = useActionState(saveStep1, null);
+export function StepBusiness(props: { kind: ApplicationKind; application: AppRow; backHref: string }) {
+  return <DraftStep kind={props.kind} application={props.application} step={1}>{application => <BusinessFields {...props} application={application} />}</DraftStep>;
+}
+
+function BusinessFields({ kind, application, backHref }: { kind: ApplicationKind; application: AppRow; backHref: string }) {
+  const [state, formAction] = useActionState(saveStep1, null);
   const d = application.business_details;
   const formRef = useRef<HTMLFormElement>(null);
-  const autosave = useAutosave(formRef, formAction);
-  const saved = isSaved(state, pending);
+  const autosave = useDraftCapture(formRef);
   useRestoreOnError(formRef, state);
   const validation = useFieldValidation(formRef, kind === "affiliate" ? step1AffiliateSchema : step1BusinessSchema, state);
 
@@ -330,10 +297,10 @@ export function StepBusiness({ kind, application, backHref }: { kind: Applicatio
                 name="audienceLocation"
                 defaultValue={s(d.audienceLocation)}
                 options={AUDIENCE_LOCATIONS.map((v) => ({ value: v, label: AUDIENCE_LOCATION_LABELS[v] }))}
-              />
+             />
             </WizardField>
           </div>
-          <StepNav backHref={backHref} saving={pending} saved={saved} />
+          <StepNav backHref={backHref} />
         </FieldErrorsProvider>
       </form>
     );
@@ -363,7 +330,7 @@ export function StepBusiness({ kind, application, backHref }: { kind: Applicatio
                 label: t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
                 icon: BUSINESS_TYPE_ICONS[t],
               }))}
-            />
+           />
           </WizardField>
           <WizardField name="yearEstablished" label="Year established" required>
             <YearField name="yearEstablished" defaultValue={s(d.yearEstablished)} min={EARLIEST_BUSINESS_YEAR} max={CURRENT_YEAR} required />
@@ -402,7 +369,7 @@ export function StepBusiness({ kind, application, backHref }: { kind: Applicatio
               { key: "location", placeholder: "Location" },
             ]}
             addLabel="Add branch"
-          />
+         />
         </WizardField>
 
         <Separator />
@@ -418,7 +385,7 @@ export function StepBusiness({ kind, application, backHref }: { kind: Applicatio
           </WizardField>
         </div>
 
-        <StepNav backHref={backHref} saving={pending} saved={saved} />
+        <StepNav backHref={backHref} />
       </FieldErrorsProvider>
     </form>
   );
@@ -427,12 +394,15 @@ export function StepBusiness({ kind, application, backHref }: { kind: Applicatio
 /* -------------------------------------------------------------------------- */
 /* Step 2 — authorized contact (agency / hotel_partner) or identity verification (affiliate) */
 /* -------------------------------------------------------------------------- */
-export function StepContact({ kind, application }: { kind: ApplicationKind; application: AppRow }) {
-  const [state, formAction, pending] = useActionState(saveStep2, null);
+export function StepContact(props: { kind: ApplicationKind; application: AppRow }) {
+  return <DraftStep kind={props.kind} application={props.application} step={2}>{application => <ContactFields {...props} application={application} />}</DraftStep>;
+}
+
+function ContactFields({ kind, application }: { kind: ApplicationKind; application: AppRow }) {
+  const [state, formAction] = useActionState(saveStep2, null);
   const d = application.business_details;
   const formRef = useRef<HTMLFormElement>(null);
-  const autosave = useAutosave(formRef, formAction);
-  const saved = isSaved(state, pending);
+  const autosave = useDraftCapture(formRef);
   useRestoreOnError(formRef, state);
   const validation = useFieldValidation(formRef, kind === "affiliate" ? step2AffiliateSchema : step2ContactSchema, state);
 
@@ -446,7 +416,7 @@ export function StepContact({ kind, application }: { kind: ApplicationKind; appl
           <WizardField name="idNumber" label="National ID or passport number" required>
             <Input name="idNumber" defaultValue={s(d.idNumber)} required />
           </WizardField>
-          <StepNav backHref={`/account/become/${kind}/${application.id}?step=1`} saving={pending} saved={saved} />
+          <StepNav backHref={`/account/become/${kind}/${application.id}?step=1`} />
         </FieldErrorsProvider>
       </form>
     );
@@ -477,7 +447,7 @@ export function StepContact({ kind, application }: { kind: ApplicationKind; appl
           </WizardField>
         </div>
 
-        <StepNav backHref={`/account/become/${kind}/${application.id}?step=1`} saving={pending} saved={saved} />
+        <StepNav backHref={`/account/become/${kind}/${application.id}?step=1`} />
       </FieldErrorsProvider>
     </form>
   );
@@ -494,7 +464,7 @@ function AmenitiesField({ initial }: { initial: string[] }) {
               type="checkbox"
               checked={checked.includes(a)}
               onChange={(e) => setChecked((prev) => (e.target.checked ? [...prev, a] : prev.filter((v) => v !== a)))}
-            />
+           />
             {AMENITY_LABELS[a]}
           </label>
         ))}
@@ -517,7 +487,7 @@ function ProductsField({ initial }: { initial: string[] }) {
               onChange={(e) =>
                 setChecked((prev) => (e.target.checked ? [...prev, p] : prev.filter((v) => v !== p)))
               }
-            />
+           />
             {p[0].toUpperCase() + p.slice(1)}
           </label>
         ))}
@@ -551,7 +521,7 @@ function OrgMemberField({
             { value: "yes", label: "Yes" },
             { value: "no", label: "No" },
           ]}
-        />
+       />
       </WizardField>
       {isMember === "yes" ? (
         <>
@@ -560,7 +530,7 @@ function OrgMemberField({
               name="orgMemberType"
               defaultValue={initialType}
               options={ORG_MEMBER_TYPES.map((t) => ({ value: t, label: ORG_MEMBER_TYPE_LABELS[t] }))}
-            />
+           />
           </WizardField>
           <WizardField name="iataNumber" label="Membership number">
             <Input name="iataNumber" defaultValue={initialNumber} />
@@ -582,7 +552,7 @@ function VenueEventTypesField({ initial }: { initial: string[] }) {
               type="checkbox"
               checked={checked.includes(t)}
               onChange={(e) => setChecked((prev) => (e.target.checked ? [...prev, t] : prev.filter((v) => v !== t)))}
-            />
+           />
             {t[0].toUpperCase() + t.slice(1)}
           </label>
         ))}
@@ -595,13 +565,16 @@ function VenueEventTypesField({ initial }: { initial: string[] }) {
 /* -------------------------------------------------------------------------- */
 /* Step 3 — type-specific operations                                          */
 /* -------------------------------------------------------------------------- */
-export function StepOperations({ kind, application }: { kind: ApplicationKind; application: AppRow }) {
-  const [state, formAction, pending] = useActionState(saveStep3, null);
+export function StepOperations(props: { kind: ApplicationKind; application: AppRow }) {
+  return <DraftStep kind={props.kind} application={props.application} step={3}>{application => <OperationsFields {...props} application={application} />}</DraftStep>;
+}
+
+function OperationsFields({ kind, application }: { kind: ApplicationKind; application: AppRow }) {
+  const [state, formAction] = useActionState(saveStep3, null);
   const d = application.business_details;
   const backHref = `/account/become/${kind}/${application.id}?step=2`;
   const formRef = useRef<HTMLFormElement>(null);
-  const autosave = useAutosave(formRef, formAction);
-  const saved = isSaved(state, pending);
+  const autosave = useDraftCapture(formRef);
   useRestoreOnError(formRef, state);
   const validation = useFieldValidation(
     formRef,
@@ -631,14 +604,14 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
                 name="propertyType"
                 defaultValue={s(d.propertyType)}
                 options={PROPERTY_TYPES.map((t) => ({ value: t, label: PROPERTY_TYPE_LABELS[t] }))}
-              />
+             />
             </WizardField>
             <WizardField name="starRating" label="Star rating" required>
               <OptionPicker
                 name="starRating"
                 defaultValue={s(d.starRating)}
                 options={STAR_RATINGS.map((r) => ({ value: r, label: STAR_RATING_LABELS[r] }))}
-              />
+             />
             </WizardField>
             <WizardField name="propertyName" label="Property name" required className="sm:col-span-2">
               <Input name="propertyName" defaultValue={s(d.propertyName)} required />
@@ -675,14 +648,14 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
                 defaultValue={s(d.cancellationPolicy)}
                 layout="stack"
                 options={CANCELLATION_POLICIES.map((c) => ({ value: c, ...CANCELLATION_POLICY_LABELS[c] }))}
-              />
+             />
             </WizardField>
           </div>
 
           <Separator />
           <AmenitiesField initial={initialAmenities} />
 
-          <StepNav backHref={backHref} saving={pending} saved={saved} />
+          <StepNav backHref={backHref} />
         </FieldErrorsProvider>
       </form>
     );
@@ -714,7 +687,7 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
             </WizardField>
           </div>
           <VenueEventTypesField initial={initialEventTypes} />
-          <StepNav backHref={backHref} saving={pending} saved={saved} />
+          <StepNav backHref={backHref} />
         </FieldErrorsProvider>
       </form>
     );
@@ -737,7 +710,7 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
                 { key: "handle", placeholder: "Handle or URL" },
               ]}
               addLabel="Add handle"
-            />
+           />
           </WizardField>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <WizardField name="audienceSize" label="Audience size">
@@ -748,7 +721,7 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
                 name="trafficSource"
                 defaultValue={s(d.trafficSource)}
                 options={TRAFFIC_SOURCES.map((t) => ({ value: t, label: t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) }))}
-              />
+             />
             </WizardField>
           </div>
           <WizardField name="promotionPlan" label="How do you plan to promote STS Somalia?" required>
@@ -758,9 +731,9 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
               defaultValue={s(d.promotionPlan)}
               placeholder="e.g. I post Umrah travel tips to my Instagram followers and share deals in a Somali diaspora WhatsApp group."
               required
-            />
+           />
           </WizardField>
-          <StepNav backHref={backHref} saving={pending} saved={saved} />
+          <StepNav backHref={backHref} />
         </FieldErrorsProvider>
       </form>
     );
@@ -781,7 +754,7 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
               defaultValue={s(d.yearsExperience)}
               options={["<1", "1-2", "3-5", "5-10", "10+"]}
               customPlaceholder="Exact years"
-            />
+           />
           </WizardField>
           <WizardField name="staffCount" label="Number of staff using the platform">
             <BucketPicker
@@ -789,21 +762,21 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
               defaultValue={s(d.staffCount)}
               options={["1", "2-5", "5-10", "10+"]}
               customPlaceholder="Exact headcount"
-            />
+           />
           </WizardField>
           <WizardField name="monthlyVolume" label="Estimated monthly booking volume" required className="sm:col-span-2">
             <OptionPicker
               name="monthlyVolume"
               defaultValue={s(d.monthlyVolume)}
               options={VOLUME_RANGES.map((r) => ({ value: r, label: r }))}
-            />
+           />
           </WizardField>
         </div>
         <Separator />
         <OrgMemberField initialIsMember={s(d.isOrgMember)} initialType={s(d.orgMemberType)} initialNumber={s(d.iataNumber)} />
         <Separator />
         <ProductsField initial={initialProducts} />
-        <StepNav backHref={backHref} saving={pending} saved={saved} />
+        <StepNav backHref={backHref} />
       </FieldErrorsProvider>
     </form>
   );
@@ -812,16 +785,19 @@ export function StepOperations({ kind, application }: { kind: ApplicationKind; a
 /* -------------------------------------------------------------------------- */
 /* Step 4 — settlement                                                        */
 /* -------------------------------------------------------------------------- */
-export function StepSettlement({ kind, application }: { kind: ApplicationKind; application: AppRow }) {
-  const [state, formAction, pending] = useActionState(saveStep4, null);
+export function StepSettlement(props: { kind: ApplicationKind; application: AppRow }) {
+  return <DraftStep kind={props.kind} application={props.application} step={4}>{application => <SettlementFields {...props} application={application} />}</DraftStep>;
+}
+
+function SettlementFields({ kind, application }: { kind: ApplicationKind; application: AppRow }) {
+  const [state, formAction] = useActionState(saveStep4, null);
   const d = application.business_details;
   const [paymentModel, setPaymentModel] = useState(s(d.paymentModel) || "prepaid_wallet");
   const savedMarkup = d.requestedMarkupPercent == null || d.requestedMarkupPercent === "" ? null : Number(d.requestedMarkupPercent);
   const savedMarkupIsPreset = savedMarkup !== null && MARKUP_PRESETS.includes(savedMarkup);
-  const [markupPreset, setMarkupPreset] = useState(savedMarkup === null ? "" : savedMarkupIsPreset ? String(savedMarkup) : "custom");
+  const [markupPreset, setMarkupPreset] = useState(typeof d.requestedMarkupPreset === "string" ? d.requestedMarkupPreset : savedMarkup === null ? "" : savedMarkupIsPreset ? String(savedMarkup) : "custom");
   const formRef = useRef<HTMLFormElement>(null);
-  const autosave = useAutosave(formRef, formAction);
-  const saved = isSaved(state, pending);
+  const autosave = useDraftCapture(formRef);
   useRestoreOnError(formRef, state);
   const validation = useFieldValidation(
     formRef,
@@ -847,7 +823,7 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
               name="payoutFrequency"
               defaultValue={s(d.payoutFrequency)}
               options={PAYOUT_FREQUENCIES.map((f) => ({ value: f, label: PAYOUT_FREQUENCY_LABELS[f] }))}
-            />
+           />
           </WizardField>
 
           <Separator />
@@ -864,7 +840,7 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
             </WizardField>
           </div>
 
-          <StepNav backHref={backHref} saving={pending} saved={saved} />
+          <StepNav backHref={backHref} />
         </FieldErrorsProvider>
       </form>
     );
@@ -887,7 +863,7 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
               { value: "prepaid_wallet", label: "Prepaid wallet top-up", icon: Wallet },
               { value: "credit_line", label: "Request a credit line", icon: Landmark },
             ]}
-          />
+         />
         </WizardField>
 
         {paymentModel === "credit_line" ? (
@@ -927,9 +903,9 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
                 step="0.01"
                 min="0"
                 max="100"
-                defaultValue={savedMarkup !== null && !savedMarkupIsPreset ? String(savedMarkup) : ""}
+                defaultValue={typeof d.requestedMarkupCustom === "string" ? d.requestedMarkupCustom : savedMarkup !== null && !savedMarkupIsPreset ? String(savedMarkup) : ""}
                 required
-              />
+             />
             </WizardField>
           ) : null}
         </div>
@@ -953,7 +929,7 @@ export function StepSettlement({ kind, application }: { kind: ApplicationKind; a
           <Textarea name="remarks" rows={3} defaultValue={s(d.remarks)} />
         </WizardField>
 
-        <StepNav backHref={backHref} saving={pending} saved={saved} />
+        <StepNav backHref={backHref} />
       </FieldErrorsProvider>
     </form>
   );
@@ -1117,7 +1093,7 @@ function DocUploadRow({
               setExpiry(e.target.value);
               if (existing) e.currentTarget.form?.requestSubmit();
             }}
-          />
+         />
           {!existing ? null : expiryPending ? (
             <p className="text-xs text-muted-foreground">Saving…</p>
           ) : isExpired ? (
@@ -1141,7 +1117,7 @@ function DocUploadRow({
             autoSubmit
             validate={checkUploadFile}
             label={isRejected ? "Drop a replacement PDF" : "Drop a PDF"}
-          />
+         />
         </form>
       ) : null}
       {state?.error ? (
@@ -1181,7 +1157,7 @@ export function StepDocuments({
           existing={refs.find((r) => r.key === slot.key)}
           review={reviews[slot.key]}
           iconIndex={i}
-        />
+       />
       ))}
       {rejectedDocs.length > 0 ? (
         <Alert variant="destructive">
@@ -1214,7 +1190,7 @@ export function StepDocuments({
         <StepNav
           backHref={`/account/become/${kind}/${application.id}?step=${backStep}`}
           nextLabel="Continue to review"
-        />
+       />
       </form>
     </div>
   );
@@ -1243,7 +1219,7 @@ function SummaryRow({ label, value }: { label: string; value: unknown }) {
   return (
     <div className="flex justify-between gap-4 py-1 text-sm">
       <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium">{display}</span>
+      <span className={cn("text-right", display === NOT_PROVIDED_BY_APPLICANT ? "font-normal text-muted-foreground" : "font-medium")}>{display}</span>
     </div>
   );
 }
@@ -1270,14 +1246,14 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
             <SummaryRow
               label="Audience location"
               value={d.audienceLocation ? ((AUDIENCE_LOCATION_LABELS as Record<string, string>)[String(d.audienceLocation)] ?? String(d.audienceLocation)) : null}
-            />
+           />
             <SummaryRow label="Mobile" value={d.mobile} />
             <SummaryRow label="Email" value={d.email} />
           </>
         ) : (
           <>
             <SummaryRow label="Legal business name" value={d.legalBusinessName} />
-            <SummaryRow label="Trading name" value={d.tradingName} />
+            <SummaryRow label="Trading name" value={applicantAnswer(d.tradingName)} />
             <SummaryRow label="Business type" value={d.businessType} />
             <SummaryRow label="City" value={d.officeCity} />
             <SummaryRow label="Business phone" value={d.businessPhone} />
@@ -1309,6 +1285,7 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
             <SummaryRow label="Name" value={d.contactFullName} />
             <SummaryRow label="Role" value={d.contactRole} />
             <SummaryRow label="Mobile" value={d.contactMobile} />
+            <SummaryRow label={kind === "agency" ? "Credential email" : "Email"} value={d.contactEmail} />
           </>
         )}
       </div>
@@ -1333,7 +1310,7 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
             <SummaryRow
               label="Room types"
               value={Array.isArray(d.roomTypes) ? (d.roomTypes as RoomTypeRow[]).map((r) => r.typeName).join(", ") : null}
-            />
+           />
             <SummaryRow label="Check-in / check-out" value={d.checkInTime && d.checkOutTime ? `${d.checkInTime} / ${d.checkOutTime}` : null} />
             <SummaryRow
               label="Amenities"
@@ -1342,7 +1319,7 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
                   ? (d.amenities as string[]).map((a) => AMENITY_LABELS[a] ?? a).join(", ")
                   : null
               }
-            />
+           />
           </>
         ) : kind === "venue_partner" ? (
           <>
@@ -1355,7 +1332,7 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
                   ? `${d.seatedCapacity ? `${d.seatedCapacity} seated · ` : ""}${d.standingCapacity} standing`
                   : null
               }
-            />
+           />
             <SummaryRow label="Event types" value={d.eventTypes} />
             <SummaryRow label="Indicative price" value={d.indicativePrice ? `USD ${d.indicativePrice}` : null} />
           </>
@@ -1381,7 +1358,7 @@ export function StepReview({ kind, application }: { kind: ApplicationKind; appli
               <SummaryRow
                 label="Markup"
                 value={d.requestedMarkupPercent == null || d.requestedMarkupPercent === "" ? null : `${d.requestedMarkupPercent}%`}
-              />
+             />
             </>
           )}
           <SummaryRow label="Bank" value={d.bankName} />

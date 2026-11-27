@@ -18,14 +18,14 @@ function load(relative, mocks = {}) {
 process.env.INTEGRATIONS_ENCRYPTION_KEY = 'isolated-test-key-not-a-real-credential';
 const crypto = load('apps/web/src/lib/integrations-crypto.ts');
 const applicationId = '10000000-0000-4000-8000-000000000001';
-function fixture() {
+function fixture({ sendNotice } = {}) {
   let next = 1, signedIn = null;
   const passwords = new Map([['applicant@example.test','ExistingCustomer!2026']]);
   const tables = {
     agency_applications: [{ id: applicationId, status: 'under_review', reference_number: 'STS-TA-TEST', applicant_id: 'customer', business_details: { contactEmail: 'contact@example.test', contactFullName: 'Amina', legalBusinessName: 'Test Travel' }, applicant: { email: 'applicant@example.test', full_name: 'Customer', phone: null } }],
     agent_login_credentials: [], profiles: [{ id: 'customer', email: 'applicant@example.test', app_metadata: {} }], agency_members: [], partner_document_reviews: [], notifications: [],
   };
-  let created = 0, emailStatus = 'sent', adminAllowed = true, mail = [], cooldown = false;
+  let created = 0, emailStatus = 'sent', emailProvider = 'smtp', adminAllowed = true, mail = [], cooldown = false;
   const client = {
     from(table) {
       let filters = [], payload, kind = 'read', single = false;
@@ -59,14 +59,16 @@ function fixture() {
   };
   const adminModule={createAdminClient:()=>client};
   const credentials=load('apps/web/src/lib/agents/credentials.ts', {'@/lib/supabase/admin':adminModule,'@/lib/integrations-crypto':crypto});
-  const notices={ applicationRecipients:(to,account)=>({to:to??account,cc:[]}),async notifyApplicant(n){mail.push(n);return {email:emailStatus,emailSent:emailStatus==='sent'};} };
+  const notices={ applicationRecipients:(to,account)=>({to:to??account,cc:[]}),async notifyApplicant(n){mail.push(n);return sendNotice ? sendNotice(n) : {email:emailStatus,emailSent:emailStatus==='sent'};} };
   const actions=load('apps/web/src/modules/admin/application-actions.ts', {
+    '@/lib/integrations':{getIntegrations:()=>({email:{provider:emailProvider}})},
     '@/lib/agents/credentials':credentials,'@/lib/supabase/admin':adminModule,'@/lib/integrations-crypto':crypto,
-    'next/cache':{revalidatePath(){}},'next/navigation':{redirect(url){throw Object.assign(new Error(url),{redirect:true});}},
+    'next/cache':{revalidatePath(){if(emailStatus==='assert-no-revalidation')throw Error('Retry must not wait for console revalidation');}},'next/navigation':{redirect(url){throw Object.assign(new Error(url),{redirect:true});}},
     '@/lib/supabase/server':{createClient:async()=>client},'@/lib/auth/session':{requirePlatformAdmin:async()=>{if(!adminAllowed)throw Error('Denied');}},
     '@/lib/notifications/application-notify':notices,'@/modules/partner-applications/config':{docSlotsFor:()=>[]},
   });
   const auth=load('apps/web/src/lib/auth/actions.ts', {
+    '@/lib/auth/google-policy':load('apps/web/src/lib/auth/google-policy.ts'),
     '@/lib/managers/identity':{managerIdPattern:/^MGR-\d{4}-\d{6,}$/},'@/lib/agents/credentials':credentials,'@/lib/supabase/admin':adminModule,'@/lib/supabase/server':{createClient:async()=>client},
     'next/navigation':{redirect(url){throw Object.assign(new Error(url),{redirect:true});}},'next/cache':{revalidatePath(){}},
     '@/lib/subdomain':{pathPrefixFor:p=>`/${p}`,portalHref:p=>`/${p}`,rootOrigin:()=>''},'@/lib/auth/login-history':{recordLoginEvent:async()=>{},recordSecurityEvent:async()=>{}},'@/lib/auth/device':{sessionIdFromAccessToken:()=>null},'@/lib/auth/recovery-codes':{consumeRecoveryCode:async()=>false},
@@ -75,7 +77,7 @@ function fixture() {
     './credentials':credentials,'@/lib/supabase/admin':adminModule,'@/lib/notifications/email':{sendEmail:async n=>{mail.push(n);return {sent:true};}},'@/lib/integrations':{getIntegrations:()=>({siteUrl:'https://example.test'})},'@/lib/notifications/email-layout':{escapeHtml:s=>s},
   });
   async function approve() { const form=new FormData();form.set('applicationId',applicationId);try{return await actions.approveApplication('agency',null,form);}catch(e){if(e.redirect)return {redirect:e.message};throw e;} }
-  return {client,tables,passwords,credentials,auth,actions,recovery,approve,mail,setEmailStatus:s=>emailStatus=s,denyAdmin:()=>adminAllowed=false,get created(){return created;}};
+  return {client,tables,passwords,credentials,auth,actions,recovery,approve,mail,setEmailStatus:s=>emailStatus=s,setEmailProvider:p=>emailProvider=p,denyAdmin:()=>adminAllowed=false,get created(){return created;}};
 }
 function loginForm(id,password) {const f=new FormData();f.set('agentId',id);f.set('password',password);return f;}
 
@@ -95,6 +97,59 @@ test('failed email retains only encrypted delivery credentials; retry uses the s
   assert.equal(f.mail[1].agentLogin.password,password);assert.equal(f.mail[1].agentLogin.agentId,c.agent_id);assert.equal(f.created,1);assert.equal(c.password_encrypted,null);
   await f.approve();assert.equal(f.created,1);assert.equal(f.mail.length,2);
 });
+test('saved credential delivery overrides stale approval URL success and failure messages',()=>{
+  const {agentCredentialEmailStatus}=load('apps/web/src/lib/agents/credentials.ts',{'@/lib/supabase/admin':{},'@/lib/integrations-crypto':crypto});
+  const approved={approved_at:'2026-11-26',email_sent_at:null};
+  assert.equal(agentCredentialEmailStatus(approved,'sent'),'pending');
+  for(const stale of ['failed','not_configured','pending'])assert.equal(agentCredentialEmailStatus({...approved,email_sent_at:'2026-11-26'},stale),'sent');
+  assert.equal(agentCredentialEmailStatus(null,'not_configured'),'not_configured');
+});
+test('successful retry returns a fresh console URL without waiting for page revalidation',async()=>{
+  const f=fixture();await f.approve();f.setEmailStatus('assert-no-revalidation');
+  const sent=f.mail.length;
+  assert.deepEqual(await f.actions.retryAgentCredentialEmail(applicationId),{error:null,destination:'/admin/partners/agency/STS-TA-TEST?approved=1&email=sent'});
+  assert.equal(f.mail.length,sent);
+});
+test('real SMTP rejection followed by retry delivers the same usable credentials once', {timeout:15000}, async()=>{
+  const { createSmtpCapture } = require('./helpers/smtp-capture.cjs');
+  const nodemailer = require('nodemailer');
+  const messages=[], transports=[];
+  const sink=createSmtpCapture(message=>messages.push(message),{rejectMessages:1});
+  const keys=['EMAIL_PROVIDER','EMAIL_FROM','EMAIL_REPLY_TO','SMTP_HOST','SMTP_PORT','SMTP_SECURE','SMTP_USER','SMTP_PASS'];
+  const previous=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
+  try {
+    const port=await sink.listen();
+    Object.assign(process.env,{EMAIL_PROVIDER:'smtp',EMAIL_FROM:'STS QA <sender@example.test>',EMAIL_REPLY_TO:'support@example.test',SMTP_HOST:'127.0.0.1',SMTP_PORT:String(port),SMTP_SECURE:'false',SMTP_USER:'qa',SMTP_PASS:'qa'});
+    const integrations={getIntegrations:()=>({email:{provider:'smtp'},siteUrl:'https://example.test'})};
+    const layout=load('apps/web/src/lib/notifications/email-layout.ts');
+    const mail=load('apps/web/src/lib/notifications/email.ts',{
+      nodemailer:{...nodemailer,createTransport(options){const transport=nodemailer.createTransport(options);transports.push(transport);return transport;}},
+      '@/lib/integrations':integrations,'@/lib/site-settings':{getSocialLinks:async()=>[]},'@/lib/social-platforms':{SOCIAL_PLATFORMS:{}},'./email-layout':layout,
+    });
+    const notify=load('apps/web/src/lib/notifications/application-notify.ts',{
+      './email':mail,'./email-layout':layout,'./whatsapp-send':{sendWhatsAppMessage:async()=>{throw Error('Unexpected WhatsApp delivery');}},
+      '@/lib/integrations':integrations,'@/lib/subdomain':{portalHref:()=>'/agent',portalLoginHref:()=>'/agent/login'},
+    });
+    const f=fixture({sendNotice:notify.notifyApplicant});
+    assert.match((await f.approve()).redirect,/email=failed/);
+    const credential=f.tables.agent_login_credentials[0];
+    const issued=f.mail[0].agentLogin;
+    assert.ok(credential.password_encrypted);assert.equal(credential.email_sent_at,null);
+    assert.equal(messages.length,1);assert.equal(messages[0].accepted,false);
+    assert.deepEqual(await f.actions.retryAgentCredentialEmail(applicationId),{error:null,destination:'/admin/partners/agency/STS-TA-TEST?approved=1&email=sent'});
+    assert.equal(messages.length,2);assert.equal(messages[1].accepted,true);
+    assert.equal(messages[1].recipients.length,1);assert.match(messages[1].recipients[0],/contact@example\.test/);
+    assert.ok(messages[1].message.includes(issued.agentId));assert.ok(messages[1].message.includes(issued.password));
+    assert.ok(credential.email_sent_at);assert.equal(credential.password_encrypted,null);assert.equal(f.created,1);
+    assert.deepEqual(await f.auth.signInWithAgentIdAction(null,loginForm(issued.agentId,issued.password)),{error:null,destination:'/agent'});
+    assert.deepEqual(await f.actions.retryAgentCredentialEmail(applicationId),{error:null,destination:'/admin/partners/agency/STS-TA-TEST?approved=1&email=sent'});
+    assert.equal(messages.length,2);assert.equal(f.created,1);
+  } finally {
+    for(const transport of transports)transport.close();
+    await sink.close();
+    for(const key of keys){if(previous[key]===undefined)delete process.env[key];else process.env[key]=previous[key];}
+  }
+});
 test('preparation retries reuse the reserved credential and identity',async()=>{
   const f=fixture();const a=await f.credentials.prepareAgentCredentials(applicationId,'contact@example.test','Amina');const b=await f.credentials.prepareAgentCredentials(applicationId,'contact@example.test','Amina');
   assert.equal(a.agent_id,b.agent_id);assert.equal(a.profile_id,b.profile_id);assert.equal(a.password_encrypted,b.password_encrypted);assert.equal(f.created,1);
@@ -102,6 +157,11 @@ test('preparation retries reuse the reserved credential and identity',async()=>{
 test('application email is required and approval is admin-only',async()=>{
   const f=fixture();await assert.rejects(f.credentials.prepareAgentCredentials(applicationId,'invalid','Amina'),/contact email/);assert.equal(f.created,0);
   f.denyAdmin();await assert.rejects(f.approve(),/Denied/);await assert.rejects(f.actions.retryAgentCredentialEmail(applicationId,null,new FormData()),/Denied/);
+});
+test('missing outgoing email blocks approval before an agent account is created',async()=>{
+  const f=fixture();f.setEmailProvider(null);
+  assert.match((await f.approve()).error,/Configure outgoing email/);
+  assert.equal(f.created,0);assert.equal(f.tables.agency_applications[0].status,'under_review');assert.equal(f.mail.length,0);
 });
 test('ID recovery sends to the saved contact and leaves the password unchanged; cooldown suppresses repeats',async()=>{
   const f=fixture();await f.approve();const c=f.tables.agent_login_credentials[0],password=f.passwords.get(c.login_email);f.mail.length=0;

@@ -11,15 +11,16 @@ import { signUpAction } from "@/lib/auth/actions";
 import { useRestoreOnError } from "@/lib/use-restore-on-error";
 import { GoogleSignIn } from "@/components/auth/google-sign-in";
 
-export function SignupForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
+export function SignupForm({ googleEnabled = false, redirectTo = "/" }: { googleEnabled?: boolean; redirectTo?: string }) {
   const [state, formAction] = useActionState(signUpAction, null);
   const formRef = useRef<HTMLFormElement>(null);
   useRestoreOnError(formRef, state);
 
   return (
     <AuthCard title="Create your account">
-      {googleEnabled ? <GoogleSignIn /> : null}
+      {googleEnabled ? <GoogleSignIn redirectTo={redirectTo} /> : null}
       <form ref={formRef} action={formAction}>
+        <input type="hidden" name="redirect_to" value={redirectTo} />
         <FieldGroup>
           <Field>
             <FieldLabel htmlFor="fullName">Full name</FieldLabel>

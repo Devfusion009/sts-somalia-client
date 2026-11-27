@@ -4,16 +4,19 @@ import { openBookingRequestSchema } from "@sts/shared-types";
 import { BookingsService } from "./bookings.service";
 
 export const bookingsRouter = router({
-  myBookings: protectedProcedure.query(async ({ ctx }) => {
-    const svc = await ctx.resolve(BookingsService);
-    return svc.getMyBookings(ctx.user!.id);
-  }),
+  myBookingsPage: protectedProcedure
+    .input(z.object({
+      page: z.number().int().min(1).max(100000).default(1),
+      filter: z.enum(["all", "upcoming", "past", "cancelled"]).default("upcoming"),
+      type: z.enum(["hotel", "flight", "visa", "umrah", "hall"]).optional(),
+      view: z.enum(["list", "trips"]).default("trips"),
+      sort: z.enum(["created", "travel"]).default("created"),
+    }))
+    .query(async ({ ctx, input }) => (await ctx.resolve(BookingsService)).getMyBookingsPage(ctx.user!.id, input)),
 
-  /** Agent portal's read-only history: orders from before the account became an agent. */
-  myPersonalBookings: protectedProcedure.query(async ({ ctx }) => {
-    const svc = await ctx.resolve(BookingsService);
-    return svc.getMyBookings(ctx.user!.id, { personalOnly: true });
-  }),
+  myPersonalBookingsPage: protectedProcedure
+    .input(z.object({ page: z.number().int().min(1).max(100000).default(1) }))
+    .query(async ({ ctx, input }) => (await ctx.resolve(BookingsService)).getMyBookingsPage(ctx.user!.id, { page: input.page, filter: "all", personalOnly: true })),
 
   requestsForOrder: protectedProcedure
     .input(z.object({ orderId: z.string().uuid() }))

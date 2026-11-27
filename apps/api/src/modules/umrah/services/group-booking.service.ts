@@ -47,6 +47,7 @@ export class GroupBookingService {
     try {
       const booking = await this.bookings.findPrice(bookingId);
       if (!booking) throw new BadRequestException("Could not create the booking.");
+      if (booking.booking_kind !== "group") throw new BadRequestException("Private Umrah is arranged directly with STS.");
       const order = await this.orders.createForBooking({
         customerId: userId,
         bookedBy: userId,
@@ -58,7 +59,7 @@ export class GroupBookingService {
         umrahBookingId: booking.id,
         hold: false,
       });
-      return { orderId: order.id, requiresApproval: booking.booking_kind === "private" };
+      return { orderId: order.id, requiresApproval: false };
     } catch {
       // Undo the booking so its seats are not held by a booking with no order.
       await this.bookings.delete(bookingId);

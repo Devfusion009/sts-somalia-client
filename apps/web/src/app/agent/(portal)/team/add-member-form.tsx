@@ -1,5 +1,7 @@
 "use client";
 
+import agentUi from "@/components/portal/agent-typography.module.css";
+
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import {
@@ -34,7 +36,7 @@ export function AddMemberForm() {
       <DialogTrigger render={<Button />}>
         <Plus data-icon="inline-start" aria-hidden="true" /> Add member
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={`${agentUi.dialog} sm:max-w-md`}>
         <DialogHeader>
           <DialogTitle>Add a team member</DialogTitle>
         </DialogHeader>
@@ -50,7 +52,7 @@ export function AddMemberForm() {
               <FieldLabel htmlFor="email">
                 Account email <span className="text-destructive">*</span>
               </FieldLabel>
-              <Input id="email" name="email" type="email" placeholder="Their STS account email" required autoFocus />
+              <Input id="email" name="email" type="email" autoComplete="email" placeholder="Their STS account email" required autoFocus />
             </Field>
             <Field>
               <FieldLabel htmlFor="role">

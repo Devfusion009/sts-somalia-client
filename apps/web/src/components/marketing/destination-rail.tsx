@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { Tag } from "lucide-react";
 
 import { CarouselRail } from "@/components/ui/aceternity/carousel-rail";
 import { FadeIn } from "@/components/ui/aceternity/motion-primitives";
@@ -16,6 +17,7 @@ export type RailCard = {
   meta?: string;
   href: string;
   badge?: string;
+  offer?: string;
 };
 
 /**
@@ -43,7 +45,12 @@ export function DestinationCard({
           sizes="(min-width: 640px) 272px, 248px"
           className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
-        {card.badge ? (
+        {card.offer ? (
+          <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-[#c4470a] px-3 py-1.5 text-sm leading-none font-semibold text-white shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
+            <Tag className="size-3.5 shrink-0" aria-hidden="true" strokeWidth={2} />
+            {card.offer}
+          </span>
+        ) : card.badge ? (
           <span className="absolute top-3 left-3 rounded-full bg-brand-accent px-2.5 py-1 text-[11px] font-bold text-brand-accent-foreground shadow">
             {card.badge}
           </span>

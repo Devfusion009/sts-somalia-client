@@ -62,7 +62,7 @@ export class PackageAdminService {
 
   async get(id: string) {
     const pkg = await this.packages.findByIdAdmin(id);
-    if (!pkg) throw new NotFoundException("Package not found.");
+    if (!pkg || pkg.package_type === "private") throw new NotFoundException("Package not found.");
     return pkg;
   }
 
@@ -103,16 +103,20 @@ export class PackageAdminService {
       await this.packages.updatePackage(input.id, row);
       return { id: input.id };
     }
-    const record = { ...row, slug: slugify(input.name), package_type: input.packageType ?? "group" };
-    return { id: input.packageType === "private"
-      ? await this.packages.insertPackage(record)
-      : await this.packages.insertPublicPackage(record, input.departureDate!, input.totalSeats!) };
+    const record = { ...row, slug: slugify(input.name), package_type: input.packageType ?? "group",
+      request_first: input.requestFirst ?? false, formation_closes_at: input.formationClosesAt,
+      payment_cutoff_at: input.paymentCutoffAt, payment_window_hours: input.paymentWindowHours, request_terms: input.requestTerms,
+    };
+    return { id: await this.packages.insertPublicPackage(record, input.departureDate!, input.totalSeats!) };
 
   }
 
   async updateDetails(d: PackageDetailsInput) {
     const current = await this.get(d.packageId);
-    if (current.package_type === "group" && (!d.contactPersonName?.trim() || !/^\+?[0-9 ()-]{7,40}$/.test(d.contactPersonPhone ?? "") || !d.mealsNote?.trim())) {
+    const phone = d.contactPersonPhone?.trim() ?? "";
+    const digits = phone.replace(/\D/g, "");
+    const validPhone = /^\+[0-9 ()-]{7,30}$/.test(phone) && digits.length >= 8 && digits.length <= 15;
+    if (current.package_type === "group" && (!d.contactPersonName?.trim() || !validPhone || !d.mealsNote?.trim())) {
       throw new BadRequestException("Enter the responsible person's name, phone number and meal details.");
     }
     await this.packages.updatePackage(d.packageId, {

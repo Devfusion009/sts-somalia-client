@@ -1,3 +1,4 @@
+import { PoolAdminWorkspace } from "@/modules/umrah/components/pool-admin-workspace";
 import { PublicPackageDetails } from "@/modules/umrah/components/public-package-details";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -107,6 +108,7 @@ export default async function UmrahPackageConfigPage({ params }: { params: Promi
           <div><span className="text-xs text-muted-foreground">Visibility</span><div className="mt-1">{pkg.status === "published" ? "Published" : "Not published"}</div></div>
         </CardContent>
       </Card>
+      {pkg.package_type === "group" && pkg.pool_visibility === "public" ? <PoolAdminWorkspace packageId={pkg.id} draft={pkg.status === "draft"} /> : null}
       <Card id="photos" className="scroll-mt-24">
         <CardHeader>
           <CardTitle className="text-base">Photo gallery</CardTitle>

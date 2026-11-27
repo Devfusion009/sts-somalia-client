@@ -6,9 +6,8 @@ import { fireDueEventReminders } from "@/modules/admin/calendar-reminders";
  * Vercel Cron hits this on a schedule (see vercel.json) — no browser
  * session exists here, so it runs as the service-role client rather than
  * requirePlatformAdmin(). Vercel automatically sends
- * `Authorization: Bearer $CRON_SECRET` when that env var is set; this
- * rejects any other caller once it's configured, and is a no-op check
- * (open) until then so local/manual testing works without extra setup.
+ * `Authorization: Bearer $CRON_SECRET`. The route is closed when the
+ * secret is absent.
  *
  * This is a backstop, not the only firing path — src/app/admin/(portal)/
  * layout.tsx calls the same fireDueEventReminders() on every admin page
@@ -27,11 +26,8 @@ const CRON_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+  if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+    return new NextResponse("Unauthorized", { status: 401 });
   }
 
   const supabase = createAdminClient();

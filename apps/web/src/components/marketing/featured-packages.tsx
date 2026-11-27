@@ -54,7 +54,12 @@ function Heading() {
 }
 
 export async function FeaturedPackages() {
-  const packages = await getFeaturedPackages();
+  const packages = await getFeaturedPackages().catch((error: unknown) => {
+    console.error("Featured Umrah catalog unavailable", error instanceof Error ? error.name : "unknown_error");
+    return null;
+  });
+
+  if (packages === null) return <section className="bg-background py-16"><div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><Heading /><p role="status" className="mt-8 rounded-xl border border-border bg-card p-6 text-sm">Umrah packages are temporarily unavailable.</p></div></section>;
 
   return (
     <section className="bg-background py-16 sm:py-20 lg:py-24">

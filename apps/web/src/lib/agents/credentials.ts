@@ -22,6 +22,9 @@ export async function prepareAgentCredentials(applicationId: string, contactEmai
   if (!["pending", "under_review"].includes(application.status)) throw new Error("Application is not awaiting approval.");
 
   if (!existing) {
+    if (!process.env.INTEGRATIONS_ENCRYPTION_KEY?.trim()) {
+      throw new Error("Agent credential storage is not configured. Contact the system administrator.");
+    }
     const password = `Sts!${randomBytes(24).toString("base64url")}9a`;
     const passwordEncrypted = encryptCredentials({ password });
     const { error } = await admin.from("agent_login_credentials").upsert({
@@ -70,6 +73,14 @@ export async function prepareAgentCredentials(applicationId: string, contactEmai
     .update({ profile_id: profile.id }).eq("application_id", applicationId).is("profile_id", null);
   if (saveError) throw new Error("Agent login account could not be linked.");
   return { ...credential, profile_id: profile.id };
+}
+
+/** A saved delivery record overrides status parameters from an old approval URL. */
+export function agentCredentialEmailStatus(
+  delivery: { approved_at: string | null; email_sent_at: string | null } | null,
+  reportedStatus?: string,
+) {
+  return delivery?.approved_at ? delivery.email_sent_at ? "sent" : "pending" : reportedStatus;
 }
 
 /** Safe delivery metadata for the admin console. Never returns a password or alias. */

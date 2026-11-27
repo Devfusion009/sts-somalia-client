@@ -12,16 +12,7 @@ function load(relative, mocks={}) {
  mod._compile(ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021,experimentalDecorators:true}}).outputText,file);
  return mod.exports;
 }
-const {privatePackageGroupKey:key}=load('apps/web/src/modules/umrah/private-package-groups.ts');
-const snapshot={packageId:'package-a',name:'Umrah',origin:'MGQ',destination:'JED',departureDate:'2027-01-10',returnDate:'2027-01-18'};
-test('only identical package, route and travel dates share a review group',()=>{
- const a={id:'one',package_snapshot:snapshot};
- assert.equal(key(a),key({id:'two',package_snapshot:{...snapshot,name:'Renamed'}}));
- for(const change of [{packageId:'package-b'},{origin:'HGA'},{destination:'MED'},{departureDate:'2027-01-11'},{returnDate:'2027-01-19'}])
-  assert.notEqual(key(a),key({id:'two',package_snapshot:{...snapshot,...change}}));
- assert.notEqual(key({id:'one'}),key({id:'two'}));
-});
-for(const kind of ['private','group']) test(`${kind} package booking returns the correct approval requirement and hold policy`,async()=>{
+for(const kind of ['group']) test(`${kind} package booking needs no private approval`,async()=>{
  let orderInput;
  const {GroupBookingService}=load('apps/api/src/modules/umrah/services/group-booking.service.ts',{'@sts/shared-types':{groupBookingErrorMessage:()=> 'Booking failed'}});
  const repo={createGroupBooking:async()=>({id:'booking',error:null}),findPrice:async()=>({id:'booking',total_price:1200,currency:'USD',booking_kind:kind}),delete:assert.fail};
@@ -30,6 +21,14 @@ for(const kind of ['private','group']) test(`${kind} package booking returns the
  assert.equal(result.requiresApproval,kind==='private');
  assert.equal(orderInput.hold,false);
  assert.equal(orderInput.price,1200);
+});
+test('a legacy private package cannot create a new in-app order',async()=>{
+ const {GroupBookingService}=load('apps/api/src/modules/umrah/services/group-booking.service.ts',{'@sts/shared-types':{groupBookingErrorMessage:()=> 'Booking failed'}});
+ let deleted=null,created=false;
+ const repo={createGroupBooking:async()=>({id:'legacy-private',error:null}),findPrice:async()=>({id:'legacy-private',total_price:1200,currency:'USD',booking_kind:'private'}),delete:async id=>{deleted=id}};
+ const orders={getActiveAgencyId:async()=>null,assertAgencyCanBookProduct:async()=>({ok:true}),resolveBookedForCustomer:async()=>null,createForBooking:async()=>{created=true;return{id:'order'}}};
+ await assert.rejects(new GroupBookingService(repo,orders).create('user',{departureId:'departure',numPilgrims:1,pilgrims:[{full_name:'Test Traveller',gender:'male'}]}));
+ assert.equal(deleted,'legacy-private');assert.equal(created,false);
 });
 for(const methodId of ['wallet','card','waafi']) test(`pending private request cannot initiate ${methodId} payment`,async()=>{
  const {PaymentsService}=load('apps/api/src/modules/payments/payments.service.ts');

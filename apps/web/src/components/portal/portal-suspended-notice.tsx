@@ -1,33 +1,29 @@
-import { PauseCircle, PhoneIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Ban, LogOut, Mail, Phone } from "lucide-react";
+import { signOutAction } from "@/lib/auth/actions";
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from "@/lib/marketing-nav";
+import styles from "./portal-suspended-notice.module.css";
 
-/**
- * Full-screen notice shown in place of a partner-facing portal when the
- * account has been suspended (or offboarded) by STS admin — the entity's
- * status is flipped by the Partner Management Console's state machine, and
- * every portal layout gates on it so suspension actually revokes access
- * rather than only changing a badge on the admin side.
- */
-export function PortalSuspendedNotice({ portalLabel }: { portalLabel: string }) {
+/** Suspension blocks the workspace while keeping support and sign-out available. */
+export function PortalSuspendedNotice({ portalLabel, agencyName, agentCode }: {
+  portalLabel: string; agencyName?: string; agentCode?: string | null;
+}) {
   return (
-    <div className="mx-auto flex min-h-dvh max-w-lg items-center justify-center px-4">
-      <Card className="w-full">
-        <CardContent className="flex flex-col items-center gap-3 p-6 text-center md:p-8">
-          <span
-            aria-hidden="true"
-            className="flex size-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive"
-          >
-            <PauseCircle className="size-5" />
-          </span>
-          <h1 className="font-heading text-base font-semibold">{portalLabel} access suspended</h1>
-          <Button variant="outline" className="mt-1 max-sm:h-11" render={<a href={SUPPORT_PHONE_TEL} />}>
-            <PhoneIcon aria-hidden="true" />
-            <span className="tabular-nums">{SUPPORT_PHONE_DISPLAY}</span>
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+    <main className={styles.page}>
+      <section className={styles.card} aria-labelledby="suspended-title">
+        <header className={styles.header}><span>STS SOMALIA</span><span>{portalLabel}</span></header>
+        <div className={styles.body}>
+          <span className={styles.icon} aria-hidden="true"><Ban size={32} strokeWidth={1.7} /></span>
+          <span className={styles.status}>ACCOUNT SUSPENDED</span>
+          <h1 id="suspended-title">Your portal access is suspended</h1>
+          {(agencyName || agentCode) && <div className={styles.identity}>{agencyName && <strong>{agencyName}</strong>}{agentCode && <span>{agentCode}</span>}</div>}
+          <p className={styles.message}>Contact STS Somalia support to discuss reactivation.</p>
+          <div className={styles.contacts}>
+            <a href="mailto:support@scoutsts.com"><Mail size={17} aria-hidden="true" />Contact support</a>
+            <a href={SUPPORT_PHONE_TEL}><Phone size={16} aria-hidden="true" /><span>{SUPPORT_PHONE_DISPLAY}</span></a>
+          </div>
+        </div>
+        <footer className={styles.footer}><span>Access restricted by STS Somalia</span><form action={signOutAction}><button type="submit"><LogOut size={15} aria-hidden="true" />Sign out</button></form></footer>
+      </section>
+    </main>
   );
 }

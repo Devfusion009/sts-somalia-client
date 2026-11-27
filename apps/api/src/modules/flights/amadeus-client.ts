@@ -4,8 +4,7 @@ import { env } from "../../config/env";
 /**
  * Amadeus flight APIs: Flight Offers Search, Flight Offers Price and Flight
  * Create Orders, with an OAuth2 client-credentials token. Plain fetch, no
- * SDK. The base URL is the Enterprise host Amadeus assigns with the
- * contract; booking is off until AMADEUS_BASE_URL, AMADEUS_CLIENT_ID and
+ * SDK. This is the legacy REST contract, not the Enterprise SOAP API; booking is off until AMADEUS_BASE_URL, AMADEUS_CLIENT_ID and
  * AMADEUS_CLIENT_SECRET are all set.
  *
  * Offers are passed back to Amadeus exactly as received (pricing and order
@@ -38,10 +37,11 @@ export function amadeusConfig(): Config | null {
   return { baseUrl: e.AMADEUS_BASE_URL.replace(/\/$/, ""), clientId: e.AMADEUS_CLIENT_ID, clientSecret: e.AMADEUS_CLIENT_SECRET };
 }
 
-let token: { value: string; expiresAt: number } | null = null;
+let token: { value: string; expiresAt: number; identity: string } | null = null;
 
 async function accessToken(config: Config): Promise<string> {
-  if (token && token.expiresAt > Date.now() + 60_000) return token.value;
+  const identity = JSON.stringify(config);
+  if (token && token.identity === identity && token.expiresAt > Date.now() + 60_000) return token.value;
   const res = await fetch(`${config.baseUrl}/v1/security/oauth2/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -50,7 +50,7 @@ async function accessToken(config: Config): Promise<string> {
   });
   if (!res.ok) throw new AmadeusError("Amadeus authentication failed.", res.status, "auth");
   const body = (await res.json()) as { access_token: string; expires_in: number };
-  token = { value: body.access_token, expiresAt: Date.now() + body.expires_in * 1000 };
+  token = { identity, value: body.access_token, expiresAt: Date.now() + body.expires_in * 1000 };
   return token.value;
 }
 

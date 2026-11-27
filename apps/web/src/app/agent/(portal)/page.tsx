@@ -1,7 +1,6 @@
 import { AgentMoney } from "@/components/portal/agent-money";
 import { Suspense } from "react";
 import { FinancePriorities } from "@/modules/agencies/components/finance-priorities";
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowDown, ArrowRight, ArrowUp, CalendarDays, ChartNoAxesColumnIncreasing, CircleDollarSign, Clock3, Coins, Minus, Plus, ReceiptText, Ticket, UsersRound, Wallet, type LucideIcon } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
@@ -20,6 +19,8 @@ import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { money } from "@/lib/money";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PanelSkeleton } from "@/components/dashboard/skeletons";
+import { AgentPortalGuide } from "./portal-guide";
+import { isNewAgent } from "./portal-guide-content";
 import { OnboardingChecklist } from "./onboarding-checklist";
 import { RecentActivityCard } from "./recent-activity-card";
 import { ServiceLauncher } from "./service-launcher";
@@ -59,27 +60,23 @@ export default async function AgentDashboardPage({ searchParams }: {
         actions={<DateRangePicker currentKey={range.key} />}
       />
 
+      <AgentPortalGuide key={`${agencyId}:${profile.id}`} userId={profile.id} agencyId={agencyId} role={membership.roleInAgency} autoShow={isNewAgent(membership.joinedAt)} />
+
       <LowBalanceBanner />
       <BroadcastBanner />
-      <Suspense fallback={null}><FinancePriorities agencyId={agencyId} /></Suspense>
-
-      <section className={styles.banner} aria-labelledby="dashboard-banner-title">
-        <Image src="/marketing/umrah-hero.webp" alt="" fill priority unoptimized sizes="(min-width: 1024px) 60vw, 100vw" className={styles.bannerImage} />
-        <div className={styles.bannerContent}>
-          <h2 id="dashboard-banner-title">Book &amp; manage travel services</h2>
-          <p>Flights, hotels, visas, Umrah and events for your customers.</p>
-          <Link href="/agent/book" className={styles.bannerAction}>Open booking desk<ArrowRight className="size-4" aria-hidden="true" /></Link>
-        </div>
-      </section>
-
-      <ServiceLauncher row />
-
       <div className={styles.metrics}>
         <Suspense fallback={<>{[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}</>}>
           <Metrics metricsP={metricsP} rangeKey={range.key} />
         </Suspense>
         <WalletCard wallet={wallet} canTopUp={membership.roleInAgency === "owner" || membership.roleInAgency === "admin"} />
       </div>
+
+      <Suspense fallback={null}><FinancePriorities agencyId={agencyId} /></Suspense>
+
+      <section aria-labelledby="dashboard-services-title" className="space-y-3">
+        <h2 id="dashboard-services-title" className="font-heading text-base font-semibold">Book travel</h2>
+        <ServiceLauncher row />
+      </section>
 
       <div className={styles.overviewGrid}>
         <Suspense fallback={<PanelSkeleton rows={6} />}><LatestBookings ordersP={ordersP} /></Suspense>

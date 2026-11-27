@@ -76,7 +76,7 @@ async function quoteStay(
     p_num_rooms: args.numRooms,
     p_adults: args.adults,
     p_children: args.children,
-    p_rate_plan_id: args.ratePlanId,
+    p_rate_plan_id: args.ratePlanId ?? undefined,
     p_extra_ids: args.extraIds,
   });
   if (error || !data || typeof data !== "object") {

@@ -1,4 +1,4 @@
-name: Deploy to production server
+name: Production deployment
 
 # main deploys to AWS (deploy.yml). The production branch deploys to the
 # Mogadishu server: images are built here, pushed to GHCR, and the server only
@@ -19,24 +19,13 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  verify-google:
-    if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build -w api
-      - run: node apps/web/test/google-customer-auth.test.cjs
-      - run: npx tsc --noEmit -p apps/web
+  verify:
+    if: github.ref == 'refs/heads/production' && vars.PRODUCTION_DEPLOY_ENABLED == 'true'
+    uses: ./.github/workflows/ci.yml
 
   build:
-    needs: verify-google
-    if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
+    needs: verify
+    if: github.ref == 'refs/heads/production' && vars.PRODUCTION_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     environment: production
     permissions:
@@ -47,6 +36,17 @@ jobs:
       api_image: ${{ steps.names.outputs.api }}
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate production payment routing
+        env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_APP_HOST: ${{ vars.NEXT_PUBLIC_APP_HOST }}
+        run: node scripts/production-payment-routing.cjs
 
       - id: names
         run: |
@@ -103,6 +103,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Set up SSH
         run: |
           install -m 700 -d ~/.ssh
@@ -123,6 +127,9 @@ jobs:
         # leaving any value already in PROD_ENV_FILE in place. Single quotes
         # stop compose from interpolating "$" in the password.
         env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_APP_HOST: ${{ vars.NEXT_PUBLIC_APP_HOST }}
           EMAIL_PROVIDER: ${{ vars.EMAIL_PROVIDER }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           EMAIL_REPLY_TO: ${{ vars.EMAIL_REPLY_TO }}
@@ -131,16 +138,26 @@ jobs:
           SMTP_SECURE: ${{ vars.SMTP_SECURE }}
           SMTP_USER: ${{ vars.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
           AMADEUS_BASE_URL: ${{ vars.AMADEUS_BASE_URL }}
           AMADEUS_CLIENT_ID: ${{ vars.AMADEUS_CLIENT_ID }}
           AMADEUS_CLIENT_SECRET: ${{ secrets.AMADEUS_CLIENT_SECRET }}
           CUSTOMER_GOOGLE_LOGIN_ENABLED: ${{ vars.CUSTOMER_GOOGLE_LOGIN_ENABLED || 'false' }}
         run: |
+          set -euo pipefail
+          routing_file=$(mktemp)
+          trap 'rm -f "$routing_file"' EXIT
+          node scripts/production-payment-routing.cjs --emit-env > "$routing_file"
+          if [ -z "$CRON_SECRET" ] && ! printf '%s\n' "${{ secrets.PROD_ENV_FILE }}" | grep -q '^CRON_SECRET='; then
+            echo 'Production CRON_SECRET is required for notification and Umrah workers.' >&2
+            exit 1
+          fi
           {
             printf '%s\n' "${{ secrets.PROD_ENV_FILE }}"
+            cat "$routing_file"
             echo "WEB_IMAGE=${{ needs.build.outputs.web_image }}"
             echo "API_IMAGE=${{ needs.build.outputs.api_image }}"
-            for key in EMAIL_PROVIDER EMAIL_FROM EMAIL_REPLY_TO SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS AMADEUS_BASE_URL AMADEUS_CLIENT_ID AMADEUS_CLIENT_SECRET CUSTOMER_GOOGLE_LOGIN_ENABLED; do
+            for key in EMAIL_PROVIDER EMAIL_FROM EMAIL_REPLY_TO SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS CRON_SECRET AMADEUS_BASE_URL AMADEUS_CLIENT_ID AMADEUS_CLIENT_SECRET CUSTOMER_GOOGLE_LOGIN_ENABLED; do
               if [ -n "${!key}" ]; then printf "%s='%s'\n" "$key" "${!key}"; fi
             done
           } | ssh prod "umask 077 && cat > ${APP_DIR}/.env.next"
@@ -156,14 +173,15 @@ jobs:
           cd /opt/sts
           [ -f .env ] && cp .env .env.previous || true
           mv .env.next .env
-          docker compose pull web api
+          docker compose pull web api worker
           docker compose up -d --remove-orphans
 
           healthy() {
             for _ in $(seq 1 30); do
               web=$(docker compose ps --format '{{.Health}}' web)
               api=$(docker compose ps --format '{{.Health}}' api)
-              [ "$web" = healthy ] && [ "$api" = healthy ] && return 0
+              worker=$(docker compose ps --status running --services worker)
+              [ "$web" = healthy ] && [ "$api" = healthy ] && [ "$worker" = worker ] && return 0
               sleep 5
             done
             return 1
@@ -174,7 +192,7 @@ jobs:
             echo "Release healthy."
           else
             echo "Release unhealthy. Rolling back."
-            docker compose logs --tail 60 web api || true
+            docker compose logs --tail 60 web api worker || true
             if [ -f .env.previous ]; then
               cp .env.previous .env
               docker compose up -d --remove-orphans

@@ -93,7 +93,7 @@ export default async function AgentBookingDetailPage({ params }: { params: Promi
   // Pilgrims, history, documents (signed links), readiness and travel — one API read under the agent's access.
   const [umrahFile, openRequests] = umrahBooking
     ? await Promise.all([
-        (await getServerTrpc()).umrah.bookingFile.query({ bookingId: umrahBooking.id }),
+        (await getServerTrpc({ timeoutMs: 15000 })).umrah.bookingFile.query({ bookingId: umrahBooking.id }),
         supabase
           .from("booking_requests")
           .select("kind")

@@ -5,7 +5,9 @@
 # see the memory of that exact gotcha) has NO path into the build context,
 # let alone the image. There is nothing to accidentally COPY.
 .env*
+**/.env*
 !.env.example
+!**/.env.example
 
 node_modules
 .next
@@ -27,5 +29,7 @@ ADMIN_CREDENTIALS.local.md
 .vercel
 image.png
 coverage
+output
+qa-evidence
 *.tsbuildinfo
 npm-debug.log*

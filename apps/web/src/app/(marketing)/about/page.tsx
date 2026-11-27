@@ -405,29 +405,23 @@ export default function AboutPage() {
             />
           </FadeIn>
 
-          <StaggerGroup className="mt-12 grid gap-5 md:grid-cols-2 md:grid-rows-2">
-            <StaggerItem className="md:row-span-2">
-              <figure className="relative h-full min-h-72 overflow-hidden rounded-2xl ring-1 ring-border">
-                <Image
-                  src="/about/umrah-group-wide.webp"
-                  alt="An STS pilgrim group gathered on ziyarah in Saudi Arabia"
-                  fill
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover"
-                />
-                <figcaption className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent p-5 pt-12 text-sm font-medium text-white">
-                  A season group on ziyarah
-                </figcaption>
-              </figure>
-            </StaggerItem>
+          <StaggerGroup className="mx-auto mt-12 grid max-w-4xl grid-cols-1 gap-6 sm:gap-8">
             {[
+              { src: "/about/umrah-group-wide.webp", alt: "An STS pilgrim group gathered on ziyarah in Saudi Arabia", cap: "A season group on ziyarah" },
               { src: "/about/ziyarah-guide.webp", alt: "An STS guide briefing women pilgrims at a ziyarah site", cap: "Guided ziyarah, in Somali" },
               { src: "/about/umrah-team.webp", alt: "Four STS team members outside the Prophet's Mosque in Madinah", cap: "The STS team in Madinah" },
             ].map((p) => (
               <StaggerItem key={p.src}>
-                <figure className="relative aspect-video overflow-hidden rounded-2xl ring-1 ring-border md:aspect-auto md:h-full">
-                  <Image src={p.src} alt={p.alt} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
-                  <figcaption className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent p-5 pt-12 text-sm font-medium text-white">
+                <figure className="overflow-hidden rounded-2xl bg-card ring-1 ring-border">
+                  <Image
+                    src={p.src}
+                    alt={p.alt}
+                    width={1100}
+                    height={825}
+                    sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 960px) calc(100vw - 48px), 896px"
+                    className="block h-auto w-full"
+                  />
+                  <figcaption className="px-5 py-4 text-sm font-medium text-foreground">
                     {p.cap}
                   </figcaption>
                 </figure>

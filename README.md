@@ -5,9 +5,8 @@ portal, B2B agent portal, hotel partner portal, flight/hotel/visa/Umrah
 booking, affiliate marketing, and admin dashboard — all on one Postgres
 schema with row-level security doing the access control.
 
-Stack: **Next.js 16 (App Router)** + **Supabase (Postgres, Auth, Storage)**,
-developed fully locally via the Supabase CLI/Docker; Vercel deployment comes
-later once the backend is solid.
+Stack: **Next.js 16 (App Router)**, **NestJS API**, and **Supabase (Postgres, Auth, Storage)**.
+QA and production run on AWS with separate Supabase projects.
 
 ## Prerequisites
 
@@ -19,7 +18,7 @@ later once the backend is solid.
 
 ```bash
 npm install
-cp apps/web/.env.example apps/web/.env.local   # pre-filled for this repo's local stack
+cp apps/web/.env.example apps/web/.env.local
 cp apps/api/.env.example apps/api/.env.local
 ./start.sh                                     # Supabase + redis + api + web, hot reload
 ```
@@ -38,9 +37,8 @@ covers the rest.
 To run the apps on the host instead of in containers, start the database on
 its own with `npm run db:start`, then `npm run dev:web` and `npm run dev:api`.
 
-Run `npm run db:status` any time to see the local API URL and keys — if you
-ever reset your Docker volumes, the keys in `.env.local` may need updating
-from there.
+Run `npm run db:status` to check local services. Use only local or QA credentials
+for development; production credentials belong in deployment secrets.
 
 ## Database workflow
 
@@ -53,11 +51,12 @@ all live in SQL so they hold regardless of which app talks to the database.
 ```bash
 npm run db:reset      # drop + recreate local DB, replay all migrations + seed.sql
 npm run db:diff -- some_change_name   # generate a new migration from a Studio schema edit
-npm run db:types       # regenerate src/lib/types/database.types.ts after any schema change
+npm run db:types       # regenerate packages/shared-types/src/database.types.ts from local DB
 ```
 
-Always run `db:types` after touching migrations — the whole app is typed
-against the generated `Database` type.
+Apply new migrations to QA and verify them before regenerating types and
+promoting to production. `AGENTS.md` contains the current release sequence,
+environment mapping, and deployment checks. Keep migration files append-only.
 
 ## Architecture
 
@@ -157,9 +156,16 @@ anonymous visitors so the B2C site can be browsed pre-login.
 See `.env.example`. `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is safe for the
 browser; `SUPABASE_SECRET_KEY` must never reach client code.
 
-## Deploying later (Vercel)
+## Deployment
 
-Nothing here is local-only by design — when ready, create a hosted Supabase
-project, run `supabase link` + `supabase db push` to apply these same
-migrations, point `NEXT_PUBLIC_SUPABASE_URL`/keys at the hosted project via
-`vercel env`, and deploy. No schema changes needed to move environments.
+`main` deploys to AWS QA through `.github/workflows/deploy.yml` after its
+verification job. The `production` branch deploys through
+`.github/workflows/deploy-production.yml`. Each environment has a separate
+Supabase project; database migrations are applied and checked in QA before
+production promotion. Follow `AGENTS.md` for the full release procedure.
+
+The deployed web app requires `CRON_SECRET` for protected notification and
+Umrah worker routes. QA deploy generates one when a GitHub secret is absent;
+production requires it in `PROD_ENV_FILE` or as a GitHub secret. A dedicated
+worker process calls these routes in QA (PM2) and production (Docker Compose).
+The web process disables its internal timers when `STS_WORKER_SCHEDULER=external`.

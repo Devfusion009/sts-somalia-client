@@ -64,43 +64,45 @@
    steppers, links); its orange is reserved for high-emphasis marketing CTAs
    and price highlights so it stays special. Neutrals are teal-tinted rather
    than gray so even empty screens feel on-brand. */
+/* Reference palette: quiet teal surfaces, ink text, orange emphasis. */
 :root {
-  --background: #f6f8f7;
-  --foreground: #0e2723;
+  --background: #ffffff;
+  --foreground: #202b2b;
   --card: #ffffff;
-  --card-foreground: #0e2723;
+  --card-foreground: #202b2b;
   --popover: #ffffff;
-  --popover-foreground: #0e2723;
-  --primary: #00947c;
+  --popover-foreground: #202b2b;
+  --primary: #187d73;
   --primary-foreground: #ffffff;
-  --secondary: #eef5f2;
-  --secondary-foreground: #0c4a40;
-  --muted: #f0f4f3;
-  --muted-foreground: #5a6f6b;
-  --accent: #e2f2ec;
-  --accent-foreground: #0c4a40;
-  --destructive: #dc2626;
+  --secondary: #edf7f5;
+  --secondary-foreground: #176b63;
+  --muted: #f4f8f7;
+  --muted-foreground: #627270;
+  --accent: #e8f4f2;
+  --accent-foreground: #176b63;
+  --destructive: #c52d35;
   --destructive-foreground: #ffffff;
-  --border: #e2e9e7;
-  --input: #d4dfdb;
-  --ring: #00947c;
-  --brand-accent: #f4711c;
-  --brand-accent-foreground: #ffffff;
-  --brand-gold: #f59e0b;
-  --chart-1: #00947c;
-  --chart-2: #f4711c;
-  --chart-3: #0284c7;
-  --chart-4: #7c3aed;
-  --chart-5: #f59e0b;
-  --radius: 0.625rem;
-  --sidebar: #0b1f1c;
-  --sidebar-foreground: #b9cbc6;
-  --sidebar-primary: #2cc9a8;
-  --sidebar-primary-foreground: #04211c;
-  --sidebar-accent: #16302b;
+  --border: #e3eae8;
+  --input: #cdd9d6;
+  --ring: #238c80;
+  --brand-accent: #f38b19;
+  --brand-accent-foreground: #272014;
+  --brand-gold: #d78015;
+  --brand-teal: #2c988c;
+  --chart-1: #238c80;
+  --chart-2: #f38b19;
+  --chart-3: #317c9a;
+  --chart-4: #7768aa;
+  --chart-5: #c28c39;
+  --radius: .75rem;
+  --sidebar: #103c37;
+  --sidebar-foreground: #edf7f5;
+  --sidebar-primary: #92ded0;
+  --sidebar-primary-foreground: #103c37;
+  --sidebar-accent: #20554e;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #2dd4b4;
+  --sidebar-border: rgba(255,255,255,.14);
+  --sidebar-ring: #92ded0;
 }
 
 .dark {
@@ -197,6 +199,8 @@
   html {
     @apply font-sans;
     text-rendering: optimizeLegibility;
+    scroll-padding-top: 6rem;
+    -webkit-font-smoothing: antialiased;
   }
   h1, h2, h3, h4 {
     @apply font-heading;
@@ -405,4 +409,221 @@ select:not([multiple]):not([size]) {
   background-position: right 0.6rem center;
   background-size: 0.9rem;
   padding-inline-end: 2rem;
+}
+
+/* Shared portal surface; the footer keeps its independent brand palette. */
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) {
+  --sidebar: #ffffff;
+  --sidebar-foreground: #475e5a;
+  --sidebar-primary: #187d73;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8f4f2;
+  --sidebar-accent-foreground: #176b63;
+  --sidebar-border: #e3eae8;
+  --sidebar-ring: #238c80;
+  background: #f4f8f7;
+}
+.dark :is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) {
+  --sidebar: #0a211d;
+  --sidebar-foreground: #c3dcd5;
+  --sidebar-primary: #2dd4b4;
+  --sidebar-primary-foreground: #04211c;
+  --sidebar-accent: #103630;
+  --sidebar-accent-foreground: #e2f3ee;
+  --sidebar-border: rgba(255,255,255,.1);
+  background: var(--background);
+}
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-inset"] { background: transparent; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-header"] { padding: 1.25rem 1rem; border-bottom: 1px solid var(--sidebar-border); }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-footer"] { padding: .875rem; border-top: 1px solid var(--sidebar-border); }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-group-label"] { font-size: .75rem; letter-spacing: .04em; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-menu-button"] { min-height: 2.75rem; font-size: .875rem; border-radius: .75rem; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-menu-button"][data-active="true"] { color: var(--sidebar-accent-foreground); background: var(--sidebar-accent); font-weight: 600; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-inset"] > header { min-height: 4.5rem; background: var(--card); }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="page-header"] { padding-bottom: 1.5rem; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="page-header"] h1 { font-size: clamp(1.5rem,2.2vw,2rem); letter-spacing: -.035em; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="card"] { box-shadow: 0 2px 6px rgb(20 60 50 / .025); }
+@media (max-width: 639px) {
+  :is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-inset"] > header { min-height: 4rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}
+
+/* Shared teal navigation for every portal, including the mobile sheet. */
+:is(.portal-shell [data-slot="sidebar"], [data-slot="sidebar"][data-mobile="true"], .dark [data-slot="sidebar"][data-mobile="true"]) {
+  --sidebar: #237f75;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #d4f7ec;
+  --sidebar-primary-foreground: #124b43;
+  --sidebar-accent: #155e56;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / .2);
+  --sidebar-ring: #d4f7ec;
+  color: var(--sidebar-foreground);
+}
+:is([data-slot="sidebar"][data-mobile="true"], .dark [data-slot="sidebar"][data-mobile="true"]) { background: var(--sidebar); }
+.portal-shell [data-slot="sidebar-inner"] { background: var(--sidebar); }
+.portal-shell [data-slot="sidebar-container"] { border-color: var(--sidebar-border); }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-content"] {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / .35) transparent;
+}
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-group"] { padding: .5rem .75rem; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-group-label"] {
+  color: var(--sidebar-foreground);
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+  margin-bottom: .375rem;
+}
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-menu"] { gap: .25rem; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-menu-button"] {
+  color: #ffffff;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-menu-button"]:hover {
+  background: #1d7168;
+  color: #ffffff;
+}
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-menu-button"][data-active="true"] {
+  background: var(--sidebar-accent);
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .15);
+}
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-input"] {
+  background: #1d7168;
+  border-color: var(--sidebar-border);
+  color: #ffffff;
+}
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-input"]::placeholder { color: #ffffff; opacity: 1; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-header"] [data-slot="sidebar-menu-button"]:hover { background: transparent; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-header"] span,
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-footer"] span { color: #ffffff; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-footer"] { background: #1d7168; }
+:is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-footer"] [data-slot="avatar-fallback"] { color: var(--sidebar-primary-foreground); }
+
+/* Deeper admin navigation on desktop and in its portalled mobile sheet. */
+:is(.portal-shell[data-portal-accent="admin"] [data-slot="sidebar"], body:has(.portal-shell[data-portal-accent="admin"]) [data-slot="sidebar"][data-mobile="true"]) {
+  --sidebar: #17685f;
+  --sidebar-accent: #104e47;
+  --sidebar-primary-foreground: #104e47;
+  --admin-sidebar-surface: #135c54;
+}
+:is(.portal-shell[data-portal-accent="admin"] [data-slot="sidebar"], body:has(.portal-shell[data-portal-accent="admin"]) [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-menu-button"]:hover {
+  background: #1c756a;
+}
+:is(.portal-shell[data-portal-accent="admin"] [data-slot="sidebar"], body:has(.portal-shell[data-portal-accent="admin"]) [data-slot="sidebar"][data-mobile="true"]) :is([data-slot="sidebar-input"], [data-slot="sidebar-footer"]) {
+  background: var(--admin-sidebar-surface);
+}
+:is(.portal-shell[data-portal-accent="admin"] [data-slot="sidebar"], body:has(.portal-shell[data-portal-accent="admin"]) [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-header"] [data-slot="sidebar-menu-button"]:hover {
+  background: transparent;
+}
+
+/* Keep the admin's compact rail aligned independently of expanded spacing. */
+.portal-shell[data-portal-accent="admin"] [data-collapsible="icon"] :is([data-slot="sidebar-header"], [data-slot="sidebar-footer"]) {
+  padding: .875rem .75rem;
+}
+.portal-shell[data-portal-accent="admin"] [data-collapsible="icon"] [data-slot="sidebar-menu-button"] {
+  position: relative;
+  width: 2.75rem !important;
+  min-width: 2.75rem;
+  height: 2.75rem !important;
+  min-height: 2.75rem;
+  justify-content: center;
+  margin-inline: auto;
+  gap: 0;
+  padding: 0 !important;
+  border-radius: .75rem;
+}
+.portal-shell[data-portal-accent="admin"] [data-collapsible="icon"] [data-slot="sidebar-menu-button"] > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.portal-shell[data-portal-accent="admin"] [data-icon-only="true"] {
+  padding: .75rem;
+  gap: .375rem;
+}
+.portal-shell[data-portal-accent="admin"] [data-icon-only="true"] > div { width: 100%; }
+@media (prefers-reduced-motion: reduce) {
+  :is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-menu-button"] { transition: none; }
+}
+
+/* Original public website palette, independent of portal surfaces. */
+.marketing-site {
+  --background: #f6f8f7;
+  --foreground: #0e2723;
+  --card: #ffffff;
+  --card-foreground: #0e2723;
+  --popover: #ffffff;
+  --popover-foreground: #0e2723;
+  --primary: #00947c;
+  --primary-foreground: #ffffff;
+  --secondary: #eef5f2;
+  --secondary-foreground: #0c4a40;
+  --muted: #f0f4f3;
+  --muted-foreground: #5a6f6b;
+  --accent: #e2f2ec;
+  --accent-foreground: #0c4a40;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e2e9e7;
+  --input: #d4dfdb;
+  --ring: #00947c;
+  --brand-accent: #f4711c;
+  --brand-accent-foreground: #ffffff;
+  --brand-gold: #f59e0b;
+  --chart-1: #00947c;
+  --chart-2: #f4711c;
+  --chart-3: #0284c7;
+  --chart-4: #7c3aed;
+  --chart-5: #f59e0b;
+  --radius: 0.625rem;
+  --sidebar: #0b1f1c;
+  --sidebar-foreground: #b9cbc6;
+  --sidebar-primary: #2cc9a8;
+  --sidebar-primary-foreground: #04211c;
+  --sidebar-accent: #16302b;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #2dd4b4;
+}
+
+.dark .marketing-site {
+  --background: #061412;
+  --foreground: #e2f3ee;
+  --card: #0a211d;
+  --card-foreground: #e2f3ee;
+  --popover: #0a211d;
+  --popover-foreground: #e2f3ee;
+  --primary: #2dd4b4;
+  --primary-foreground: #04211c;
+  --secondary: #103630;
+  --secondary-foreground: #e2f3ee;
+  --muted: #103630;
+  --muted-foreground: #8fb3ab;
+  --accent: #103630;
+  --accent-foreground: #e2f3ee;
+  --destructive: #f87171;
+  --destructive-foreground: #450a0a;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #2dd4b4;
+  --brand-accent: #fb8b3c;
+  --brand-accent-foreground: #1a0800;
+  --brand-gold: #fbbf24;
+  --chart-1: #2dd4b4;
+  --chart-2: #fb8b3c;
+  --chart-3: #38bdf8;
+  --chart-4: #a78bfa;
+  --chart-5: #fbbf24;
+  --sidebar: #04100e;
+  --sidebar-foreground: #e2f3ee;
+  --sidebar-primary: #2dd4b4;
+  --sidebar-primary-foreground: #04211c;
+  --sidebar-accent: #0a211d;
+  --sidebar-accent-foreground: #e2f3ee;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #2dd4b4;
 }

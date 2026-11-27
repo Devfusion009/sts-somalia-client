@@ -4,19 +4,13 @@ import { AdminSupabaseService } from "../../infra/supabase/admin-supabase.servic
 import { sendEmail } from "../../infra/notify/email";
 import { escapeHtml, renderEmail } from "../../infra/notify/email-layout";
 import { env } from "../../config/env";
-import {
-  AmadeusError,
-  amadeusConfig,
-  createOrder,
-  getOrder,
-  orderReference,
-  orderTickets,
-  type AmadeusOffer,
-  type AmadeusTraveler,
-} from "./amadeus-client";
+import { AmadeusError } from "./amadeus-client";
+import { resolveFlightProvider, FlightProviderError, type FlightTraveler, type SupplierOffer } from "./flight-provider";
 
 type BookingRow = {
   id: string;
+  provider: string;
+  raw_payload: { provider_binding?: string };
   customer_id: string;
   booked_by: string;
   agency_id: string | null;
@@ -26,7 +20,7 @@ type BookingRow = {
   return_at: string | null;
   total_price: number;
   currency: string;
-  offer_snapshot: AmadeusOffer | null;
+  offer_snapshot: SupplierOffer | null;
   contact_email: string | null;
   contact_phone: string | null;
   ticketing_attempts: number;
@@ -74,10 +68,11 @@ export class FlightTicketingService {
 
   @Interval(30_000)
   async tick(): Promise<void> {
-    if (this.running || !amadeusConfig()) return;
+    if (this.running) return;
     this.running = true;
     try {
-      await this.admin.get().rpc("expire_flight_fares");
+      const { error } = await this.admin.get().rpc("expire_flight_fares");
+      if (error) throw new Error("Flight fare expiry is unavailable.");
       await this.bookPaid();
       await this.checkTickets();
     } catch (error) {
@@ -89,7 +84,8 @@ export class FlightTicketingService {
 
   private async bookPaid() {
     const db = this.admin.get();
-    const { data: rows } = await db.rpc("claim_flight_ticketing", { p_limit: 5 });
+    const { data: rows, error } = await db.rpc("claim_flight_ticketing", { p_limit: 5 });
+    if (error) throw new Error("Flight ticketing claims are unavailable.");
     for (const row of (rows ?? []) as unknown as BookingRow[]) {
       await this.bookOne(row);
     }
@@ -104,7 +100,7 @@ export class FlightTicketingService {
       .eq("booking_id", row.id)
       .order("traveler_ref");
 
-    const travelers = ((passengers ?? []) as Passenger[]).map((p, index): AmadeusTraveler => {
+    const travelers = ((passengers ?? []) as Passenger[]).map((p, index): FlightTraveler => {
       const [first, ...rest] = p.full_name.split(/\s+/);
       return {
         id: p.traveler_ref ?? String(index + 1),
@@ -125,11 +121,13 @@ export class FlightTicketingService {
     }
 
     try {
-      const order = await createOrder({ offer: row.offer_snapshot, travelers, contactEmail: row.contact_email, contactPhone: row.contact_phone });
-      const tickets = orderTickets(order);
-      const pnr = orderReference(order);
+      const provider = await resolveFlightProvider(row.provider, row.raw_payload?.provider_binding, true);
+      if (!provider) throw new FlightProviderError("Original supplier credentials are unavailable.");
+      const order = await provider.create({ offer: row.offer_snapshot, travelers, contactEmail: row.contact_email, contactPhone: row.contact_phone, bookingId: row.id });
+      const tickets = order.tickets;
+      const pnr = order.reference;
       const now = new Date().toISOString();
-      await db
+      const { error: saveError } = await db
         .from("flight_bookings")
         .update({
           status: "confirmed",
@@ -142,9 +140,12 @@ export class FlightTicketingService {
           ticketed_at: tickets.length > 0 ? now : null,
         })
         .eq("id", row.id);
-      await this.notifyTraveller({ ...row, provider_booking_ref: pnr }, tickets, travelers);
+      if (saveError) throw new FlightProviderError(`Supplier order ${order.id} was created but could not be saved. Reconcile before retrying.`);
+      // An email failure must never requeue or invalidate a confirmed supplier order.
+      await this.notifyTraveller({ ...row, provider_booking_ref: pnr }, tickets, travelers)
+        .catch(() => this.logger.warn(`[flights] receipt delivery failed: ${row.id}`));
     } catch (error) {
-      const retryable = error instanceof AmadeusError && (error.code === "auth" || error.code === "not_configured" || error.status === 429);
+      const retryable = (error instanceof FlightProviderError && error.safeToRetry) || error instanceof AmadeusError && (error.code === "auth" || error.code === "not_configured" || error.status === 429);
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`[flights] booking ${row.id} failed: ${message}`);
       if (retryable && row.ticketing_attempts < 3) {
@@ -157,21 +158,25 @@ export class FlightTicketingService {
 
   private async checkTickets() {
     const db = this.admin.get();
-    const { data: rows } = await db.rpc("claim_flight_ticket_checks", { p_limit: 10 });
+    const { data: rows, error } = await db.rpc("claim_flight_ticket_checks", { p_limit: 10 });
+    if (error) throw new Error("Flight ticket checks are unavailable.");
     for (const row of (rows ?? []) as unknown as BookingRow[]) {
       if (!row.provider_order_id) continue;
       try {
-        const tickets = orderTickets(await getOrder(row.provider_order_id));
+        const provider = await resolveFlightProvider(row.provider, row.raw_payload?.provider_binding, true);
+        if (!provider) continue;
+        const tickets = (await provider.get(row.provider_order_id)).tickets;
         if (tickets.length === 0) continue;
-        await db
+        const { error: saveError } = await db
           .from("flight_bookings")
           .update({ ticketing_status: "ticketed", ticket_numbers: tickets, ticketed_at: new Date().toISOString() })
           .eq("id", row.id);
+        if (saveError) throw new Error("Ticket numbers could not be saved.");
         const { data: passengers } = await db.from("flight_passengers").select("full_name").eq("booking_id", row.id);
         await this.notifyTraveller(
           row,
           tickets,
-          (passengers ?? []).map((p, i) => ({ id: String(i + 1), firstName: p.full_name, lastName: "" }) as AmadeusTraveler)
+          (passengers ?? []).map((p, i) => ({ id: String(i + 1), firstName: p.full_name, lastName: "" }) as FlightTraveler)
         );
       } catch (error) {
         this.logger.warn(`[flights] ticket check ${row.id} failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -189,7 +194,7 @@ export class FlightTicketingService {
         profile_id: a.id,
         type: "flight_ticketing_failed",
         title: `Flight booking failed · ${route}`,
-        body: "Paid in full; the airline booking did not complete.",
+        body: "Payment received. Check the supplier booking status before retrying.",
         data: { flight_booking_id: row.id },
       })),
       ...[...new Set([row.customer_id, row.booked_by])].map((profileId) => ({
@@ -202,7 +207,7 @@ export class FlightTicketingService {
     ]);
   }
 
-  private async notifyTraveller(row: BookingRow, tickets: string[], travelers: AmadeusTraveler[]) {
+  private async notifyTraveller(row: BookingRow, tickets: string[], travelers: FlightTraveler[]) {
     const db = this.admin.get();
     const route = `${row.origin_iata} → ${row.destination_iata}`;
     const ticketed = tickets.length > 0;

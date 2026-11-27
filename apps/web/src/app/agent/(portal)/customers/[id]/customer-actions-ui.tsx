@@ -1,5 +1,7 @@
 "use client";
 
+import agentUi from "@/components/portal/agent-typography.module.css";
+
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
@@ -37,7 +39,7 @@ export function EditCustomerDialog({ customer }: { customer: CustomerProfile }) 
       >
         <Pencil className="size-4" aria-hidden="true" />Edit profile
       </DialogTrigger>
-      <DialogContent className={styles.dialog}>
+      <DialogContent className={`${styles.dialog} ${agentUi.dialog}`}>
         <DialogHeader className={styles.dialogHeader}>
           <DialogTitle>Edit customer profile</DialogTitle>
         </DialogHeader>
@@ -99,7 +101,7 @@ export function DeleteCustomerButton({
       >
         <Trash2 aria-hidden="true" />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className={`${agentUi.dialog} sm:max-w-sm`}>
         <DialogHeader>
           <DialogTitle>Delete this customer?</DialogTitle>
         </DialogHeader>

@@ -53,7 +53,7 @@ test('return URLs preserve booking context but cannot escape into other origins 
   }
 });
 
-function harness({ env = production, profile = { role: 'customer', is_platform_admin: false }, manager = null, profileError = null, mfa = { currentLevel: 'aal1', nextLevel: 'aal1' }, mfaError = null, exchangeError = null } = {}) {
+function harness({ env = production, profile = { role: 'customer', is_platform_admin: false }, manager = null, business = {}, profileError = null, mfa = { currentLevel: 'aal1', nextLevel: 'aal1' }, mfaError = null, exchangeError = null } = {}) {
   const calls = { exchange: [], signedOut: 0, logged: [], started: [], cookies: [] };
   const user = { id: 'customer-id', email: 'customer@example.test', email_confirmed_at: '2026-11-20', app_metadata: {}, identities: [{ provider: 'google' }] };
   const store = { get: () => ({ value: '/checkout/order-123' }), getAll: () => [{ name: 'sb-project-auth-token.0' }], set: (...args) => calls.cookies.push(args) };
@@ -65,7 +65,8 @@ function harness({ env = production, profile = { role: 'customer', is_platform_a
       mfa: { getAuthenticatorAssuranceLevel: async () => ({ data: mfa, error: mfaError }) },
     },
     from: table => {
-      const result = table === 'profiles' ? { data: profile, error: profileError } : { data: manager, error: null };
+      const result = table === 'profiles' ? { data: profile, error: profileError }
+        : { data: business[table] ?? (['hotel_managers', 'venue_managers'].includes(table) ? manager : null), error: null };
       const chain = { select: () => chain, eq: () => chain, limit: () => chain, single: async () => result, maybeSingle: async () => result };
       return chain;
     },
@@ -158,6 +159,15 @@ test('Google cannot bypass an existing two-factor requirement or failed MFA look
   const failed = harness({ mfaError: { message: 'unavailable' } });
   assert.match((await failed.callback(failed.request())).url, /google_sign_in_failed$/);
   assert.equal(failed.calls.signedOut, 1);
+});
+
+test('business memberships cannot use Google even with a customer profile role', async () => {
+  for (const table of ['agency_members', 'hotel_partner_members', 'venue_partner_members', 'affiliates']) {
+    const h = harness({ business: { [table]: { id: 'business-identity' } } });
+    assert.match((await h.callback(h.request())).url, /google_sign_in_failed$/);
+    assert.equal(h.calls.signedOut, 1, table);
+    assert.equal(h.calls.logged.length, 0, table);
+  }
 });
 
 test('unverified users, non-Google identities and failed access checks lose local credentials', async () => {

@@ -9,7 +9,6 @@ import { sendEmail } from "@/lib/notifications/email";
 import type { ActionState } from "@/lib/auth/actions";
 import {
   ACCOUNT_SLUG_FROM_TYPE,
-  ENTITY_TABLE,
   VALID_TRANSITIONS,
   type PartnerAccountStatus,
   type PartnerAccountType,
@@ -31,9 +30,8 @@ async function loadAccount(accountId: string) {
 // Status transitions — the state machine's only write path. The `to` value
 // is validated against VALID_TRANSITIONS from the account's CURRENT status
 // (re-read inside the action), so a stale page or a crafted request can
-// never skip a state or resurrect an offboarded account. The optimistic
-// `.eq("status", current)` guard makes concurrent transitions lose cleanly
-// instead of double-applying.
+// never skip a state or resurrect an offboarded account. The database RPC
+// locks and verifies the current status before committing all changes.
 // ---------------------------------------------------------------------------
 const transitionSchema = z.object({
   accountId: z.string().min(1),
@@ -41,14 +39,8 @@ const transitionSchema = z.object({
   reason: z.string().max(1000).optional(),
 });
 
-const TRANSITION_ACTION: Record<string, string> = {
-  live: "reactivated",
-  suspended: "suspended",
-  offboarded: "offboarded",
-};
-
 export async function transitionPartnerAccount(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const admin = await requirePlatformAdmin();
+  await requirePlatformAdmin();
   const parsed = transitionSchema.safeParse({
     accountId: formData.get("accountId"),
     to: formData.get("to"),
@@ -68,45 +60,17 @@ export async function transitionPartnerAccount(_prev: ActionState, formData: For
   }
 
   const supabase = await createClient();
-  const now = new Date().toISOString();
-  const patch: {
-    status: PartnerAccountStatus;
-    went_live_at?: string;
-    suspended_at?: string;
-    offboarded_at?: string;
-  } = { status: parsed.data.to };
-  if (parsed.data.to === "live" && account.status === "onboarding") patch.went_live_at = now;
-  if (parsed.data.to === "suspended") patch.suspended_at = now;
-  if (parsed.data.to === "offboarded") patch.offboarded_at = now;
-
-  const { error, count } = await supabase
-    .from("partner_accounts")
-    .update(patch, { count: "exact" })
-    .eq("id", account.id)
-    .eq("status", account.status);
-  if (error) return { error: error.message };
-  if (!count) return { error: "The account changed while you were looking at it — reload and try again." };
-
-  // Suspension has teeth: the operational entity is flipped too, which the
-  // partner-facing portal layouts gate on. live/onboarding <-> active.
-  const entityStatus = parsed.data.to === "live" ? "active" : "suspended";
-  await supabase.from(ENTITY_TABLE[account.type]).update({ status: entityStatus }).eq("id", account.entity_id);
-
-  await supabase.from("partner_account_events").insert({
-    account_id: account.id,
-    actor: admin.id,
-    action:
-      parsed.data.to === "live" && account.status === "onboarding"
-        ? "went_live"
-        : TRANSITION_ACTION[parsed.data.to],
-    from_status: account.status,
-    to_status: parsed.data.to,
-    reason: parsed.data.reason ?? null,
+  const { error } = await supabase.rpc("transition_partner_account", {
+    p_account_id: account.id,
+    p_expected_status: account.status,
+    p_to_status: parsed.data.to,
+    p_reason: parsed.data.to === "suspended" ? undefined : parsed.data.reason,
   });
+  if (error) return { error: error.message };
 
-  revalidatePath(consolePath(account.type, account.id));
-  revalidatePath("/admin/partners");
-  return { error: null };
+  // Return before the full console reload: its document signing and portfolio
+  // queries must not keep the confirmed status change in an "Applying" state.
+  return { error: null, destination: consolePath(account.type, account.id) };
 }
 
 // ---------------------------------------------------------------------------

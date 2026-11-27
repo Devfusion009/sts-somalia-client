@@ -7,7 +7,7 @@ import { getMyPartnerContexts } from "@/modules/identity/queries";
 import { getMyAgency } from "@/modules/agencies/queries";
 import { agencyLogoUrl } from "@/modules/agencies/logo";
 import { getAgencyOnboardingChecklist } from "@/modules/admin/partner-accounts";
-import { PortalShell, type PortalNavGroup } from "@/components/portal/portal-shell";
+import { PortalShell } from "@/components/portal/portal-shell";
 import { PortalSuspendedNotice } from "@/components/portal/portal-suspended-notice";
 import { OnboardingStatusBanner } from "@/components/portal/onboarding-status-banner";
 import { AgentNotificationBell } from "@/components/portal/agent-notification-bell";
@@ -15,6 +15,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import styles from "@/components/portal/operations-shell.module.css";
+import { AgentSectionNavigation } from "./section-navigation";
+import { AGENT_NAV_GROUPS } from "./navigation";
 import typography from "@/components/portal/agent-typography.module.css";
 
 /** Portal-scoped title — see the admin portal layout for why this lives on the layout. */
@@ -25,43 +27,6 @@ export const metadata: Metadata = {
   },
 };
 
-const NAV_GROUPS: PortalNavGroup[] = [
-  {
-    label: "Workspace",
-    alwaysOpen: true,
-    items: [
-      { href: "/agent", label: "Dashboard", icon: "overview" },
-      { href: "/agent/book", label: "New booking", icon: "new-booking" },
-      { href: "/agent/bookings", label: "Bookings", icon: "bookings" },
-      { href: "/agent/customers", label: "Customers", icon: "profile" },
-      { href: "/agent/finance", label: "Wallet", icon: "payouts" },
-      { href: "/agent/reports", label: "Commissions & earnings", icon: "earnings" },
-      { href: "/agent/calendar", label: "Booking calendar", icon: "calendar" },
-      { href: "/agent/finance/transactions", label: "Transactions", icon: "payments" },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      { href: "/agent/finance/top-up", label: "Top up wallet", icon: "bank" },
-      { href: "/agent/finance/withdrawals", label: "Withdraw earnings", icon: "bank" },
-      { href: "/agent/finance/billing", label: "Billing", icon: "invoice" },
-      { href: "/agent/markups", label: "Markups", icon: "catalog" },
-      { href: "/agent/refunds", label: "Refunds", icon: "refund" },
-    ],
-  },
-  {
-    label: "Agency",
-    items: [
-      { href: "/agent/settings", label: "Agency profile", icon: "agency" },
-      { href: "/agent/team", label: "Team", icon: "team" },
-      { href: "/agent/bank-details", label: "Bank details", icon: "bank" },
-      { href: "/agent/security", label: "Security", icon: "security" },
-      { href: "/agent/personal-bookings", label: "Personal bookings", icon: "bookings" },
-    ],
-  },
-];
-
 export default async function AgentLayout({ children }: { children: React.ReactNode }) {
   // Checked via direct membership lookup, not profile.role: a user approved
   // for more than one program (e.g. hotel partner AND agent) only has one
@@ -69,7 +34,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
   // every membership row they were actually granted — gating on role alone
   // would incorrectly lock them out of programs they still belong to.
   const profile = await requireUserForPortal("agent");
-  const membership = await getMyAgency(profile.id);
+  const membership = await getMyAgency(profile.id, true);
 
   if (!membership) {
     return (
@@ -95,7 +60,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
   // the Partner Management Console's suspend/offboard transitions flip
   // agencies.status, and this is where that bites.
   if (membership.agency.status === "suspended") {
-    return <PortalSuspendedNotice portalLabel="Agent Portal" />;
+    return <PortalSuspendedNotice portalLabel="Agent Portal" agencyName={membership.agency.name} agentCode={profile.agent_code ?? membership.agency.agent_code} />;
   }
 
   // Account discovery is optional shell content; it must not block bookings or the wallet.
@@ -103,7 +68,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
 
   return (
     <PortalShell
-      className={styles.shell}
+      className={`${styles.shell} ${typography.shell}`}
       portalName="Agent Portal"
       roleLabel={
         {
@@ -114,7 +79,8 @@ export default async function AgentLayout({ children }: { children: React.ReactN
           viewer: "Viewer",
         }[membership.roleInAgency] ?? "Agency Staff"
       }
-      navGroups={NAV_GROUPS}
+      navGroups={AGENT_NAV_GROUPS}
+      searchableNavigation
       profileName={profile.full_name}
       profileEmail={profile.email?.endsWith("@agent-login.scoutsts.invalid") ? membership.agency.contact_email : profile.email}
       contexts={contexts}
@@ -131,7 +97,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
       <Suspense fallback={null}>
         <AgencyOnboarding agency={membership.agency} />
       </Suspense>
-      <div className={typography.portal}>{children}</div>
+      <div className={typography.portal}><AgentSectionNavigation />{children}</div>
     </PortalShell>
   );
 }

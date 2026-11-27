@@ -32,14 +32,18 @@ export async function GET(request: NextRequest) {
   };
   try {
     const user = data.user;
-    const [profile, hotels, venues] = await Promise.all([
+    const [profile, ...businessIdentities] = await Promise.all([
       supabase.from("profiles").select("role, is_platform_admin").eq("id", user.id).single(),
       supabase.from("hotel_managers").select("hotel_id").eq("profile_id", user.id).eq("status", "active").limit(1).maybeSingle(),
       supabase.from("venue_managers").select("venue_id").eq("profile_id", user.id).eq("status", "active").limit(1).maybeSingle(),
+      supabase.from("agency_members").select("agency_id").eq("profile_id", user.id).eq("status", "active").limit(1).maybeSingle(),
+      supabase.from("hotel_partner_members").select("partner_id").eq("profile_id", user.id).eq("status", "active").limit(1).maybeSingle(),
+      supabase.from("venue_partner_members").select("partner_id").eq("profile_id", user.id).eq("status", "active").limit(1).maybeSingle(),
+      supabase.from("affiliates").select("id").eq("profile_id", user.id).limit(1).maybeSingle(),
     ]);
-    if (profile.error || hotels.error || venues.error || !user.email_confirmed_at ||
+    if (profile.error || businessIdentities.some(identity => identity.error) || !user.email_confirmed_at ||
       !user.identities?.some(identity => identity.provider === "google") ||
-      !isGoogleCustomer(profile.data, user.app_metadata, Boolean(hotels.data || venues.data))) return reject();
+      !isGoogleCustomer(profile.data, user.app_metadata, businessIdentities.some(identity => Boolean(identity.data)))) return reject();
 
     const { data: aal, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (mfaError || !aal || !aal.currentLevel) return reject();

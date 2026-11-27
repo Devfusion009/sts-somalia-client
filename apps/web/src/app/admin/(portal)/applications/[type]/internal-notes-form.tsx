@@ -38,7 +38,7 @@ export function InternalNotesForm({
             Saved.
           </p>
         ) : null}
-        <SubmitButton size="sm" pendingText="Saving…">
+        <SubmitButton variant="outline" size="sm" pendingText="Saving…">
           Save notes
         </SubmitButton>
       </div>

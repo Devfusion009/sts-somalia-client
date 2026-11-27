@@ -8,8 +8,12 @@ import { retryFlightTicketing, type FlightAdminState } from "@/modules/flights/a
 export function RetryTicketingForm({ bookingId }: { bookingId: string }) {
   const [state, action] = useActionState<FlightAdminState, FormData>(retryFlightTicketing, null);
   return (
-    <form action={action} className="flex items-center gap-2">
+    <form action={action} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="bookingId" value={bookingId} />
+      <label className="flex items-center gap-2 text-xs">
+        <input type="checkbox" name="supplierChecked" value="yes" required />
+        Supplier checked: no booking exists
+      </label>
       {state?.error ? <span className="text-xs text-destructive">{state.error}</span> : null}
       {state?.ok ? <span className="text-xs text-muted-foreground">{state.ok}</span> : null}
       <SubmitButton size="sm" variant="outline" pendingText="Queuing…">

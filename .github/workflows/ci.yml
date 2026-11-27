@@ -1,20 +1,44 @@
 name: CI
 
-# Required check on every pull request into main (QA) and production.
-# Deploy workflows do not run these checks; a merge only ships what passed here.
+# Shared quality gate for pull requests and all deployment workflows.
 
 on:
   pull_request:
-    branches: [main, production]
+    branches: [main, production, client_impression]
+  workflow_call:
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number }}
+  group: quality-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  deployment-policy:
+    name: Deployment isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate GitHub Actions workflows
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl --fail --silent --show-error --location --retry 3 \
+            -o actionlint.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz
+          echo '023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757  actionlint.tar.gz' | sha256sum --check
+          tar -xzf actionlint.tar.gz actionlint
+          cd "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes= .github/workflows/*.yml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node --test scripts/test/deployment-policy.test.cjs
+
   api:
     name: api
     runs-on: ubuntu-latest
@@ -35,6 +59,17 @@ jobs:
 
       - name: Build
         run: npm run build -w api
+
+      - name: Locate PostgreSQL test tools
+        run: echo "PG_TEST_BIN=$(pg_config --bindir)" >> "$GITHUB_ENV"
+
+      - name: Shared types and Umrah integration tests
+        run: |
+          npm test -w @sts/shared-types
+          python3 apps/api/test/public-umrah-integration.py --request-pool
+          python3 apps/api/test/marketing-aging-integration.py
+          python3 apps/api/test/umrah-capacity-integration.py
+          python3 apps/api/test/my-bookings-page-integration.py
 
   web:
     name: web
@@ -61,5 +96,11 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit -p apps/web
 
-      - name: Customer Google sign-in tests
-        run: node apps/web/test/google-customer-auth.test.cjs
+      - name: Umrah UI and notification tests
+        run: node --test apps/web/test/agent-bookings.test.cjs apps/web/test/catalog-outage.test.cjs apps/web/test/cron-auth.test.cjs apps/web/test/google-customer-auth.test.cjs apps/web/test/external-worker.test.mjs apps/web/test/marketing-callback.test.cjs apps/web/test/my-bookings-pages.test.cjs apps/web/test/pool-email.test.cjs apps/web/test/pool-worker.test.cjs apps/web/test/public-umrah-catalog.test.cjs
+
+      - name: Agent onboarding, suspension and recovery regression tests
+        run: node --test apps/web/test/agent-portal-guide.test.cjs apps/web/test/partner-suspension.test.cjs apps/web/test/portal-password-link.test.cjs
+
+      - name: Agent credential delivery and SMTP retry tests
+        run: node --test apps/web/test/agent-credentials.test.cjs apps/web/test/smtp-capture.test.cjs

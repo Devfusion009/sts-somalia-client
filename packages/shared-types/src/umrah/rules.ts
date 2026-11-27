@@ -124,9 +124,12 @@ function localToday() {
  * create_umrah_group_booking applies the same rule in SQL.
  */
 export function bookableDepartures<
-  T extends { departure_date: string; sales_close_days?: number | null; status?: string | null },
+  T extends { departure_date: string; sales_close_days?: number | null; status?: string | null; booking_mode?: string; formation_status?: string; formation_closes_at?: string | null; payment_cutoff_at?: string | null; payment_window_hours?: number; replacement_sales_open?: boolean },
 >(departures: T[], today = localToday()): T[] {
   return departures
+    .filter((d) => d.booking_mode !== "request_then_pay" ||
+      (d.formation_status === "forming" && !!d.formation_closes_at && Date.parse(d.formation_closes_at) > Date.now()) ||
+      (d.formation_status === "payment_open" && d.replacement_sales_open && !!d.payment_cutoff_at && Date.now() + (d.payment_window_hours ?? 48) * 3_600_000 <= Date.parse(d.payment_cutoff_at)))
     .filter((d) => (d.status ?? "open") === "open")
     .filter((d) => {
       const [y, m, day] = d.departure_date.split("-").map(Number);

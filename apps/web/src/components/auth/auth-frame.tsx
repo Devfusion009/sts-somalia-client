@@ -3,8 +3,8 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-/** Control height shared by every auth form: 36px, 44px on phones. */
-export const AUTH_CONTROL = "h-9 max-sm:h-11";
+/** Control height shared by every auth form: 44px across screen sizes. */
+export const AUTH_CONTROL = "h-11";
 
 /**
  * Centered auth layout used by /signup, /forgot-password, /reset-password,
@@ -26,7 +26,7 @@ export function AuthFrame({
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-secondary/30 px-4 py-12">
       <AuthLogo href={homeHref} label={label} />
-      <div className="w-full max-w-sm">{children}</div>
+      <div className="w-full max-w-md">{children}</div>
       {footer}
     </div>
   );
@@ -65,7 +65,7 @@ export function AuthCard({
   return (
     <Card className={cn("gap-6 py-6 sm:py-8", className)}>
       <CardHeader className="px-6 sm:px-8">
-        <h1 className="font-heading text-xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">{title}</h1>
       </CardHeader>
       <CardContent className="px-6 sm:px-8">{children}</CardContent>
     </Card>

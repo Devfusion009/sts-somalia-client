@@ -74,7 +74,7 @@ export class CheckoutService {
            flight_booking:flight_booking_id (id, origin_iata, destination_iata, depart_at),
            visa_application:visa_application_id (id, application_ref, applicant_type, visa_type:visa_type_id (name, destination_country_code)),
            umrah_booking:umrah_bookings!umrah_booking_id (
-             id, num_pilgrims, booking_kind, status, fulfillment_stage, room_sharing,
+             id, num_pilgrims, booking_kind, status, fulfillment_stage, room_sharing, pool_request_id,
              package:package_id (name),
              custom_request:custom_request_id (reference, departure_date),
              umrah_pilgrims (full_name),

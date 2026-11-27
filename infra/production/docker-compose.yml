@@ -34,6 +34,7 @@ services:
       DEPLOYMENT_ENV: production
       WAAFI_ENVIRONMENT: production
       PAYMENTS_TEST_MODE: "false"
+      STS_WORKER_SCHEDULER: external
       # Heap cap at about 75% of the container limit so V8 collects before the OOM killer acts.
       NODE_OPTIONS: --max-old-space-size=1200
       # Server-side calls to the api stay on the Docker network.
@@ -78,6 +79,20 @@ services:
     deploy:
       resources:
         limits: { memory: 900m }
+
+  worker:
+    image: ${WEB_IMAGE}
+    restart: unless-stopped
+    command: ["node", "/app/worker.mjs"]
+    env_file: .env
+    environment:
+      WORKER_WEB_ORIGIN: http://web:3000
+    networks: [edge]
+    depends_on:
+      web: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { memory: 128m, cpus: "0.25" }
 
   redis:
     image: redis:7.4-alpine

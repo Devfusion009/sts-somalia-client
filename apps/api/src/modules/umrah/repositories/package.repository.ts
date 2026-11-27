@@ -9,13 +9,13 @@ import { dbException, throwIfDbError } from "../../../common/errors/db-error";
 export const IMAGES_BUCKET = "umrah-images";
 
 const CARD_SELECT =
-  "id, package_type, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats, offline_seats, sales_close_days, status), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
+  "id, package_type, slug, name, tagline, tier, is_featured, origin_iata, destination_iata, duration_days, base_price, original_price, currency, includes, images, umrah_package_departures(departure_date, total_seats, booked_seats, offline_seats, sales_close_days, status, booking_mode, formation_status, formation_closes_at, payment_cutoff_at, payment_window_hours, replacement_sales_open), umrah_package_hotels(city, name, star_rating, distance_to_haram_m)";
 
 const DETAIL_SELECT = `id, package_type, slug, name, description, tagline, tier, is_featured, origin_iata, destination_iata,
   duration_days, includes, images, base_price, original_price, currency, status,
   agent_contacts, facilities, accommodation_details, flight_details, transport_details, nights_makkah, nights_madinah,
   meal_plan, meals_note, contact_person_name, contact_person_phone, contact_person_email, contact_whatsapp,
-  umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, offline_seats, price_override, sales_close_days, status,
+  umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, offline_seats, price_override, sales_close_days, status, booking_mode, formation_status, formation_closes_at, payment_cutoff_at, payment_window_hours, replacement_sales_open, request_terms,
     outbound_airline, outbound_flight_number, outbound_departs_at, outbound_arrives_at,
     return_airline, return_flight_number, return_departs_at, return_arrives_at, baggage_note),
   umrah_package_hotels(id, city, name, star_rating, distance_to_haram_m, nights, room_type, sort_order),
@@ -48,10 +48,8 @@ export class PackageRepository {
 
   async findPublishedCards(opts: { featuredFirst: boolean; limit?: number }) {
     const client = createAnonClient();
-    const { error: releaseError } = await client.rpc("release_public_umrah_checkouts");
-    throwIfDbError(releaseError, "Seat availability could not be checked.");
     let query = client.from("umrah_packages").select(CARD_SELECT).eq("status", "published").eq("pool_visibility", "public")
-      .or("package_type.eq.private,public_setup_complete.eq.true");
+      .eq("package_type", "group").eq("public_setup_complete", true);
     query = opts.featuredFirst
       ? query.order("is_featured", { ascending: false }).order("base_price", { ascending: true })
       : query.order("base_price");
@@ -61,32 +59,17 @@ export class PackageRepository {
     return data ?? [];
   }
 
-  async findIdBySlug(slug: string): Promise<string | null> {
-    const { data } = await this.rls.getOrAnon().from("umrah_packages").select("id").eq("slug", slug).maybeSingle();
-    return data?.id ?? null;
-  }
-
-  /** Lazy backstop for the unpaid-seat sweep before seat counts are read. */
-  async releaseStaleSeats(packageId: string) {
-    const client = createAnonClient();
-    const { error } = await client.rpc("release_public_umrah_checkouts");
-    throwIfDbError(error, "Seat availability could not be checked.");
-    await client.rpc("release_stale_umrah_seats", { p_package_id: packageId });
-  }
-
   async findPublishedDetail(slug: string) {
     const { data, error } = await this.rls.getOrAnon().from("umrah_packages").select(DETAIL_SELECT)
       .eq("slug", slug).eq("status", "published")
-      .or("package_type.eq.private,public_setup_complete.eq.true").maybeSingle();
+      .eq("package_type", "group").eq("public_setup_complete", true).maybeSingle();
     throwIfDbError(error, "The package could not be loaded.");
     return data;
   }
 
   async findAssignedCards() {
-    const { error: releaseError } = await this.rls.get().rpc("release_public_umrah_checkouts");
-    throwIfDbError(releaseError, "Seat availability could not be checked.");
     const { data, error } = await this.rls.get().from("umrah_packages").select(CARD_SELECT)
-      .eq("status", "published").eq("pool_visibility", "private");
+      .eq("status", "published").eq("pool_visibility", "private").eq("package_type", "group");
     throwIfDbError(error, "Agency pools could not be loaded.");
     return data ?? [];
   }
@@ -97,6 +80,7 @@ export class PackageRepository {
     const { data, error } = await this.db()
       .from("umrah_packages")
       .select("*, umrah_package_departures(id, departure_date, return_date, total_seats, booked_seats, price_override)")
+      .eq("package_type", "group")
       .order("created_at", { ascending: false });
     throwIfDbError(error, "Packages could not be loaded.");
     return data ?? [];
@@ -126,13 +110,6 @@ export class PackageRepository {
     throwIfDbError(error, "The package could not be saved.");
     await this.cache.invalidate("umrah-packages");
     return data as string;
-  }
-
-  async insertPackage(row: Row) {
-    const { data, error } = await this.write().from("umrah_packages").insert(row).select("id").single();
-    throwIfDbError(error, "The package could not be saved.");
-    await this.cache.invalidate("umrah-packages");
-    return data!.id as string;
   }
 
   async updatePackage(id: string, row: Row) {

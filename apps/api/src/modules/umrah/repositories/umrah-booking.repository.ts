@@ -62,11 +62,6 @@ export class UmrahBookingRepository {
     return { id: (data as string | null) ?? null, error };
   }
 
-  async insertPrivateBooking(row: Row): Promise<{ id: string | null; error: PgError }> {
-    const { data, error } = await this.write().from("umrah_bookings").insert(row).select("id").single();
-    return { id: data?.id ?? null, error };
-  }
-
   async findPrice(bookingId: string): Promise<{ id: string; total_price: number; currency: string; booking_kind: string } | null> {
     const { data } = await this.db().from("umrah_bookings").select("id, total_price, currency, booking_kind").eq("id", bookingId).single();
     return data;

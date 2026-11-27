@@ -36,7 +36,7 @@ export function UmrahCollectionHero() {
             <h1 id="umrah-collection-title" className={styles.umrahTitle}>From Somalia.<br />To the <em className={styles.editorial}>Haramain.</em></h1>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/umrah/group" className="inline-flex min-h-13 items-center justify-center gap-4 rounded-xl bg-[#e8cc91] px-6 text-sm font-semibold text-[#182f28] transition-colors hover:bg-[#f1dbb0] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Explore group packages<ArrowRight className="size-4" aria-hidden="true" /></Link>
-              <Link href="/umrah/private" className="inline-flex min-h-13 items-center justify-center gap-3 rounded-xl border border-white/30 px-6 text-sm font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Build a private trip<ArrowRight className="size-4" aria-hidden="true" /></Link>
+              <Link href="/umrah/private" className="inline-flex min-h-13 items-center justify-center gap-3 rounded-xl border border-white/30 px-6 text-sm font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Contact STS for private Umrah<ArrowRight className="size-4" aria-hidden="true" /></Link>
             </div>
             <ul className="mt-9 grid max-w-lg grid-cols-3 gap-3 border-t border-white/15 pt-6 text-[11px] leading-relaxed text-white/75">
               <li><ShieldCheck className="mb-2 size-4 text-[#e8cc91]" aria-hidden="true" />Visa, flights<br />& hotels</li>

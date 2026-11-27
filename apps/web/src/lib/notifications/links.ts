@@ -13,6 +13,10 @@ export function newOrderHref(n: { data?: unknown }): string | null {
 }
 
 export function agentNotificationHref(n: NotificationLike): string | null {
+  if (n.type.startsWith("umrah_pool_")) {
+    const id = (n.data as {request_id?: string} | null)?.request_id;
+    return id && /^[0-9a-f-]{36}$/i.test(id) ? `/agent/umrah/requests/${id}` : "/agent/bookings";
+  }
   if (n.type === "low_balance") return "/agent/finance";
   if (n.type === "earnings_reviewed") return "/agent/finance";
   if (n.type === "payout_request_reviewed" || n.type === "payout_paid" || n.type === "payout_sent" || n.type === "payout_failed") {
@@ -45,6 +49,10 @@ export function agentNotificationHref(n: NotificationLike): string | null {
 }
 
 export function customerNotificationHref(n: NotificationLike): string | null {
+  if (n.type.startsWith("umrah_pool_")) {
+    const id = (n.data as {request_id?: string} | null)?.request_id;
+    return id && /^[0-9a-f-]{36}$/i.test(id) ? `/account/umrah/requests/${id}` : "/account/bookings";
+  }
   if (n.type === "bank_proof_rejected") {
     const id = (n.data as { order_id?: string } | null)?.order_id;
     return id ? `/checkout/${id}` : "/account/bookings";
@@ -85,7 +93,7 @@ export function adminNotificationHref(n: NotificationLike): string | null {
   if (n.type === "bank_proof_submitted") return newOrderHref(n) ?? "/admin/orders";
   if (n.type === "new_order") return newOrderHref(n) ?? "/admin/orders";
   if (n.type === "flight_ticketing_failed") return "/admin/flights?view=attention";
-  if (n.type === "private_umrah_request") return "/admin/umrah/requests?status=pending";
+  if (n.type === "private_umrah_request") return "/admin/orders";
   if (n.type === "payout_request") return "/admin/finance/withdrawals?status=pending";
   if (n.type === "visa_application_submitted" || n.type === "visa_status_changed" || n.type === "visa_case_attention") {
     const applicationId = (n.data as { applicationId?: string } | null)?.applicationId;

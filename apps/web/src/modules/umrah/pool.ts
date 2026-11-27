@@ -5,6 +5,7 @@ export type UmrahPoolRow = {
   sales_close_days?: number; departure_status: string | null; total_seats: number | null; booked_seats: number | null;
   offline_seats: number | null; available_seats: number; confirmed_seats: number; held_seats: number;
   bookings: number; customers: number;
+  booking_mode?: string; formation_status?: string; allocated_seats?: number;
 };
 
 export function poolCapacity(row: Pick<UmrahPoolRow, "total_seats" | "confirmed_seats" | "held_seats" | "offline_seats">) {
@@ -14,8 +15,9 @@ export function poolCapacity(row: Pick<UmrahPoolRow, "total_seats" | "confirmed_
   return { total, filled, held, remaining: Math.max(0, total - filled - held), percent: total > 0 ? Math.min(100, filled / total * 100) : 0 };
 }
 
-export function poolStatus(row: Pick<UmrahPoolRow, "package_status" | "departure_status" | "departure_date" | "pool_visibility" | "total_seats" | "confirmed_seats" | "held_seats" | "offline_seats"> & { sales_close_days?: number }, today = new Date().toISOString().slice(0,10)) {
+export function poolStatus(row: Pick<UmrahPoolRow, "package_status" | "departure_status" | "departure_date" | "pool_visibility" | "total_seats" | "confirmed_seats" | "held_seats" | "offline_seats"> & { sales_close_days?: number; booking_mode?: string; formation_status?: string }, today = new Date().toISOString().slice(0,10)) {
   if (row.package_status !== "published") return row.package_status === "draft" ? "Draft" : row.package_status.replace(/_/g," ");
+  if (row.booking_mode === "request_then_pay") return ({ forming: "Forming", activation_pending: "Awaiting confirmation", payment_open: "Payment open", ready: "Paid group", completed: "Completed", cancelled: "Cancelled", draft: "Draft" } as Record<string,string>)[row.formation_status ?? "draft"];
   if (!row.departure_date) return "No dates";
   const close = new Date(`${row.departure_date}T00:00:00Z`);
   close.setUTCDate(close.getUTCDate() - (row.sales_close_days ?? 0));

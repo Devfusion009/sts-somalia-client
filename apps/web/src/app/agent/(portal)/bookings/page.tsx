@@ -1,7 +1,8 @@
+import { PoolRequestList } from "@/modules/umrah/components/pool-request-list";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowRight, CalendarDays, Download, Phone, Plus, Receipt, Search, UserRound } from "lucide-react";
+import { ArrowRight, CalendarDays, Download, Phone, Receipt, Search, UserRound } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getMyAgency, getAgencyOrders } from "@/modules/agencies/queries";
 import { BOOKING_PRODUCTS, BOOKING_QUEUES, BOOKING_STATUS_LABELS, bookingListHref, parseBookingFilters, type BookingSearchParams } from "@/modules/agencies/booking-filters";
@@ -44,10 +45,10 @@ export default async function AgentBookingsPage({ searchParams }: { searchParams
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Bookings" actions={<>
+      <PoolRequestList agent />
+      <PageHeader title="Bookings" actions={
         <Button variant="outline" nativeButton={false} render={<a href={exportHref} />}><Download data-icon="inline-start" aria-hidden="true" />Export CSV</Button>
-        {canBook ? <Button render={<Link href="/agent/book" />}><Plus data-icon="inline-start" aria-hidden="true" />New booking</Button> : null}
-      </>} />
+      } />
 
       <section aria-label="Booking filters" className="space-y-4 rounded-2xl border border-border bg-card p-4">
         <FilterChips label="Booking status" active={filters.queue ?? "all"} items={BOOKING_QUEUES.map((item) => ({ ...item, href: bookingListHref(filters, { queue: item.key }) }))} />
@@ -86,9 +87,9 @@ export default async function AgentBookingsPage({ searchParams }: { searchParams
         <Card className="hidden overflow-hidden py-0 lg:block">
           <div
             role="region"
-            aria-label="Scrollable bookings list"
+            aria-label="Bookings table"
             tabIndex={0}
-            className="max-h-[clamp(20rem,calc(100dvh-28rem),44rem)] overflow-x-auto overflow-y-scroll [scrollbar-gutter:stable] [scrollbar-color:var(--primary)_var(--muted)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring [&::-webkit-scrollbar]:w-3 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-primary/60 [&::-webkit-scrollbar-track]:bg-muted"
+            className="overflow-x-auto [scrollbar-gutter:stable] [scrollbar-color:var(--primary)_var(--muted)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring [&::-webkit-scrollbar]:w-3 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-primary/60 [&::-webkit-scrollbar-track]:bg-muted"
           >
           <Table containerClassName="overflow-visible"><TableHeader sticky className="bg-muted [&_th]:text-[0.6875rem] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-muted-foreground"><TableRow><TableHead className="pl-5">Order</TableHead><TableHead>Booking</TableHead><TableHead>Customer</TableHead><TableHead>Status</TableHead><TableHead numeric>Total</TableHead><TableHead numeric className="pr-5">Actions</TableHead></TableRow></TableHeader>
             <TableBody>{orders.map((order) => <TableRow key={order.id} className="transition-colors hover:bg-muted/40" style={{ boxShadow: `inset 3px 0 0 ${accentOf(order)}` }}>

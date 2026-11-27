@@ -13,7 +13,9 @@
  */
 export function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  if (!process.env.EMAIL_PROVIDER?.trim()) return;
+  if (process.env.STS_WORKER_SCHEDULER === "external") return;
+  if (process.env.CRON_SECRET) startPoolScheduler();
+  if (!process.env.EMAIL_PROVIDER?.trim() || !process.env.CRON_SECRET) return;
 
   const globalFlag = globalThis as typeof globalThis & { __stsEmailOutbox?: boolean };
   if (globalFlag.__stsEmailOutbox) return;
@@ -37,5 +39,25 @@ export function register() {
   };
 
   const timer = setInterval(tick, intervalMs);
+  timer.unref?.();
+}
+
+/** Formation and expiry must run even when no email provider is configured. */
+function startPoolScheduler() {
+  const state = globalThis as typeof globalThis & { __stsUmrahPools?: boolean };
+  if (state.__stsUmrahPools) return;
+  state.__stsUmrahPools = true;
+  let running = false;
+  const timer = setInterval(async () => {
+    if (running) return;
+    running = true;
+    try {
+      const response = await fetch(`http://127.0.0.1:${process.env.PORT || 3000}/api/cron/umrah-pools`, {
+        headers: { authorization: `Bearer ${process.env.CRON_SECRET}` }, cache: "no-store", signal: AbortSignal.timeout(120_000),
+      });
+      if (!response.ok) console.error("Umrah pool worker failed", response.status);
+    } catch { console.error("Umrah pool worker unavailable"); }
+    finally { running = false; }
+  }, 30_000);
   timer.unref?.();
 }

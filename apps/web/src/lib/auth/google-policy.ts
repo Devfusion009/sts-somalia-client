@@ -43,8 +43,8 @@ export function customerGoogleReturnPath(value: unknown): string {
 export function isGoogleCustomer(
   profile: { role: string; is_platform_admin: boolean } | null,
   metadata: Record<string, unknown>,
-  hasManagerSeat: boolean,
+  hasBusinessIdentity: boolean,
 ): boolean {
-  return profile?.role === "customer" && profile.is_platform_admin === false && !hasManagerSeat &&
+  return profile?.role === "customer" && profile.is_platform_admin === false && !hasBusinessIdentity &&
     !metadata.agent_application_id && !metadata.manager_identity_id;
 }

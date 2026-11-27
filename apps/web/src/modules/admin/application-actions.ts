@@ -3,6 +3,7 @@
 import { prepareAgentCredentials, getAgentCredentialDelivery } from "@/lib/agents/credentials";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptCredentials } from "@/lib/integrations-crypto";
+import { getIntegrations } from "@/lib/integrations";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -285,6 +286,9 @@ export async function approveApplication(
   let agentId: string | null = null;
 
   if (type === "agency") {
+    if (!getIntegrations().email.provider) {
+      return { error: "Configure outgoing email before approving agent applications." };
+    }
     const { data: appRow } = await supabase
       .from("agency_applications")
       .select("business_details")
@@ -382,8 +386,10 @@ export async function retryAgentCredentialEmail(applicationId: string): Promise<
   const info = await loadApplicantInfo(supabase, "agency", applicationId);
   if (!info) return { error: "Application not found." };
   const status = await deliverAgentCredentials(applicationId, info);
-  revalidatePath(`/admin/partners/agency/${info.referenceNumber}`);
-  return { error: status === "sent" ? null : "Credential email was not sent." };
+  if (status !== "sent") return { error: status === "not_configured" ? "Outgoing email is not configured." : "Credential email was not sent. Retry delivery." };
+  // Return before rendering the full console. The client opens a fresh page
+  // after success, avoiding a long server-action revalidation response.
+  return { error: null, destination: `/admin/partners/agency/${encodeURIComponent(info.referenceNumber)}?approved=1&email=sent` };
 }
 
 const rejectSchema = z.object({

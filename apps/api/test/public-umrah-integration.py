@@ -3,7 +3,7 @@ Usage: python3 apps/api/test/public-umrah-integration.py
 Requires local PostgreSQL 16+ binaries. No Docker, credentials or network listener.
 """
 from pathlib import Path
-import os, subprocess, tempfile, concurrent.futures
+import os, subprocess, tempfile, concurrent.futures, sys
 ROOT=Path(__file__).resolve().parents[3]
 BINS=Path(os.environ.get('PG_TEST_BIN','/usr/lib/postgresql/16/bin'))
 def run(args, **kwargs):
@@ -34,6 +34,8 @@ with tempfile.TemporaryDirectory(prefix='sts-public-umrah-') as folder:
         run(args,input='create trigger order_items_apply_umrah_terms after insert on order_items for each row execute function order_items_apply_umrah_terms(); create trigger payments_settle_order before insert or update of status on payments for each row execute function handle_payment_succeeded();')
         run(args,input='create trigger orders_confirm_umrah_group_bookings after update of status on orders for each row execute function umrah_confirm_group_bookings_on_payment();')
         run(args+['-f',ROOT/'apps/api/test/public-umrah-checks.sql'])
+        run(args+['-f',ROOT/'supabase/migrations/20261120000007_optional_umrah_city_nights.sql'])
+        run(args+['-f',ROOT/'apps/api/test/public-umrah-no-nights.sql'])
         run(args,input='grant select on test_ids to authenticated;')
         query="""begin; set local role authenticated; select set_config('test.uid','00000000-0000-0000-0000-000000000002',true); select create_umrah_group_booking((select id from test_ids where name='departure'),1,0::smallint,'','[{"full_name":"Last Seat Traveller","gender":"male"}]',null); select pg_sleep(0.2); commit;"""
         def compete(_): return subprocess.run([str(x) for x in args],input=query,text=True,capture_output=True)
@@ -44,6 +46,32 @@ with tempfile.TemporaryDirectory(prefix='sts-public-umrah-') as folder:
         assert remaining=='0',remaining
         run(args+['-f',ROOT/'supabase/migrations/20261116000002_unified_umrah_pool.sql'])
         run(args+['-f',ROOT/'apps/api/test/unified-umrah-pool.sql'])
+        run(args+['-f',ROOT/'apps/api/test/public-umrah-no-nights.sql'])
+        if '--request-pool' in sys.argv:
+            # Use the real paid-order invoice trigger in this isolated fixture.
+            run(args,input='create table invoices(order_id uuid unique references orders,invoice_number text unique,status text,issued_at timestamptz,total numeric,currency text); create sequence invoice_number_seq;')
+            run(args,input=function('20260807000001_b2b_phase1.sql','generate_invoice_number')+'\n'+function('20260807000001_b2b_phase1.sql','create_invoice_for_paid_order'))
+            run(args,input='create trigger orders_create_invoice after insert or update of status on orders for each row execute function create_invoice_for_paid_order();')
+            run(args+['-f',ROOT/'apps/api/test/pool-request-fixture.sql'])
+            for migration in sorted((ROOT/'supabase/migrations').glob('20261117*umrah_pool*.sql')):
+                run(args+['-f',migration])
+                if migration.name.startswith('20261117000001_'): run(args+['-f',ROOT/'apps/api/test/pool-request-schema.sql'])
+            run(args+['-f',ROOT/'supabase/migrations/20261119000001_admin_confirm_umrah_pool.sql'])
+            run(args+['-f',ROOT/'supabase/migrations/20261120000008_admin_umrah_departure_date.sql'])
+            run(args+['-f',ROOT/'apps/api/test/public-umrah-no-nights.sql'])
+            checks=ROOT/'apps/api/test/pool-request-checks.sql'
+            if checks.exists(): run(args+['-f',checks])
+            query="""begin; set local role authenticated; select set_config('test.admin','no',true); select set_config('test.agent','no',true); select set_config('test.uid','00000000-0000-0000-0000-000000000002',true); select submit_umrah_pool_requests((select id from test_ids where name='request-departure'),gen_random_uuid(),'[{"pilgrims":[{"full_name":"Final QA Pilgrim","gender":"male"}]}]',true); commit;"""
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool: results=list(pool.map(compete,range(2)))
+            assert sorted(r.returncode for r in results)==[0,3],[(r.returncode,r.stderr) for r in results]
+            run(args,input="select test_assert((select booked_seats=40 from umrah_package_departures where id=(select id from test_ids where name='request-departure')),'last seat oversold'); select test_assert((select count(*)=1 from umrah_pool_events where kind='activate'),'activation not exactly once');")
+            activation=ROOT/'apps/api/test/pool-request-activation.sql'
+            if activation.exists(): run(args+['-f',activation])
+            payment=ROOT/'apps/api/test/pool-request-payment.sql'
+            if payment.exists(): run(args+['-f',payment])
+            run(args+['-f',ROOT/'apps/api/test/pool-request-closure.sql'])
+            print('PASS: atomic package creation and exact formation closure without duplicate release/notice.')
+            print('PASS: request-first schema, ownership, atomic batch, idempotency, withdrawal and concurrent capacity gates.')
         print('PASS: package validation, publication, customer and agent inventory, payment gate, expiry, bank review, confirmation, pool totals, concurrent last-seat race.')
     except subprocess.CalledProcessError as error:
         print(error.stdout);print(error.stderr);

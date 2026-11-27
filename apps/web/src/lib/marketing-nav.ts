@@ -104,7 +104,7 @@ export const MEGA_SECTIONS: MegaSection[] = [
     label: "Umrah",
     href: "/umrah",
     icon: "umrah",
-    blurb: "Join a fixed-price group package, or build a private trip on your own dates.",
+    blurb: "Join a group package or contact STS to plan a private trip.",
     // The two flows are the top-level split everywhere Umrah appears, the
     // menu included. This column used to be four "By tier" entries that all
     // pointed at the same /umrah URL — four ways to arrive in the same place,
@@ -120,7 +120,7 @@ export const MEGA_SECTIONS: MegaSection[] = [
       {
         heading: "Private Umrah",
         links: [
-          { label: "Build your own trip", href: "/umrah/private" },
+          { label: "Contact STS for a private trip", href: "/umrah/private" },
           { label: "Compare both options", href: "/umrah" },
         ],
       },

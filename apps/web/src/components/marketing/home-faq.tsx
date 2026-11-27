@@ -71,7 +71,7 @@ export function HomeFaq({
 } = {}) {
   // Structured data is emitted by the page.
   return (
-    <section className="bg-background py-16 sm:py-20 lg:py-24">
+    <section id={homepage ? "faq" : undefined} className="scroll-mt-24 bg-background py-16 sm:py-20 lg:py-24">
       <div className={cn("mx-auto px-4 sm:px-6 lg:px-8", homepage ? "grid max-w-7xl items-start gap-10 lg:grid-cols-[0.8fr_1.4fr] lg:gap-20" : "max-w-3xl")}>
         <Reveal>
           {homepage ? (

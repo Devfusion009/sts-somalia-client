@@ -6,8 +6,8 @@ import {
 
 export default function OrderQueueLoading() {
   return (
-    <LoadingShell label="Order queue">
-      <Title title="Order Queue" badge />
+    <LoadingShell label="Booking requests">
+      <Title title="Booking requests" badge />
       <RequestCards rows={5} />
     </LoadingShell>
   );

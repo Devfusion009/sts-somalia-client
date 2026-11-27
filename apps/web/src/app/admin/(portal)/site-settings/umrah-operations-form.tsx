@@ -54,7 +54,7 @@ export function UmrahOperationsForm({ settings }: { settings: UmrahOperations })
     <Card>
       <CardContent>
         <form action={action} className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <NumberField
               name="unpaidHoldHours"
               label="Unpaid seat hold"
@@ -63,41 +63,8 @@ export function UmrahOperationsForm({ settings }: { settings: UmrahOperations })
               min={0}
               max={720}
             />
-            <NumberField
-              name="privateDepositPercent"
-              label="Private trip deposit"
-              unit="%"
-              value={settings.privateDepositPercent}
-              min={0}
-              max={100}
-            />
-            <NumberField
-              name="privateBalanceDueDays"
-              label="Private balance due"
-              unit="days before"
-              value={settings.privateBalanceDueDays}
-              min={0}
-              max={180}
-            />
-            <NumberField
-              name="privateLeadDays"
-              label="Private trip lead time"
-              unit="days"
-              value={settings.privateLeadDays}
-              min={0}
-              max={120}
-            />
           </div>
           <div className="space-y-2.5">
-            <label className="flex cursor-pointer items-center gap-2.5 text-sm">
-              <input
-                type="checkbox"
-                name="privateFullPaymentBeforeDocuments"
-                defaultChecked={settings.privateFullPaymentBeforeDocuments}
-                className="size-4 accent-primary"
-              />
-              Private trips: full payment before e-tickets and hotel vouchers
-            </label>
             <label className="flex cursor-pointer items-center gap-2.5 text-sm">
               <input
                 type="checkbox"

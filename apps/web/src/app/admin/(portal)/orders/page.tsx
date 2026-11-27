@@ -37,6 +37,7 @@ import { OrderStatusSelect } from "./order-status-select";
 import { RecordPaymentDialog } from "./record-payment-dialog";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Orders & Payments" };
 
@@ -75,7 +76,11 @@ export default async function AdminOrdersPage({
   // only the page of orders actually shown loads its full booking and payment detail.
   const today = new Date().setHours(0, 0, 0, 0);
   const search = (queryParam ?? "").trim().slice(0, 100);
-  const queue = await getOrderQueue(filter, page, format(today, "yyyy-MM-dd"), { sort, search, category });
+  const [queue, { count: poolRequestCount, error: poolRequestError }] = await Promise.all([
+    getOrderQueue(filter, page, format(today, "yyyy-MM-dd"), { sort, search, category }),
+    createClient().then(db => db.from("umrah_pool_requests").select("id", { count: "exact", head: true }).eq("status", "requested")),
+  ]);
+  if (poolRequestError) throw new Error("Umrah pool request count could not be loaded.");
   const ordersHref = (nextFilter: string, nextPage = 1) => {
     const params = new URLSearchParams({ filter: nextFilter, sort, category });
     if (search) params.set("q", search);
@@ -98,7 +103,7 @@ export default async function AdminOrdersPage({
     <div className="space-y-6">
       <PageHeader title="Orders & Payments" actions={<RefreshOrdersButton />} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 
         <StatTile
           label="Collected revenue"
@@ -109,6 +114,13 @@ export default async function AdminOrdersPage({
           label="Payment requests"
           value={String(queue.action)}
           tone={queue.action > 0 ? "warn" : undefined}
+        /></Link>
+
+        <Link href="/admin/umrah/bookings" className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary"><StatTile
+          label="Umrah pool requests"
+          value={String(poolRequestCount ?? 0)}
+          hint="Awaiting group formation"
+          tone={(poolRequestCount ?? 0) > 0 ? "warn" : undefined}
         /></Link>
 
       </div>
