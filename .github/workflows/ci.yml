@@ -99,5 +99,8 @@ jobs:
       - name: Umrah UI and notification tests
         run: node --test apps/web/test/agent-bookings.test.cjs apps/web/test/catalog-outage.test.cjs apps/web/test/cron-auth.test.cjs apps/web/test/google-customer-auth.test.cjs apps/web/test/external-worker.test.mjs apps/web/test/marketing-callback.test.cjs apps/web/test/my-bookings-pages.test.cjs apps/web/test/pool-email.test.cjs apps/web/test/pool-worker.test.cjs apps/web/test/public-umrah-catalog.test.cjs
 
+      - name: Agent onboarding, suspension and recovery regression tests
+        run: node --test apps/web/test/agent-portal-guide.test.cjs apps/web/test/partner-suspension.test.cjs apps/web/test/portal-password-link.test.cjs
+
       - name: Agent credential delivery and SMTP retry tests
         run: node --test apps/web/test/agent-credentials.test.cjs apps/web/test/smtp-capture.test.cjs
