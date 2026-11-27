@@ -8477,6 +8477,15 @@ export type Database = {
         Args: { p_agent_code: string; p_username: string }
         Returns: string
       }
+      transition_partner_account: {
+        Args: {
+          p_account_id: string
+          p_expected_status: Database["public"]["Enums"]["partner_account_status"]
+          p_to_status: Database["public"]["Enums"]["partner_account_status"]
+          p_reason?: string
+        }
+        Returns: undefined
+      }
       agent_login_identity: { Args: { p_agent_id: string }; Returns: string }
       agent_username_base: { Args: { p_email: string }; Returns: string }
       applicant_can_edit: {

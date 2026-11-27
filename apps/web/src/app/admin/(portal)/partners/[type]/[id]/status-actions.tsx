@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Ban, PlayCircle, Archive } from "lucide-react";
 import {
   AlertDialog,
@@ -32,7 +32,7 @@ const TRANSITION_UI: Record<
   suspended: {
     label: "Suspend",
     icon: Ban,
-    variant: "outline",
+    variant: "destructive",
     title: "Suspend this partner account?",
     description: "Portal access and transacting stop until reactivated.",
     confirmLabel: "Suspend account",
@@ -58,13 +58,17 @@ const TRANSITION_UI: Record<
  * Only the transitions valid from the CURRENT state are rendered — the
  * server action re-validates against the state machine anyway, so these
  * buttons are a mirror of it, never the enforcement. Every transition asks
- * for confirmation and takes an optional reason for the audit trail.
+ * for confirmation; suspension does not ask for a reason.
  * Onboarding -> Live is deliberately absent: that promotion is automatic
  * when the checklist completes, never a manual click.
  */
 export function StatusActions({ accountId, status }: { accountId: string; status: PartnerAccountStatus }) {
-  const [state, formAction] = useActionState(transitionPartnerAccount, null);
+  const [state, formAction, pending] = useActionState(transitionPartnerAccount, null);
   const [openTarget, setOpenTarget] = useState<TransitionTarget | null>(null);
+
+  useEffect(() => {
+    if (state?.destination) window.location.assign(state.destination);
+  }, [state]);
 
   const [lastState, setLastState] = useState(state);
   if (state !== lastState) {
@@ -86,7 +90,7 @@ export function StatusActions({ accountId, status }: { accountId: string; status
         {targets.map((to) => {
           const { label, icon: Icon, variant } = TRANSITION_UI[to];
           return (
-            <Button key={to} variant={variant} onClick={() => setOpenTarget(to)}>
+            <Button key={to} variant={variant} disabled={pending} onClick={() => setOpenTarget(to)}>
               <Icon data-icon="inline-start" /> {label}
             </Button>
           );
@@ -108,20 +112,20 @@ export function StatusActions({ accountId, status }: { accountId: string; status
                 <AlertDialogTitle>{ui.title}</AlertDialogTitle>
                 {ui.description ? <AlertDialogDescription>{ui.description}</AlertDialogDescription> : null}
               </AlertDialogHeader>
-              <Textarea
+              {openTarget !== "suspended" ? <Textarea
                 name="reason"
                 placeholder="Reason (recorded in the activity log)"
                 aria-label="Reason"
                 className="my-4"
                 rows={3}
-              />
-              <AlertDialogFooter>
-                <Button type="button" variant="outline" onClick={() => setOpenTarget(null)}>
+              /> : null}
+              <AlertDialogFooter className="mt-5">
+                <Button type="button" variant="outline" disabled={pending} onClick={() => setOpenTarget(null)}>
                   Cancel
                 </Button>
                 <SubmitButton
                   variant={ui.variant === "outline" ? "default" : ui.variant}
-                  pendingText="Applying…"
+                  pendingText={openTarget === "suspended" ? "Suspending…" : openTarget === "live" ? "Reactivating…" : "Offboarding…"}
                 >
                   {ui.confirmLabel}
                 </SubmitButton>
