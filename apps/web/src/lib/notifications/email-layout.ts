@@ -89,11 +89,23 @@ export type EmailContent = {
   rawHtml?: string;
 };
 
-export type SocialLinkItem = { label: string; short: string; href: string };
+export type SocialLinkItem = {
+  label: string;
+  icon: "whatsapp" | "website" | "instagram" | "tiktok" | "facebook" | "x" | "youtube" | "linkedin";
+  href: string;
+};
 
-/** One round "Connect with us" badge; initials instead of images so every client shows it. */
+/** Hosted PNGs work in email clients without SVG or icon-font support. */
 export function socialBadge(item: SocialLinkItem): string {
-  return `<a href="${escapeHtml(item.href)}" title="${escapeHtml(item.label)}" style="display:inline-block;width:32px;height:32px;line-height:32px;margin:0 0 6px 6px;border-radius:16px;background:${BRAND};color:#ffffff;font-family:${SANS};font-size:11px;font-weight:700;text-align:center;text-decoration:none;">${escapeHtml(item.short)}</a>`;
+  let href: string;
+  try {
+    const url = new URL(item.href);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+    href = url.href;
+  } catch {
+    return "";
+  }
+  return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(item.label)}" aria-label="${escapeHtml(item.label)}" style="display:inline-block;vertical-align:middle;margin:0 0 8px 8px;text-decoration:none;"><img src="${escapeHtml(assetOrigin())}/email/icons/${item.icon}.png" width="36" height="36" alt="${escapeHtml(item.label)}" border="0" style="display:block;width:36px;height:36px;border:0;outline:none;color:${BRAND};font-family:${SANS};font-size:10px;"></a>`;
 }
 
 function routeMark(): string {
@@ -161,8 +173,8 @@ export function renderEmail(content: EmailContent): string {
     : "";
 
   const staticSocial = [
-    socialBadge({ label: "WhatsApp", short: "WA", href: WHATSAPP_URL }),
-    socialBadge({ label: "Website", short: "www", href: site }),
+    socialBadge({ label: "WhatsApp", icon: "whatsapp", href: WHATSAPP_URL }),
+    socialBadge({ label: "Website", icon: "website", href: site }),
   ].join("");
 
   return `<!doctype html>
