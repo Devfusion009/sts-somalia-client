@@ -504,6 +504,23 @@ select:not([multiple]):not([size]) {
 :is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-footer"] { background: #1d7168; }
 :is(.portal-shell, [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-footer"] [data-slot="avatar-fallback"] { color: var(--sidebar-primary-foreground); }
 
+/* Deeper admin navigation on desktop and in its portalled mobile sheet. */
+:is(.portal-shell[data-portal-accent="admin"] [data-slot="sidebar"], body:has(.portal-shell[data-portal-accent="admin"]) [data-slot="sidebar"][data-mobile="true"]) {
+  --sidebar: #17685f;
+  --sidebar-accent: #104e47;
+  --sidebar-primary-foreground: #104e47;
+  --admin-sidebar-surface: #135c54;
+}
+:is(.portal-shell[data-portal-accent="admin"] [data-slot="sidebar"], body:has(.portal-shell[data-portal-accent="admin"]) [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-menu-button"]:hover {
+  background: #1c756a;
+}
+:is(.portal-shell[data-portal-accent="admin"] [data-slot="sidebar"], body:has(.portal-shell[data-portal-accent="admin"]) [data-slot="sidebar"][data-mobile="true"]) :is([data-slot="sidebar-input"], [data-slot="sidebar-footer"]) {
+  background: var(--admin-sidebar-surface);
+}
+:is(.portal-shell[data-portal-accent="admin"] [data-slot="sidebar"], body:has(.portal-shell[data-portal-accent="admin"]) [data-slot="sidebar"][data-mobile="true"]) [data-slot="sidebar-header"] [data-slot="sidebar-menu-button"]:hover {
+  background: transparent;
+}
+
 /* Keep the admin's compact rail aligned independently of expanded spacing. */
 .portal-shell[data-portal-accent="admin"] [data-collapsible="icon"] :is([data-slot="sidebar-header"], [data-slot="sidebar-footer"]) {
   padding: .875rem .75rem;

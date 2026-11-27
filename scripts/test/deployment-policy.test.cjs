@@ -104,3 +104,32 @@ test('deployment output rejects foreign hosts, credentials, injection and non-HT
     'https://stssomaliaclient-test.vercel.app\nurl=evil',
   ]) assert.throws(() => validatePreviewUrl(value), value);
 });
+
+const { productionPaymentRouting } = require('../production-payment-routing.cjs');
+const productionOrigins = { NEXT_PUBLIC_SITE_URL: 'https://scoutsts.com', NEXT_PUBLIC_API_URL: 'https://api.scoutsts.com', NEXT_PUBLIC_APP_HOST: 'scoutsts.com' };
+test('production runtime uses the same HTTPS origins as the browser build', () => {
+  const config = productionPaymentRouting(productionOrigins);
+  assert.equal(config.CADDYFILE, 'Caddyfile.domain');
+  assert.equal(config.SITE_DOMAIN, 'scoutsts.com');
+  assert.equal(config.NEXT_PUBLIC_API_URL, 'https://api.scoutsts.com');
+  assert.ok(config.WEB_ORIGIN.split(',').includes('https://admin.scoutsts.com'));
+  assert.ok(config.WEB_ORIGIN.split(',').includes('https://agent.scoutsts.com'));
+  const w = workflow('deploy-production.yml');
+  const writer = w.jobs.deploy.steps.find(s => s.name === 'Write env file');
+  assert.equal(writer.env.NEXT_PUBLIC_SITE_URL, '${{ vars.NEXT_PUBLIC_SITE_URL }}');
+  assert.equal(writer.env.NEXT_PUBLIC_API_URL, '${{ vars.NEXT_PUBLIC_API_URL }}');
+  assert.match(writer.run, /production-payment-routing\.cjs --emit-env/);
+  assert.ok(writer.run.indexOf('cat "$routing_file"') > writer.run.indexOf('secrets.PROD_ENV_FILE'));
+});
+test('production routing rejects HTTP, IP addresses, foreign APIs and origin injection', () => {
+  for (const patch of [
+    { NEXT_PUBLIC_SITE_URL: 'http://scoutsts.com' },
+    { NEXT_PUBLIC_SITE_URL: 'https://102.214.168.182' },
+    { NEXT_PUBLIC_API_URL: 'http://api.scoutsts.com' },
+    { NEXT_PUBLIC_API_URL: 'https://qa-api.scoutsts.com' },
+    { NEXT_PUBLIC_API_URL: 'https://api.scoutsts.com/path' },
+    { NEXT_PUBLIC_API_URL: 'https://user:pass@api.scoutsts.com' },
+    { NEXT_PUBLIC_API_URL: 'https://api.scoutsts.com/?key=value' },
+    { NEXT_PUBLIC_APP_HOST: "scoutsts.com'\nOTHER=value" },
+  ]) assert.throws(() => productionPaymentRouting({ ...productionOrigins, ...patch }));
+});

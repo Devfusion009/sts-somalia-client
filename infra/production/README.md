@@ -28,8 +28,14 @@ Secrets: `PROD_HOST`, `PROD_USER` (`deploy`), `PROD_SSH_KEY` (private key),
 `.env.example`, multi-line).
 
 Variables: `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_API_URL`,
-`NEXT_PUBLIC_APP_HOST` (empty until a domain exists), and repository variable
+`NEXT_PUBLIC_APP_HOST` (the production site hostname), and repository variable
 `PRODUCTION_DEPLOY_ENABLED=true` to switch the workflow on.
+
+The workflow validates the production HTTPS origins before building. It writes
+those same values to the server environment after `PROD_ENV_FILE`, together
+with the portal CORS origins and Caddy domain. This keeps browser requests,
+payment returns and webhook forwarding on the same production addresses.
+The private server-to-server API route stays `http://api:4000` inside Docker.
 
 ## Before the first deploy
 

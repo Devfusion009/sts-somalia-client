@@ -37,6 +37,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate production payment routing
+        env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_APP_HOST: ${{ vars.NEXT_PUBLIC_APP_HOST }}
+        run: node scripts/production-payment-routing.cjs
+
       - id: names
         run: |
           repo="${GITHUB_REPOSITORY,,}"
@@ -92,6 +103,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Set up SSH
         run: |
           install -m 700 -d ~/.ssh
@@ -112,6 +127,9 @@ jobs:
         # leaving any value already in PROD_ENV_FILE in place. Single quotes
         # stop compose from interpolating "$" in the password.
         env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_APP_HOST: ${{ vars.NEXT_PUBLIC_APP_HOST }}
           EMAIL_PROVIDER: ${{ vars.EMAIL_PROVIDER }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           EMAIL_REPLY_TO: ${{ vars.EMAIL_REPLY_TO }}
@@ -126,12 +144,17 @@ jobs:
           AMADEUS_CLIENT_SECRET: ${{ secrets.AMADEUS_CLIENT_SECRET }}
           CUSTOMER_GOOGLE_LOGIN_ENABLED: ${{ vars.CUSTOMER_GOOGLE_LOGIN_ENABLED || 'false' }}
         run: |
+          set -euo pipefail
+          routing_file=$(mktemp)
+          trap 'rm -f "$routing_file"' EXIT
+          node scripts/production-payment-routing.cjs --emit-env > "$routing_file"
           if [ -z "$CRON_SECRET" ] && ! printf '%s\n' "${{ secrets.PROD_ENV_FILE }}" | grep -q '^CRON_SECRET='; then
             echo 'Production CRON_SECRET is required for notification and Umrah workers.' >&2
             exit 1
           fi
           {
             printf '%s\n' "${{ secrets.PROD_ENV_FILE }}"
+            cat "$routing_file"
             echo "WEB_IMAGE=${{ needs.build.outputs.web_image }}"
             echo "API_IMAGE=${{ needs.build.outputs.api_image }}"
             for key in EMAIL_PROVIDER EMAIL_FROM EMAIL_REPLY_TO SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS CRON_SECRET AMADEUS_BASE_URL AMADEUS_CLIENT_ID AMADEUS_CLIENT_SECRET CUSTOMER_GOOGLE_LOGIN_ENABLED; do

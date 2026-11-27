@@ -19,6 +19,8 @@ import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { money } from "@/lib/money";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PanelSkeleton } from "@/components/dashboard/skeletons";
+import { AgentPortalGuide } from "./portal-guide";
+import { isNewAgent } from "./portal-guide-content";
 import { OnboardingChecklist } from "./onboarding-checklist";
 import { RecentActivityCard } from "./recent-activity-card";
 import { ServiceLauncher } from "./service-launcher";
@@ -57,6 +59,8 @@ export default async function AgentDashboardPage({ searchParams }: {
         meta={<span className="text-xs tabular-nums">{profile.agent_code ?? membership.agency.agent_code} · <Suspense fallback={<Skeleton className="inline-block h-3 w-24" />}><TeamCount countP={teamCountP} /></Suspense></span>}
         actions={<DateRangePicker currentKey={range.key} />}
       />
+
+      <AgentPortalGuide key={`${agencyId}:${profile.id}`} userId={profile.id} agencyId={agencyId} role={membership.roleInAgency} autoShow={isNewAgent(membership.joinedAt)} />
 
       <LowBalanceBanner />
       <BroadcastBanner />

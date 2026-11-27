@@ -134,12 +134,12 @@ export async function getAgencyOrders(
 }
 
 /** Memoized per request: the agent layout and every agent page both resolve it. */
-export const getMyAgency = cache(async (profileId: string) => {
+const loadMyAgency = cache(async (profileId: string) => {
   const supabase = await createClient();
   const { data: membership } = await supabase
     .from("agency_members")
     .select(
-      "id, agency_id, role_in_agency, username, agencies(id, agent_code, name, legal_name, registration_number, status, commission_rate, commission_rate_set_at, contact_email, contact_phone, country_code, credit_balance, credit_limit, logo_path, bank_name, bank_account_name, bank_account_number, bank_branch, bank_swift_code, about, website, address)"
+      "id, agency_id, role_in_agency, username, created_at, agencies(id, agent_code, name, legal_name, registration_number, status, commission_rate, commission_rate_set_at, contact_email, contact_phone, country_code, credit_balance, credit_limit, logo_path, bank_name, bank_account_name, bank_account_number, bank_branch, bank_swift_code, about, website, address)"
     )
     .eq("profile_id", profileId)
     .eq("status", "active")
@@ -151,9 +151,17 @@ export const getMyAgency = cache(async (profileId: string) => {
     agency: membership.agencies,
     roleInAgency: membership.role_in_agency,
     memberId: membership.id,
+    joinedAt: membership.created_at,
     username: membership.username,
   };
 });
+
+/** Only the blocked-access layout opts into reading suspended agency details. */
+export async function getMyAgency(profileId: string, includeSuspended = false) {
+  const membership = await loadMyAgency(profileId);
+  if (!includeSuspended && membership?.agency.status === "suspended") return null;
+  return membership;
+}
 
 /** Wallet snapshot + transaction history for the agent portal. */
 export async function getAgencyWallet(agencyId: string) {

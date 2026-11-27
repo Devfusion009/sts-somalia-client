@@ -34,7 +34,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
   // every membership row they were actually granted — gating on role alone
   // would incorrectly lock them out of programs they still belong to.
   const profile = await requireUserForPortal("agent");
-  const membership = await getMyAgency(profile.id);
+  const membership = await getMyAgency(profile.id, true);
 
   if (!membership) {
     return (
@@ -60,7 +60,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
   // the Partner Management Console's suspend/offboard transitions flip
   // agencies.status, and this is where that bites.
   if (membership.agency.status === "suspended") {
-    return <PortalSuspendedNotice portalLabel="Agent Portal" />;
+    return <PortalSuspendedNotice portalLabel="Agent Portal" agencyName={membership.agency.name} agentCode={profile.agent_code ?? membership.agency.agent_code} />;
   }
 
   // Account discovery is optional shell content; it must not block bookings or the wallet.

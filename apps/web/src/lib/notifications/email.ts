@@ -2,7 +2,7 @@ import "server-only";
 import nodemailer, { type Transporter } from "nodemailer";
 import { getIntegrations } from "@/lib/integrations";
 import { getSocialLinks } from "@/lib/site-settings";
-import { SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/social-platforms";
+import { SOCIAL_PLATFORMS } from "@/lib/social-platforms";
 import { SOCIAL_SLOT, socialBadge, wrapEmailHtml } from "./email-layout";
 
 /**
@@ -69,15 +69,6 @@ function smtp(): Transporter {
   return smtpTransport;
 }
 
-const SOCIAL_SHORT: Record<SocialPlatform, string> = {
-  instagram: "IG",
-  tiktok: "TT",
-  facebook: "f",
-  x: "X",
-  youtube: "YT",
-  linkedin: "in",
-};
-
 /**
  * Every message leaves in the branded frame: bare HTML fragments are wrapped,
  * and the footer's social slot gets the links an admin set in Site settings.
@@ -87,7 +78,7 @@ async function finishHtml(subject: string, html: string): Promise<string> {
   if (!framed.includes(SOCIAL_SLOT)) return framed;
   const links = await getSocialLinks().catch(() => []);
   const badges = links
-    .map((link) => socialBadge({ label: SOCIAL_PLATFORMS[link.platform].label, short: SOCIAL_SHORT[link.platform], href: link.url }))
+    .map((link) => socialBadge({ label: SOCIAL_PLATFORMS[link.platform].label, icon: link.platform, href: link.url }))
     .join("");
   return framed.replace(SOCIAL_SLOT, badges);
 }

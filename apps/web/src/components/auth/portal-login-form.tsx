@@ -8,6 +8,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { SubmitButton } from "@/components/submit-button";
 import type { ActionState } from "@/lib/auth/actions";
 import { useRestoreOnError } from "@/lib/use-restore-on-error";
+import { rootOrigin } from "@/lib/subdomain";
 import { DemoLoginButton } from "@/modules/demo/demo-login-button";
 import { AUTH_CONTROL, AuthCard } from "./auth-frame";
 
@@ -99,7 +100,7 @@ export function PortalLoginForm({
 }
 
 /** "Password" label with the forgot-password link on the right. */
-export function PasswordLabelRow({ forgotHref = "/forgot-password" }: { forgotHref?: string }) {
+export function PasswordLabelRow({ forgotHref = `${rootOrigin()}/forgot-password` }: { forgotHref?: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <FieldLabel htmlFor="password">Password</FieldLabel>
