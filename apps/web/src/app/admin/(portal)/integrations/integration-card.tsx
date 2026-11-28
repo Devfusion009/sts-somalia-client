@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useOptimistic, useState, useTransition } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { CheckCircle2, XCircle, ExternalLink, Trash2, ChevronDown } from "lucide-react";
@@ -32,9 +31,9 @@ import {
   setIntegrationActive,
   deleteIntegrationCredentials,
   testIntegrationConnection,
-  setupWaafiWebhook,
 } from "@/modules/admin/integrations/actions";
 import { CustomPartnerConfigForm } from "./custom-partner-config-form";
+import { WaafiSetupCard } from "./waafi-setup-card";
 
 /**
  * The card's headline state. Derived rather than stored: "live" is the
@@ -52,12 +51,15 @@ const PHASE_STYLE: Record<Phase, { label: string; variant: BadgeVariant }> = {
 };
 
 export function IntegrationCard({ status }: { status: IntegrationStatus }) {
+  return status.provider.key === "waafi" ? <WaafiSetupCard status={status} /> : <ProviderIntegrationCard status={status} />;
+}
+
+function ProviderIntegrationCard({ status }: { status: IntegrationStatus }) {
   const { provider } = status;
   const [saveState, saveAction] = useActionState(saveIntegrationCredentials, null);
   const [isActive, setIsActive] = useOptimistic(status.isActive);
   const [pending, startTransition] = useTransition();
   const [testing, startTest] = useTransition();
-  const [registering, startRegister] = useTransition();
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(
     status.lastTestOk === null ? null : { ok: status.lastTestOk, message: status.lastTestMessage ?? "" }
   );
@@ -121,7 +123,7 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
             <Switch
               id={`active-${provider.key}`}
               checked={isActive}
-              disabled={!status.hasCredentials || pending || registering}
+              disabled={!status.hasCredentials || pending}
               onCheckedChange={toggleActive}
             />
           </div>
@@ -152,8 +154,6 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
         {provider.capabilities && <div className="flex flex-wrap gap-2" aria-label="Supported capabilities">
           {provider.capabilities.map((capability) => <Badge key={capability} variant="outline">{capability}</Badge>)}
         </div>}
-
-        {provider.key === "waafi" && <Link href="/admin/finance/payments/sandbox" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm font-medium text-amber-900">Open sandbox test desk <ExternalLink className="size-3.5" aria-hidden="true" /></Link>}
 
         <details className="group/credentials" open={!status.hasCredentials}>
           <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
@@ -246,18 +246,12 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
               size="sm"
               variant="outline"
               loading={testing}
-              disabled={!status.hasCredentials || pending || registering}
+              disabled={!status.hasCredentials || pending}
               onClick={runTest}
             >
               Test connection
             </Button>
-            {provider.key === "waafi" ? (
-              <Button type="button" size="sm" variant="outline" loading={registering} disabled={!status.hasCredentials || pending || testing || registering}
-                onClick={() => startRegister(async () => { setTestResult(await setupWaafiWebhook()); })}>
-                Register webhook
-              </Button>
-            ) : null}
-            <SubmitButton size="sm" pendingText="Saving…" disabled={testing || registering || pending}>
+            <SubmitButton size="sm" pendingText="Saving…" disabled={testing || pending}>
               {status.hasCredentials ? "Replace credentials" : "Save credentials"}
             </SubmitButton>
           </div>

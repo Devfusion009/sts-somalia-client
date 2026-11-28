@@ -53,10 +53,35 @@ production checkout continues to reject sandbox credentials.
 
 ## Setup and release
 
+### Admin setup after merchant approval
+
+An STS platform admin can complete setup at **Administration → Integrations →
+Payments → WaafiPay**, without changing server environment variables:
+
+1. **Save live merchant credentials**: enter the production Merchant UID, API user
+   ID, API key, Store ID and HPP key supplied by WaafiPay. Existing credentials can
+   be replaced after pausing new payments. Saved secret values are never sent
+   back to the browser. The deployment selects its gateway environment.
+2. **Verify and set up notifications**: authenticate, register the site's default
+   notification endpoint when none exists, encrypt its signing key, then check
+   the payment database and API. Existing external webhook registrations are
+   not replaced. An existing signing key can be entered in the advanced field.
+3. **Activate live payments**: review the merchant and store, then confirm. The
+   server repeats the checks and atomically matches the tested credentials.
+   Verification alone never activates payments or creates a charge.
+4. Complete a small real payment yourself and verify its receipt in the STS
+   merchant account and payment record before accepting customer payments.
+
+**Pause new payments** preserves the saved merchant and in-flight confirmation
+path. Replacing credentials clears the previous verification. The sandbox test
+desk remains a separate configuration and cannot activate live checkout.
+
+### Infrastructure prerequisites
+
 1. Disable new WaafiPay payments and reconcile any legacy in-flight WaafiPay records before the cutover; do not fabricate receipts for old records. Apply `supabase/migrations/20261109000001_waafi_payment_reliability.sql` to QA first. It adds payment-attempt reservations, transaction receipts, webhook receipts, and atomic settlement functions. Deploy the web and API changes together.
-2. In Admin → Integrations → WaafiPay, select Sandbox for QA and enter credentials issued for the sandbox merchant. Saving credentials disables the gateway until it is checked again. Existing in-flight payments must be resolved before changing the merchant, store or environment, or removing saved credentials. Keys for the same merchant/store may be repaired or rotated while confirmations remain pending. Disabling new payments preserves confirmations for already-started attempts.
-3. Test the connection. This performs `WEBHOOK_LIST`; it never makes a test charge. Authentication failure remains a failure and cannot be activated.
-4. Register the webhook. The web app registers `https://<site-origin>/api/payments/waafi/webhook`, stores WaafiPay's signing secret encrypted, and forwards signed requests without changing raw bytes to the API. The direct API endpoint is `/payments/waafi/webhook`.
+2. In Admin → Integrations → WaafiPay, enter credentials issued for the deployment’s environment. Saving credentials disables the gateway until it is checked again. Existing in-flight payments must be resolved before changing the merchant, store or environment, or removing saved credentials. Keys for the same merchant/store may be repaired or rotated while confirmations remain pending. Disabling new payments preserves confirmations for already-started attempts.
+3. Verify setup. Authentication uses `WEBHOOK_LIST`; it never makes a test charge. Authentication failure remains a failure and cannot be activated.
+4. The setup action registers the webhook when none exists. The web app registers `https://<site-origin>/api/payments/waafi/webhook`, stores WaafiPay's signing secret encrypted, and forwards signed requests without changing raw bytes to the API. The direct API endpoint is `/payments/waafi/webhook`.
 5. If a merchant already has a webhook, review its destination in WaafiPay. The app will not overwrite another application or rotate its secret automatically. For the same existing URL, save its existing signing secret. If the secret was lost during an interrupted registration, recover/rotate it through the provider before enabling the gateway.
 6. Enable WaafiPay. Activation checks HTTPS, the environment, a successful connection test, a signing secret, the database migration, and whether the API can decrypt the same saved credentials as the web app. Failed setup leaves payments disabled with an admin error.
 7. Complete a small sandbox order payment and a wallet top-up using the provider's sandbox test accounts. Verify the order/invoice, wallet ledger, gateway transaction reference, and webhook receipt. Repeat a return and delivery: the wallet must still be credited once.

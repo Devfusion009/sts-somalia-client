@@ -17,6 +17,8 @@ import { testCustomPartnerConfig } from "@/modules/visa/partner/adapters/custom"
 import type { ActionState } from "@/lib/auth/actions";
 
 import { waafiSetupError, registerWaafiWebhook, verifyWaafiWebhook } from "./waafi-setup";
+import { waafiCredentialRevision } from "./waafi-state";
+import { resolveWaafiConfig } from "@sts/shared-types/dist/waafi-server";
 
 const PATH = "/admin/integrations";
 
@@ -86,6 +88,10 @@ export async function saveIntegrationCredentials(_prev: ActionState, formData: F
     return { error: "Enter a numeric Store ID." };
   }
   if (!process.env.INTEGRATIONS_ENCRYPTION_KEY) return { error: "Credential storage is not configured." };
+  if (provider.key === "waafi") {
+    if (!credentials.store_id || !credentials.hpp_key) return { error: "Enter the Store ID and HPP key." };
+    if (!resolveWaafiConfig(credentials, process.env)) return { error: "Use WaafiPay credentials for this site's environment." };
+  }
   if (provider.key === "waafi") {
     const db = await createClient();
     const { data: old, error: readError } = await db.from("platform_api_integrations").select("credentials_encrypted").eq("provider_key", "waafi").maybeSingle();
@@ -196,7 +202,7 @@ export async function saveCustomPartnerConfig(_prev: ActionState, formData: Form
   return { error: null };
 }
 
-export async function setIntegrationActive(providerKey: string, isActive: boolean): Promise<{ error: string | null }> {
+export async function setIntegrationActive(providerKey: string, isActive: boolean, expectedRevision?: string): Promise<{ error: string | null }> {
   await requirePlatformAdmin();
   const provider = getProvider(providerKey);
   if (!provider) return { error: "Unknown provider." };
@@ -210,6 +216,9 @@ export async function setIntegrationActive(providerKey: string, isActive: boolea
       .maybeSingle();
     if (readError) return { error: "Provider configuration could not be read." };
     if (!data?.credentials_encrypted) return { error: "Save credentials before enabling this provider." };
+    if (providerKey === "waafi" && expectedRevision && waafiCredentialRevision(data.credentials_encrypted) !== expectedRevision) {
+      return { error: "Credentials changed. Reload and verify setup again." };
+    }
     if (!data.last_test_ok) return { error: "Test the connection before enabling this provider." };
     if (provider.category === "flights") {
       try {
@@ -218,21 +227,8 @@ export async function setIntegrationActive(providerKey: string, isActive: boolea
       } catch { return { error: "The booking API is unavailable." }; }
     }
     if (providerKey === "waafi") {
-      let credentials: Record<string, string>;
-      try { credentials = decryptCredentials(data.credentials_encrypted); }
-      catch { return { error: "The server cannot read the saved credentials." }; }
-      const invalid = waafiSetupError(credentials);
+      const invalid = await waafiActivationError(data.credentials_encrypted);
       if (invalid) return { error: invalid };
-      if (!credentials.webhook_secret) return { error: "Register the WaafiPay webhook before enabling payments." };
-      const webhook = await verifyWaafiWebhook(credentials);
-      if (webhook.error) return { error: webhook.error };
-      const { error: schemaError } = await createAdminClient().from("waafi_payment_attempts").select("reference_id").limit(1);
-      if (schemaError) return { error: "Apply the WaafiPay database migration before enabling payments." };
-      try {
-        const trpc = await getServerTrpcForActions();
-        const readiness = await trpc.payments.admin.waafiReadiness.query();
-        if (!readiness.ready) return { error: readiness.message ?? "The payment API is not configured." };
-      } catch { return { error: "The payment API is unavailable." }; }
     }
     const { error } = await supabase.rpc("activate_platform_integration", {
       p_provider_key: providerKey, p_credentials_encrypted: data.credentials_encrypted,
@@ -244,6 +240,73 @@ export async function setIntegrationActive(providerKey: string, isActive: boolea
   }
   revalidatePath(PATH);
   return { error: null };
+}
+
+async function waafiActivationError(encrypted: string): Promise<string | null> {
+  let credentials: Record<string, string>;
+  try { credentials = decryptCredentials(encrypted); }
+  catch { return "The server cannot read the saved credentials."; }
+  const invalid = waafiSetupError(credentials);
+  if (invalid) return invalid;
+  if (!credentials.webhook_secret) return "Set up payment notifications before activation.";
+  const webhook = await verifyWaafiWebhook(credentials);
+  if (webhook.error) return webhook.error;
+  const { error: schemaError } = await createAdminClient().from("waafi_payment_attempts").select("reference_id").limit(1);
+  if (schemaError) return "The WaafiPay database migration is missing. Contact your platform administrator.";
+  try {
+    const readiness = await (await getServerTrpcForActions()).payments.admin.waafiReadiness.query();
+    return readiness.ready ? null : readiness.message ?? "The payment API is not configured.";
+  } catch { return "The payment API is unavailable."; }
+}
+
+/** Verifies setup and saves the provider-issued notification secret; never activates payments. */
+export async function prepareWaafiPayments(expectedRevision: string): Promise<{ ok: boolean; message: string }> {
+  await requirePlatformAdmin();
+  const db = await createClient();
+  const { data: row, error: readError } = await db.from("platform_api_integrations")
+    .select("credentials_encrypted,is_active,config").eq("provider_key", "waafi").maybeSingle();
+  if (readError || !row?.credentials_encrypted) return { ok: false, message: "Save credentials before verifying setup." };
+  if (row.is_active) return { ok: false, message: "Pause payments before changing setup." };
+  if (waafiCredentialRevision(row.credentials_encrypted) !== expectedRevision) return { ok: false, message: "Credentials changed. Reload and verify setup again." };
+  let credentials: Record<string, string>;
+  try { credentials = decryptCredentials(row.credentials_encrypted); }
+  catch { return { ok: false, message: "The server cannot read the saved credentials." }; }
+  const invalid = waafiSetupError(credentials);
+  if (invalid) return { ok: false, message: invalid };
+  const baseConfig = { ...(row.config as Record<string, unknown> ?? {}), waafi_setup: null };
+  const { data: reserved, error: reserveError } = await db.from("platform_api_integrations").update({
+    config: baseConfig, last_test_ok: null, last_tested_at: null, last_test_message: null,
+  }).eq("provider_key", "waafi").eq("credentials_encrypted", row.credentials_encrypted).eq("is_active", false).select("id");
+  if (reserveError || !reserved?.length) return { ok: false, message: "Credentials changed. Reload and verify setup again." };
+  revalidatePath(PATH);
+  const test = await testWaafiConnection(credentials);
+  if (!test.ok) {
+    await db.from("platform_api_integrations").update({ last_test_ok: false, last_tested_at: new Date().toISOString(), last_test_message: test.message })
+      .eq("provider_key", "waafi").eq("credentials_encrypted", row.credentials_encrypted);
+    revalidatePath(PATH);
+    return test;
+  }
+  const webhook = await registerWaafiWebhook(credentials);
+  if (webhook.error) return { ok: false, message: webhook.error };
+  let encrypted = row.credentials_encrypted;
+  if (webhook.secret) {
+    try { encrypted = encryptCredentials({ ...credentials, webhook_secret: webhook.secret }); }
+    catch { return { ok: false, message: "Payment notifications were registered, but their signing key could not be saved." }; }
+    const { data, error } = await db.from("platform_api_integrations").update({ credentials_encrypted: encrypted })
+      .eq("provider_key", "waafi").eq("credentials_encrypted", row.credentials_encrypted).eq("is_active", false).select("id");
+    if (error || !data?.length) return { ok: false, message: "Payment notifications were registered, but their signing key could not be saved. Recover it with WaafiPay before retrying." };
+  }
+  const readinessError = await waafiActivationError(encrypted);
+  revalidatePath(PATH); // A saved signing key must remain visible even if API verification fails.
+  if (readinessError) return { ok: false, message: readinessError };
+  const verifiedAt = new Date().toISOString();
+  const config = { ...baseConfig, waafi_setup: { revision: waafiCredentialRevision(encrypted), verifiedAt } };
+  const { data, error } = await db.from("platform_api_integrations").update({
+    config, last_test_ok: true, last_tested_at: verifiedAt, last_test_message: "WaafiPay setup verified.",
+  }).eq("provider_key", "waafi").eq("credentials_encrypted", encrypted).eq("is_active", false).select("id");
+  if (error || !data?.length) return { ok: false, message: "Credentials changed. Reload and verify setup again." };
+  revalidatePath(PATH);
+  return { ok: true, message: "WaafiPay setup verified. Payments remain off." };
 }
 
 export async function deleteIntegrationCredentials(providerKey: string): Promise<{ error: string | null }> {
