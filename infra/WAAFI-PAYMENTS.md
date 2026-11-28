@@ -23,6 +23,30 @@ Both sites need public HTTPS domains. The existing HTTP-only QA address can disp
 
 Optional environment-only provisioning uses `WAAFI_MERCHANT_UID`, `WAAFI_API_USER_ID`, `WAAFI_API_KEY`, `WAAFI_STORE_ID`, `WAAFI_HPP_KEY`, and `WAAFI_WEBHOOK_SECRET`. A complete saved admin configuration takes precedence; disabled or unreadable saved credentials never fall back to another merchant's environment credentials. `WAAFI_API_URL`, if present, must exactly match that environment's official endpoint.
 
+## Admin-only sandbox desk on the production website
+
+Admin → Integrations → WaafiPay → Open sandbox test desk provides an isolated
+HPP test flow, including on the production domain. It always uses
+`https://sandbox.waafipay.com/asm` and the documented test wallet numbers.
+
+The desk saves encrypted credentials under `waafi_sandbox_test`, with
+`is_active=false`; the live `waafi` integration is never changed. Attempts
+use per-admin `SBX-` references and encrypted credential snapshots in
+project-scoped Redis with a one-hour expiry. If Redis is unavailable, the
+request fails before gateway initiation. Repeated submissions use the same
+reservation instead of starting another checkout.
+
+The HTTPS return page verifies the reference, amount, currency and final
+transaction status through `HPP_GETTRANINFO`. It ignores provider callback
+claims and never registers a merchant webhook. No order, booking, wallet,
+payment settlement or accounting write is part of this test path. Success
+is labelled **Sandbox test approved**, never a real payment receipt.
+
+The HTTP-only QA site can render the desk and validate credentials but cannot
+launch hosted checkout; complete the isolated HPP test on an HTTPS domain.
+No sandbox credential or test PIN belongs in source control. The normal
+production checkout continues to reject sandbox credentials.
+
 ## Setup and release
 
 1. Disable new WaafiPay payments and reconcile any legacy in-flight WaafiPay records before the cutover; do not fabricate receipts for old records. Apply `supabase/migrations/20261109000001_waafi_payment_reliability.sql` to QA first. It adds payment-attempt reservations, transaction receipts, webhook receipts, and atomic settlement functions. Deploy the web and API changes together.
