@@ -61,7 +61,7 @@ test('missing encryption returns a clear error without database writes', async (
     '@/lib/supabase/admin': {}, '@/lib/auth/session': { requirePlatformAdmin: async () => ({}) },
     '@/lib/integrations-crypto': {}, '@/lib/provider-catalog': { getProvider: () => ({ key: 'waafi', credentialFields: [{ key: 'merchant_uid' }] }) },
     '@/lib/provider-runtime/payments-test': {}, '@/lib/provider-runtime/duffel': {}, '@/lib/provider-runtime/hotelbeds': {},
-    '@/lib/provider-runtime/visa-check': {}, '@/modules/visa/partner/adapters/custom': {}, './waafi-setup': {},
+    '@/lib/provider-runtime/visa-check': {}, '@/modules/visa/partner/adapters/custom': {}, './waafi-setup': {}, './waafi-state': {},
   });
   const original = process.env.INTEGRATIONS_ENCRYPTION_KEY;
   delete process.env.INTEGRATIONS_ENCRYPTION_KEY;

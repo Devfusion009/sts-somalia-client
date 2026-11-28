@@ -39,9 +39,9 @@ function ProviderList({ integrations }: { integrations: IntegrationStatus[] }) {
   return (
     <div className={styles.providerGrid}>
       {integrations.map((status) => (
-        // Keyed on the active flag so a switch flipped by another card (card
-        // processors are mutually exclusive) remounts with the saved state.
-        <IntegrationCard key={`${status.provider.key}-${status.isActive}-${status.lastTestedAt ?? "untested"}`} status={status} />
+        // Generic switches remount when another provider changes them. WaafiPay
+        // derives its state from props and keeps action errors across refreshes.
+        <IntegrationCard key={status.provider.key === "waafi" ? "waafi" : `${status.provider.key}-${status.isActive}-${status.lastTestedAt ?? "untested"}`} status={status} />
       ))}
     </div>
   );
