@@ -87,7 +87,7 @@ export function WaafiSetupCard({ status }: { status: IntegrationStatus }) {
             <summary className="flex min-h-9 cursor-pointer items-center justify-between gap-3 rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               {status.hasCredentials ? "Replace credentials" : "Merchant credentials"}<ChevronDown className="size-4 transition-transform group-open/waafi:rotate-180" aria-hidden />
             </summary>
-            <form action={saveAction} autoComplete="off" className="space-y-4 pt-4" key={setup?.revision || "empty"}>
+            <form action={saveAction} onSubmit={() => setResult(null)} autoComplete="off" className="space-y-4 pt-4" key={setup?.revision || "empty"}>
               <input type="hidden" name="providerKey" value="waafi" />
               <input type="hidden" name="environment" value={setup?.environment ?? "sandbox"} />
               <fieldset disabled={busy || status.isActive} className="grid gap-4 sm:grid-cols-2">
