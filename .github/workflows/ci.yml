@@ -102,8 +102,8 @@ jobs:
       - name: Agent onboarding, suspension and recovery regression tests
         run: node --test apps/web/test/agent-portal-guide.test.cjs apps/web/test/partner-suspension.test.cjs apps/web/test/portal-password-link.test.cjs
 
-      - name: Isolated WaafiPay sandbox regression tests
-        run: node --test apps/web/test/waafi-sandbox-desk.test.cjs apps/web/test/waafi-topup.test.cjs
+      - name: WaafiPay admin setup and sandbox regression tests
+        run: node --test apps/web/test/waafi-admin-setup.test.cjs apps/web/test/waafi-sandbox-desk.test.cjs apps/web/test/waafi-topup.test.cjs apps/api/test/integration-configuration.test.cjs
 
       - name: Agent credential delivery and SMTP retry tests
         run: node --test apps/web/test/agent-credentials.test.cjs apps/web/test/smtp-capture.test.cjs
