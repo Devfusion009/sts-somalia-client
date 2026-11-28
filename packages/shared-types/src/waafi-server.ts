@@ -74,6 +74,8 @@ export type WaafiAttemptStore = {
 };
 export type WaafiCharge = {
   referenceId: string; amount: number; currency: string; description: string;
+  /** Optional protocol UUID when the merchant reference uses a readable prefix. */
+  requestId?: string;
   payerPhone?: string; successUrl: string; cancelUrl: string;
 };
 
@@ -102,7 +104,7 @@ export async function chargeWaafi(input: WaafiCharge, gateway: WaafiConfig, stor
     const response = await fetch(gateway.apiUrl, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        schemaVersion: "1.0", requestId: input.referenceId, timestamp: new Date().toISOString(), channelName: "WEB",
+        schemaVersion: "1.0", requestId: input.requestId ?? input.referenceId, timestamp: new Date().toISOString(), channelName: "WEB",
         serviceName: hosted ? "HPP_PURCHASE" : "API_PURCHASE",
         serviceParams: {
           merchantUid: gateway.merchantUid,

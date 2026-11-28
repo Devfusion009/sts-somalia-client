@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useOptimistic, useState, useTransition } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { CheckCircle2, XCircle, ExternalLink, Trash2, ChevronDown } from "lucide-react";
@@ -151,6 +152,8 @@ export function IntegrationCard({ status }: { status: IntegrationStatus }) {
         {provider.capabilities && <div className="flex flex-wrap gap-2" aria-label="Supported capabilities">
           {provider.capabilities.map((capability) => <Badge key={capability} variant="outline">{capability}</Badge>)}
         </div>}
+
+        {provider.key === "waafi" && <Link href="/admin/finance/payments/sandbox" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm font-medium text-amber-900">Open sandbox test desk <ExternalLink className="size-3.5" aria-hidden="true" /></Link>}
 
         <details className="group/credentials" open={!status.hasCredentials}>
           <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
