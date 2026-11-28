@@ -98,3 +98,20 @@ test('unidentified published sites and local development cannot select the live 
   assert.equal(resolveWaafiConfig(creds, { NEXT_PUBLIC_SITE_URL: 'https://qa.example.test' }), null);
   assert.equal(resolveWaafiConfig({ ...creds, environment: 'production' }, { DEPLOYMENT_ENV: 'development' }), null);
 });
+
+test('a sandbox merchant reference may use a separate protocol request UUID', async t => {
+  let body;
+  t.mock.method(global, 'fetch', async (_url, options) => {
+    body = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ responseCode: '2001', params: { hppUrl: 'https://sandbox.waafipay.com/hpp/token/test' } }) };
+  });
+  const protocol = await import('../dist/waafi-server.js');
+  const requestId = '10000000-0000-4000-8000-000000000001';
+  const referenceId = 'SBX-20000000-0000-4000-8000-000000000001';
+  const result = await protocol.chargeWaafi({ requestId, referenceId, amount: 1, currency: 'USD', description: 'Sandbox test', payerPhone: '252611111111', successUrl: 'https://admin.example.test/sandbox', cancelUrl: 'https://admin.example.test/sandbox' }, {
+    apiUrl: protocol.WAAFI_ENDPOINTS.sandbox, environment: 'sandbox', merchantUid: 'TEST', apiUserId: 'test', apiKey: 'test', webhookSecret: null, hpp: { storeId: '12345', hppKey: 'test' },
+  }, { begin: async () => ({ claimed: true }), save: async () => {} });
+  assert.equal(result.type, 'redirect');
+  assert.equal(body.requestId, requestId);
+  assert.equal(body.serviceParams.transactionInfo.referenceId, referenceId);
+});
