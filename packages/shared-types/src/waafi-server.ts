@@ -157,9 +157,14 @@ export async function queryWaafiTransaction(referenceId: string, gateway: WaafiC
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) return null;
-    const body = await response.json() as { responseCode?: string; params?: { referenceId?: string; transactionId?: string; amount?: string | number; currency?: string; status?: string } };
+    const body = await response.json() as { responseCode?: string; params?: { referenceId?: string; invoiceId?: string; transactionId?: string; amount?: string | number; currency?: string; status?: string } };
     const tx = body.params;
-    if (body.responseCode !== "2001" || tx?.referenceId !== referenceId || tx.amount == null || !Number.isFinite(Number(tx.amount)) || !tx.currency || !tx.status) return null;
+    // Some HPP responses return the merchant reference only as invoiceId.
+    // Never use a callback claim or accept conflicting identifiers.
+    const returnedReference = tx?.referenceId ?? tx?.invoiceId;
+    if (body.responseCode !== "2001" || returnedReference !== referenceId ||
+      (tx?.referenceId != null && tx.invoiceId != null && tx.referenceId !== tx.invoiceId) ||
+      tx?.amount == null || !Number.isFinite(Number(tx.amount)) || !tx.currency || !tx.status) return null;
     return { referenceId, transactionId: tx.transactionId ?? "", amount: Number(tx.amount), currency: tx.currency.toUpperCase(), status: tx.status.toUpperCase() };
   } catch { return null; }
 }
