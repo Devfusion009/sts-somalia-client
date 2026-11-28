@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { resolveWaafiConfig, validWaafiRedirect, chargeWaafi, verifyWaafiSignature } = require('../dist/waafi-server');
+const { resolveWaafiConfig, validWaafiRedirect, chargeWaafi, queryWaafiTransaction, verifyWaafiSignature } = require('../dist/waafi-server');
 const creds = { environment: 'sandbox', merchant_uid: 'test-merchant', api_user_id: 'test-user', api_key: 'test-api', store_id: '1000000', hpp_key: 'test-hpp', webhook_secret: 'test-signing-secret' };
 const qa = { DEPLOYMENT_ENV: 'qa', NEXT_PUBLIC_SITE_URL: 'https://qa.example.test' };
 const gateway = resolveWaafiConfig(creds, qa, true);
@@ -12,6 +12,35 @@ function store() {
   let claimed = false, result;
   return { async begin() { const first = !claimed; claimed = true; return { claimed: first, result }; }, async save(value) { result = value; } };
 }
+
+for (const identifiers of [
+  { referenceId: input.referenceId },
+  { invoiceId: input.referenceId },
+  { referenceId: input.referenceId, invoiceId: input.referenceId },
+]) test(`inquiry verifies a merchant reference from ${Object.keys(identifiers).join(' and ')}`, async t => {
+  let request;
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    request = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ responseCode: '2001', params: {
+      ...identifiers, transactionId: 'test-transaction', amount: '10.25', currency: 'USD', status: 'Approved',
+    } }) };
+  });
+  assert.deepEqual(await queryWaafiTransaction(input.referenceId, gateway), {
+    referenceId: input.referenceId, transactionId: 'test-transaction', amount: 10.25, currency: 'USD', status: 'APPROVED',
+  });
+  assert.equal(request.serviceName, 'HPP_GETTRANINFO');
+  assert.equal(request.serviceParams.referenceId, input.referenceId);
+});
+for (const identifiers of [
+  {}, { invoiceId: 'another-test' }, { referenceId: 'another-test' },
+  { referenceId: 'another-test', invoiceId: input.referenceId },
+  { referenceId: input.referenceId, invoiceId: 'another-test' },
+]) test(`inquiry rejects missing, wrong or conflicting identifiers: ${JSON.stringify(identifiers)}`, async t => {
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ responseCode: '2001', params: {
+    ...identifiers, transactionId: 'test-transaction', amount: '10.25', currency: 'USD', status: 'Approved',
+  } }) }));
+  assert.equal(await queryWaafiTransaction(input.referenceId, gateway), null);
+});
 
 test('QA and production select only their own environment', () => {
   assert.equal(gateway.apiUrl, 'https://sandbox.waafipay.com/asm');

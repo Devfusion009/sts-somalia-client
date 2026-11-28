@@ -42,6 +42,10 @@ claims and never registers a merchant webhook. No order, booking, wallet,
 payment settlement or accounting write is part of this test path. Success
 is labelled **Sandbox test approved**, never a real payment receipt.
 
+Gateway inquiry responses may identify the merchant reference as `invoiceId`
+instead of `referenceId`. Either must exactly match the saved test reference;
+conflicting identifiers are rejected.
+
 The HTTP-only QA site can render the desk and validate credentials but cannot
 launch hosted checkout; complete the isolated HPP test on an HTTPS domain.
 No sandbox credential or test PIN belongs in source control. The normal
@@ -57,8 +61,6 @@ production checkout continues to reject sandbox credentials.
 6. Enable WaafiPay. Activation checks HTTPS, the environment, a successful connection test, a signing secret, the database migration, and whether the API can decrypt the same saved credentials as the web app. Failed setup leaves payments disabled with an admin error.
 7. Complete a small sandbox order payment and a wallet top-up using the provider's sandbox test accounts. Verify the order/invoice, wallet ledger, gateway transaction reference, and webhook receipt. Repeat a return and delivery: the wallet must still be credited once.
 8. After QA acceptance and explicit approval to promote, apply the same migration to the production database and deploy through the production release flow. Configure the live merchant separately and register the live HTTPS callback. Production must never reuse the sandbox credentials or signing secret.
-
-The credentials supplied during investigation returned authentication error `1001` at the documented sandbox endpoint. WaafiPay must confirm or replace that credential set; code changes cannot establish a successful provider transaction using rejected credentials.
 
 ## Confirmation and recovery
 
